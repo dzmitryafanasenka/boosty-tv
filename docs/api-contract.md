@@ -9,7 +9,7 @@ Status: **draft from reference-code audit.** The reference is BoostBuddy `1.16.0
 | `REF` | Request and fields are used by the shipped BoostBuddy 1.16.0 client (`cm/data/api/BoostyApi.kt`, `PhoneAuthApi.kt`, repositories). This is strong evidence that the endpoint worked for the reference author, but it is **not verified by us**. |
 | `REF-DEAD` | Present in the reference client but not reachable from its UI. |
 | `RE-SPEC` | Listed only in the reference's reverse-engineered `cm/data/api/openapi/boosty-api.yaml` ("extracted from the public web bundle and Android APK; not official"). Treat it as **unverified**. Do not build on it without a live check. |
-| `LIVE` | Verified by this project on a real device or account. First entries: §2.2 phone sign-in (Story 1.3, 2026-10-25). |
+| `LIVE` | Verified by this project on a real device or account. First entries: §2.2 phone sign-in (Story 1.3, 2026-10-25), §2.3 refresh and §2.4 logout (Story 1.4, 2026-10-25). |
 
 Rules:
 - Do not add endpoints that are not listed here.
@@ -109,9 +109,9 @@ Recordings keep only the HTTP status, content type, `Retry-After`, key paths wit
 | Too many confirm attempts | — | not triggered (owner decision) | — | unverified |
 | Captcha demanded | any | **Not observed** in this session (send, 3 resends, wrong and correct confirm) | — | `LIVE` (not observed, not proof of absence) |
 | `expiresIn` units (send) | — | 604800 is either about 10 min in milliseconds or 7 days in seconds | — | **unverified** |
-| `expires_in` units (confirm) | — | 2592000. Seconds per the reference (30 days); the real lifetime is not measured yet (Story 1.4) | — | unverified |
+| `expires_in` units (confirm) | — | 2592000. Seconds per the reference (30 days); the real lifetime is not measured (refresh returns the same value, Story 1.4) | — | unverified |
 
-### 2.3 Token refresh (`REF`)
+### 2.3 Token refresh (`REF`, partly `LIVE`)
 
 `POST /oauth/token/`
 
@@ -124,20 +124,51 @@ Recordings keep only the HTTP status, content type, `Retry-After`, key paths wit
 
 Headers: the web-style set above plus `X-From-Id`.
 
-Response: `{ "access_token", "refresh_token"?, "expires_in"? }`. A new refresh token is stored if one is returned, so rotation is possible but unverified.
+Response: `{ "access_token", "refresh_token"?, "expires_in"? }`. A new refresh token is stored if one is returned. Rotation is `LIVE`-verified (Story 1.4, below): Boosty always returned a new refresh token, and the old one is rejected.
 
 Reference policy, which we will reimplement rather than copy:
 - Single-flight via a mutex.
 - Proactive refresh when less than 300 s remain before expiry.
 - On 401: refresh once and retry the original request once. If refresh fails, surface 401, which leads to the signed-out state.
 
-Unverified: refresh-token lifetime, whether refresh tokens are single-use, the response when the refresh token is revoked, and whether `device_id` must match the id used at sign-in. The cookie flow has no `device_id` at sign-in, yet the reference refreshes those tokens with its own `device_id`.
+Resolved in Story 1.4 (below): refresh tokens are single-use and rotate; a rejected refresh is HTTP 400 `invalid_grant`. Still unverified: refresh-token lifetime, and whether a `device_id` mismatch alone causes the rejection (the live result is ambiguous). The cookie flow has no `device_id` at sign-in, yet the reference refreshes those tokens with its own `device_id`.
 
 An unused leftover in the reference, `BoostyApi.refreshToken`, sends `device_os=android` without headers. It is not used.
+
+#### Live evidence (Story 1.4)
+
+Recorded 2026-10-25 on the pinned Chromecast with Google TV 4K (Android TV 14), release-like build, branch `spike/1-4-refresh-logout`, with the owner's session from Story 1.3. The agent ran each case once with keys injected via adb (owner-approved), reading results from the spike's sanitized log. The spike client (`src/app/spike/refreshCoordinator.ts`) sends the form above with the same web headers as §2.2 plus `X-From-Id`, no `Authorization`, `credentials: 'omit'`. "Corrupted" means the app altered its own stored copy of the token (same length, every alphanumeric character changed); no other token was ever sent.
+
+| Case | Request | Status | Sanitized shape | Level |
+|---|---|---|---|---|
+| Refresh with a valid refresh token | `POST /oauth/token/` | **200** `application/json` | `{access_token: string (len 64), refresh_token: string (len 64), expires_in: number = 2592000}`. Same shape as the phone confirm response. A new access token every time | `LIVE` |
+| Rotation | — | — | **Yes.** All 3 successful refreshes returned a `refresh_token` different from the one sent. Store the new refresh token after every refresh | `LIVE` |
+| Reuse of the previous (rotated-out) refresh token | `POST /oauth/token/` | **400** `application/json` | `{error: string = "invalid_grant", error_description: string (len 29)}`. Refresh tokens are **single-use**. The access token issued by the newer refresh kept working (E1 200) right after the reuse attempt, so the reuse did not revoke the current access token. Whether it revoked the newer *refresh* token is not known (see the `device_id` row) | `LIVE` |
+| Corrupted refresh token ("refresh rejected" signal) | `POST /oauth/token/` | **400** `application/json` | `{error: string = "invalid_grant", error_description: string (len 29)}`. This is the observed rejection signal: **HTTP 400 with `error = invalid_grant`** → «expired». Not 401 | `LIVE` |
+| Refresh with a different `device_id` (random UUIDv4, also in `X-From-Id`), valid-looking current refresh token | `POST /oauth/token/` | **400** | `{error: string = "invalid_grant", error_description: string (len 29)}`, the same shape as an invalid token. E1 with the current access token still returned 200 afterwards. **Ambiguous:** this refresh token had not been used before, but the reuse attempt above had happened earlier in the same session, so the rejection is either a `device_id` binding or a revocation caused by that reuse. Not disambiguated (no extra refresh was sent; each case once) | `LIVE` (ambiguous) |
+| E1 with a corrupted access token | `GET /v1/user/current` | **401** `application/json` | `{error: string = "unauthorized", error_description: string (len 22)}` | `LIVE` |
+| `expires_in` units | — | — | `2592000` on every refresh, as at sign-in. Read as seconds (30 days); the real lifetime was not measured | unverified (units) |
+
+Implementation guidance derived from the live run (for the session stories):
+- Treat refresh **400 `invalid_grant`** as «refresh rejected» → «expired». Keep 5xx, 429, timeouts and transport errors as recoverable with the tokens kept. The exact `error_description` text was not recorded and must not be matched on.
+- Refresh tokens rotate and are single-use: persist the new pair atomically after every successful refresh, and never send a refresh token twice (single-flight). A lost refresh response (for example a timeout after the server answered) can leave the client with a burned refresh token; the next refresh then gets `invalid_grant` and the user must sign in again. This is a known risk of single-use tokens, not a reason to retry the refresh.
+- Always send the install's own `device_id`; a different one is rejected (at least in the circumstances above).
+
+Production refresh-coordinator requirements (from the Story 1.4 review; binding for the session stories):
+- **Rejection signal:** only `400` with `error: "invalid_grant"` means «expired». Any other 4xx/5xx/429/timeout keeps the tokens (the spike predicate was narrowed to match; tests cover 400 other-error, 401 and 403).
+- **Timeouts:** every refresh and API request has a timeout (`AbortController`). A hung refresh must not hold the single-flight promise forever.
+- **Persist before adopt:** refresh tokens are single-use, so the new pair is written to `SecureStore` before it replaces the in-memory session. A failed or throwing save is surfaced as a distinct result, not only a log line.
+- **Burned-token risk:** a 200 that cannot be parsed, or a lost response after the server processed the refresh, has probably consumed the refresh token. Treat these as "session may be lost": keep the current state, but expect `invalid_grant` on the next refresh and show «Войдите снова» calmly, without a loop.
+- **Races:** a session generation guards `signOut`/`reload` against an in-flight refresh. A late rejection never turns «signed-out» into «expired»; a late success after `reload` is persisted or explicitly discarded with a log entry. No null dereference.
+- **Logout order:** clear `SecureStore` first, then the in-memory session. A failed clear is surfaced.
+- **`expires_in` validation:** accept only finite numbers above the 300 s proactive window. Otherwise keep the previous expiry, so that a refresh storm cannot occur.
+- **Reuse detection (open):** whether reusing a rotated-out refresh token revokes the whole token family is unknown. It decides how severe the burned-token case is, and is to be settled together with the `device_id` question on a fresh session.
 
 ### 2.4 Logout
 
 The reference makes **no server call**; it only clears local data. `DELETE /oauth/token` exists only at `RE-SPEC` level and is unverified. Do not depend on it until it is verified live.
+
+`LIVE` (Story 1.4, 2026-10-25, device): local-only logout clears the secure store (read back = empty) and the in-memory session; the install `device_id` is unchanged; a call after logout sends no request. No server call is made, so the server-side session is presumably not revoked: the last refresh token probably stays valid on the server until it expires or is used (not tested).
 
 ## 3. Endpoints used by the reference (`REF`)
 
@@ -271,7 +302,7 @@ Retry policy for Boosty TV (our policy, not the reference's):
 
 ## 8. Unverified items to resolve in the spike
 
-1. The real `expires_in` from phone auth and refresh; refresh-token rotation and lifetime.
+1. The real lifetime behind `expires_in` (2592000 from phone auth and refresh) and the refresh-token lifetime. Rotation and the rejection signal are resolved (§2.3, Story 1.4). Open: whether a `device_id` mismatch alone rejects a refresh.
 2. Phone auth (partly resolved in Story 1.3, see §2.2 "Live evidence"): still open are the expired-challenge shape, the confirm attempt limit, whether captcha can be demanded, the challenge `expiresIn` units, and the exact server resend window (a resend was allowed at 32 s and rejected at 2–5 s).
 3. Minimal required headers (UA, `X-App`, `X-From-Id`) for normal calls and for refresh.
 4. Events (E18): response shape, pagination and the list of event types.
