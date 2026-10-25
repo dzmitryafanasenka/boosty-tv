@@ -5,6 +5,7 @@ import { JsStackCheck } from './spike/JsStackCheck';
 import { KeychainCheck } from './spike/KeychainCheck';
 import { NavigationCheck } from './spike/NavigationCheck';
 import { PhoneAuthCheck } from './spike/PhoneAuthCheck';
+import { PlaybackCheck } from './spike/PlaybackCheck';
 import { QrCheck } from './spike/QrCheck';
 import { SessionRefreshCheck } from './spike/SessionRefreshCheck';
 import { SpikeButton, spikeColors } from './spike/SpikeUi';
@@ -12,8 +13,9 @@ import { VideoCheck } from './spike/VideoCheck';
 import { ZodPluralCheck } from './spike/ZodPluralCheck';
 
 /**
- * Spike menu (spike branches only; never merged). Story 1.5 adds the content
- * shapes check as the first entry, then the Story 1.4 session refresh/logout
+ * Spike menu (spike branches only; never merged). Story 1.6 adds the playback,
+ * expiry and progress check as the first entry, then the Story 1.5 content
+ * shapes check, the Story 1.4 session refresh/logout
  * check and the Story 1.3 phone sign-in;
  * the Story 1.2 library checks follow. Each entry opens one check screen.
  * The menu is also present in the locally signed release-like build, where
@@ -21,6 +23,11 @@ import { ZodPluralCheck } from './spike/ZodPluralCheck';
  */
 
 const CHECKS = [
+  {
+    id: 'playback',
+    label: 'Плеер: доступ, истечение, прогресс',
+    Screen: PlaybackCheck,
+  },
   {
     id: 'contentshapes',
     label: 'Контент: доступ, ошибки, события',
@@ -66,7 +73,7 @@ function App() {
   return (
     <View style={styles.screen}>
       <StatusBar hidden />
-      <Text style={styles.title}>Boosty TV — спайк 1.5</Text>
+      <Text style={styles.title}>Boosty TV — спайк 1.6</Text>
       <Text style={styles.subtitle}>
         {`Проверки на устройстве (${__DEV__ ? 'debug' : 'release'})`}
       </Text>

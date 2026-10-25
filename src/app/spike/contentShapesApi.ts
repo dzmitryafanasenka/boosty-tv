@@ -59,7 +59,7 @@ export const buildFeedRequest = () =>
 export const buildPostRequest = (
   blogUrl: string,
   postId: string,
-  name: 'E8' | 'E8-noauth' | 'E8-missing' = 'E8',
+  name: 'E8' | 'E8-noauth' | 'E8-missing' | 'E8-badtoken' = 'E8',
 ) => get(name, `/v1/blog/${seg(blogUrl)}/post/${seg(postId)}?${NO_COMMENTS}`);
 
 /** E15 `GET /v1/blog/{blogUrl}/video_stream`. */

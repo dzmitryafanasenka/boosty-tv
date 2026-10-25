@@ -121,7 +121,11 @@ export function normalizeSmsCode(raw: string): string | null {
 
 // ------------------------------------------------------------- requests ----
 
-/** Story 1.5 adds the read-only content requests (contentShapesApi.ts). */
+/**
+ * Story 1.5 adds the read-only content requests (contentShapesApi.ts);
+ * Story 1.6 adds the corrupted-Bearer E8 and the E9 progress write
+ * (playbackApi.ts).
+ */
 export type ContentRequestName =
   | 'E1-noauth'
   | 'E2'
@@ -132,6 +136,8 @@ export type ContentRequestName =
   | 'E8'
   | 'E8-noauth'
   | 'E8-missing'
+  | 'E8-badtoken'
+  | 'E9'
   | 'E15'
   | 'E18'
   | 'E18-page2';
