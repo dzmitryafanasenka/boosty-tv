@@ -57,7 +57,7 @@ Focus ids follow `<screen>/<zone>/<id>` with stable content ids, never list indi
 | `home/continue/<videoId>`, `home/feed/<postId>`, `home/feed/retry`, `home/action/filters`, `home/action/refresh` | Главная |
 | `subs/tile/<blogUrl>`, `subs/tile/my-blog` | Подписки |
 | `author/<blogUrl>/action/search \| filters \| reset`, `author/<blogUrl>/live`, `author/<blogUrl>/live/like`, `author/<blogUrl>/live/share`, `author/<blogUrl>/post/<postId>` | Автор |
-| `auth/welcome/signin`, `auth/phone/country`, `auth/phone/number`, `auth/phone/send`, `auth/code/field`, `auth/code/<action>`, `auth/expired/relogin` | Sign-in (A1–A11; `<action>` = `resend`, `change-number`, `new-code`, `retry`) |
+| `auth/welcome/signin`, `auth/phone/country`, `auth/phone/number`, `auth/phone/send`, `auth/phone/back`, `auth/phone/to-welcome`, `auth/code/field`, `auth/code/<action>`, `auth/expired/relogin` | Sign-in (A1–A11; `<action>` = `resend`, `change-number`, `new-code`, `retry`; A9/A10 use `auth/phone/change-number` and `auth/phone/retry`, so they never share an id with A5) |
 | `filters/access/<value>`, `filters/period`, `filters/tag/<tagId>`, `filters/tags/load-more`, `filters/reset`, `filters/period/<preset>`, `filters/period/custom/<from\|to>/<day\|month\|year>`, `filters/period/custom/done` | Filter sheet, period list and stepper |
 | `search/field`, `search/action/filters`, `search/result/<postId>` | Поиск |
 | `post/<postId>/primary`, `post/<postId>/restart`, `post/<postId>/author`, `post/<postId>/video/<videoId>`, `post/<postId>/block/<blockKey>`, `post/<postId>/poll/option/<optionId>`, `post/<postId>/poll/submit`, `post/<postId>/poll/retract` | Пост (`<blockKey>`: see below) |
@@ -106,6 +106,13 @@ No sidebar. Each screen is a trapped stack screen.
 | A11 Session expired | «Войти снова» | — | → A2 with the stored phone (initial focus «Получить код») | Exit the app | After re-login with the same account id → Главная with its saved state; with a different account → Главная fresh |
 
 Phone-field rules: the country code is editable, defaults to `+7`, and accepts any E.164 country code (owner uses `+375`). Validity is E.164, not a fixed digit count (the design map's «10 цифр» is superseded).
+
+Implementation notes (Story 2.2, device-verified by adb unless noted):
+- A2 routing uses two `TVFocusGuideView` destinations: the field row → the number field, the button row → «Получить код». So ↓ from either field lands on «Получить код» and ↑ from either button on the number, whatever the geometry. Inside a row, focus moves natively.
+- Moving focus to a text field (initial focus, after «Готово», after A4, on return to A2) calls `requestTVFocus()` on the field's non-collapsable host view, which focuses the input natively **without** opening the IME. `TextInput.focus()` is never used for this: it opens the keyboard.
+- Every return to A1 or A2 (Back, «Назад», «Изменить номер») focuses the target explicitly when the route regains focus.
+- Until Story 2.3 adds the code field, minimal A5 has one focusable element, «Изменить номер» (`auth/code/change-number`), with initial focus, so focus never stays on the covered A2 (host tests only; no send on the device in Story 2.2).
+- A9 also offers «На первый экран» (`auth/phone/to-welcome`, → A1), as in the mock. A10 hides «Попробовать снова» after its one retry; focus then goes to «Изменить номер» (host tests only).
 
 ## 3. Shell: sidebar and sections
 

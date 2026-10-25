@@ -1,7 +1,15 @@
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Screen } from '../../shared/focus';
 import { t } from '../../shared/i18n';
-import { Button, Text, spacing } from '../../shared/ui';
+import {
+  Button,
+  Text,
+  requestHostFocus,
+  spacing,
+  type HostView,
+} from '../../shared/ui';
 
 /** Focus id (docs/focus-map.md §1.5) of the only focusable element. */
 export const WELCOME_SIGN_IN_ID = 'auth/welcome/signin';
@@ -9,12 +17,27 @@ export const WELCOME_SIGN_IN_ID = 'auth/welcome/signin';
 const COLUMN_WIDTH = 440;
 const COLUMN_TOP = 150;
 
+export type WelcomeScreenProps = {
+  /** OK on «Войти в Boosty»: open A2. */
+  onSignIn: () => void;
+};
+
 /**
  * A1 Welcome (docs/focus-map.md §2). One focusable element, «Войти в
- * Boosty», with initial focus. OK does nothing until A2 lands (Story 2.2).
+ * Boosty», with initial focus; OK opens A2. Whenever A1 becomes the focused
+ * route again (Back from A2), focus is put back on the button explicitly:
+ * Android's post-pop fallback focus is never relied on (ADR 0007).
  * Back is not intercepted, so Android exits the app.
  */
-export function WelcomeScreen() {
+export function WelcomeScreen({ onSignIn }: WelcomeScreenProps) {
+  const signInRef = useRef<HostView>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      requestHostFocus(signInRef.current);
+    }, []),
+  );
+
   return (
     <Screen testID="auth/welcome">
       <View style={styles.columnSlot}>
@@ -29,8 +52,10 @@ export function WelcomeScreen() {
             {t('welcome.body')}
           </Text>
           <Button
+            ref={signInRef}
             testID={WELCOME_SIGN_IN_ID}
             label={t('welcome.signIn')}
+            onPress={onSignIn}
             hasTVPreferredFocus
             style={styles.button}
           />

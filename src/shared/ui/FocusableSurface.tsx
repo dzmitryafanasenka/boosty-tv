@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ComponentRef,
+  type ReactNode,
+  type Ref,
+} from 'react';
 import {
   Animated,
   Pressable,
@@ -14,6 +21,9 @@ import {
 import { toEasing } from './motion';
 import { colors, focus, motion } from './tokens';
 import { useReducedMotion } from './useReducedMotion';
+
+/** Instance of a host `View` (has `requestTVFocus()` on TV). */
+export type HostView = ComponentRef<typeof View>;
 
 export type SurfaceState = {
   focused: boolean;
@@ -35,6 +45,8 @@ export type FocusableSurfaceProps = Omit<
   /** Surface style per state: size, padding, background (the focus lift). */
   surfaceStyle?: (state: SurfaceState) => StyleProp<ViewStyle>;
   children?: ReactNode | ((state: SurfaceState) => ReactNode);
+  /** The focusable host view (for `requestTVFocus()` and focus guides). */
+  ref?: Ref<HostView>;
 };
 
 const RING_WIDTH = focus['ring-width'];
@@ -62,6 +74,7 @@ export function FocusableSurface({
   onBlur,
   onPressIn,
   onPressOut,
+  ref,
   ...pressableProps
 }: FocusableSurfaceProps) {
   const reducedMotion = useReducedMotion();
@@ -102,6 +115,7 @@ export function FocusableSurface({
   return (
     <Pressable
       {...pressableProps}
+      ref={ref}
       testID={testID}
       disabled={disabled}
       focusable={!disabled}

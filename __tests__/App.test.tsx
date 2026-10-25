@@ -28,19 +28,7 @@ test('renders A1 Welcome with one focusable, initially focused sign-in button', 
   expect(text).toContain(t('welcome.body'));
   expect(text).toContain(t('welcome.disclaimer'));
 
-  // OK does nothing yet (A2 lands in Story 2.2): the tree stays unchanged
-  // after the TV press path and the click path (OK / DPAD_CENTER).
-  const before = JSON.stringify(renderer.container.toJSON());
-  await act(async () => {
-    button.props.onPressIn({ nativeEvent: {} });
-  });
-  await act(async () => {
-    button.props.onPressOut({ nativeEvent: {} });
-  });
-  await act(async () => {
-    button.props.onClick({ nativeEvent: {} });
-  });
-  expect(JSON.stringify(renderer.container.toJSON())).toBe(before);
+  // OK opens A2: __tests__/signInFlow.test.tsx.
 
   await act(async () => {
     renderer.unmount();

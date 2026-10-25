@@ -86,6 +86,7 @@ Changes on top of the template:
 ```sh
 npm ci && npm run lint && npm run typecheck && npm test
 npm run check:fixtures   # sanitization check for src/test/fixtures (Story 1.5)
+npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output /tmp/rn-check.bundle   # release Metro bundle (Zod 4 needs the Babel plugin; Story 2.2, also in CI)
 npm ls react-native        # react-native@npm:react-native-tvos@0.87.1-1, deduped
 cd android && ./gradlew assembleDebug assembleRelease
 aapt dump badging app/build/outputs/apk/debug/app-debug.apk   # leanback-launchable-activity + banner
@@ -478,3 +479,28 @@ First production screen on `main`: design tokens (`src/shared/ui/tokens.ts`), bu
 | TalkBack announcement | **Not verified** — owner check | — |
 | Physical remote look and feel | **Not verified** — owner check | — |
 | Reduce motion on the device | **Not verified** on the device; component tests only | — |
+
+### Story 2.2 — Request a sign-in code by phone, 2026-10-26
+
+**Status: A1 → A2, focus, system keyboard, validation (A4) and Back verified on the pinned device by adb (injected keys, uiautomator, screenshots). No send request was made (owner decision 2026-10-26: the live send runs once in Story 2.3 together with confirm). A9, A10, A5, the network and unknown errors and the send itself are covered by host tests only.**
+
+Changes: root JS stack (`@react-navigation/stack`, ADR 0007) with routes A1 → A2 → A5 (`src/app/routes.ts`); A2 `PhoneScreen` (A2/A4/A9/A10 states), minimal A5 `CodeScreen`, `authFlow` (in-memory draft and challenge) and E.164 validation (`src/features/auth`); `AuthApiClient.sendCode`, the ADR 0008 profiles, `AuthError` and the send DTO (`src/shared/api`); install `device_id` (`InstallIdModule.kt` + `src/shared/platform/deviceId.ts`); redacting `Logger` (`src/shared/services`); `TextField` (`src/shared/ui`). New exact pins: `@react-navigation/native` 7.5.1, `@react-navigation/stack` 7.12.1, `react-native-gesture-handler` 3.4.0, `react-native-screens` 4.30.0 (peer only, never rendered), `react-native-safe-area-context` 5.10.1, `zod` 4.6.7, dev `@babel/plugin-transform-export-namespace-from` 7.29.7 (in `babel.config.js`). Jest transforms the ESM navigation packages and loads `react-native-gesture-handler/jestSetup.js`.
+
+**Host checks:** `npm run lint -- --max-warnings 0`, `npm run typecheck`, `npm test`, `npm run check:fixtures` and the release Metro bundle pass. New tests: `logger.test.ts` (redaction of E.164 numbers, 7+ digit runs, `Bearer`, 32+ opaque runs, URLs with a query, `code=` / `sms_code=` / `phone=`; ring of 200; console only when enabled), `deviceId.test.ts`, `profiles.test.ts` (exact header set per profile, no Boosty headers for other hosts), `authApiClient.test.ts` (send request and headers, double send = one request, 429 `sms_gate_ratelimit` → `TooManyAttempts`, everything else → `Unknown`, fetch rejection and 30 s timeout → `Network`, no secrets in logs), `phone.test.ts`, `authFlow.test.ts`, `TextField.test.tsx` and `signInFlow.test.tsx` (the real App: navigation, initial focus targets, «Готово» rule, A4, A9, A10 with one retry, network/unknown errors, Back on every layer, late result after Back).
+
+**Build:** `./gradlew assembleRelease -PreactNativeArchitectures=armeabi-v7a` BUILD SUCCESSFUL. Release-like (`zipalign -p 4` + `apksigner`, SDK debug key outside the repo) installed with `adb install -r` over the previous build (same package id, nothing uninstalled or cleared). Device serial: `adb-25311HFDD69E8B-SKv3Ox._adb-tls-connect._tcp` (wireless adb).
+
+| Row | Result | Who |
+|---|---|---|
+| A1 OK → A2 | A2 shown; the number field focused (`focused=true`), country code `+7`; the IME is not opened by the move (`mInputShown=false`) | agent via adb (injected keys) |
+| A2 arrows | ← number → country; → back to the number; ↓ from the number or the country → «Получить код»; → «Назад»; ↑ from either button → the number; → at the number and ↑ at the fields do nothing | agent via adb |
+| System keyboard | OK on the number opens the system numeric IME (`mInputShown=true`); digits typed; Back closes the IME first and focus stays on the field | agent via adb |
+| «Готово» (IME ✓ key, reached with the D-pad) | Number `91624` (invalid) → focus stays on the number field; a valid 11-digit number → focus on «Получить код», IME closed. OK was **not** pressed with the valid number | agent via adb |
+| A4 | «Получить код» with an invalid or empty number: red border, «Проверьте номер телефона», focus on the number field (focus ring outside the red border); no request (no send was ever made) | agent via adb (screenshot) |
+| Country code | Edited to `+375` digit by digit; a 4th digit is refused (`+` + 3 digits). A burst of adb `input text` with a letter lost characters (controlled-input race under injected bursts, see risks) | agent via adb |
+| Back | A2 → A1 with «Войти в Boosty» focused; «Назад» → A1 focused; A1 again → A2 with an empty number (draft reset); Back on A1 → Google TV Home | agent via adb |
+| Logcat | App lines scanned after the run: no 7+ digit runs, `Bearer` or 32+ opaque runs from the app (only system ids in `ActivityManager`/`WindowManager` lines); the typed numbers appear nowhere in the buffer; release build prints no JS log. Buffer cleared | agent via adb |
+| `device_id` native module | Linked in the release build (app starts, no error), but **not exercised on the device**: only a send reads it. Story 2.3 | — |
+| Send, A5, A9, A10, Network, Unknown | **Not run on the device** (owner decision); host tests only | — |
+| Physical remote, TalkBack | **Not verified** — owner check | — |
+
