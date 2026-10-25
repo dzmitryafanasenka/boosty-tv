@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&display=swap" rel="stylesheet"></helmet>
+<div style="width:336px;height:1080px;box-sizing:border-box;background:#1D1B19;border-right:1px solid #2A2825;display:flex;flex-direction:column;gap:64px;padding:54px 24px 54px 72px;font-family:'Golos Text',sans-serif">
+  <div style="padding-left:24px;font-size:30px;font-weight:700;color:#F4EFE7;letter-spacing:-0.01em">Boosty<span style="color:#E8914A"> TV</span></div>
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <sc-for list="{{items}}" as="it" hint-placeholder-count="5">
+      <div style="position:relative;height:72px;box-sizing:border-box;display:flex;align-items:center;padding:0 24px;border-radius:14px;font-size:28px;background:{{it.bg}};color:{{it.color}};font-weight:{{it.weight}};outline:{{it.ring}};outline-offset:4px;transform:{{it.tf}};transition:transform 160ms cubic-bezier(0.2,0,0,1)">
+        <div style="position:absolute;left:0;top:20px;bottom:20px;width:5px;border-radius:3px;background:{{it.bar}}"></div>
+        {{it.label}}
+      </div>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:336,&quot;height&quot;:1080},&quot;current&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;home&quot;,&quot;search&quot;,&quot;subs&quot;,&quot;events&quot;,&quot;settings&quot;],&quot;default&quot;:&quot;home&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;focus&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;&quot;,&quot;home&quot;,&quot;search&quot;,&quot;subs&quot;,&quot;events&quot;,&quot;settings&quot;],&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const cur = this.props.current ?? 'home';
+    const foc = this.props.focus ?? '';
+    const defs = [['home','Главная'],['search','Поиск'],['subs','Подписки'],['events','События'],['settings','Настройки']];
+    const items = defs.map(([id, label]) => {
+      const f = foc === id, c = cur === id;
+      return {
+        label,
+        bg: f ? '#423D37' : c ? '#2A2724' : 'transparent',
+        color: f ? '#FFFFFF' : c ? '#F2A462' : '#A9A299',
+        weight: c || f ? 600 : 500,
+        ring: f ? '4px solid #F4EFE7' : '4px solid transparent',
+        tf: f ? 'scale(1.04)' : 'none',
+        bar: c ? '#E8914A' : 'transparent'
+      };
+    });
+    return { items };
+  }
+}
+</script>
+</body>
+</html>

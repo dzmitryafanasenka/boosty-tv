@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&display=swap" rel="stylesheet"></helmet>
+<div style="width:{{w}};box-sizing:border-box;min-height:{{mh}};padding:14px 28px;border-radius:14px;display:flex;align-items:center;gap:24px;background:{{bg}};outline:{{ring}};outline-offset:4px;transform:{{tf}};font-family:'Golos Text',sans-serif;transition:transform 160ms cubic-bezier(0.2,0,0,1)">
+  <sc-if value="{{isRadio}}"><div style="flex:none;width:32px;height:32px;box-sizing:border-box;border-radius:50%;border:3px solid {{markBorder}};display:flex;align-items:center;justify-content:center"><div style="width:14px;height:14px;border-radius:50%;background:{{dotBg}}"></div></div></sc-if>
+  <sc-if value="{{isCheck}}"><div style="flex:none;width:32px;height:32px;box-sizing:border-box;border-radius:8px;border:3px solid {{markBorder}};background:{{checkBg}};color:#1E140A;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700">{{checkGlyph}}</div></sc-if>
+  <div style="display:flex;flex-direction:column;gap:6px;flex:1;min-width:0">
+    <div style="font-size:{{lfs}};font-weight:{{lw}};color:{{lc}}">{{label}}</div>
+    <sc-if value="{{hasDesc}}"><div style="font-size:22px;line-height:1.4;color:#A9A299;text-wrap:pretty">{{desc}}</div></sc-if>
+  </div>
+  <sc-if value="{{hasValue}}"><div style="flex:none;font-size:24px;color:{{vc}};white-space:nowrap">{{value}}</div></sc-if>
+  <sc-if value="{{isNav}}"><div style="flex:none;font-size:34px;line-height:1;color:{{vc}}">›</div></sc-if>
+  <sc-if value="{{isToggle}}"><div style="flex:none;position:relative;width:72px;height:40px;border-radius:20px;background:{{tgBg}}"><div style="position:absolute;top:4px;left:{{tgLeft}};width:32px;height:32px;border-radius:50%;background:{{knob}}"></div></div></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1040,&quot;height&quot;:160},&quot;label&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Параметр&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;value&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;desc&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;kind&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;nav&quot;,&quot;toggle&quot;,&quot;radio&quot;,&quot;check&quot;,&quot;info&quot;],&quot;default&quot;:&quot;nav&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;on&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;f&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;disabled&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;compact&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;w&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:960,&quot;tsType&quot;:&quot;number&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const P = this.props;
+    const k = P.kind ?? 'nav', f = !!P.f && !P.disabled, on = !!P.on, dis = !!P.disabled;
+    const sel = (k === 'radio' || k === 'check') && on;
+    return {
+      label: P.label ?? 'Параметр', value: P.value ?? '', desc: P.desc ?? '',
+      hasValue: !!P.value, hasDesc: !!P.desc,
+      w: typeof P.w === 'number' ? P.w + 'px' : (P.w ?? '960px'),
+      mh: P.compact ? '76px' : '88px',
+      lfs: P.compact ? '26px' : '28px',
+      bg: f ? '#3A3632' : P.flat ? 'transparent' : '#221F1D',
+      ring: f ? '4px solid #F4EFE7' : '4px solid transparent',
+      tf: f ? 'scale(1.02)' : 'none',
+      lc: dis ? '#6E6962' : f ? '#FFFFFF' : '#ECE6DE',
+      lw: sel || f ? 600 : 500,
+      vc: dis ? '#6E6962' : '#A9A299',
+      isRadio: k === 'radio', isCheck: k === 'check', isNav: k === 'nav', isToggle: k === 'toggle',
+      markBorder: sel ? '#E8914A' : dis ? '#4A4641' : '#8F887F',
+      dotBg: sel ? '#E8914A' : 'transparent',
+      checkBg: sel ? '#E8914A' : 'transparent', checkGlyph: sel ? '✓' : '',
+      tgBg: on ? '#E8914A' : '#4A4641', tgLeft: on ? '36px' : '4px', knob: on ? '#1E140A' : '#B7B0A6'
+    };
+  }
+}
+</script>
+</body>
+</html>

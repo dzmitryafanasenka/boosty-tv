@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"></helmet>
+<div style="position:relative;width:1920px;height:1080px;background:#171615;overflow:hidden;display:flex;font-family:'Golos Text',sans-serif;color:#F4EFE7">
+  <dc-import name="TV Sidebar" current="subs" focus="{{navFocus}}" hint-size="336px,1080px"></dc-import>
+  <div ref="{{sc}}" style="flex:1;min-width:0;height:1080px;position:relative;overflow:hidden">
+    <div style="padding:54px 96px 140px 48px;display:flex;flex-direction:column">
+      <div data-fid="header" style="display:flex;align-items:center;gap:32px">
+        <div style="flex:none;width:112px;height:112px;border-radius:50%;background:{{avBg}};color:#1A1816;display:flex;align-items:center;justify-content:center;font-size:40px;font-weight:600">{{a.ini}}</div>
+        <div style="display:flex;flex-direction:column;gap:8px;min-width:0;max-width:1200px">
+          <div style="font-size:44px;line-height:1.15;font-weight:600;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{a.title}}</div>
+          <div style="display:flex;align-items:center;gap:16px;font-size:26px;color:#A9A299">{{a.name}}<sc-if value="{{a.mine}}"><span style="height:32px;padding:0 12px;border-radius:8px;background:#3A2A1C;color:#F2A462;font-size:20px;font-weight:600;display:flex;align-items:center">Мой блог</span></sc-if></div>
+        </div>
+      </div>
+      <div data-fid="search" style="margin-top:36px;display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+        <sc-if value="{{kb}}">
+          <div style="width:760px;height:64px;box-sizing:border-box;border-radius:32px;border:3px solid #F4EFE7;background:#2A2724;display:flex;align-items:center;gap:14px;padding:0 28px;font-size:26px">
+            <span style="color:#8F887F;white-space:nowrap">В этом блоге:</span><span style="white-space:nowrap;overflow:hidden">{{q}}</span><span style="width:3px;height:34px;background:#E8914A;margin-left:-10px"></span>
+          </div>
+        </sc-if>
+        <sc-if value="{{noKb}}" hint-placeholder-val="{{true}}">
+          <dc-import name="TV Button" label="{{searchLabel}}" sub="{{searchSub}}" pill="{{true}}" size="s" f="{{fSearch}}" hint-size="260px,64px"></dc-import>
+        </sc-if>
+        <dc-import name="TV Button" label="Фильтры" count="{{active}}" pill="{{true}}" size="s" f="{{fFilters}}" hint-size="180px,64px"></dc-import>
+        <sc-if value="{{hasReset}}"><dc-import name="TV Button" label="Сбросить" pill="{{true}}" size="s" f="{{fReset}}" hint-size="180px,64px"></dc-import></sc-if>
+        <sc-if value="{{hasSummary}}"><div style="font-size:22px;color:#A9A299">{{summary}}</div></sc-if>
+      </div>
+      <sc-if value="{{hasLive}}">
+        <div data-fid="live" style="margin-top:48px;display:flex;align-items:center;gap:24px">
+          <dc-import name="Live Card" s="{{live}}" f="{{fLive}}" hint-size="1040px,240px"></dc-import>
+          <sc-if value="{{liveActions}}">
+            <div style="display:flex;flex-direction:column;gap:20px">
+              <dc-import name="TV Button" icon="{{likeIcon}}" label="{{likeLabel}}" f="{{fLike}}" hint-size="200px,80px"></dc-import>
+              <dc-import name="TV Button" label="Поделиться" f="{{fShare}}" hint-size="220px,80px"></dc-import>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+      <div style="margin-top:48px;display:flex;align-items:baseline;gap:20px">
+        <div style="font-size:32px;font-weight:600">{{listTitle}}</div>
+        <sc-if value="{{loading}}"><div style="font-size:22px;color:#8F887F">Обновляем…</div></sc-if>
+      </div>
+      <sc-if value="{{hasPosts}}" hint-placeholder-val="{{true}}">
+        <div style="margin-top:28px;display:grid;grid-template-columns:repeat(4,336px);column-gap:32px;row-gap:44px;opacity:{{listOpacity}}">
+          <sc-for list="{{posts}}" as="c" hint-placeholder-count="8">
+            <div data-fid="{{c.fid}}"><dc-import name="Post Card" p="{{c.p}}" focused="{{c.f}}" hint-size="336px,314px"></dc-import></div>
+          </sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{noPosts}}">
+        <div style="margin-top:28px;width:1440px;box-sizing:border-box;padding:48px;border-radius:16px;background:#1D1B19;display:flex;flex-direction:column;gap:12px">
+          <div style="font-size:30px;font-weight:600">{{emptyTitle}}</div>
+          <div style="font-size:24px;color:#B7B0A6">{{emptyBody}}</div>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+  <sc-if value="{{kb}}"><div style="position:absolute;left:0;bottom:0"><dc-import name="TV Keyboard" hi="и" hint-size="1920px,400px"></dc-import></div></sc-if>
+  <sc-if value="{{hasPanel}}">
+    <div style="position:absolute;left:336px;top:0;right:680px;bottom:0;background:rgba(10,9,8,0.55)"></div>
+    <div style="position:absolute;right:0;top:0;width:680px;height:1080px;box-sizing:border-box;background:#1D1B19;border-left:1px solid #2A2825;padding:54px 48px;display:flex;flex-direction:column;gap:14px">
+      <sc-if value="{{pMain}}">
+        <div style="display:flex;align-items:baseline;justify-content:space-between"><div style="font-size:36px;font-weight:600">Фильтры</div><div style="font-size:22px;color:#8F887F">применяются сразу</div></div>
+        <div style="display:flex;align-items:center;gap:20px;margin:8px 0 6px">
+          <dc-import name="TV Button" label="Сбросить" size="s" disabled="{{resetDisabled}}" f="{{pfReset}}" hint-size="180px,64px"></dc-import>
+          <div style="font-size:22px;color:#A9A299">{{activeLabel}}</div>
+        </div>
+        <div style="font-size:22px;color:#8F887F;margin-top:6px">Доступ</div>
+        <sc-for list="{{accRows}}" as="r" hint-placeholder-count="3"><dc-import name="Setting Row" kind="radio" compact="{{true}}" w="{{584}}" label="{{r.label}}" on="{{r.on}}" f="{{r.f}}" hint-size="584px,76px"></dc-import></sc-for>
+        <div style="font-size:22px;color:#8F887F;margin-top:10px">Период</div>
+        <dc-import name="Setting Row" kind="nav" compact="{{true}}" w="{{584}}" label="{{periodLabel}}" f="{{pfPeriod}}" hint-size="584px,76px"></dc-import>
+        <div style="font-size:22px;color:#8F887F;margin-top:10px">Теги</div>
+        <sc-for list="{{tagRows}}" as="r" hint-placeholder-count="4"><dc-import name="Setting Row" kind="check" compact="{{true}}" w="{{584}}" label="{{r.label}}" on="{{r.on}}" f="{{r.f}}" hint-size="584px,76px"></dc-import></sc-for>
+      </sc-if>
+      <sc-if value="{{pPeriod}}">
+        <div style="font-size:36px;font-weight:600;margin-bottom:16px">Период</div>
+        <sc-for list="{{perRows}}" as="r" hint-placeholder-count="5"><dc-import name="Setting Row" kind="{{r.kind}}" w="{{584}}" label="{{r.label}}" value="{{r.value}}" on="{{r.on}}" f="{{r.f}}" hint-size="584px,88px"></dc-import></sc-for>
+      </sc-if>
+      <sc-if value="{{pCustom}}">
+        <div style="font-size:36px;font-weight:600">Свой период</div>
+        <div style="font-size:22px;color:#8F887F;margin-bottom:20px">↑ ↓ меняют значение, ← → переход между полями</div>
+        <sc-for list="{{steppers}}" as="g" hint-placeholder-count="2">
+          <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:24px">
+            <div style="font-size:24px;color:#B7B0A6">{{g.label}}</div>
+            <div style="display:flex;gap:20px">
+              <sc-for list="{{g.items}}" as="s" hint-placeholder-count="3">
+                <div style="width:{{s.w}};height:132px;box-sizing:border-box;border-radius:14px;background:{{s.bg}};outline:{{s.ring}};outline-offset:4px;transform:{{s.tf}};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">
+                  <div style="font-size:18px;color:{{s.arrow}}">▲</div>
+                  <div style="font-size:38px;font-weight:600;font-variant-numeric:tabular-nums">{{s.v}}</div>
+                  <div style="font-size:18px;color:{{s.arrow}}">▼</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+        <div style="font-size:24px;color:#F2A462;margin-bottom:16px">{{customSummary}}</div>
+        <div style="display:flex"><dc-import name="TV Button" label="Готово" f="{{pfDone}}" hint-size="180px,80px"></dc-import></div>
+      </sc-if>
+    </div>
+  </sc-if>
+  <sc-if value="{{hasQr}}"><div style="position:absolute;left:0;top:0"><dc-import name="QR Dialog" title="{{qr.title}}" sub="{{qr.sub}}" note="{{qr.note}}" hint-size="1920px,1080px"></dc-import></div></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1920,&quot;height&quot;:1080},&quot;aid&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;ml&quot;,&quot;ab&quot;,&quot;ko&quot;,&quot;ik&quot;,&quot;pa&quot;,&quot;dg&quot;,&quot;vs&quot;,&quot;on&quot;,&quot;me&quot;],&quot;default&quot;:&quot;ml&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;focus&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;post-0&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;panel&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;&quot;,&quot;filters&quot;,&quot;period&quot;,&quot;custom&quot;],&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;pf&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;filters&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object&quot;},&quot;search&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object&quot;},&quot;live&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object|string&quot;},&quot;custom&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;array&quot;},&quot;liked&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;loading&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;qr&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object&quot;},&quot;smooth&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  sc = React.createRef();
+  componentDidMount() {
+    const w = window;
+    w.__tvd = w.__tvd || import(new URL('tv-data.js', document.baseURI).href);
+    w.__tvd.then((m) => { this.D = m; this.forceUpdate(); });
+  }
+  componentDidUpdate() {
+    const c = this.sc.current; if (!c) return;
+    const f = this.props.focus ?? 'post-0';
+    const key = f.startsWith('post-') ? f : f === 'live' || f === 'like' || f === 'share' ? 'live' : 'header';
+    const el = c.querySelector(`[data-fid="${key}"]`); if (!el) return;
+    const cr = c.getBoundingClientRect(), er = el.getBoundingClientRect(), k = cr.height / c.offsetHeight || 1;
+    const top = (er.top - cr.top) / k + c.scrollTop, bot = top + er.height / k;
+    let t = c.scrollTop;
+    if (key === 'header') t = 0;
+    else if (top - t < 140) t = Math.max(0, top - 140); else if (bot - t > c.clientHeight - 60) t = bot - c.clientHeight + 60;
+    if (key === 'live') t = 0;
+    if (t !== c.scrollTop) c.scrollTo({ top: t, behavior: this.props.smooth ? 'smooth' : 'auto' });
+  }
+  renderVals() {
+    const D = this.D, P = this.props;
+    const F = P.focus ?? 'post-0', pf = P.pf ?? '', panel = P.panel ?? '';
+    const fl = P.filters || {}, se = P.search || {};
+    const aid = P.aid ?? 'ml';
+    const a = D ? D.AUTHORS[aid] : { title: '', name: '', ini: '', hue: 40 };
+    const live = !D || P.live === 'none' || se.active ? null : (P.live || a.live || null);
+    const ids = D ? D.filterPosts(D.authorPosts(aid), { ...fl, q: se.active ? se.q : '' }) : [];
+    const active = D ? D.activeCount(fl) : 0;
+    const tags = D ? D.authorTags(aid) : [];
+    const sum = [];
+    if (D && (fl.access ?? 'allowed') !== 'allowed') sum.push(D.ACCESS.find((x) => x[0] === fl.access)[1]);
+    if (D && fl.period && fl.period !== 'all') sum.push(D.periodLabel(fl));
+    (fl.tags || []).forEach((t) => sum.push(t));
+    const cu = P.custom || [[1, 8, 2026], [25, 9, 2026]];
+    const stepper = (grp, vals) => ({ label: grp === 'f' ? 'С' : 'По', items: ['d', 'm', 'y'].map((x, i) => {
+      const f = pf === grp + x;
+      return { v: i === 1 ? (D ? D.MONTHS_SHORT[vals[1]] : '') : vals[i], w: i === 1 ? '180px' : '150px', bg: f ? '#3A3632' : '#221F1D', ring: f ? '4px solid #F4EFE7' : '4px solid transparent', tf: f ? 'scale(1.04)' : 'none', arrow: f ? '#F4EFE7' : 'transparent' };
+    }) });
+    const pl = live && live.likes != null ? live.likes + (P.liked ? 1 : 0) : 0;
+    return {
+      sc: this.sc, a, avBg: `oklch(0.72 0.09 ${a.hue})`,
+      navFocus: F.startsWith('nav-') ? F.slice(4) : '',
+      kb: !!se.kb, noKb: !se.kb, q: se.q || '',
+      searchLabel: se.active ? 'Поиск' : 'Поиск в блоге', searchSub: se.active ? `«${se.q}»` : '',
+      fSearch: F === 'search', fFilters: F === 'filters', fReset: F === 'reset',
+      active, hasReset: active > 0 || !!se.active,
+      hasSummary: sum.length > 0, summary: sum.join(' · '),
+      hasLive: !!live, live, fLive: F === 'live',
+      liveActions: !!live && live.status === 'live' && live.access !== false,
+      likeIcon: P.liked ? 'heart-on' : 'heart', likeLabel: String(pl), fLike: F === 'like', fShare: F === 'share',
+      listTitle: se.active ? `Найдено в блоге: ${ids.length}` : active ? `Публикации · ${ids.length}` : 'Публикации',
+      loading: !!P.loading, listOpacity: P.loading ? 0.5 : 1,
+      hasPosts: ids.length > 0, noPosts: !!D && ids.length === 0,
+      emptyTitle: se.active ? `Ничего не найдено по запросу «${se.q}»` : 'Нет публикаций с такими фильтрами',
+      emptyBody: se.active ? 'Ищем только в этом блоге. Проверьте написание или нажмите «Сбросить».' : 'Измените фильтры или нажмите «Сбросить».',
+      posts: D ? ids.map((id, i) => ({ p: D.card(id), f: F === 'post-' + i, fid: 'post-' + i })) : [],
+      hasPanel: !!panel, pMain: panel === 'filters', pPeriod: panel === 'period', pCustom: panel === 'custom',
+      resetDisabled: active === 0, pfReset: pf === 'reset', activeLabel: active ? `Активно: ${active}` : 'Фильтры по умолчанию',
+      accRows: D ? D.ACCESS.map(([k, l], i) => ({ label: l, on: (fl.access ?? 'allowed') === k, f: pf === 'acc-' + i })) : [],
+      periodLabel: D ? D.periodLabel(fl) : '', pfPeriod: pf === 'period',
+      tagRows: tags.map((t, i) => ({ label: t, on: (fl.tags || []).includes(t), f: pf === 'tag-' + i })),
+      perRows: D ? D.PERIODS.map(([k, l], i) => ({ label: l, kind: k === 'custom' ? 'nav' : 'radio', value: k === 'custom' && fl.period === 'custom' ? D.periodLabel(fl) : '', on: (fl.period ?? 'all') === k, f: pf === 'per-' + i })) : [],
+      steppers: [stepper('f', cu[0]), stepper('t', cu[1])],
+      customSummary: D ? `${cu[0][0]} ${D.MONTHS[cu[0][1]]} ${cu[0][2]} — ${cu[1][0]} ${D.MONTHS[cu[1][1]]} ${cu[1][2]}` : '',
+      pfDone: pf === 'done',
+      hasQr: !!P.qr, qr: P.qr || {}
+    };
+  }
+}
+</script>
+</body>
+</html>

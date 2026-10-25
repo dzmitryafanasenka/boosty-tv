@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"></helmet>
+<div style="position:relative;width:1920px;height:1080px;background:#171615;overflow:hidden;display:flex;font-family:'Golos Text',sans-serif;color:#F4EFE7">
+  <dc-import name="TV Sidebar" current="search" focus="{{navFocus}}" hint-size="336px,1080px"></dc-import>
+  <div ref="{{sc}}" style="flex:1;min-width:0;height:1080px;position:relative;overflow:hidden">
+    <div style="padding:54px 96px 140px 48px;display:flex;flex-direction:column">
+      <div data-fid="field" style="display:flex;align-items:center;gap:20px">
+        <div style="font-size:44px;font-weight:600">Поиск</div>
+        <div style="height:40px;padding:0 14px;border-radius:8px;background:#3A2A1C;color:#F2A462;font-size:22px;font-weight:600;display:flex;align-items:center">по подпискам</div>
+      </div>
+      <div style="margin-top:32px;display:flex;align-items:center;gap:24px">
+        <div style="width:1100px;height:100px;box-sizing:border-box;border-radius:16px;border:3px solid {{fBorder}};background:{{fBg}};display:flex;align-items:center;gap:16px;padding:0 32px;font-size:36px">
+          <span style="color:{{qColor}};white-space:nowrap;overflow:hidden">{{qText}}</span>
+          <sc-if value="{{kb}}"><span style="width:3px;height:44px;background:#E8914A;margin-left:-12px"></span></sc-if>
+        </div>
+        <dc-import name="TV Button" label="Фильтры" sub="Доступные мне" pill="{{true}}" size="s" f="{{fFilters}}" hint-size="300px,64px"></dc-import>
+      </div>
+      <div style="margin-top:16px;font-size:22px;color:#8F887F">Ищем только в публикациях авторов, на которых вы подписаны. Поиска по всему Boosty нет.</div>
+      <sc-if value="{{isLoading}}">
+        <div style="margin-top:48px;font-size:32px;font-weight:600">Ищем…</div>
+        <div style="margin-top:28px;display:grid;grid-template-columns:repeat(4,336px);column-gap:32px">
+          <sc-for list="{{sk}}" as="s" hint-placeholder-count="4">
+            <div style="width:336px;display:flex;flex-direction:column;gap:18px">
+              <div style="aspect-ratio:16/9;border-radius:14px;background:#24221F"></div>
+              <div style="height:24px;width:92%;border-radius:6px;background:#24221F"></div>
+              <div style="height:24px;width:58%;border-radius:6px;background:#24221F"></div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{isResults}}">
+        <div style="margin-top:48px;font-size:32px;font-weight:600">{{resTitle}}</div>
+        <div style="margin-top:28px;display:grid;grid-template-columns:repeat(4,336px);column-gap:32px;row-gap:44px">
+          <sc-for list="{{res}}" as="c" hint-placeholder-count="4">
+            <div data-fid="{{c.fid}}"><dc-import name="Post Card" p="{{c.p}}" focused="{{c.f}}" hint-size="336px,314px"></dc-import></div>
+          </sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{isEmpty}}">
+        <div style="margin-top:64px;display:flex;flex-direction:column;gap:16px;max-width:1100px">
+          <div style="font-size:36px;font-weight:600">Ничего не найдено по запросу «{{q}}»</div>
+          <div style="font-size:26px;line-height:1.45;color:#B7B0A6">Проверьте написание или сократите запрос. Фильтры тоже влияют на поиск: сейчас показываются только доступные вам посты.</div>
+        </div>
+      </sc-if>
+      <sc-if value="{{isError}}">
+        <div data-fid="retry" style="margin-top:64px;display:flex;flex-direction:column;align-items:flex-start;gap:16px;max-width:1100px">
+          <div style="font-size:36px;font-weight:600">Не удалось выполнить поиск</div>
+          <div style="font-size:26px;line-height:1.45;color:#B7B0A6">Нет соединения с сервером. Запрос сохранён — можно повторить.</div>
+          <div style="margin-top:16px"><dc-import name="TV Button" label="Повторить" f="{{fRetry}}" hint-size="220px,80px"></dc-import></div>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+  <sc-if value="{{kb}}"><div style="position:absolute;left:0;bottom:0"><dc-import name="TV Keyboard" hi="{{kbHi}}" hint-size="1920px,400px"></dc-import></div></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1920,&quot;height&quot;:1080},&quot;q&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;kb&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;status&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;idle&quot;,&quot;loading&quot;,&quot;results&quot;,&quot;empty&quot;,&quot;error&quot;],&quot;default&quot;:&quot;idle&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;focus&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;field&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;ids&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;string[]&quot;},&quot;smooth&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  sc = React.createRef();
+  componentDidMount() {
+    const w = window;
+    w.__tvd = w.__tvd || import(new URL('tv-data.js', document.baseURI).href);
+    w.__tvd.then((m) => { this.D = m; this.forceUpdate(); });
+  }
+  componentDidUpdate() {
+    const c = this.sc.current; if (!c) return;
+    const f = this.props.focus ?? 'field';
+    const el = c.querySelector(`[data-fid="${f}"]`);
+    let t = c.scrollTop;
+    if (!el || f === 'field' || f === 'filters') t = 0;
+    else {
+      const cr = c.getBoundingClientRect(), er = el.getBoundingClientRect(), k = cr.height / c.offsetHeight || 1;
+      const top = (er.top - cr.top) / k + c.scrollTop, bot = top + er.height / k;
+      if (top - t < 140) t = Math.max(0, top - 140); else if (bot - t > c.clientHeight - 60) t = bot - c.clientHeight + 60;
+    }
+    if (t !== c.scrollTop) c.scrollTo({ top: t, behavior: this.props.smooth ? 'smooth' : 'auto' });
+  }
+  renderVals() {
+    const D = this.D, P = this.props;
+    const F = P.focus ?? 'field', st = P.status ?? 'idle', q = P.q ?? '', kb = !!P.kb;
+    const ids = P.ids || [];
+    const editing = kb || F === 'field';
+    return {
+      sc: this.sc, q, kb,
+      navFocus: F.startsWith('nav-') ? F.slice(4) : '',
+      qText: q || 'Название или текст публикации', qColor: q ? '#F4EFE7' : '#6E6962',
+      fBorder: editing ? '#F4EFE7' : '#3A3632', fBg: editing ? '#2A2724' : '#211F1D',
+      fFilters: F === 'filters', fRetry: F === 'retry',
+      isLoading: st === 'loading', isResults: st === 'results', isEmpty: st === 'empty', isError: st === 'error',
+      resTitle: `Найдено: ${ids.length}`,
+      res: D ? ids.map((id, i) => ({ p: D.card(id), f: F === 'res-' + i, fid: 'res-' + i })) : [],
+      sk: [0, 1, 2, 3], kbHi: P.kbHi ?? 'к'
+    };
+  }
+}
+</script>
+</body>
+</html>

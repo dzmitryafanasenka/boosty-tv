@@ -1,0 +1,25 @@
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Secrets and signing material — never commit (CLAUDE.md, AD-14, AD-16)
+*.keystore
+*.jks
+*.p12
+*.pem
+keystore.properties
+signing.properties
+.env
+.env.*
+!.env.example
+**/spike-credentials*
+**/*.har
+
+# Personal BMAD overrides (not shared)
+_bmad/custom/config.user.toml
+_bmad/config.user.toml
+
+# Claude Code local settings
+.claude/settings.local.json

@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#0E0D0C;} a{color:#F2A462;} a:hover{color:#FFC48F;}</style>
+</helmet>
+<div style="min-height:100vh;box-sizing:border-box;background:#0E0D0C;display:flex;flex-direction:column;align-items:center;gap:20px;padding:20px 16px 32px;font-family:'Golos Text',sans-serif;color:#F4EFE7">
+  <div style="position:relative;width:{{fw}};height:{{fh}};overflow:hidden;border-radius:10px;box-shadow:0 0 0 1px #2A2825, 0 30px 80px rgba(0,0,0,0.6);background:#171615">
+    <div style="position:absolute;left:0;top:0;width:1920px;height:1080px;transform:{{tvScale}};transform-origin:0 0">
+      <sc-if value="{{loading}}" hint-placeholder-val="{{true}}"><div style="width:1920px;height:1080px;display:flex;align-items:center;justify-content:center;font-size:32px;color:#8F887F">Загрузка прототипа…</div></sc-if>
+      <sc-if value="{{isAuth}}"><dc-import name="Auth Screen" s="{{authS}}" hint-size="1920px,1080px"></dc-import></sc-if>
+      <sc-if value="{{isHome}}"><dc-import name="Home Feed" focus="{{st.hf}}" feed-n="{{st.feedN}}" more="{{st.more}}" prog="{{st.prog}}" smooth="{{true}}" hint-size="1920px,1080px"></dc-import></sc-if>
+      <sc-if value="{{isSubs}}"><dc-import name="Subscriptions" mode="grid" focus="{{st.sf}}" hint-size="1920px,1080px"></dc-import></sc-if>
+      <sc-if value="{{isAuthor}}"><dc-import name="Author Page" aid="{{st.aid}}" focus="{{st.auf}}" panel="{{st.panel}}" pf="{{st.pf}}" filters="{{st.filters}}" search="{{st.asearch}}" custom="{{st.custom}}" liked="{{authorLiked}}" live="{{authorLive}}" loading="{{st.aloading}}" smooth="{{true}}" hint-size="1920px,1080px"></dc-import></sc-if>
+      <sc-if value="{{isPost}}"><dc-import name="Post Screen" id="{{st.pid}}" focus="{{st.pf2}}" ui="{{st.ui}}" prog="{{st.prog}}" smooth="{{true}}" hint-size="1920px,1080px"></dc-import></sc-if>
+      <sc-if value="{{isPlayer}}"><dc-import name="Player Screen" v="{{pv.v}}" pos="{{pv.pos}}" playing="{{pv.playing}}" overlay="{{pv.overlay}}" focus="{{pv.f}}" panel="{{pv.panel}}" pf="{{pv.pf}}" quality="{{st.quality}}" speed="{{st.speed}}" seek="{{pv.seek}}" buffering="{{pv.buffering}}" recovering="{{pv.recovering}}" error="{{pv.error}}" live="{{pv.live}}" ended="{{pv.ended}}" liked="{{pv.liked}}" hint-size="1920px,1080px"></dc-import></sc-if>
+      <sc-if value="{{isSearch}}"><dc-import name="Search Screen" q="{{st.q}}" kb="{{st.skb}}" status="{{st.sst}}" focus="{{st.srf}}" ids="{{st.sids}}" smooth="{{true}}" hint-size="1920px,1080px"></dc-import></sc-if>
+      <sc-if value="{{isEvents}}"><dc-import name="Events Screen" mode="list" focus="{{st.ef}}" read="{{st.read}}" hint-size="1920px,1080px"></dc-import></sc-if>
+      <sc-if value="{{isSettings}}"><dc-import name="Settings Screen" focus="{{st.setf}}" mode="{{st.setMode}}" sys="{{st.sys}}" diag-unlocked="{{st.diag}}" modal="{{st.modal}}" mf="{{st.mf}}" log-on="{{st.logOn}}" saved="{{st.saved}}" hint-size="1920px,1080px"></dc-import></sc-if>
+      <sc-if value="{{isNet}}"><dc-import name="State Screen" kind="network" current="subs" section="Подписки" focus="{{st.nf}}" hint-size="1920px,1080px"></dc-import></sc-if>
+      <sc-if value="{{hasQr}}"><div style="position:absolute;left:0;top:0"><dc-import name="QR Dialog" title="{{st.qr.title}}" sub="{{st.qr.sub}}" note="{{st.qr.note}}" hint-size="1920px,1080px"></dc-import></div></sc-if>
+      <sc-if value="{{hasToast}}"><div style="position:absolute;left:50%;bottom:72px;transform:translateX(-50%);padding:20px 32px;border-radius:14px;background:rgba(46,43,40,0.97);font-size:26px;color:#F4EFE7;box-shadow:0 12px 30px rgba(0,0,0,0.5);white-space:nowrap">{{st.toast}}</div></sc-if>
+    </div>
+  </div>
+  <div style="width:{{fw}};box-sizing:border-box;display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;flex-wrap:wrap;gap:8px 20px;font-size:15px;color:#B7B0A6">
+      <span><b style="color:#F4EFE7">Стрелки</b> — D-pad</span><span><b style="color:#F4EFE7">Enter</b> — OK</span><span><b style="color:#F4EFE7">Esc / Backspace</b> — Back</span><span><b style="color:#F4EFE7">Пробел</b> — Play/Pause</span><span><b style="color:#F4EFE7">, .</b> — перемотка</span><span><b style="color:#F4EFE7">M</b> — Menu/Info</span><span>Коды: любой, кроме 0000 (неверный), 1111 (истёк), 9999 (лимит), 7777 (проверка)</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      <sc-for list="{{scen}}" as="c" hint-placeholder-count="9">
+        <div onClick="{{c.go}}" style="cursor:pointer;padding:8px 12px;border-radius:8px;background:#221F1D;border:1px solid #34302C;font-size:14px;color:#E6E0D8" style-hover="background:#2E2B28">{{c.label}}</div>
+      </sc-for>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+      <div style="font-size:14px;color:#8F887F">Симуляция:</div>
+      <div onClick="{{toggleFail}}" style="cursor:pointer;padding:8px 12px;border-radius:8px;background:{{failBg}};border:1px solid #34302C;font-size:14px;color:{{failColor}}">{{failLabel}}</div>
+      <div onClick="{{expireLink}}" style="cursor:pointer;padding:8px 12px;border-radius:8px;background:#221F1D;border:1px solid #34302C;font-size:14px;color:#E6E0D8">Истекла ссылка на видео (в плеере)</div>
+      <div onClick="{{expireSession}}" style="cursor:pointer;padding:8px 12px;border-radius:8px;background:#221F1D;border:1px solid #34302C;font-size:14px;color:#E6E0D8">Сессия истекла (401)</div>
+    </div>
+    <div style="font-size:13px;line-height:1.5;color:#6E6962">Иллюстрация дизайна, не production-код. Фокус браузера не доказывает поведение нативного фокуса Android TV. Фильтры ленты на Главной и в Поиске в прототипе не открываются — панель показана на странице автора (сценарий 5).</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  init() {
+    return {
+      scr: 'welcome', stack: [],
+      af: 'enter', phone: '', code: '', kb: false, authErr: '', resend: 60, codeExpired: false, sending: false,
+      hf: 'cont-0', feedN: 8, more: '',
+      sf: 'tile-0',
+      aid: 'ml', auf: 'post-0', filters: {}, panel: '', pf: '', custom: [[1, 8, 2026], [25, 9, 2026]], asearch: { q: '', kb: false, active: false }, liked: {}, aloading: false, ended: {},
+      pid: 'kapusta', pf2: 'play', ui: {},
+      pl: null,
+      q: '', skb: false, sst: 'idle', sids: [], srf: 'field',
+      ef: 'ev-0', read: [],
+      setf: 'sys', sys: false, taps: 0, diag: false, modal: '', mf: 'cancel', setMode: 'main', logOn: true, saved: false,
+      nf: 'btn', prog: {}, failNext: false, qr: null, toast: '', speed: 1, quality: 'auto'
+    };
+  }
+  state = { ...this.init(), vw: 1280, vh: 800 };
+  lastContent = {};
+  lastInput = Date.now();
+  reps = 0;
+  componentDidMount() {
+    const w = window;
+    w.__tvd = w.__tvd || import(new URL('tv-data.js', document.baseURI).href);
+    w.__tvd.then((m) => { this.D = m; this.forceUpdate(); });
+    this.onResize = () => this.setState({ vw: window.innerWidth, vh: window.innerHeight });
+    this.onResize();
+    window.addEventListener('resize', this.onResize);
+    window.addEventListener('keydown', this.onKey);
+    try { const saved = JSON.parse(localStorage.getItem('boostytv-proto') || 'null'); if (saved && saved.prog) this.setState({ prog: saved.prog }); } catch (e) {}
+    this.tick = 0;
+    this.timer = setInterval(() => this.onTick(), 250);
+  }
+  componentWillUnmount() { window.removeEventListener('resize', this.onResize); window.removeEventListener('keydown', this.onKey); clearInterval(this.timer); }
+  // ---------- helpers
+  toast(t) { this.setState({ toast: t }); clearTimeout(this.tt); this.tt = setTimeout(() => this.setState({ toast: '' }), 2400); }
+  later(ms, fn) { setTimeout(fn, ms); }
+  SNAP = { post: ['pid', 'pf2', 'ui'], author: ['aid', 'auf', 'filters', 'panel', 'pf', 'asearch', 'custom'], player: ['pl'] };
+  go(scr, patch = {}) {
+    const s = this.state, keys = this.SNAP[s.scr] || [], snap = {};
+    keys.forEach((k) => { snap[k] = s[k]; });
+    if (s.scr === 'post' && s.ui.audio) snap.ui = { ...s.ui, audio: { ...s.ui.audio, playing: false } };
+    this.setState({ stack: [...s.stack, { scr: s.scr, snap }], scr, ...patch });
+  }
+  back() {
+    const st = [...this.state.stack]; const e = st.pop();
+    if (!e) return;
+    this.setState({ stack: st, scr: e.scr, ...e.snap });
+  }
+  FK = { home: 'hf', subs: 'sf', author: 'auf', search: 'srf', events: 'ef', settings: 'setf', neterr: 'nf' };
+  SECS = ['home', 'search', 'subs', 'events', 'settings'];
+  secOf(scr) { return scr === 'author' || scr === 'neterr' ? 'subs' : scr; }
+  initFocus(sec) { return { home: 'cont-0', subs: 'tile-0', search: 'field', events: 'ev-0', settings: 'sys' }[sec]; }
+  focusOf() { const k = this.FK[this.state.scr]; return k ? this.state[k] : ''; }
+  setFocus(f) { const k = this.FK[this.state.scr]; if (k) this.setState({ [k]: f }); }
+  toNav() { const s = this.state; this.lastContent[s.scr] = this.focusOf(); this.setFocus('nav-' + this.secOf(s.scr)); }
+  openSection(sec) {
+    const s = this.state;
+    if (this.secOf(s.scr) === sec && s.scr === sec) { this.setFocus(this.lastContent[s.scr] || this.initFocus(sec)); return; }
+    const patch = { scr: sec, stack: [] };
+    patch[this.FK[sec]] = this.initFocus(sec);
+    if (sec === 'search') Object.assign(patch, { q: '', skb: false, sst: 'idle', sids: [] });
+    if (sec === 'settings') Object.assign(patch, { setMode: 'main', modal: '' });
+    this.setState(patch);
+  }
+  navKeys(a) {
+    const s = this.state, f = this.focusOf(), cur = f.slice(4), i = this.SECS.indexOf(cur);
+    if (a === 'up' && i > 0) this.setFocus('nav-' + this.SECS[i - 1]);
+    else if (a === 'down' && i < this.SECS.length - 1) this.setFocus('nav-' + this.SECS[i + 1]);
+    else if (a === 'right') this.setFocus(this.lastContent[s.scr] || this.firstContent());
+    else if (a === 'ok') this.openSection(cur);
+    else if (a === 'back') { if (this.secOf(s.scr) === 'home') this.toast('Выход из приложения — системное действие'); else this.openSection('home'); }
+  }
+  firstContent() { const s = this.state; return s.scr === 'author' ? this.authorInit(s.aid) : s.scr === 'neterr' ? 'btn' : this.initFocus(s.scr); }
+  grid(i, n, cols, a) {
+    const r = Math.floor(i / cols), c = i % cols;
+    if (a === 'left') return c > 0 ? i - 1 : 'L';
+    if (a === 'right') return c < cols - 1 && i + 1 < n ? i + 1 : null;
+    if (a === 'up') return r > 0 ? i - cols : 'U';
+    if (a === 'down') return i + cols < n ? i + cols : (r < Math.floor((n - 1) / cols) ? n - 1 : 'D');
+    return null;
+  }
+  fmtPhone(d) { const a = d.slice(0, 3), b = d.slice(3, 6), c = d.slice(6, 8), e = d.slice(8, 10); return [a, b].filter(Boolean).join(' ') + (c ? '-' + c : '') + (e ? '-' + e : ''); }
+  // ---------- keys
+  onKey = (e) => {
+    if (!this.D) return;
+    const s = this.state;
+    const typing = ((s.scr === 'phone' || s.scr === 'code') && s.kb) || (s.scr === 'search' && s.skb) || (s.scr === 'author' && s.asearch.kb);
+    if (typing) { this.typeKey(e); return; }
+    const map = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', Enter: 'ok', Escape: 'back', Backspace: 'back', ' ': 'play', m: 'menu', M: 'menu', 'ь': 'menu', i: 'menu', ',': 'rew', '.': 'ff', 'б': 'rew', 'ю': 'ff' };
+    const a = map[e.key]; if (!a) return;
+    e.preventDefault();
+    this.lastInput = Date.now();
+    if (s.qr) { if (a === 'ok' || a === 'back') this.setState({ qr: null }); return; }
+    const g = ['welcome', 'phone', 'code', 'captcha', 'limit', 'expired'].includes(s.scr) ? 'auth' : s.scr;
+    const h = this['k_' + g]; if (h) h.call(this, a, e);
+  };
+  typeKey(e) {
+    const s = this.state, k = e.key;
+    if (!['Enter', 'Escape', 'Backspace'].includes(k) && k.length !== 1) return;
+    e.preventDefault();
+    if (s.scr === 'phone' || s.scr === 'code') {
+      const fld = s.scr === 'phone' ? 'phone' : 'code';
+      if (k === 'Enter') {
+        if (s.scr === 'phone') { let d = s.phone; if (d.length === 11 && /^[78]/.test(d)) d = d.slice(1); this.setState({ kb: false, phone: d, af: d.length === 10 ? 'send' : 'field' }); }
+        else { this.setState({ kb: false }); if (s.code) this.submitCode(); }
+      } else if (k === 'Escape') this.setState({ kb: false });
+      else if (k === 'Backspace') this.setState({ [fld]: s[fld].slice(0, -1), authErr: '' });
+      else if (/\d/.test(k) && s[fld].length < (fld === 'phone' ? 11 : 8)) this.setState({ [fld]: s[fld] + k, authErr: '' });
+      return;
+    }
+    if (s.scr === 'search') {
+      if (k === 'Enter') { this.setState({ skb: false }); this.runSearch(); }
+      else if (k === 'Escape') this.setState({ skb: false });
+      else if (k === 'Backspace') this.setState({ q: s.q.slice(0, -1) });
+      else if (s.q.length < 40) this.setState({ q: s.q + k });
+      return;
+    }
+    if (s.scr === 'author') {
+      const as = s.asearch;
+      if (k === 'Enter') {
+        const q = as.q.trim();
+        const ids = q ? this.D.filterPosts(this.D.authorPosts(s.aid), { ...s.filters, q }) : [];
+        this.setState({ asearch: { q, kb: false, active: !!q }, auf: q && ids.length ? 'post-0' : 'search' });
+      } else if (k === 'Escape') this.setState({ asearch: { ...as, kb: false } });
+      else if (k === 'Backspace') this.setState({ asearch: { ...as, q: as.q.slice(0, -1) } });
+      else if (as.q.length < 30) this.setState({ asearch: { ...as, q: as.q + k } });
+    }
+  }
+  // ---------- auth
+  codeButtons() { const s = this.state; return s.codeExpired ? ['newcode', 'change'] : ['login', ...(s.resend === 0 ? ['resend'] : []), 'change']; }
+  k_auth(a) {
+    const s = this.state, f = s.af;
+    if (s.sending) return;
+    if (s.scr === 'welcome') { if (a === 'ok') this.setState({ scr: 'phone', af: 'field', authErr: '' }); if (a === 'back') this.toast('Выход из приложения — системное действие'); return; }
+    if (s.scr === 'phone') {
+      const row = ['send', 'back'];
+      if (a === 'down' && f === 'field') this.setState({ af: 'send' });
+      else if (a === 'up' && row.includes(f)) this.setState({ af: 'field' });
+      else if ((a === 'left' || a === 'right') && row.includes(f)) this.setState({ af: a === 'right' ? 'back' : 'send' });
+      else if (a === 'ok') {
+        if (f === 'field') this.setState({ kb: true, authErr: '' });
+        else if (f === 'send') this.sendCode();
+        else this.setState({ scr: 'welcome', af: 'enter' });
+      } else if (a === 'back') this.setState({ scr: 'welcome', af: 'enter' });
+      return;
+    }
+    if (s.scr === 'code') {
+      const row = this.codeButtons();
+      const i = row.indexOf(f);
+      if (a === 'down' && f === 'field') this.setState({ af: row[0] });
+      else if (a === 'up' && i >= 0) this.setState({ af: 'field' });
+      else if (a === 'left' && i > 0) this.setState({ af: row[i - 1] });
+      else if (a === 'right' && i >= 0 && i < row.length - 1) this.setState({ af: row[i + 1] });
+      else if (a === 'ok') {
+        if (f === 'field') this.setState({ kb: true });
+        else if (f === 'login') this.submitCode();
+        else if (f === 'resend') { this.setState({ resend: 60, af: 'field', authErr: '' }); this.toast('Код отправлен повторно'); }
+        else if (f === 'change') this.setState({ scr: 'phone', af: 'field', authErr: '', code: '' });
+        else if (f === 'newcode') { this.setState({ codeExpired: false, resend: 60, code: '', authErr: '', af: 'field' }); this.toast('Новый код отправлен'); }
+      } else if (a === 'back') this.setState({ scr: 'phone', af: 'field', authErr: '', code: '' });
+      return;
+    }
+    const rows = { limit: ['change', 'first'], captcha: ['retry', 'change'], expired: ['relogin'] }[s.scr];
+    const i = rows.indexOf(f);
+    if (a === 'left' && i > 0) this.setState({ af: rows[i - 1] });
+    else if (a === 'right' && i < rows.length - 1) this.setState({ af: rows[i + 1] });
+    else if (a === 'ok') {
+      if (f === 'change') this.setState({ scr: 'phone', af: 'field', code: '', authErr: '' });
+      else if (f === 'first') this.setState({ scr: 'welcome', af: 'enter' });
+      else if (f === 'retry') this.toast('Boosty снова запросил проверку');
+      else if (f === 'relogin') this.setState({ scr: 'phone', af: 'send', authErr: '' });
+    } else if (a === 'back') { if (s.scr === 'expired') this.toast('Выход из приложения — системное действие'); else this.setState({ scr: 'phone', af: 'field' }); }
+  }
+  sendCode() {
+    let d = this.state.phone; if (d.length === 11 && /^[78]/.test(d)) d = d.slice(1);
+    if (d.length !== 10) { this.setState({ authErr: 'Некорректный номер. Нужно 10 цифр после +7.', af: 'field' }); return; }
+    this.setState({ sending: true, phone: d });
+    this.later(700, () => this.setState({ sending: false, scr: 'code', code: '', af: 'field', resend: 60, codeExpired: false, authErr: '' }));
+  }
+  submitCode() {
+    const c = this.state.code; if (!c) return;
+    if (c === '0000') return this.setState({ authErr: 'Неверный код. Проверьте и введите ещё раз.', af: 'field' });
+    if (c === '1111') return this.setState({ codeExpired: true, authErr: 'Срок действия кода истёк. Запросите новый.', af: 'newcode' });
+    if (c === '9999') return this.setState({ scr: 'limit', af: 'change', authErr: '' });
+    if (c === '7777') return this.setState({ scr: 'captcha', af: 'retry', authErr: '' });
+    this.setState({ sending: true });
+    this.later(600, () => this.setState({ sending: false, scr: 'home', stack: [], hf: 'cont-0', authErr: '', kb: false }));
+  }
+  // ---------- home
+  k_home(a) {
+    const s = this.state, f = s.hf, n = s.feedN;
+    if (f.startsWith('nav-')) return this.navKeys(a);
+    if (a === 'back') return this.toNav();
+    if (f.startsWith('cont-')) {
+      const i = +f.slice(5);
+      if (a === 'left') return i > 0 ? this.setState({ hf: 'cont-' + (i - 1) }) : this.toNav();
+      if (a === 'right' && i < 4) return this.setState({ hf: 'cont-' + (i + 1) });
+      if (a === 'down') return this.setState({ hf: 'feed-' + Math.min(i, 3) });
+      if (a === 'ok') { const [id, vi] = this.D.CONT[i]; return this.startVod(id, vi); }
+      return;
+    }
+    if (f === 'filters' || f === 'refresh') {
+      if (a === 'left') return f === 'refresh' ? this.setState({ hf: 'filters' }) : this.toNav();
+      if (a === 'right' && f === 'filters') return this.setState({ hf: 'refresh' });
+      if (a === 'up') return this.setState({ hf: f === 'filters' ? 'cont-0' : 'cont-3' });
+      if (a === 'down') return this.setState({ hf: f === 'filters' ? 'feed-0' : 'feed-3' });
+      if (a === 'ok') return this.toast(f === 'filters' ? 'Фильтры ленты — как у автора, см. сценарий 5' : 'Лента обновлена, фокус на месте');
+      return;
+    }
+    if (f === 'retry') {
+      if (a === 'up') return this.setState({ hf: 'feed-' + (Math.floor((n - 1) / 4) * 4) });
+      if (a === 'left') return this.toNav();
+      if (a === 'ok') return this.loadMore();
+      return;
+    }
+    const i = +f.slice(5), r = this.grid(i, n, 4, a);
+    if (a === 'ok') { const id = this.D.ALL_FEED[i]; return id.startsWith('live:') ? this.startLive(id.slice(5)) : this.openPost(id); }
+    if (r === 'L') return this.toNav();
+    if (r === 'U') return this.setState({ hf: i % 4 < 2 ? 'filters' : 'refresh' });
+    if (r === 'D') { if (s.more === 'error') this.setState({ hf: 'retry' }); return; }
+    if (r == null) return;
+    this.setState({ hf: 'feed-' + r });
+    if (Math.floor(r / 4) >= Math.floor((n - 1) / 4) && n < 16 && !s.more) this.loadMore();
+  }
+  loadMore() {
+    this.setState({ more: 'loading' });
+    this.later(1000, () => {
+      if (this.state.failNext) this.setState({ more: 'error', failNext: false });
+      else this.setState((s) => ({ feedN: 16, more: '', hf: s.hf === 'retry' ? 'feed-8' : s.hf }));
+    });
+  }
+  // ---------- subs
+  k_subs(a) {
+    const f = this.state.sf;
+    if (f.startsWith('nav-')) return this.navKeys(a);
+    if (a === 'back') return this.toNav();
+    const i = +f.slice(5), r = this.grid(i, 9, 3, a);
+    if (a === 'ok') return this.openAuthor(this.D.SUBS_ORDER[i]);
+    if (r === 'L') return this.toNav();
+    if (typeof r === 'number') this.setState({ sf: 'tile-' + r });
+  }
+  k_neterr(a) {
+    const f = this.state.nf;
+    if (f.startsWith('nav-')) return this.navKeys(a);
+    if (a === 'left') return this.toNav();
+    if (a === 'back') return this.back();
+    if (a === 'ok') { const aid = this.state.aid; this.setState({ scr: 'author', ...this.authorReset(aid) }); }
+  }
+  // ---------- author
+  liveOf(aid) { const s = this.state, a = this.D.AUTHORS[aid]; return a.live && !s.ended[aid] && !s.asearch.active ? a.live : null; }
+  liveFocusable(aid) { const l = this.liveOf(aid); return !!l && l.status === 'live'; }
+  liveActions(aid) { const l = this.liveOf(aid); return !!l && l.status === 'live' && l.access !== false; }
+  authorInit(aid) { return this.liveFocusable(aid) ? 'live' : 'post-0'; }
+  authorReset(aid) { return { aid, auf: this.D.AUTHORS[aid].live && this.D.AUTHORS[aid].live.status === 'live' && !this.state.ended[aid] ? 'live' : 'post-0', filters: {}, panel: '', pf: '', asearch: { q: '', kb: false, active: false } }; }
+  openAuthor(aid) {
+    if (this.state.failNext) { this.go('neterr', { aid, nf: 'btn', failNext: false }); return; }
+    this.go('author', this.authorReset(aid));
+  }
+  authorIds() { const s = this.state; return this.D.filterPosts(this.D.authorPosts(s.aid), { ...s.filters, q: s.asearch.active ? s.asearch.q : '' }); }
+  flash() { this.setState({ aloading: true }); clearTimeout(this.ft); this.ft = setTimeout(() => this.setState({ aloading: false }), 450); }
+  k_author(a) {
+    const s = this.state, f = s.auf, D = this.D;
+    if (s.panel) return this.panelKey(a);
+    if (f.startsWith('nav-')) return this.navKeys(a);
+    const ids = this.authorIds(), n = ids.length;
+    const active = D.activeCount(s.filters);
+    const head = ['search', 'filters', ...(active || s.asearch.active ? ['reset'] : [])];
+    const lf = this.liveFocusable(s.aid), la = this.liveActions(s.aid);
+    if (a === 'back') { if (s.asearch.active) { this.setState({ asearch: { q: '', kb: false, active: false }, auf: 'search' }); this.flash(); return; } return this.back(); }
+    const hi = head.indexOf(f);
+    if (hi >= 0) {
+      if (a === 'left') return hi > 0 ? this.setState({ auf: head[hi - 1] }) : this.toNav();
+      if (a === 'right' && hi < head.length - 1) return this.setState({ auf: head[hi + 1] });
+      if (a === 'down') return this.setState({ auf: lf ? 'live' : n ? 'post-0' : f });
+      if (a === 'ok') {
+        if (f === 'search') return this.setState({ asearch: { ...s.asearch, kb: true } });
+        if (f === 'filters') { const ai = D.ACCESS.findIndex((x) => x[0] === (s.filters.access ?? 'allowed')); return this.setState({ panel: 'filters', pf: 'acc-' + ai }); }
+        if (f === 'reset') { this.setState({ filters: {}, asearch: { q: '', kb: false, active: false }, auf: 'filters' }); this.flash(); }
+      }
+      return;
+    }
+    if (f === 'live' || f === 'like' || f === 'share') {
+      const live = this.liveOf(s.aid);
+      if (f === 'live') {
+        if (a === 'left') return this.toNav();
+        if (a === 'right' && la) return this.setState({ auf: 'like' });
+        if (a === 'up') return this.setState({ auf: 'search' });
+        if (a === 'down' && n) return this.setState({ auf: 'post-0' });
+        if (a === 'ok') return live.access === false ? this.setState({ qr: { title: 'Эфир «' + live.title + '»', sub: 'boosty.to/…/streams/video_stream', note: 'Эфир доступен подписчикам уровня «' + live.level + '». Страница откроется на телефоне.' } }) : this.startLive(s.aid);
+      } else {
+        if (a === 'left') return this.setState({ auf: 'live' });
+        if (a === 'up') return this.setState({ auf: f === 'share' ? 'like' : 'search' });
+        if (a === 'down') return this.setState({ auf: f === 'like' ? 'share' : n ? 'post-0' : f });
+        if (a === 'ok' && f === 'like') return this.setState({ liked: { ...s.liked, [s.aid]: !s.liked[s.aid] } });
+        if (a === 'ok' && f === 'share') return this.setState({ qr: { title: 'Эфир «' + live.title + '»', sub: 'boosty.to/…/streams/video_stream', note: 'Ссылка на страницу эфира' } });
+      }
+      return;
+    }
+    if (f.startsWith('post-')) {
+      const i = +f.slice(5), r = this.grid(i, n, 4, a);
+      if (a === 'ok') return this.openPost(ids[i]);
+      if (r === 'L') return this.toNav();
+      if (r === 'U') return this.setState({ auf: lf ? 'live' : 'search' });
+      if (typeof r === 'number') this.setState({ auf: 'post-' + r });
+    }
+  }
+  daysAgo(d, m, y) { return Math.round((new Date(2026, 9, 25) - new Date(y, m, d)) / 864e5); }
+  panelKey(a) {
+    const s = this.state, D = this.D, pf = s.pf, fl = s.filters;
+    const lin = (list) => { const i = list.indexOf(pf); if (a === 'up' && i > 0) this.setState({ pf: list[i - 1] }); if (a === 'down' && i < list.length - 1) this.setState({ pf: list[i + 1] }); };
+    const setF = (nf) => { this.setState({ filters: nf }); this.flash(); };
+    if (s.panel === 'filters') {
+      const tags = D.authorTags(s.aid);
+      const list = [...(D.activeCount(fl) ? ['reset'] : []), 'acc-0', 'acc-1', 'acc-2', 'period', ...tags.map((t, i) => 'tag-' + i)];
+      if (a === 'back') return this.setState({ panel: '', auf: 'filters' });
+      if (a === 'up' || a === 'down') return lin(list);
+      if (a !== 'ok') return;
+      if (pf === 'reset') { setF({}); this.setState({ pf: 'acc-0' }); }
+      else if (pf.startsWith('acc-')) setF({ ...fl, access: D.ACCESS[+pf.slice(4)][0] });
+      else if (pf === 'period') this.setState({ panel: 'period', pf: 'per-' + Math.max(0, D.PERIODS.findIndex((p) => p[0] === (fl.period ?? 'all'))) });
+      else if (pf.startsWith('tag-')) { const t = tags[+pf.slice(4)], cur = fl.tags || []; setF({ ...fl, tags: cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t] }); }
+      return;
+    }
+    if (s.panel === 'period') {
+      if (a === 'back') return this.setState({ panel: 'filters', pf: 'period' });
+      if (a === 'up' || a === 'down') return lin(['per-0', 'per-1', 'per-2', 'per-3', 'per-4']);
+      if (a === 'ok') {
+        const i = +pf.slice(4);
+        if (i < 4) { setF({ ...fl, period: D.PERIODS[i][0], custom: undefined, range: undefined }); this.setState({ panel: 'filters', pf: 'period' }); }
+        else { this.applyCustom(s.custom); this.setState({ panel: 'custom', pf: 'fd' }); }
+      }
+      return;
+    }
+    if (s.panel === 'custom') {
+      const fields = ['fd', 'fm', 'fy', 'td', 'tm', 'ty'];
+      const i = fields.indexOf(pf);
+      if (a === 'back') return this.setState({ panel: 'period', pf: 'per-4' });
+      if (pf === 'done') { if (a === 'up') this.setState({ pf: 'fd' }); if (a === 'ok') this.setState({ panel: 'filters', pf: 'period' }); return; }
+      if (a === 'left' && i > 0) return this.setState({ pf: fields[i - 1] });
+      if (a === 'right' && i < 5) return this.setState({ pf: fields[i + 1] });
+      if (a === 'down' && false) return;
+      if (a === 'up' || a === 'down') {
+        const d = a === 'up' ? 1 : -1;
+        const cu = s.custom.map((x) => [...x]);
+        const g = pf[0] === 'f' ? 0 : 1, part = { d: 0, m: 1, y: 2 }[pf[1]];
+        const v = cu[g];
+        if (part === 0) v[0] = Math.min(new Date(v[2], v[1] + 1, 0).getDate(), Math.max(1, v[0] + d));
+        if (part === 1) { v[1] = Math.min(11, Math.max(0, v[1] + d)); v[0] = Math.min(v[0], new Date(v[2], v[1] + 1, 0).getDate()); }
+        if (part === 2) v[2] = Math.min(2026, Math.max(2020, v[2] + d));
+        const t = (x) => new Date(x[2], x[1], x[0]).getTime();
+        if (t(cu[0]) > t(cu[1])) { if (g === 0) cu[1] = [...cu[0]]; else cu[0] = [...cu[1]]; }
+        this.setState({ custom: cu }); this.applyCustom(cu);
+        return;
+      }
+      if (a === 'ok') this.setState({ pf: 'done' });
+    }
+  }
+  applyCustom(cu) {
+    const fl = this.state.filters;
+    this.setState({ filters: { ...fl, period: 'custom', custom: cu, range: [this.daysAgo(...cu[0]), this.daysAgo(...cu[1])] } });
+    this.flash();
+  }
+  // ---------- post
+  postNav() {
+    const s = this.state, D = this.D, p = D.POSTS[s.pid], ui = s.ui;
+    const L = ['author'], R = [];
+    const vids = p.videos.map((v) => { const pos = D.vidPos(v, s.prog); return { pos, done: pos >= v.dur - 10 }; });
+    let ri = vids.findIndex((x) => x.pos > 0 && !x.done); if (ri < 0) ri = Math.max(0, vids.findIndex((x) => !x.done));
+    if (!p.locked && vids.length) { L.push('play'); if (vids[ri] && vids[ri].pos > 0 && !vids[ri].done) L.push('restart'); }
+    if (!p.locked && vids.length > 1) vids.forEach((x, i) => R.push(['vid-' + i]));
+    let img = 0, fi = 0, ei = 0, li = 0;
+    p.blocks.forEach((b) => {
+      if (b.t === 'text') {
+        const collapsed = b.paras.length > 3 && !ui.expanded;
+        if (!collapsed && b.paras.length > 3) b.paras.forEach((x, k) => { if (k >= 3) R.push(['par-' + k]); });
+        if (collapsed) R.push(['more']);
+        const links = []; (collapsed ? b.paras.slice(0, 3) : b.paras).forEach((pa) => pa.forEach((sp) => { if (sp[1].includes('l')) links.push('link-' + li++); }));
+        if (links.length) R.push(links);
+      } else if (b.t === 'image') R.push(['img-' + img++]);
+      else if (b.t === 'audio') R.push(['aud']);
+      else if (b.t === 'file') R.push(['file-' + fi++]);
+      else if (b.t === 'ext') R.push(['ext-' + ei++]);
+      else if (b.t === 'poll') {
+        const pu = ui.poll || {}, pv = D.pollView(b, pu), fin = !!pu.finished;
+        if (!fin) b.options.forEach((o, i) => R.push(['opt-' + i]));
+        if (!fin && pu.status !== 'sending') {
+          if (pu.status === 'error') R.push(['poll-retry']);
+          else if (pv.voted) R.push(['retract']);
+          else if (b.multi && (pu.checked || []).length) R.push(['vote']);
+        }
+      }
+    });
+    return { L, R, ri, p };
+  }
+  postInit(id) { const save = this.state.pid, ui = this.state.ui; this.state.pid = id; this.state.ui = {}; const { L, R } = this.postNav(); this.state.pid = save; this.state.ui = ui; return L.includes('play') ? 'play' : R.length ? R[0][0] : 'author'; }
+  openPost(id) { this.go('post', { pid: id, pf2: this.postInit(id), ui: {} }); }
+  fixPostFocus() {
+    const { L, R } = this.postNav(), flat = [...L, ...R.flat()], f = this.state.pf2;
+    if (flat.includes(f)) return;
+    const fb = { vote: 'retract', retract: 'opt-0', 'poll-retry': 'opt-0', more: 'par-3' }[f];
+    this.setState({ pf2: fb && flat.includes(fb) ? fb : flat.find((x) => x.startsWith('opt-')) || L[L.length - 1] });
+  }
+  pollBlock() { return this.D.POSTS[this.state.pid].blocks.find((b) => b.t === 'poll'); }
+  sendPoll(action) {
+    const s = this.state, b = this.pollBlock(), pu = s.ui.poll || {};
+    this.setState({ ui: { ...s.ui, poll: { ...pu, status: 'sending', pending: null, sendingId: action.id, last: action } } });
+    this.later(800, () => {
+      const s2 = this.state, pu2 = s2.ui.poll || {};
+      if (s2.failNext) { this.setState({ failNext: false, ui: { ...s2.ui, poll: { ...pu2, status: 'error' } }, pf2: 'poll-retry' }); return; }
+      const answer = action.kind === 'retract' ? [] : action.kind === 'multi' ? action.ids : [action.id];
+      this.setState({ ui: { ...s2.ui, poll: { ...pu2, status: 'ok', answer, checked: [], sendingId: null } } }, () => this.fixPostFocus());
+      void b;
+    });
+  }
+  k_post(a) {
+    const s = this.state, f = s.pf2, ui = s.ui;
+    const { L, R, ri, p } = this.postNav();
+    const inL = L.includes(f);
+    let r = -1, c = 0; R.forEach((row, i) => { const j = row.indexOf(f); if (j >= 0) { r = i; c = j; } });
+    const move = (nf) => {
+      const pu = ui.poll || {};
+      const patch = { pf2: nf };
+      if (pu.pending && nf !== f) patch.ui = { ...ui, poll: { ...pu, pending: null } };
+      this.setState(patch);
+    };
+    if (a === 'back') return this.back();
+    if (f === 'aud' && (a === 'left' || a === 'right')) {
+      const au = p.blocks.find((b) => b.t === 'audio'), cur = ui.audio || { pos: 0, playing: false };
+      return this.setState({ ui: { ...ui, audio: { ...cur, pos: Math.max(0, Math.min(au.dur, (cur.pos || 0) + (a === 'right' ? 10 : -10))) } } });
+    }
+    if (a === 'up' || a === 'down') {
+      const d = a === 'up' ? -1 : 1;
+      if (inL) { const i = L.indexOf(f) + d; if (i >= 0 && i < L.length) move(L[i]); return; }
+      const nr = r + d; if (nr >= 0 && nr < R.length) move(R[nr][Math.min(c, R[nr].length - 1)]);
+      return;
+    }
+    if (a === 'left') { if (!inL) { if (c > 0) move(R[r][c - 1]); else { this.lastRight = f; move(L.includes('play') ? 'play' : L[0]); } } return; }
+    if (a === 'right') { if (inL) { if (R.length) { const flat = R.flat(); move(flat.includes(this.lastRight) ? this.lastRight : R[0][0]); } } else if (c < R[r].length - 1) move(R[r][c + 1]); return; }
+    if (a === 'play' && ui.audio) return this.setState({ ui: { ...ui, audio: { ...ui.audio, playing: !ui.audio.playing } } });
+    if (a !== 'ok') return;
+    if (f === 'author') { this.go('author', this.authorReset(p.a)); return; }
+    if (f === 'play') return this.startVod(p.id, ri);
+    if (f === 'restart') return this.startVod(p.id, ri, 0);
+    if (f.startsWith('vid-')) return this.startVod(p.id, +f.slice(4));
+    if (f === 'more') return this.setState({ ui: { ...ui, expanded: true }, pf2: 'par-3' });
+    if (f.startsWith('link-')) return this.setState({ qr: { title: 'Ссылка из поста', sub: 'example.ru', note: 'Откроется в браузере телефона.' } });
+    if (f.startsWith('file-')) { const b = p.blocks.find((x) => x.t === 'file'); return this.setState({ qr: { title: b.name, sub: 'Файл · ' + b.size, note: 'Ссылка подписана Boosty и действует ограниченное время. Если не откроется — закройте и откройте QR снова.' } }); }
+    if (f.startsWith('ext-')) { const b = p.blocks.find((x) => x.t === 'ext'); return this.setState({ qr: { title: b.title, sub: 'Видео на ' + b.host, note: 'Внешнее видео не воспроизводится в приложении.' } }); }
+    if (f === 'aud') { const cur = ui.audio || { pos: 0, playing: false }; return this.setState({ ui: { ...ui, audio: { ...cur, playing: !cur.playing } } }); }
+    const b = this.pollBlock();
+    if (b) {
+      const pu = ui.poll || {}, pv = this.D.pollView(b, pu);
+      if (pu.status === 'sending') return;
+      if (f.startsWith('opt-')) {
+        const o = b.options[+f.slice(4)];
+        if (b.multi) { if (pv.voted) return; const ch = pu.checked || []; return this.setState({ ui: { ...ui, poll: { ...pu, status: '', checked: ch.includes(o.id) ? ch.filter((x) => x !== o.id) : [...ch, o.id] } } }); }
+        if (pu.pending === o.id) return this.sendPoll(pv.voted && pv.opts.find((x) => x.id === o.id).voted ? { kind: 'retract', id: o.id } : { kind: 'single', id: o.id });
+        return this.setState({ ui: { ...ui, poll: { ...pu, pending: o.id, status: pu.status === 'error' ? '' : pu.status } } });
+      }
+      if (f === 'vote') return this.sendPoll({ kind: 'multi', ids: pu.checked || [], id: null });
+      if (f === 'retract') return this.sendPoll({ kind: 'retract', id: null });
+      if (f === 'poll-retry') return this.sendPoll(pu.last || { kind: 'single', id: null });
+    }
+  }
+  // ---------- player
+  startVod(postId, vi, from) {
+    const D = this.D, p = D.POSTS[postId], v = p.videos[vi];
+    let pos = from ?? D.vidPos(v, this.state.prog); if (pos >= v.dur - 10) pos = 0;
+    this.go('player', { pl: { kind: 'vod', postId, vi, key: v.key, pos, dur: v.dur, playing: true, overlay: true, f: 'tl', panel: '', pf: '', seek: null, buffering: true, recovering: false, error: '', ended: false, recoveredOnce: false } });
+    this.lastInput = Date.now();
+    this.later(700, () => this.setPl({ buffering: false }));
+  }
+  startLive(aid) {
+    const live = this.D.AUTHORS[aid].live;
+    this.go('player', { pl: { kind: 'live', aid, elapsed: live.elapsed, watched: 0, playing: true, overlay: true, f: 'pp', panel: '', pf: '', seek: null, buffering: true, recovering: false, error: '', ended: false } });
+    this.lastInput = Date.now();
+    this.later(700, () => this.setPl({ buffering: false }));
+  }
+  setPl(patch) { this.setState((s) => (s.pl ? { pl: { ...s.pl, ...patch } } : null)); }
+  exitPlayer() {
+    const s = this.state, pl = s.pl;
+    if (pl && pl.kind === 'vod') {
+      const prog = { ...s.prog, [pl.key]: Math.floor(pl.seek ?? pl.pos) };
+      this.setState({ prog });
+      try { localStorage.setItem('boostytv-proto', JSON.stringify({ prog })); } catch (e) {}
+    }
+    if (pl && pl.kind === 'live' && pl.ended) this.setState({ ended: { ...s.ended, [pl.aid]: true } });
+    this.back();
+    if (pl && pl.kind === 'live' && pl.ended) this.later(0, () => { if (this.state.scr === 'author' && this.state.auf === 'live') this.setState({ auf: 'post-0' }); });
+  }
+  seekBy(dir, e) {
+    const pl = this.state.pl; if (!pl || pl.kind === 'live') return;
+    this.reps = e && e.repeat ? this.reps + 1 : 0;
+    const step = this.reps < 3 ? 5 : this.reps < 8 ? 10 : this.reps < 14 ? 20 : 30;
+    const seek = Math.max(0, Math.min(pl.dur, (pl.seek ?? pl.pos) + dir * step));
+    this.setPl({ seek, overlay: true, f: 'tl' });
+    clearTimeout(this.seekT);
+    this.seekT = setTimeout(() => { const p2 = this.state.pl; if (p2 && p2.seek != null) this.setPl({ pos: p2.seek, seek: null }); }, 600);
+  }
+  k_player(a, e) {
+    const s = this.state, pl = s.pl; if (!pl) return;
+    const live = pl.kind === 'live';
+    if (pl.ended) { if (a === 'ok' || a === 'back') this.exitPlayer(); return; }
+    if (pl.error) {
+      if (a === 'left' || a === 'right') return this.setPl({ f: a === 'right' ? 'err-back' : 'err-retry' });
+      if (a === 'back' || (a === 'ok' && pl.f === 'err-back')) return this.exitPlayer();
+      if (a === 'ok') { this.setPl({ error: '', buffering: true, f: 'tl' }); this.later(900, () => this.setPl({ buffering: false, playing: true })); }
+      return;
+    }
+    if (pl.panel) {
+      const quals = ['auto', '1080p', '720p', '480p', '360p'], SP = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 3];
+      const list = pl.panel === 'settings' ? ['quality', ...(live ? [] : ['speed'])] : pl.panel === 'quality' ? quals.map((q) => 'q-' + q) : SP.map((x) => 'sp-' + x);
+      const i = list.indexOf(pl.pf);
+      if (a === 'up' && i > 0) return this.setPl({ pf: list[i - 1] });
+      if (a === 'down' && i < list.length - 1) return this.setPl({ pf: list[i + 1] });
+      if (a === 'menu') return this.setPl({ panel: '', f: 'set' });
+      if (a === 'back') return pl.panel === 'settings' ? this.setPl({ panel: '', f: 'set' }) : this.setPl({ panel: 'settings', pf: pl.panel });
+      if (a === 'ok') {
+        if (pl.panel === 'settings') return this.setPl({ panel: pl.pf, pf: pl.pf === 'quality' ? 'q-' + s.quality : 'sp-' + s.speed });
+        if (pl.panel === 'quality') { this.setState({ quality: pl.pf.slice(2) }); this.setPl({ panel: '', f: 'set', buffering: true }); this.later(700, () => this.setPl({ buffering: false })); return; }
+        if (pl.panel === 'speed') { this.setState({ speed: +pl.pf.slice(3) }); return this.setPl({ panel: 'settings', pf: 'speed' }); }
+      }
+      return;
+    }
+    if (a === 'menu') return this.setPl({ panel: 'settings', pf: 'quality', overlay: true });
+    if (a === 'play') return this.setPl({ playing: !pl.playing, overlay: true });
+    if (a === 'rew' || a === 'ff') return this.seekBy(a === 'ff' ? 1 : -1, e);
+    if (!pl.overlay) {
+      if (a === 'ok') return this.setPl({ playing: !pl.playing, overlay: true, f: live ? 'pp' : 'tl' });
+      if (a === 'left' || a === 'right') { if (!live) this.seekBy(a === 'right' ? 1 : -1, e); return; }
+      if (a === 'up' || a === 'down') return this.setPl({ overlay: true, f: live ? 'pp' : 'tl' });
+      if (a === 'back') return this.exitPlayer();
+      return;
+    }
+    const ctr = ['pp', ...(live ? ['like', 'share'] : []), 'set'];
+    if (a === 'back') return this.setPl({ overlay: false });
+    if (pl.f === 'tl') {
+      if (a === 'left' || a === 'right') return this.seekBy(a === 'right' ? 1 : -1, e);
+      if (a === 'ok') return this.setPl({ playing: !pl.playing });
+      if (a === 'down') return this.setPl({ f: 'pp' });
+      return;
+    }
+    const i = ctr.indexOf(pl.f);
+    if (a === 'left' && i > 0) return this.setPl({ f: ctr[i - 1] });
+    if (a === 'right' && i < ctr.length - 1) return this.setPl({ f: ctr[i + 1] });
+    if (a === 'up' && !live) return this.setPl({ f: 'tl' });
+    if (a === 'ok') {
+      if (pl.f === 'pp') return this.setPl({ playing: !pl.playing });
+      if (pl.f === 'set') return this.setPl({ panel: 'settings', pf: 'quality' });
+      if (pl.f === 'like') return this.setState({ liked: { ...s.liked, [pl.aid]: !s.liked[pl.aid] } });
+      if (pl.f === 'share') { const l = this.D.AUTHORS[pl.aid].live; return this.setState({ qr: { title: 'Эфир «' + l.title + '»', sub: 'boosty.to/…/streams/video_stream', note: 'Ссылка на страницу эфира' } }); }
+    }
+  }
+  onTick() {
+    const s = this.state; this.tick++;
+    if (s.scr === 'player' && s.pl) {
+      const pl = s.pl, idle = !pl.seek && pl.seek !== 0;
+      if (pl.playing && idle && !pl.buffering && !pl.error && !pl.ended && !pl.recovering) {
+        if (pl.kind === 'vod') { const pos = pl.pos + 0.25 * s.speed; if (pos >= pl.dur) this.setPl({ pos: pl.dur, playing: false, overlay: true }); else this.setPl({ pos }); }
+        else { const w = (pl.watched || 0) + 0.25; this.setPl({ elapsed: pl.elapsed + 0.25, watched: w, ...(w >= 20 ? { ended: true } : {}) }); }
+      }
+      if (pl.overlay && pl.playing && !pl.panel && pl.seek == null && !pl.error && Date.now() - this.lastInput > 5000) this.setPl({ overlay: false });
+    }
+    if (s.scr === 'post' && s.ui.audio && s.ui.audio.playing) {
+      const au = this.D && this.D.POSTS[s.pid].blocks.find((b) => b.t === 'audio');
+      if (au) this.setState({ ui: { ...s.ui, audio: { ...s.ui.audio, pos: Math.min(au.dur, s.ui.audio.pos + 0.25) } } });
+    }
+    if (s.scr === 'code' && s.resend > 0 && this.tick % 4 === 0) {
+      const r = s.resend - 1;
+      this.setState({ resend: r, ...(r === 0 && s.af === 'login' ? {} : {}) });
+    }
+  }
+  // ---------- search / events / settings
+  runSearch() {
+    const q = this.state.q.trim(); if (!q) return this.setState({ sst: 'idle', srf: 'field' });
+    this.setState({ sst: 'loading', srf: 'field' });
+    this.later(700, () => {
+      if (this.state.failNext) return this.setState({ sst: 'error', srf: 'retry', failNext: false });
+      const P = this.D.POSTS, ql = q.toLowerCase();
+      const ids = Object.keys(P).filter((k) => P[k].a !== 'me' && P[k].title.toLowerCase().includes(ql));
+      this.setState(ids.length ? { sst: 'results', sids: ids, srf: 'res-0' } : { sst: 'empty', sids: [], srf: 'field' });
+    });
+  }
+  k_search(a) {
+    const s = this.state, f = s.srf;
+    if (f.startsWith('nav-')) return this.navKeys(a);
+    if (a === 'back') return this.toNav();
+    const below = s.sst === 'results' ? 'res-0' : s.sst === 'error' ? 'retry' : null;
+    if (f === 'field' || f === 'filters') {
+      if (a === 'left') return f === 'filters' ? this.setState({ srf: 'field' }) : this.toNav();
+      if (a === 'right' && f === 'field') return this.setState({ srf: 'filters' });
+      if (a === 'down' && below) return this.setState({ srf: below });
+      if (a === 'ok') return f === 'field' ? this.setState({ skb: true }) : this.toast('Фильтры — как у автора, см. сценарий 5');
+      return;
+    }
+    if (f === 'retry') { if (a === 'up') this.setState({ srf: 'field' }); if (a === 'left') this.toNav(); if (a === 'ok') this.runSearch(); return; }
+    const i = +f.slice(4), r = this.grid(i, s.sids.length, 4, a);
+    if (a === 'ok') return this.openPost(s.sids[i]);
+    if (r === 'L') return this.toNav();
+    if (r === 'U') return this.setState({ srf: 'field' });
+    if (typeof r === 'number') this.setState({ srf: 'res-' + r });
+  }
+  k_events(a) {
+    const s = this.state, f = s.ef;
+    if (f.startsWith('nav-')) return this.navKeys(a);
+    if (a === 'back' || a === 'left') return this.toNav();
+    const i = +f.slice(3), n = this.D.EVENTS.length;
+    if (a === 'up' && i > 0) this.setState({ ef: 'ev-' + (i - 1) });
+    if (a === 'down' && i < n - 1) this.setState({ ef: 'ev-' + (i + 1) });
+    if (a === 'ok') { this.setState({ read: [...new Set([...s.read, i])] }); this.openAuthor(this.D.EVENTS[i].a); }
+  }
+  k_settings(a) {
+    const s = this.state, f = s.setf;
+    if (s.modal) {
+      if (a === 'left' || a === 'right') return this.setState({ mf: a === 'right' ? 'confirm' : 'cancel' });
+      if (a === 'back' || (a === 'ok' && s.mf === 'cancel')) return this.setState({ modal: '', setf: 'logout' });
+      if (a === 'ok') { const keep = { vw: s.vw, vh: s.vh }; this.setState({ ...this.init(), ...keep }); this.toast('Вы вышли из аккаунта'); }
+      return;
+    }
+    if (f.startsWith('nav-')) return this.navKeys(a);
+    const list = s.setMode === 'diag' ? ['log', 'save'] : ['sys', 'ver', ...(s.diag ? ['diag'] : []), 'logout'];
+    const i = list.indexOf(f);
+    if (a === 'back') return s.setMode === 'diag' ? this.setState({ setMode: 'main', setf: 'diag' }) : this.toNav();
+    if (a === 'left') return this.toNav();
+    if (a === 'up' && i > 0) return this.setState({ setf: list[i - 1] });
+    if (a === 'down' && i < list.length - 1) return this.setState({ setf: list[i + 1] });
+    if (a !== 'ok') return;
+    if (f === 'sys') this.setState({ sys: !s.sys });
+    else if (f === 'ver') { const t = s.taps + 1; if (t >= 7 && !s.diag) { this.setState({ taps: t, diag: true }); this.toast('Диагностика открыта'); } else { this.setState({ taps: t }); if (t >= 4 && !s.diag) this.toast('Ещё ' + (7 - t)); } }
+    else if (f === 'diag') this.setState({ setMode: 'diag', setf: 'log' });
+    else if (f === 'logout') this.setState({ modal: 'logout', mf: 'cancel' });
+    else if (f === 'log') this.setState({ logOn: !s.logOn });
+    else if (f === 'save') { this.setState({ saved: true }); this.toast('Журнал сохранён'); }
+  }
+  // ---------- scenarios
+  preset(patch, stack = []) { const keep = { vw: this.state.vw, vh: this.state.vh, prog: this.state.prog }; this.setState({ ...this.init(), ...keep, ...patch, stack }); this.lastContent = {}; }
+  renderVals() {
+    const s = this.state, D = this.D;
+    const scale = Math.min((s.vw - 32) / 1920, (s.vh - 190) / 1080, 1);
+    const sc = Math.max(0.3, scale);
+    const base = {
+      st: s, fw: Math.round(1920 * sc) + 'px', fh: Math.round(1080 * sc) + 'px', tvScale: `scale(${sc})`,
+      loading: !D, hasQr: !!s.qr, hasToast: !!s.toast,
+      failBg: s.failNext ? '#3A1E1B' : '#221F1D', failColor: s.failNext ? '#F08C7C' : '#E6E0D8',
+      failLabel: s.failNext ? 'Следующий запрос упадёт ✓' : 'Сбой сети для следующего запроса',
+      toggleFail: () => this.setState({ failNext: !this.state.failNext }),
+      expireLink: () => {
+        const pl = this.state.pl;
+        if (this.state.scr !== 'player' || !pl || pl.kind !== 'vod') return this.toast('Откройте видео');
+        if (pl.recoveredOnce) { this.setPl({ error: 'fail', f: 'err-retry' }); return; }
+        this.setPl({ recovering: true, overlay: false });
+        this.later(1800, () => this.setPl({ recovering: false, recoveredOnce: true }));
+      },
+      expireSession: () => this.preset({ scr: 'expired', af: 'relogin', phone: '9162451807' }),
+      scen: [
+        { label: '1 · Вход', go: () => this.preset({ scr: 'welcome' }) },
+        { label: '2 · Подписки → автор → пост с двумя видео', go: () => this.preset({ scr: 'home', hf: 'nav-subs' }) },
+        { label: '3 · Продолжить просмотр', go: () => this.preset({ scr: 'home', hf: 'cont-0' }) },
+        { label: '4 · Поиск по подпискам', go: () => this.preset({ scr: 'search', srf: 'field' }) },
+        { label: '5 · Фильтры автора', go: () => this.preset({ scr: 'author', aid: 'ml', auf: 'filters' }, [{ scr: 'subs', snap: {} }]) },
+        { label: '6 · Опрос, один вариант', go: () => this.preset({ scr: 'post', pid: 'poll1', pf2: 'opt-0' }, [{ scr: 'home', snap: {} }]) },
+        { label: '6 · Опрос, несколько', go: () => this.preset({ scr: 'post', pid: 'poll2', pf2: 'opt-0' }, [{ scr: 'home', snap: {} }]) },
+        { label: '7 · Эфир', go: () => this.preset({ scr: 'author', aid: 'ab', auf: 'live', sf: 'tile-6' }, [{ scr: 'subs', snap: {} }]) },
+        { label: '8 · Файл и QR', go: () => this.preset({ scr: 'post', pid: 'file', pf2: 'file-0' }, [{ scr: 'home', snap: {} }]) },
+        { label: '9 · Ошибка сети', go: () => this.preset({ scr: 'subs', sf: 'tile-1', failNext: true }) },
+        { label: '9 · Закрытый пост', go: () => this.preset({ scr: 'post', pid: 'locked', pf2: 'author' }, [{ scr: 'home', snap: {} }]) },
+        { label: '9 · Выход', go: () => this.preset({ scr: 'settings', setf: 'logout' }) }
+      ]
+    };
+    if (!D) return base;
+    const scr = s.scr;
+    const isAuth = ['welcome', 'phone', 'code', 'captcha', 'limit', 'expired'].includes(scr);
+    let authS = null;
+    if (isAuth) {
+      const af = s.af, ph = this.fmtPhone(s.phone);
+      if (scr === 'welcome') authS = { hero: true, top: 300, title: 'Boosty TV', accentTail: ' TV', body: 'Видео из ваших подписок Boosty на телевизоре.', buttons: [{ label: 'Войти в Boosty', kind: 'primary', f: true }], footer: 'Неофициальный клиент, не связан с Boosty. Вход по номеру телефона и коду.' };
+      if (scr === 'phone') authS = { step: 'Шаг 1 из 2', title: 'Номер телефона', body: 'Номер, привязанный к вашему аккаунту Boosty. На него придёт код для входа.', field: { label: 'Номер телефона', prefix: '+7', placeholder: '900 000-00-00', value: ph, state: s.kb ? 'typing' : 'idle', f: af === 'field' }, error: s.authErr, kb: s.kb, kbKey: -1, buttons: [{ label: s.sending ? 'Отправляем код…' : 'Получить код', kind: 'primary', f: af === 'send' }, { label: 'Назад', f: af === 'back' }] };
+      if (scr === 'code') {
+        const btns = s.codeExpired ? [{ label: 'Выслать новый код', kind: 'primary', f: af === 'newcode' }, { label: 'Изменить номер', f: af === 'change' }]
+          : [{ label: s.sending ? 'Проверяем…' : 'Войти', kind: 'primary', f: af === 'login' }, { label: 'Выслать повторно', kind: s.resend > 0 ? 'disabled' : 'secondary', sub: s.resend > 0 ? '0:' + String(s.resend).padStart(2, '0') : '', f: af === 'resend' }, { label: 'Изменить номер', f: af === 'change' }];
+        authS = { step: 'Шаг 2 из 2', title: 'Введите код', body: `Код отправлен на +7 ${ph}. Он может прийти по SMS, в мессенджер или в приложение Boosty.`, field: { label: 'Код из сообщения', placeholder: 'Введите код', value: s.code, state: s.kb ? 'typing' : 'idle', f: af === 'field' }, error: s.authErr, kb: s.kb, kbKey: -1, hint: s.resend === 0 && !s.codeExpired ? 'Код не пришёл? Можно запросить ещё раз.' : '', buttons: btns };
+      }
+      if (scr === 'limit') authS = { top: 240, icon: 'warn', title: 'Слишком много попыток', body: 'Boosty временно ограничил вход по этому номеру. Подождите и попробуйте снова.', buttons: [{ label: 'Изменить номер', f: af === 'change' }, { label: 'На первый экран', f: af === 'first' }] };
+      if (scr === 'captcha') authS = { top: 240, icon: 'error', title: 'Boosty требует дополнительную проверку', body: 'Boosty попросил подтвердить, что входит человек. Пройти эту проверку с телевизора сейчас нельзя.', body2: 'Попробуйте войти позже. Если проверка появляется снова, вход через приложение временно недоступен.', buttons: [{ label: 'Попробовать снова', f: af === 'retry' }, { label: 'Изменить номер', f: af === 'change' }], footer: 'Для диагностики: captcha_required' };
+      if (scr === 'expired') authS = { top: 280, title: 'Сессия истекла', body: 'Boosty завершил вход на этом телевизоре. Войдите снова — позиции просмотра хранятся в Boosty и не потеряются.', buttons: [{ label: 'Войти снова', kind: 'primary', f: true }] };
+    }
+    let pv = {};
+    if (scr === 'player' && s.pl) {
+      const pl = s.pl;
+      if (pl.kind === 'vod') {
+        const p = D.POSTS[pl.postId], a = D.AUTHORS[p.a], v = p.videos[pl.vi];
+        pv = { v: { title: p.title, sub: p.videos.length > 1 ? `Видео ${pl.vi + 1} из ${p.videos.length} · ${v.title}` : '', name: a.name, ini: a.ini, hue: a.hue, dur: v.dur }, pos: pl.pos, live: null };
+      } else {
+        const a = D.AUTHORS[pl.aid];
+        pv = { v: { title: a.live.title, sub: a.title, name: a.name, ini: a.ini, hue: a.hue, dur: 1 }, pos: 0, live: { ...a.live, elapsed: pl.elapsed, likes: a.live.likes }, liked: !!s.liked[pl.aid] };
+      }
+      Object.assign(pv, { playing: pl.playing, overlay: pl.overlay, f: pl.f, panel: pl.panel, pf: pl.pf, seek: pl.seek, buffering: pl.buffering, recovering: pl.recovering, error: pl.error, ended: pl.ended });
+    }
+    return {
+      ...base, isAuth, authS, pv,
+      isHome: scr === 'home', isSubs: scr === 'subs', isAuthor: scr === 'author', isPost: scr === 'post', isPlayer: scr === 'player',
+      isSearch: scr === 'search', isEvents: scr === 'events', isSettings: scr === 'settings', isNet: scr === 'neterr',
+      authorLiked: !!s.liked[s.aid], authorLive: s.ended[s.aid] ? 'none' : undefined
+    };
+  }
+}
+</script>
+</body>
+</html>

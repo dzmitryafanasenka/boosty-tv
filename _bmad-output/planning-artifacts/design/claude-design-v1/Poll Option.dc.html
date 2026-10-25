@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&display=swap" rel="stylesheet"></helmet>
+<div style="position:relative;width:{{w}};height:84px;box-sizing:border-box;border-radius:14px;overflow:hidden;background:{{bg}};border:{{border}};outline:{{ring}};outline-offset:4px;transform:{{tf}};font-family:'Golos Text',sans-serif;color:#F4EFE7;transition:transform 160ms cubic-bezier(0.2,0,0,1)">
+  <div style="position:absolute;left:0;top:0;bottom:0;width:{{pctW}};background:{{barBg}}"></div>
+  <div style="position:relative;height:100%;display:flex;align-items:center;gap:20px;padding:0 24px">
+    <sc-if value="{{hasMark}}"><div style="flex:none;width:32px;height:32px;box-sizing:border-box;border-radius:{{markRad}};border:3px solid {{markBorder}};background:{{markBg}};color:#1E140A;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700">{{glyph}}</div></sc-if>
+    <div style="flex:1;min-width:0;font-size:26px;font-weight:{{tw}};color:{{tc}};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{o.text}}</div>
+    <sc-if value="{{hasHint}}"><div style="flex:none;font-size:22px;font-weight:600;color:#F2A462;white-space:nowrap">{{hint}}</div></sc-if>
+    <div style="flex:none;font-size:24px;color:#B7B0A6;font-variant-numeric:tabular-nums;white-space:nowrap">{{o.pct}}% · {{o.count}}</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1000,&quot;height&quot;:120},&quot;o&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object&quot;},&quot;multi&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;f&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;checked&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;pending&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;&quot;,&quot;vote&quot;,&quot;retract&quot;],&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;finished&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;sending&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;w&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:960,&quot;tsType&quot;:&quot;number&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const P = this.props;
+    const o = P.o || { text: 'Вариант ответа', pct: 38, count: 81, voted: false };
+    const f = !!P.f && !P.finished, multi = !!P.multi, chk = multi ? !!P.checked || o.voted : o.voted;
+    const pend = P.pending || '';
+    return {
+      o, w: (P.w ?? 960) + 'px',
+      bg: P.finished ? '#1E1C1A' : '#221F1D',
+      border: pend ? '3px dashed #E8914A' : '3px solid transparent',
+      ring: f ? '4px solid #F4EFE7' : '4px solid transparent',
+      tf: f ? 'scale(1.02)' : 'none',
+      pctW: (o.pct || 0) + '%',
+      barBg: o.voted ? 'rgba(232,145,74,0.30)' : 'rgba(244,239,231,0.08)',
+      hasMark: !P.finished || o.voted,
+      markRad: multi ? '8px' : '50%',
+      markBorder: chk ? '#E8914A' : '#8F887F',
+      markBg: chk ? '#E8914A' : 'transparent',
+      glyph: chk ? '✓' : '',
+      tw: o.voted || f ? 600 : 500,
+      tc: P.finished && !o.voted ? '#B7B0A6' : '#F4EFE7',
+      hasHint: !!pend || !!P.sending,
+      hint: P.sending ? 'Отправляем…' : pend === 'retract' ? 'OK ещё раз — отозвать' : 'OK ещё раз — голосовать'
+    };
+  }
+}
+</script>
+</body>
+</html>

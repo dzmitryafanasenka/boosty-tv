@@ -1,0 +1,119 @@
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created, ready for development
+#   - in-progress: Developer actively working on implementation
+#   - review: Implementation complete, ready for review
+#   - done: Story completed
+
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+
+# Action Item Status:
+#   - open: Committed during a retrospective, not yet addressed
+#   - in-progress: Actively being worked on
+#   - done: Completed
+
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when its first story starts (via build's sprint sync)
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates the next story after the previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+# - Retrospective appends its action items to action_items; the status view surfaces open ones
+generated: 10-25-2026 14:34
+last_updated: 10-25-2026 14:34
+project: Boosty TV
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+development_status:
+  epic-1: backlog
+  1-1-production-project-skeleton: backlog
+  1-2-library-compatibility-on-the-device: backlog
+  1-3-spike-phone-sign-in-and-token-persistence: backlog
+  1-4-spike-refresh-and-logout-behavior: backlog
+  1-5-spike-entitlement-errors-and-events-shapes: backlog
+  1-6-spike-authorized-playback-expiry-and-progress-round-trip: backlog
+  1-7-spike-audio-and-files: backlog
+  1-8-focus-map-and-spike-decision: backlog
+  epic-1-retrospective: optional
+
+  epic-2: backlog
+  2-1-welcome-screen-on-the-design-foundation: backlog
+  2-2-request-a-sign-in-code-by-phone: backlog
+  2-3-confirm-the-code-and-create-the-session: backlog
+  2-4-the-app-shell-sidebar-back-and-focus: backlog
+  2-5-stay-signed-in-across-restarts-and-expiry: backlog
+  2-6-session-expired-and-quick-re-login: backlog
+  2-7-minimal-settings-and-sign-out: backlog
+  2-8-account-switch-never-leaks-data: backlog
+  epic-2-retrospective: optional
+
+  epic-3: backlog
+  3-1-subscription-feed-on-the-home-screen: backlog
+  3-2-subscriptions-grid: backlog
+  3-3-author-page: backlog
+  3-4-post-screen: backlog
+  3-5-media-rows-in-a-post: backlog
+  3-6-locked-posts: backlog
+  epic-3-retrospective: optional
+
+  epic-4: backlog
+  4-1-play-a-video-from-a-post: backlog
+  4-2-progress-is-saved-and-playback-resumes: backlog
+  4-3-choose-video-quality: backlog
+  4-4-recover-from-expired-links-and-playback-errors: backlog
+  4-5-finishing-a-video: backlog
+  4-6-sleep-background-and-audio-focus: backlog
+  4-7-continue-watching-row-on-the-home-screen: backlog
+  epic-4-retrospective: optional
+
+  epic-5: backlog
+  5-1-refresh-the-feed: backlog
+  5-2-my-blog-tile-in-subscriptions: backlog
+  5-3-filter-the-feed-by-access: backlog
+  5-4-filter-by-period: backlog
+  5-5-filter-by-tags: backlog
+  5-6-search-in-subscriptions: backlog
+  5-7-search-and-filters-inside-an-author: backlog
+  epic-5-retrospective: optional
+
+  epic-6: backlog
+  6-1-rich-text-emoji-and-long-posts: backlog
+  6-2-images-in-posts: backlog
+  6-3-links-files-and-external-videos-via-qr: backlog
+  6-4-inline-audio: backlog
+  6-5-poll-display: backlog
+  6-6-vote-and-retract-in-a-single-choice-poll: backlog
+  6-7-multiple-choice-poll: backlog
+  epic-6-retrospective: optional
+
+  epic-7: backlog
+  7-1-live-stream-card-on-the-author-page: backlog
+  7-2-watch-a-live-stream: backlog
+  7-3-live-viewer-heartbeat: backlog
+  7-4-like-and-share-a-live-stream: backlog
+  7-5-events-list: backlog
+  epic-7-retrospective: optional
+
+  epic-8: backlog
+  8-1-playback-speed: backlog
+  8-2-system-video-player-option: backlog
+  8-3-hidden-diagnostics-for-testing: backlog
+  epic-8-retrospective: optional
+
+  epic-9: backlog
+  9-1-signed-release-on-github-releases: backlog
+  9-2-update-notice-from-github-releases: backlog
+  9-3-performance-on-the-device: backlog
+  9-4-visual-fidelity-and-accessibility-pass: backlog
+  9-5-full-device-regression-and-owner-acceptance: backlog
+  epic-9-retrospective: optional

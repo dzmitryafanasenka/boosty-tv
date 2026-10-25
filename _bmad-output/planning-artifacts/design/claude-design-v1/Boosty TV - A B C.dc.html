@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#E6E3DE;} a{color:#A8581A;} a:hover{color:#7A3F12;}</style>
+</helmet>
+<section style="padding:120px 120px 40px;font-family:'Golos Text',sans-serif;color:#1E1C1A;display:flex;flex-direction:column;gap:48px">
+  <div style="display:flex;flex-direction:column;gap:16px;max-width:2400px">
+    <div style="font-size:88px;font-weight:700;letter-spacing:-0.02em">Boosty TV — экраны A, B, C</div>
+    <div style="font-size:32px;line-height:1.45;color:#4F4A44;max-width:2000px">Неофициальный клиент Boosty для Android TV. Кадр 1920×1080 в дизайн-координатах (на Android TV 1080p это 960×540 dp, 1 dp = 2 px). Под каждым макетом: начальный фокус, переходы и ID из feature-parity. Разделы D–L будут в следующих итерациях.</div>
+  </div>
+  <div style="width:3960px;box-sizing:border-box;background:#171615;border-radius:16px;padding:64px;display:flex;flex-wrap:wrap;gap:72px;color:#F4EFE7;align-items:flex-start">
+    <div style="display:flex;flex-direction:column;gap:28px">
+      <div style="font-size:24px;color:#8F887F;font-family:'JetBrains Mono',monospace">ФОКУС И СОСТОЯНИЯ</div>
+      <div style="display:flex;gap:40px;align-items:center">
+        <div style="display:flex;flex-direction:column;gap:14px;align-items:flex-start"><div style="height:80px;box-sizing:border-box;padding:0 40px;border-radius:16px;display:flex;align-items:center;font-size:28px;font-weight:600;background:#F2A05A;color:#1E140A;outline:4px solid #F4EFE7;outline-offset:4px;transform:scale(1.04)">Основная · фокус</div><div style="font-size:20px;color:#8F887F">контур 4 px + зазор 4 px + ×1.04</div></div>
+        <div style="display:flex;flex-direction:column;gap:14px;align-items:flex-start"><div style="height:80px;box-sizing:border-box;padding:0 40px;border-radius:16px;display:flex;align-items:center;font-size:28px;font-weight:600;background:#E8914A;color:#1E140A">Основная</div><div style="font-size:20px;color:#8F887F">по умолчанию</div></div>
+        <div style="display:flex;flex-direction:column;gap:14px;align-items:flex-start"><div style="height:80px;box-sizing:border-box;padding:0 40px;border-radius:16px;display:flex;align-items:center;font-size:28px;font-weight:600;background:#46413B;color:#F4EFE7;outline:4px solid #F4EFE7;outline-offset:4px;transform:scale(1.04)">Вторичная · фокус</div><div style="font-size:20px;color:#8F887F">поверхность светлеет</div></div>
+        <div style="display:flex;flex-direction:column;gap:14px;align-items:flex-start"><div style="height:80px;box-sizing:border-box;padding:0 40px;border-radius:16px;display:flex;align-items:center;font-size:28px;font-weight:600;background:#2E2B28;color:#F4EFE7">Вторичная</div><div style="font-size:20px;color:#8F887F">по умолчанию</div></div>
+        <div style="display:flex;flex-direction:column;gap:14px;align-items:flex-start"><div style="height:80px;box-sizing:border-box;padding:0 40px;border-radius:16px;display:flex;align-items:center;gap:14px;font-size:28px;font-weight:600;background:#201E1C;color:#6E6962">Недоступна<span style="font-weight:500">0:42</span></div><div style="font-size:20px;color:#8F887F">не получает фокус</div></div>
+        <div style="display:flex;flex-direction:column;gap:14px;align-items:flex-start"><div style="height:80px;box-sizing:border-box;padding:0 40px;border-radius:16px;display:flex;align-items:center;font-size:28px;font-weight:600;background:#F2A05A;color:#1E140A;transform:scale(0.98)">Нажато</div><div style="font-size:20px;color:#8F887F">×0.98, 80 мс, без контура</div></div>
+      </div>
+      <div style="display:flex;gap:40px;align-items:center">
+        <div style="display:flex;flex-direction:column;gap:14px;align-items:flex-start"><div style="position:relative;width:240px;height:72px;box-sizing:border-box;padding:0 24px;border-radius:14px;display:flex;align-items:center;font-size:28px;font-weight:600;background:#2A2724;color:#F2A462"><div style="position:absolute;left:0;top:20px;bottom:20px;width:5px;border-radius:3px;background:#E8914A"></div>Главная</div><div style="font-size:20px;color:#8F887F">текущий раздел: метка + цвет</div></div>
+        <div style="display:flex;flex-direction:column;gap:14px;align-items:flex-start"><div style="width:240px;height:72px;box-sizing:border-box;padding:0 24px;border-radius:14px;display:flex;align-items:center;font-size:28px;font-weight:600;background:#423D37;color:#FFFFFF;outline:4px solid #F4EFE7;outline-offset:4px;transform:scale(1.04)">Подписки</div><div style="font-size:20px;color:#8F887F">раздел в фокусе</div></div>
+        <div style="font-size:24px;line-height:1.5;color:#B7B0A6;max-width:900px">Фокус всегда светлый контур, текущий выбор всегда оранжевый. Один и тот же элемент может быть текущим и в фокусе одновременно. Поля ввода не масштабируются, их контур — рамка поля.</div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:28px">
+      <div style="font-size:24px;color:#8F887F;font-family:'JetBrains Mono',monospace">ЦВЕТ</div>
+      <div style="display:grid;grid-template-columns:repeat(4,200px);gap:20px">
+        <sc-for list="{{swatches}}" as="w" hint-placeholder-count="8">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="height:72px;border-radius:12px;background:{{w.c}};border:1px solid #3A3632"></div>
+            <div style="font-size:22px">{{w.n}}</div>
+            <div style="font-size:18px;color:#8F887F;font-family:'JetBrains Mono',monospace">{{w.c}}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:20px;max-width:760px">
+      <div style="font-size:24px;color:#8F887F;font-family:'JetBrains Mono',monospace">ТИПОГРАФИКА · СЕТКА · ДВИЖЕНИЕ</div>
+      <div style="font-size:24px;line-height:1.6;color:#B7B0A6">Golos Text. Заголовок экрана 44–56 / 600. Секция 32 / 600. Заголовок карточки 26/32 / 600, не больше 2 строк. Мета 22. Минимум на экране — 20 (подписи бейджей).</div>
+      <div style="font-size:24px;line-height:1.6;color:#B7B0A6">Safe area 96 px по бокам, 54 px сверху и снизу (5%). Сайдбар 336, контент 1440 = 4 карточки по 336 с шагом 32.</div>
+      <div style="font-size:24px;line-height:1.6;color:#B7B0A6">Фокус: 160 мс, cubic-bezier(0.2, 0, 0, 1). Нажатие: 80 мс. Прокрутка к фокусу: 240 мс, та же кривая.</div>
+    </div>
+  </div>
+</section>
+<section id="A" style="padding:80px 120px;font-family:'Golos Text',sans-serif;color:#1E1C1A;display:flex;flex-direction:column;gap:56px">
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div style="font-size:72px;font-weight:700;letter-spacing:-0.02em">A. Вход и сессия</div>
+    <div style="font-size:28px;color:#5A554F">AUTH-03 телефон + код · AUTH-05/06 сессия · вход нужен редко, поэтому экраны простые и линейные</div>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:120px;max-width:3960px">
+    <sc-for list="{{auth}}" as="item" hint-placeholder-count="4">
+      <div id="{{item.id}}" style="width:1920px;display:flex;flex-direction:column;gap:28px">
+        <div style="display:flex;align-items:center;gap:20px">
+          <div style="background:#1E1C1A;color:#F4EFE7;font-family:'JetBrains Mono',monospace;font-size:28px;padding:6px 16px;border-radius:8px">{{item.id}}</div>
+          <div style="font-size:36px;font-weight:600">{{item.name}}</div>
+        </div>
+        <div style="width:1920px;height:1080px;overflow:hidden;border-radius:8px;box-shadow:0 20px 50px rgba(0,0,0,0.18)">
+          <dc-import name="Auth Screen" s="{{item.s}}" hint-size="1920px,1080px"></dc-import>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <sc-for list="{{item.notes}}" as="n" hint-placeholder-count="3">
+            <div style="display:flex;gap:20px;font-size:24px;line-height:1.45;color:#3B3835">
+              <div style="flex:none;width:170px;font-family:'JetBrains Mono',monospace;font-size:20px;color:#7A746C;padding-top:3px">{{n.k}}</div>
+              <div style="text-wrap:pretty">{{n.v}}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</section>
+<section id="B" style="padding:80px 120px;font-family:'Golos Text',sans-serif;color:#1E1C1A;display:flex;flex-direction:column;gap:56px">
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div style="font-size:72px;font-weight:700;letter-spacing:-0.02em">B. Главная (лента)</div>
+    <div style="font-size:28px;color:#5A554F">FEED-01…04 · «Продолжить просмотр» — улучшение клиента (локальная история + серверная позиция PLAY-03/04)</div>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:120px;max-width:3960px;align-items:flex-start">
+    <sc-for list="{{home}}" as="item" hint-placeholder-count="4">
+      <div id="{{item.id}}" style="width:1920px;display:flex;flex-direction:column;gap:28px">
+        <div style="display:flex;align-items:center;gap:20px">
+          <div style="background:#1E1C1A;color:#F4EFE7;font-family:'JetBrains Mono',monospace;font-size:28px;padding:6px 16px;border-radius:8px">{{item.id}}</div>
+          <div style="font-size:36px;font-weight:600">{{item.name}}</div>
+        </div>
+        <div style="width:1920px;height:1080px;overflow:hidden;border-radius:8px;box-shadow:0 20px 50px rgba(0,0,0,0.18)">
+          <dc-import name="Home Feed" mode="{{item.mode}}" focus="{{item.focus}}" more="{{item.more}}" all="{{item.all}}" hint-size="1920px,1080px"></dc-import>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <sc-for list="{{item.notes}}" as="n" hint-placeholder-count="3">
+            <div style="display:flex;gap:20px;font-size:24px;line-height:1.45;color:#3B3835">
+              <div style="flex:none;width:170px;font-family:'JetBrains Mono',monospace;font-size:20px;color:#7A746C;padding-top:3px">{{n.k}}</div>
+              <div style="text-wrap:pretty">{{n.v}}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-for>
+    <div id="B7" style="width:1920px;display:flex;flex-direction:column;gap:28px">
+      <div style="display:flex;align-items:center;gap:20px">
+        <div style="background:#1E1C1A;color:#F4EFE7;font-family:'JetBrains Mono',monospace;font-size:28px;padding:6px 16px;border-radius:8px">B7</div>
+        <div style="font-size:36px;font-weight:600">Карточка: длительность и типы</div>
+      </div>
+      <div style="width:1920px;box-sizing:border-box;background:#171615;border-radius:8px;padding:64px 96px;display:flex;flex-direction:column;gap:56px;box-shadow:0 20px 50px rgba(0,0,0,0.18)">
+        <div style="display:flex;gap:64px">
+          <div style="display:flex;flex-direction:column;gap:24px">
+            <div style="font-size:24px;color:#8F887F">Продолжить: длительность известна</div>
+            <dc-import name="Post Card" p="{{v.contDur}}" focused="{{false}}" hint-size="336px,314px"></dc-import>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:24px">
+            <div style="font-size:24px;color:#8F887F">Продолжить: длительности нет</div>
+            <dc-import name="Post Card" p="{{v.contNoDur}}" focused="{{false}}" hint-size="336px,314px"></dc-import>
+          </div>
+          <div style="width:2px;background:#2E2B28"></div>
+          <div style="display:flex;flex-direction:column;gap:24px">
+            <div style="font-size:24px;color:#8F887F">Лента: без длительности (по умолчанию)</div>
+            <dc-import name="Post Card" p="{{v.feedNoDur}}" focused="{{false}}" hint-size="336px,314px"></dc-import>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:24px">
+            <div style="font-size:24px;color:#8F887F">Лента: если API отдаст длительность</div>
+            <dc-import name="Post Card" p="{{v.feedDur}}" focused="{{false}}" hint-size="336px,314px"></dc-import>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:24px">
+          <div style="font-size:24px;color:#8F887F">Типы постов · фокус на «Эфир»</div>
+          <div style="display:grid;grid-template-columns:repeat(4,336px);column-gap:56px;row-gap:48px">
+            <sc-for list="{{v.types}}" as="c" hint-placeholder-count="8">
+              <dc-import name="Post Card" p="{{c.p}}" focused="{{c.f}}" hint-size="336px,314px"></dc-import>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <sc-for list="{{v.notes}}" as="n" hint-placeholder-count="3">
+          <div style="display:flex;gap:20px;font-size:24px;line-height:1.45;color:#3B3835">
+            <div style="flex:none;width:170px;font-family:'JetBrains Mono',monospace;font-size:20px;color:#7A746C;padding-top:3px">{{n.k}}</div>
+            <div style="text-wrap:pretty">{{n.v}}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <div id="B8" style="width:1280px;display:flex;flex-direction:column;gap:28px">
+      <div style="display:flex;align-items:center;gap:20px">
+        <div style="background:#1E1C1A;color:#F4EFE7;font-family:'JetBrains Mono',monospace;font-size:28px;padding:6px 16px;border-radius:8px">B8</div>
+        <div style="font-size:36px;font-weight:600">Главная на 1280×720</div>
+      </div>
+      <div style="width:1280px;height:720px;overflow:hidden;border-radius:8px;box-shadow:0 20px 50px rgba(0,0,0,0.18)">
+        <div style="width:1920px;height:1080px;transform:scale(0.666667);transform-origin:0 0">
+          <dc-import name="Home Feed" mode="top" focus="cont-0" hint-size="1920px,1080px"></dc-import>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <sc-for list="{{v.notes720}}" as="n" hint-placeholder-count="3">
+          <div style="display:flex;gap:20px;font-size:24px;line-height:1.45;color:#3B3835">
+            <div style="flex:none;width:170px;font-family:'JetBrains Mono',monospace;font-size:20px;color:#7A746C;padding-top:3px">{{n.k}}</div>
+            <div style="text-wrap:pretty">{{n.v}}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+</section>
+<section id="C" style="padding:80px 120px 160px;font-family:'Golos Text',sans-serif;color:#1E1C1A;display:flex;flex-direction:column;gap:56px">
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div style="font-size:72px;font-weight:700;letter-spacing:-0.02em">C. Подписки</div>
+    <div style="font-size:28px;color:#5A554F">SUB-01 список авторов · SUB-02 «Мой блог» · оформление платной подписки здесь не появляется</div>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:120px;max-width:3960px">
+    <sc-for list="{{subs}}" as="item" hint-placeholder-count="3">
+      <div id="{{item.id}}" style="width:1920px;display:flex;flex-direction:column;gap:28px">
+        <div style="display:flex;align-items:center;gap:20px">
+          <div style="background:#1E1C1A;color:#F4EFE7;font-family:'JetBrains Mono',monospace;font-size:28px;padding:6px 16px;border-radius:8px">{{item.id}}</div>
+          <div style="font-size:36px;font-weight:600">{{item.name}}</div>
+        </div>
+        <div style="width:1920px;height:1080px;overflow:hidden;border-radius:8px;box-shadow:0 20px 50px rgba(0,0,0,0.18)">
+          <dc-import name="Subscriptions" mode="{{item.mode}}" focus="{{item.focus}}" hint-size="1920px,1080px"></dc-import>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <sc-for list="{{item.notes}}" as="n" hint-placeholder-count="3">
+            <div style="display:flex;gap:20px;font-size:24px;line-height:1.45;color:#3B3835">
+              <div style="flex:none;width:170px;font-family:'JetBrains Mono',monospace;font-size:20px;color:#7A746C;padding-top:3px">{{n.k}}</div>
+              <div style="text-wrap:pretty">{{n.v}}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const N = (o) => Object.entries(o).map(([k, v]) => ({ k, v }));
+    const phone = { label: 'Номер телефона', prefix: '+7', placeholder: '900 000-00-00' };
+    const codeBody = 'Код отправлен на +7 916 245-18-07. Он может прийти по SMS, в мессенджер или в приложение Boosty.';
+    const code = { label: 'Код из сообщения', placeholder: 'Введите код' };
+    const auth = [
+      { id: 'A1', name: 'Welcome', s: { hero: true, top: 300, title: 'Boosty TV', accentTail: ' TV', body: 'Видео из ваших подписок Boosty на телевизоре.', buttons: [{ label: 'Войти в Boosty', kind: 'primary', f: true }], footer: 'Неофициальный клиент, не связан с Boosty. Вход по номеру телефона и коду.' },
+        notes: N({ 'Фокус': '«Войти в Boosty» — единственный фокусируемый элемент.', 'OK': '→ A2.', 'Back': 'Системный выход из приложения.', 'Когда': 'Только при первом запуске и после выхода (AUTH-07). Сессия живёт неделями, остальные запуски открывают сразу Главную.' }) },
+      { id: 'A2', name: 'Номер телефона — фокус на поле', s: { step: 'Шаг 1 из 2', title: 'Номер телефона', body: 'Номер, привязанный к вашему аккаунту Boosty. На него придёт код для входа.', field: { ...phone, state: 'idle', f: true }, buttons: [{ label: 'Получить код', kind: 'primary' }, { label: 'Назад' }] },
+        notes: N({ 'Фокус': 'Поле номера. Рамка поля светлая — это его состояние фокуса.', 'OK': 'Открывает системную клавиатуру (A3).', '↓': '«Получить код». ← → между кнопками, без зацикливания.', 'Back': '→ A1.', 'ID': 'AUTH-03' }) },
+      { id: 'A3', name: 'Номер — системная клавиатура', s: { step: 'Шаг 1 из 2', title: 'Номер телефона', body: 'Номер, привязанный к вашему аккаунту Boosty. На него придёт код для входа.', field: { ...phone, value: '916 245-1', state: 'typing' }, kb: true, kbKey: 6, buttons: [{ label: 'Получить код', kind: 'primary' }, { label: 'Назад' }] },
+        notes: N({ 'Клавиатура': 'Рисует система (Gboard для TV), вид на макете условный. Наш экран всегда держит поле выше 680 px, чтобы оно не уходило под клавиатуру.', 'Ввод': 'Тип поля phone. «+7» зафиксирован; 10 цифр или 11 с ведущей 7/8 нормализуются в +7… (AUTH-03). Маска 916 245-18-07 вставляется по мере ввода.', 'Готово': 'Закрывает клавиатуру. При 10 цифрах фокус переходит на «Получить код», иначе остаётся на поле.', 'Back': 'Закрывает клавиатуру, фокус на поле, введённое сохраняется.' }) },
+      { id: 'A4', name: 'Номер — «Некорректный номер»', s: { step: 'Шаг 1 из 2', title: 'Номер телефона', body: 'Номер, привязанный к вашему аккаунту Boosty. На него придёт код для входа.', field: { ...phone, value: '916 245-1', state: 'idle', f: true }, error: 'Некорректный номер. Нужно 10 цифр после +7.', buttons: [{ label: 'Получить код', kind: 'primary' }, { label: 'Назад' }] },
+        notes: N({ 'Фокус': 'Возвращается на поле. Ошибка обозначена рамкой, значком и текстом.', 'Сброс': 'Текст ошибки исчезает при следующем вводе.', 'Отправка': 'Пока идёт запрос, кнопка показывает «Отправляем код…» и не принимает повторный OK. Фокус на ней не меняется.' }) },
+      { id: 'A5', name: 'Код — ожидание, таймер', s: { step: 'Шаг 2 из 2', title: 'Введите код', body: codeBody, field: { ...code, state: 'idle', f: true }, buttons: [{ label: 'Войти', kind: 'primary' }, { label: 'Выслать повторно', kind: 'disabled', sub: 'через 0:42' }, { label: 'Изменить номер' }] },
+        notes: N({ 'Фокус': 'Поле кода. OK открывает клавиатуру; «Готово» с непустым кодом сразу отправляет его.', 'Канал': 'Если в ответе есть sentTransport, называем канал прямо: «Код отправлен по SMS». Иначе — общая подсказка, как на макете.', 'Таймер': '60 с, клиентский. Недоступная кнопка не получает фокус. Серверный лимит неизвестен.', 'Поле': 'Длина кода не подтверждена, поэтому одно поле без ячеек на каждую цифру.', 'Back': '→ A2, номер сохранён.' }) },
+      { id: 'A6', name: 'Код — можно выслать повторно', s: { step: 'Шаг 2 из 2', title: 'Введите код', body: codeBody, field: { ...code, state: 'idle' }, hint: 'Код не пришёл? Можно запросить ещё раз.', buttons: [{ label: 'Войти', kind: 'primary' }, { label: 'Выслать повторно', f: true }, { label: 'Изменить номер' }] },
+        notes: N({ 'Фокус': '«Выслать повторно» (на макете пользователь уже перешёл на неё).', 'OK': 'Повторная отправка (transport=gate). Кнопка снова становится недоступной на 60 с, фокус переносится на поле кода, чтобы не остаться на недоступном элементе.', 'Изменить номер': '→ A2 с фокусом на поле, номер подставлен.' }) },
+      { id: 'A7', name: 'Код — неверный', s: { step: 'Шаг 2 из 2', title: 'Введите код', body: codeBody, field: { ...code, value: '4821', state: 'idle', f: true }, error: 'Неверный код. Проверьте и введите ещё раз.', buttons: [{ label: 'Войти', kind: 'primary' }, { label: 'Выслать повторно', kind: 'disabled', sub: 'через 0:18' }, { label: 'Изменить номер' }] },
+        notes: N({ 'Фокус': 'Поле кода, введённое значение сохранено, чтобы его можно было исправить.', 'Допущение': 'Формат ошибок phone-auth не подтверждён (api-contract §2.2). Различаем 4 случая — неверный, истёкший, лимит, проверка — только если сервер их различает. Иначе общий текст «Не удалось войти. Попробуйте ещё раз».' }) },
+      { id: 'A8', name: 'Код — истёк', s: { step: 'Шаг 2 из 2', title: 'Введите код', body: codeBody, field: { ...code, value: '4821', state: 'idle' }, error: 'Срок действия кода истёк. Запросите новый.', buttons: [{ label: 'Выслать новый код', kind: 'primary', f: true }, { label: 'Изменить номер' }] },
+        notes: N({ 'Фокус': '«Выслать новый код». «Войти» скрыт: с истёкшим кодом он бесполезен.', 'Когда': 'По ответу сервера или локально по expiresIn из ответа send (единицы не подтверждены, поэтому локальная проверка — с запасом).', 'OK': 'Новый код → A5, фокус на поле, поле очищено.' }) },
+      { id: 'A9', name: 'Слишком много попыток', s: { top: 240, icon: 'warn', title: 'Слишком много попыток', body: 'Boosty временно ограничил вход по этому номеру. Подождите и попробуйте снова.', buttons: [{ label: 'Изменить номер', f: true }, { label: 'На первый экран' }] },
+        notes: N({ 'Фокус': '«Изменить номер».', 'Ожидание': 'Если сервер вернёт время блокировки, показываем «Можно повторить через 14 мин». Своих таймеров не придумываем. Автоповтора нет.', 'Допущение': 'Ответ на 429 не наблюдался (api-contract §7).', 'Back': '→ A2.' }) },
+      { id: 'A10', name: 'Boosty требует дополнительную проверку', s: { top: 240, icon: 'error', title: 'Boosty требует дополнительную проверку', body: 'Boosty попросил подтвердить, что входит человек. Пройти эту проверку с телевизора сейчас нельзя.', body2: 'Попробуйте войти позже. Если проверка появляется снова, вход через приложение временно недоступен.', buttons: [{ label: 'Попробовать снова', f: true }, { label: 'Изменить номер' }], footer: 'Для диагностики: captcha_required · 25.10.2026, 14:32' },
+        notes: N({ 'Статус': 'Потенциальный блокер релиза (brief, «Risks»; spike S2; /auth/phone/mobile_captcha/send — только RE-SPEC).', 'Решение': 'Никаких обходов: без WebView, виртуального курсора и сторонних сервисов. Честно говорим, что вход не пройдёт.', 'Фокус': '«Попробовать снова» — повторяет send один раз по нажатию, не в фоне.', 'Диагностика': 'Код ошибки и время — для владельца, без номера телефона и токенов (SET-05).' }) },
+      { id: 'A11', name: 'Сессия истекла', s: { top: 280, title: 'Сессия истекла', body: 'Boosty завершил вход на этом телевизоре. Войдите снова — позиции просмотра хранятся в Boosty и не потеряются.', buttons: [{ label: 'Войти снова', kind: 'primary', f: true }] },
+        notes: N({ 'Когда': 'Только 401 после неудачного обновления токена (AUTH-05, AUTH-06). 403, 404, 5xx и сеть сюда не ведут — это «нет доступа» или «ошибка сети».', 'OK': '→ A2 с подставленным последним номером (хранится в Keystore вместе с сессией) — улучшение клиента.', 'Back': 'Системный выход.', 'После входа': 'Если user id (E1) совпадает, локальная история «Продолжить просмотр» сохраняется; иначе очищается.' }) }
+    ];
+    const home = [
+      { id: 'B1', name: 'Главная — запуск', mode: 'top', focus: 'cont-0', notes: N({ 'Фокус': 'Первая карточка «Продолжить просмотр». Если ряда нет — первая карточка ленты.', '← →': 'По ряду, без зацикливания. ← из первой колонки → сайдбар на «Главная».', '↑ ↓': 'Между рядами на ближайшую по горизонтали карточку. ↑ из первого ряда ленты → «Фильтры».', 'OK': 'Пост (F), для «Продолжить» — сразу плеер с серверной позиции.', 'Back': 'Фокус в сайдбар. Повторный Back — системный выход.', 'Safe area': '96 / 54 px. Подложка сайдбара доходит до края, текст пунктов начинается с 96. Пятая карточка ряда уходит за край намеренно — подсказка прокрутки, фокусная карточка всегда внутри 1824 px.' }) },
+      { id: 'B2', name: 'Фокус в ленте', mode: 'top', focus: 'feed-2', notes: N({ 'Фокус': 'Карточка ×1.06 + контур. Соседи не сдвигаются: масштаб через transform, у ряда запас 24 px на вырост.', 'Тип': 'Бейдж в превью: Видео, N видео, Аудио, Текст и фото, Опрос, Файл, LIVE, Нет доступа. Других меток нет.', 'Без превью': 'Опрос и файл без изображения показывают аватар автора на тоне автора.', 'Обновить': 'FEED-03. Фокус остаётся на той же карточке по post id; если её нет — на соседней по индексу.', 'Прокрутка': 'Ряд с фокусом держится на второй строке экрана, заголовок ряда остаётся видимым.' }) },
+      { id: 'B3', name: 'Фокус в сайдбаре', mode: 'top', focus: 'nav-subs', notes: N({ 'Текущий': '«Главная» — оранжевая метка. Фокус — светлый контур на «Подписки». Это разные состояния.', '↑ ↓': 'По пунктам, без зацикливания.', '→': 'Возврат в контент на последнюю сфокусированную карточку.', 'OK': 'Открывает раздел. Наведение раздел не переключает — лишних загрузок нет.', 'События': 'Условный пункт (EVT-01): показываем, только когда эндпоинт E18 проверен.' }) },
+      { id: 'B4', name: 'Подгрузка в конце', mode: 'top', more: 'loading', all: true, focus: 'feed-13', notes: N({ 'Когда': 'Следующая страница (FEED-02, offset из extra) запрашивается, когда фокус за 2 ряда до конца.', 'Фокус': 'Не двигается. Skeleton-ряд добавляется снизу; новые карточки заменяют его на месте.', 'Слияние': 'Добавляем в конец, дубликаты по post id отбрасываем.' }) },
+      { id: 'B5', name: 'Ошибка подгрузки', mode: 'top', more: 'error', all: true, focus: 'retry', notes: N({ 'Фокус': '↓ из последнего ряда → «Повторить». ↑ → последняя карточка в той же колонке.', 'OK': 'Строка ошибки сменяется skeleton-рядом. После загрузки фокус переходит на первую новую карточку.', 'Список': 'Загруженное выше не сбрасывается и не перерисовывается.' }) },
+      { id: 'B6', name: 'Первая загрузка', mode: 'skeleton', focus: 'nav-home', notes: N({ 'Фокус': '«Главная» в сайдбаре, пока нет карточек.', 'Данные': 'Когда лента пришла и пользователь не трогал пульт — фокус переходит на первую карточку. Если уже перешёл в другой раздел — не трогаем.', 'Ошибка': 'Полноэкранная ошибка сети — в разделе L.' }) }
+    ];
+    const a = { ml: ['Марина Лебедева', 'МЛ', 40], ik: ['Илья Ковалёв', 'ИК', 75], pa: ['Пётр Аникин', 'ПА', 255], dg: ['Даша и Глеб', 'ДГ', 330], vs: ['Вера Соколова', 'ВС', 150], ab: ['Артём Брагин', 'АБ', 200], on: ['Ольга Никитина', 'ОН', 225], ko: ['Кирилл Орлов', 'КО', 110] };
+    const P = (k, o) => ({ name: a[k][0], ini: a[k][1], hue: a[k][2], ...o });
+    const types = [
+      P('on', { title: 'Териберка зимой: что посмотреть за два дня', badge: 'Видео', date: 'Сегодня, 12:40' }),
+      P('ml', { title: 'Пироги на неделю: пять начинок из одного теста', badge: '3 видео', date: 'Вчера, 14:10' }),
+      P('dg', { title: 'Выпуск 87. Почему мы перестали ходить в кино', badge: 'Аудио', dur: '1:12:05', date: 'Сегодня, 09:15', thumbLabel: 'обложка выпуска' }),
+      P('vs', { title: 'Акварельный скетчинг: свет и тень на крышах', badge: 'Текст и фото', date: 'Вчера, 21:30', thumbLabel: 'изображение из поста' }),
+      P('pa', { title: 'Какую эпоху разбираем в ноябре? Голосуем', badge: 'Опрос', kind: 'poll', date: 'Вчера, 18:05' }),
+      P('ik', { title: 'Чертежи верстака и список материалов', badge: 'Файл', kind: 'file', date: '22 октября' }),
+      P('ko', { title: 'Архитектура TV-клиента: закрытый разбор', badge: 'Нет доступа', locked: true, date: '23 октября', thumbLabel: 'тизер' }),
+      P('ab', { title: 'Разбор партий турнира в Вейк-ан-Зее', badge: 'LIVE', live: true, date: 'эфир идёт' })
+    ];
+    const v = {
+      contDur: P('ik', { title: 'Стол из слэба за выходные. Часть 2', badge: 'Видео', dur: '54:10', prog: 0.61, sub: 'осталось 21 мин' }),
+      contNoDur: P('ik', { title: 'Стол из слэба за выходные. Часть 2', badge: 'Видео', sub: 'остановились на 33:05' }),
+      feedNoDur: P('on', { title: 'Териберка зимой: что посмотреть за два дня', badge: 'Видео', date: 'Сегодня, 12:40' }),
+      feedDur: P('on', { title: 'Териберка зимой: что посмотреть за два дня', badge: 'Видео', dur: '32:18', date: 'Сегодня, 12:40' }),
+      types: types.map((p, i) => ({ p, f: i === 7 })),
+      notes: N({ 'Длительность': 'Длительность ok_video в API не подтверждена, поэтому карточка ленты по умолчанию без неё. Вариант справа включается, только если поле найдётся в спайке.', 'Продолжить': 'Длительность берётся из локальной истории — её сообщает плеер во время просмотра. Если её нет, показываем только позицию из timeCode («остановились на 33:05»), без полосы.', 'Аудио': 'Длительность audio_file есть в API (duration), поэтому показывается всегда. Позиция аудио не сохраняется — полосы нет.', 'Доступ': '«Нет доступа» — затемнённый тизер, замок и бейдж. Без цены и кнопок оплаты (POST-08).' }),
+      notes720: N({ 'Принцип': 'На Android TV и 1080p, и 720p — это 960×540 dp. Раскладка в dp одна и та же, система масштабирует её целиком, поэтому отдельной вёрстки нет.', 'Проверено': '4 колонки и пятая карточка за краем сохраняются; заголовки — 2 строки; мета 22 → 14,7 px при том же физическом размере на экране; safe area 64 / 36 px.', 'Риск': 'На 720p превью загружаем меньшего размера, чтобы не тратить память.' })
+    };
+    const subs = [
+      { id: 'C1', name: 'Подписки — сетка', mode: 'grid', focus: 'tile-0', notes: N({ 'Фокус': 'Первая плитка: «Мой блог», если он есть, иначе первый автор.', '← → ↑ ↓': 'Сетка 3 колонки без зацикливания. ← из первой колонки → сайдбар на «Подписки». ↑ из первого ряда — на месте.', 'OK': 'Страница автора (D).', 'Back': 'Сайдбар, затем Главная.', 'Мой блог': 'SUB-02: только если у профиля есть blogUrl и в блоге есть хотя бы один пост.', 'Порядок': 'Как отдаёт API (E2). Сортировки нет.' }) },
+      { id: 'C2', name: 'Длинный список (55)', mode: 'long', focus: '', notes: N({ 'Список': 'Виртуализированная сетка по рядам (3 колонки, ряд 152 + 24 px). Ряд с фокусом держится в средней трети экрана; заголовок «Подписки» закреплён.', 'Счётчик': '«28 из 55» и индикатор прокрутки — улучшение клиента, помогают не теряться в длинном списке.', 'Возврат': 'После автора фокус возвращается на ту же плитку по blogUrl, прокрутка восстанавливается.', 'Риск': 'SUB-01: BoostBuddy запрашивает limit=30 без пагинации. Если пагинация E2 не подтвердится, а пришло ровно 30, в конце списка показываем «Показаны первые 30 подписок».' }) },
+      { id: 'C3', name: 'Нет подписок', mode: 'empty', focus: '', notes: N({ 'Фокус': '«Обновить» — единственное действие.', 'OK': 'Перезапрашивает E2. Пока идёт запрос — «Обновляем…», фокус на месте.', '←': 'Сайдбар.', 'Решение': 'Не предлагаем оформить подписку и не показываем цены. Только объясняем, где это делается.' }) }
+    ];
+    const swatches = [
+      { n: 'Фон', c: '#171615' }, { n: 'Поверхность', c: '#221F1D' }, { n: 'Поверхность, фокус', c: '#46413B' }, { n: 'Контур фокуса', c: '#F4EFE7' },
+      { n: 'Текст 2', c: '#B7B0A6' }, { n: 'Акцент', c: '#E8914A' }, { n: 'Ошибка', c: '#E0624F' }, { n: 'LIVE', c: '#C93C32' }
+    ];
+    return { auth, home, subs, v, swatches };
+  }
+}
+</script>
+</body>
+</html>

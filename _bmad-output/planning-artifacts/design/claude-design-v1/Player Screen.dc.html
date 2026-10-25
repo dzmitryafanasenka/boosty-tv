@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"></helmet>
+<div style="position:relative;width:1920px;height:1080px;background:#0C0B0A;overflow:hidden;font-family:'Golos Text',sans-serif;color:#F4EFE7">
+  <div style="position:absolute;inset:0;background:{{frameBg}}"></div>
+  <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:24px;color:rgba(244,239,231,0.3)">кадр видео</div>
+  <sc-if value="{{showOv}}" hint-placeholder-val="{{true}}">
+    <div style="position:absolute;left:0;right:0;top:0;height:320px;background:linear-gradient(rgba(8,7,6,0.85), rgba(8,7,6,0))"></div>
+    <div style="position:absolute;left:0;right:0;bottom:0;height:420px;background:linear-gradient(rgba(8,7,6,0), rgba(8,7,6,0.9))"></div>
+    <div style="position:absolute;left:96px;top:54px;width:1400px;display:flex;flex-direction:column;gap:12px">
+      <sc-if value="{{isLive}}">
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:6px">
+          <div style="height:40px;padding:0 14px;border-radius:8px;background:#C93C32;display:flex;align-items:center;gap:10px;font-size:22px;font-weight:700"><div style="width:10px;height:10px;border-radius:50%;background:#FFFFFF"></div>LIVE</div>
+          <div style="font-size:24px;color:#F4EFE7;font-variant-numeric:tabular-nums">В эфире {{liveElapsed}}</div>
+        </div>
+      </sc-if>
+      <div style="display:flex;align-items:center;gap:14px">
+        <div style="flex:none;width:44px;height:44px;border-radius:50%;background:{{avBg}};color:#1A1816;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700">{{v.ini}}</div>
+        <div style="font-size:24px;color:#D8D2C9">{{v.name}}</div>
+      </div>
+      <div style="font-size:40px;line-height:48px;font-weight:600;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{v.title}}</div>
+      <sc-if value="{{hasSub}}"><div style="font-size:26px;color:#B7B0A6">{{v.sub}}</div></sc-if>
+    </div>
+    <sc-if value="{{notLive}}" hint-placeholder-val="{{true}}">
+      <div style="position:absolute;left:96px;right:96px;bottom:190px;height:{{tlH}}">
+        <div style="position:absolute;left:0;right:0;top:50%;height:{{trackH}};transform:translateY(-50%);border-radius:6px;background:rgba(244,239,231,0.25)"></div>
+        <div style="position:absolute;left:0;top:50%;height:{{trackH}};width:{{posW}};transform:translateY(-50%);border-radius:6px;background:#E8914A"></div>
+        <sc-if value="{{seeking}}"><div style="position:absolute;left:{{segL}};top:50%;height:{{trackH}};width:{{segW}};transform:translateY(-50%);background:rgba(244,239,231,0.7)"></div></sc-if>
+        <div style="position:absolute;left:{{knobW}};top:50%;width:{{knob}};height:{{knob}};transform:translate(-50%,-50%);border-radius:50%;background:#F4EFE7;outline:{{tlRing}};outline-offset:4px"></div>
+        <sc-if value="{{seeking}}">
+          <div style="position:absolute;left:{{knobW}};bottom:44px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 20px;border-radius:14px;background:#F4EFE7;color:#1A1816">
+            <div style="font-size:36px;font-weight:700;font-variant-numeric:tabular-nums">{{seekT}}</div>
+            <div style="font-size:22px;font-weight:600;color:#7A4A1C">{{seekDelta}}</div>
+          </div>
+        </sc-if>
+      </div>
+      <div style="position:absolute;left:96px;right:96px;bottom:140px;display:flex;justify-content:space-between;font-size:28px;font-variant-numeric:tabular-nums">
+        <span>{{posT}}</span><span style="color:#B7B0A6">−{{remT}}</span>
+      </div>
+    </sc-if>
+    <div style="position:absolute;left:96px;bottom:54px;display:flex;align-items:center;gap:24px">
+      <dc-import name="TV Button" icon="{{ppIcon}}" label="" f="{{fPP}}" hint-size="80px,80px"></dc-import>
+      <sc-if value="{{isLive}}">
+        <dc-import name="TV Button" icon="{{likeIcon}}" label="{{likeLabel}}" f="{{fLike}}" hint-size="180px,80px"></dc-import>
+        <dc-import name="TV Button" label="Поделиться" f="{{fShare}}" hint-size="220px,80px"></dc-import>
+      </sc-if>
+      <dc-import name="TV Button" label="{{setLabel}}" f="{{fSet}}" hint-size="220px,80px"></dc-import>
+    </div>
+    <div style="position:absolute;right:96px;bottom:76px;font-size:24px;color:#B7B0A6">{{techInfo}}</div>
+  </sc-if>
+  <sc-if value="{{bigPause}}">
+    <div style="position:absolute;left:50%;top:50%;width:140px;height:140px;transform:translate(-50%,-50%);border-radius:50%;background:rgba(18,16,14,0.7);display:flex;align-items:center;justify-content:center"><div style="width:0;height:0;border-left:44px solid #F4EFE7;border-top:26px solid transparent;border-bottom:26px solid transparent;margin-left:10px"></div></div>
+  </sc-if>
+  <sc-if value="{{buffering}}">
+    <div style="position:absolute;left:50%;top:50%;width:96px;height:96px;box-sizing:border-box;transform:translate(-50%,-50%) rotate(45deg);border-radius:50%;border:8px solid rgba(244,239,231,0.2);border-top-color:#E8914A"></div>
+  </sc-if>
+  <sc-if value="{{recovering}}">
+    <div style="position:absolute;right:96px;top:54px;display:flex;align-items:center;gap:16px;padding:18px 28px;border-radius:14px;background:rgba(36,33,30,0.94);font-size:24px">
+      <div style="width:28px;height:28px;box-sizing:border-box;border-radius:50%;border:4px solid rgba(244,239,231,0.25);border-top-color:#E8914A"></div>
+      Восстанавливаем воспроизведение…
+    </div>
+  </sc-if>
+  <sc-if value="{{hasError}}">
+    <div style="position:absolute;inset:0;background:rgba(10,9,8,0.82);display:flex;align-items:center;justify-content:center">
+      <div style="width:900px;box-sizing:border-box;padding:56px;border-radius:24px;background:#24211E;display:flex;flex-direction:column;gap:18px">
+        <div style="font-size:44px;font-weight:600">{{errTitle}}</div>
+        <div style="font-size:26px;line-height:1.45;color:#B7B0A6">{{errBody}}</div>
+        <div style="display:flex;gap:20px;margin-top:20px">
+          <sc-for list="{{errBtns}}" as="b" hint-placeholder-count="2"><dc-import name="TV Button" label="{{b.label}}" kind="{{b.kind}}" f="{{b.f}}" hint-size="200px,80px"></dc-import></sc-for>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ended}}">
+    <div style="position:absolute;inset:0;background:rgba(10,9,8,0.9);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px">
+      <div style="font-size:56px;font-weight:600">Стрим завершён</div>
+      <div style="font-size:26px;color:#B7B0A6">Трансляция «{{v.title}}» закончилась.</div>
+      <div style="margin-top:24px"><dc-import name="TV Button" label="Назад" f="{{true}}" hint-size="180px,80px"></dc-import></div>
+    </div>
+  </sc-if>
+  <sc-if value="{{hasPanel}}">
+    <div style="position:absolute;right:0;top:0;width:640px;height:1080px;box-sizing:border-box;padding:54px 48px;background:#1D1B19;border-left:1px solid #2A2825;display:flex;flex-direction:column;gap:12px">
+      <div style="font-size:36px;font-weight:600">{{panelTitle}}</div>
+      <div style="font-size:22px;color:#8F887F;margin-bottom:16px">{{panelHint}}</div>
+      <sc-for list="{{rows}}" as="r" hint-placeholder-count="3">
+        <dc-import name="Setting Row" kind="{{r.kind}}" compact="{{true}}" w="{{544}}" label="{{r.label}}" value="{{r.value}}" desc="{{r.desc}}" on="{{r.on}}" f="{{r.f}}" hint-size="544px,76px"></dc-import>
+      </sc-for>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1920,&quot;height&quot;:1080},&quot;v&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object&quot;},&quot;pos&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:760,&quot;tsType&quot;:&quot;number&quot;},&quot;playing&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;overlay&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;focus&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;tl&quot;,&quot;pp&quot;,&quot;set&quot;,&quot;like&quot;,&quot;share&quot;,&quot;err-back&quot;],&quot;default&quot;:&quot;tl&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;panel&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;&quot;,&quot;settings&quot;,&quot;quality&quot;,&quot;speed&quot;],&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;pf&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;quality&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;auto&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;speed&quot;:{&quot;editor&quot;:&quot;float&quot;,&quot;default&quot;:1,&quot;tsType&quot;:&quot;number&quot;},&quot;seek&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:null,&quot;tsType&quot;:&quot;number|null&quot;},&quot;buffering&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;recovering&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;error&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;&quot;,&quot;fail&quot;,&quot;unsupported&quot;],&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;live&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object&quot;},&quot;ended&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;liked&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const P = this.props;
+    const v = P.v || { title: 'Квашеная капуста по бабушкиному рецепту: два способа и одна ошибка', sub: 'Видео 2 из 2 · Способ 2. В ведре с яблоками', name: 'Марина Лебедева', ini: 'МЛ', hue: 40, dur: 1462 };
+    const fmt = (s) => { s = Math.max(0, Math.round(s)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60, p = (n) => String(n).padStart(2, '0'); return h ? `${h}:${p(m)}:${p(x)}` : `${m}:${p(x)}`; };
+    const F = P.focus ?? 'tl', panel = P.panel ?? '', pf = P.pf ?? '';
+    const live = P.live || null, ended = !!P.ended;
+    const pos = P.pos ?? 760, dur = v.dur || 1;
+    const seeking = P.seek != null;
+    const target = seeking ? P.seek : pos;
+    const err = P.error || '';
+    const paused = P.playing === false;
+    const showOv = (P.overlay ?? true) || paused || seeking || !!panel || !!err;
+    const frac = Math.min(1, Math.max(0, target / dur)), pfrac = Math.min(1, pos / dur);
+    const tlF = F === 'tl' && !panel && !err;
+    const q = P.quality ?? 'auto', sp = P.speed ?? 1;
+    const QL = { auto: 'Авто', '2160p': '2160p', '1440p': '1440p', '1080p': '1080p', '720p': '720p', '480p': '480p', '360p': '360p', '240p': '240p', '144p': '144p' };
+    const quals = P.qualities || ['auto', '1080p', '720p', '480p', '360p'];
+    const SP = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 3];
+    const spL = (s) => (s === 1 ? 'Обычная · 1×' : String(s).replace('.', ',') + '×');
+    let rows = [], panelTitle = '', panelHint = '';
+    if (panel === 'settings') {
+      panelTitle = 'Настройки'; panelHint = 'Back — закрыть';
+      rows = [{ kind: 'nav', label: 'Качество', value: q === 'auto' ? 'Авто · 1080p' : QL[q], f: pf === 'quality' }];
+      if (!live) rows.push({ kind: 'nav', label: 'Скорость', value: sp === 1 ? '1×' : String(sp).replace('.', ',') + '×', f: pf === 'speed' });
+    } else if (panel === 'quality') {
+      panelTitle = 'Качество'; panelHint = 'Только варианты, которые прислал Boosty';
+      rows = quals.map((k) => ({ kind: 'radio', label: QL[k], desc: k === 'auto' ? 'Подстраивается под скорость сети' : '', on: q === k, f: pf === 'q-' + k }));
+    } else if (panel === 'speed') {
+      panelTitle = 'Скорость'; panelHint = 'Запоминается для всех видео';
+      rows = SP.map((s) => ({ kind: 'radio', label: spL(s), on: sp === s, f: pf === 'sp-' + s }));
+    }
+    const el = live ? (live.elapsed || 0) : 0;
+    const likes = live ? live.likes + (P.liked ? 1 : 0) : 0;
+    const d = seeking ? Math.round(P.seek - pos) : 0;
+    return {
+      v, avBg: `oklch(0.72 0.09 ${v.hue ?? 40})`,
+      frameBg: `repeating-linear-gradient(135deg, oklch(0.26 0.025 ${v.hue ?? 40}) 0 24px, oklch(0.23 0.025 ${v.hue ?? 40}) 24px 48px)`,
+      showOv: showOv && !ended, hasSub: !!v.sub,
+      isLive: !!live, notLive: !live, liveElapsed: fmt(el),
+      tlH: '48px', trackH: tlF ? '12px' : '8px', knob: tlF ? '36px' : '24px', tlRing: tlF ? '4px solid rgba(244,239,231,0.6)' : '4px solid transparent',
+      posW: pfrac * 100 + '%', knobW: frac * 100 + '%', seeking,
+      segL: Math.min(frac, pfrac) * 100 + '%', segW: Math.abs(frac - pfrac) * 100 + '%',
+      seekT: fmt(target), seekDelta: (d >= 0 ? '+' : '−') + fmt(Math.abs(d)),
+      posT: fmt(target), remT: fmt(dur - target),
+      ppIcon: paused ? 'play' : 'pause', fPP: F === 'pp' && !panel && !err,
+      likeIcon: P.liked ? 'heart-on' : 'heart', likeLabel: String(likes), fLike: F === 'like' && !panel, fShare: F === 'share' && !panel,
+      setLabel: live ? 'Качество' : 'Настройки', fSet: F === 'set' && !panel,
+      techInfo: live ? (q === 'auto' ? 'Авто · 1080p' : QL[q]) : `${q === 'auto' ? 'Авто · 1080p' : QL[q]} · ${String(sp).replace('.', ',')}×`,
+      bigPause: paused && !panel && !seeking && !err && !ended,
+      buffering: !!P.buffering && !err, recovering: !!P.recovering,
+      hasError: !!err, ended,
+      errTitle: err === 'unsupported' ? 'Этот формат видео не поддерживается' : 'Не удалось воспроизвести видео',
+      errBody: err === 'unsupported' ? 'Boosty не прислал поток, который умеет воспроизводить телевизор (нужен HLS, DASH или MP4).' : 'Мы уже пробовали восстановить воспроизведение. Проверьте подключение и попробуйте ещё раз — видео продолжится с того же места.',
+      errBtns: err === 'unsupported' ? [{ label: 'Назад', kind: 'secondary', f: true }] : [{ label: 'Повторить', kind: 'primary', f: F !== 'err-back' }, { label: 'Назад', kind: 'secondary', f: F === 'err-back' }],
+      hasPanel: !!panel, panelTitle, panelHint, rows
+    };
+  }
+}
+</script>
+</body>
+</html>

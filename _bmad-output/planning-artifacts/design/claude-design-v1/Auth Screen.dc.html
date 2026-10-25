@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"></helmet>
+<div style="position:relative;width:1920px;height:1080px;background:#171615;overflow:hidden;font-family:'Golos Text',sans-serif;color:#F4EFE7">
+  <sc-if value="{{showMark}}"><div style="position:absolute;left:96px;top:54px;font-size:30px;font-weight:700;letter-spacing:-0.01em">Boosty<span style="color:#E8914A"> TV</span></div></sc-if>
+  <div style="position:absolute;left:0;right:0;top:{{top}};display:flex;justify-content:center">
+    <div style="width:880px;display:flex;flex-direction:column">
+      <sc-if value="{{s.icon}}"><div style="width:88px;height:88px;border-radius:50%;background:{{iconBg}};color:#1A1816;display:flex;align-items:center;justify-content:center;font-size:52px;font-weight:700;margin-bottom:40px">!</div></sc-if>
+      <sc-if value="{{s.step}}"><div style="font-size:24px;color:#8F887F;font-weight:500;margin-bottom:16px">{{s.step}}</div></sc-if>
+      <div style="font-size:{{titleSize}};line-height:1.1;font-weight:600;letter-spacing:-0.015em;text-wrap:balance">{{titleHead}}<span style="color:#E8914A">{{titleTail}}</span></div>
+      <sc-if value="{{s.body}}"><div style="font-size:28px;line-height:1.45;color:#B7B0A6;margin-top:24px;text-wrap:pretty">{{s.body}}</div></sc-if>
+      <sc-if value="{{s.body2}}"><div style="font-size:28px;line-height:1.45;color:#B7B0A6;margin-top:16px;text-wrap:pretty">{{s.body2}}</div></sc-if>
+      <sc-if value="{{hasField}}">
+        <div style="margin-top:48px;display:flex;flex-direction:column;gap:14px">
+          <div style="font-size:24px;color:#B7B0A6;font-weight:500">{{fLabel}}</div>
+          <div style="height:100px;box-sizing:border-box;border-radius:16px;border:3px solid {{fBorder}};background:{{fBg}};outline:{{fRing}};outline-offset:4px;display:flex;align-items:center;gap:18px;padding:0 32px;font-size:44px;font-variant-numeric:tabular-nums;letter-spacing:0.02em">
+            <sc-if value="{{fPrefix}}"><span style="color:#8F887F">{{fPrefix}}</span></sc-if>
+            <span style="color:{{fTextColor}}">{{fText}}</span>
+            <sc-if value="{{caret}}"><span style="width:3px;height:52px;background:#E8914A;margin-left:-14px"></span></sc-if>
+          </div>
+          <sc-if value="{{s.error}}">
+            <div style="display:flex;align-items:center;gap:14px;font-size:24px;color:#F29A8A">
+              <div style="flex:none;width:30px;height:30px;border-radius:50%;background:#E0624F;color:#1A1816;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700">!</div>
+              {{s.error}}
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+      <sc-if value="{{s.hint}}"><div style="margin-top:20px;font-size:24px;line-height:1.4;color:#B7B0A6">{{s.hint}}</div></sc-if>
+      <sc-if value="{{hasButtons}}">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:24px;margin-top:48px">
+          <sc-for list="{{buttons}}" as="b" hint-placeholder-count="2">
+            <div style="height:80px;box-sizing:border-box;padding:0 40px;border-radius:16px;display:flex;align-items:center;gap:14px;font-size:28px;font-weight:600;background:{{b.bg}};color:{{b.color}};outline:{{b.ring}};outline-offset:4px;transform:{{b.tf}};box-shadow:{{b.shadow}}">
+              {{b.label}}
+              <sc-if value="{{b.sub}}"><span style="font-weight:500;color:{{b.subColor}};font-variant-numeric:tabular-nums">{{b.sub}}</span></sc-if>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+  <sc-if value="{{s.footer}}"><div style="position:absolute;left:96px;right:96px;bottom:54px;font-size:22px;color:#8F887F">{{s.footer}}</div></sc-if>
+  <sc-if value="{{s.kb}}">
+    <div style="position:absolute;left:0;right:0;bottom:0;height:400px;background:#2B2C2F;display:flex;align-items:center;justify-content:center;gap:16px;font-family:Roboto,Arial,sans-serif">
+      <div style="display:grid;grid-template-columns:repeat(3,128px);gap:12px">
+        <sc-for list="{{keys}}" as="k" hint-placeholder-count="12">
+          <div style="height:72px;border-radius:10px;background:{{k.bg}};color:{{k.color}};display:flex;align-items:center;justify-content:center;font-size:32px">{{k.l}}</div>
+        </sc-for>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="width:200px;height:72px;border-radius:10px;background:#3C3D41;color:#E8EAED;display:flex;align-items:center;justify-content:center;font-size:28px">Стереть</div>
+        <div style="width:200px;height:240px;border-radius:10px;background:#8AB4F8;color:#202124;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:500">Готово</div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1920,&quot;height&quot;:1080},&quot;s&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const s = this.props.s || { title: 'Экран входа', buttons: [{ label: 'Продолжить', kind: 'primary', f: true }] };
+    const fl = s.field;
+    const st = fl ? fl.state || 'idle' : 'idle';
+    const editing = st === 'focus' || st === 'typing';
+    const err = !!s.error;
+    const buttons = (s.buttons || []).map(b => {
+      const f = !!b.f, k = b.kind || 'secondary';
+      let bg = k === 'primary' ? (f ? '#F2A05A' : '#E8914A') : k === 'disabled' ? '#201E1C' : (f ? '#46413B' : '#2E2B28');
+      return {
+        label: b.label, sub: b.sub || '',
+        bg, color: k === 'primary' ? '#1E140A' : k === 'disabled' ? '#6E6962' : '#F4EFE7',
+        ring: f ? '4px solid #F4EFE7' : '4px solid transparent',
+        tf: f ? 'scale(1.04)' : 'none',
+        shadow: f ? '0 12px 28px rgba(0,0,0,0.45)' : 'none',
+        subColor: k === 'disabled' ? '#6E6962' : '#8F887F'
+      };
+    });
+    const keys = ['1','2','3','4','5','6','7','8','9','+','0','−'].map((l, i) => ({ l, bg: i === (s.kbKey ?? 6) ? '#E8EAED' : '#3C3D41', color: i === (s.kbKey ?? 6) ? '#202124' : '#E8EAED' }));
+    const title = s.title || '';
+    const ac = s.accentTail || '';
+    return {
+      s, buttons, keys,
+      showMark: !s.hero,
+      top: (s.top ?? 200) + 'px',
+      titleSize: s.hero ? '128px' : '56px',
+      titleHead: ac ? title.slice(0, title.length - ac.length) : title,
+      titleTail: ac,
+      iconBg: s.icon === 'error' ? '#E0624F' : '#E8914A',
+      hasField: !!fl, hasButtons: buttons.length > 0,
+      fLabel: fl ? fl.label : '', fPrefix: fl ? fl.prefix || '' : '',
+      fText: fl ? (fl.value || fl.placeholder || '') : '',
+      fTextColor: fl && fl.value ? '#F4EFE7' : '#6E6962',
+      fBorder: err ? '#E0624F' : editing || (fl && fl.f) ? '#F4EFE7' : '#3A3632',
+      fBg: editing || (fl && fl.f) ? '#2A2724' : '#211F1D',
+      fRing: err && fl && fl.f ? '4px solid #F4EFE7' : '4px solid transparent',
+      caret: editing
+    };
+  }
+}
+</script>
+</body>
+</html>

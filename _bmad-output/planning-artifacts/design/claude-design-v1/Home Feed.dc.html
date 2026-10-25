@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"></helmet>
+<div style="position:relative;width:1920px;height:1080px;background:#171615;overflow:hidden;display:flex;font-family:'Golos Text',sans-serif;color:#F4EFE7">
+  <dc-import name="TV Sidebar" current="home" focus="{{navFocus}}" hint-size="336px,1080px"></dc-import>
+  <div ref="{{sc}}" style="flex:1;min-width:0;height:1080px;position:relative;overflow:hidden">
+    <div style="padding:54px 0 120px 48px;display:flex;flex-direction:column;gap:48px">
+      <div style="display:flex;flex-direction:column;gap:24px">
+        <div style="display:flex;align-items:baseline;gap:20px">
+          <div style="font-size:32px;font-weight:600">Продолжить просмотр</div>
+          <div style="font-size:22px;color:#8F887F">на этом устройстве</div>
+        </div>
+        <sc-if value="{{isSkel}}">
+          <div style="display:flex;gap:32px">
+            <sc-for list="{{sk5}}" as="s" hint-placeholder-count="5">
+              <div style="flex:none;width:336px;display:flex;flex-direction:column;gap:18px">
+                <div style="aspect-ratio:16/9;border-radius:14px;background:#24221F"></div>
+                <div style="height:24px;width:92%;border-radius:6px;background:#24221F"></div>
+                <div style="height:24px;width:58%;border-radius:6px;background:#24221F"></div>
+                <div style="display:flex;gap:12px;align-items:center"><div style="width:32px;height:32px;border-radius:50%;background:#24221F"></div><div style="height:20px;width:50%;border-radius:6px;background:#24221F"></div></div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{notSkel}}" hint-placeholder-val="{{true}}">
+          <div style="display:flex;gap:32px">
+            <sc-for list="{{cont}}" as="c" hint-placeholder-count="5">
+              <div data-fid="{{c.fid}}" style="flex:none"><dc-import name="Post Card" p="{{c.p}}" focused="{{c.f}}" hint-size="336px,314px"></dc-import></div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:28px">
+        <div data-fid="filters" style="width:1440px;display:flex;align-items:center;justify-content:space-between">
+          <div style="font-size:32px;font-weight:600">Новое в подписках</div>
+          <sc-if value="{{notSkel}}" hint-placeholder-val="{{true}}">
+            <div style="display:flex;gap:20px">
+              <dc-import name="TV Button" label="Фильтры" sub="Доступные мне" pill="{{true}}" size="s" f="{{fFil}}" hint-size="300px,64px"></dc-import>
+              <dc-import name="TV Button" label="Обновить" pill="{{true}}" size="s" f="{{fRef}}" hint-size="160px,64px"></dc-import>
+            </div>
+          </sc-if>
+        </div>
+        <sc-if value="{{isSkel}}">
+          <div style="display:grid;grid-template-columns:repeat(4,336px);column-gap:32px;row-gap:44px">
+            <sc-for list="{{sk8}}" as="s" hint-placeholder-count="8">
+              <div style="width:336px;display:flex;flex-direction:column;gap:18px">
+                <div style="aspect-ratio:16/9;border-radius:14px;background:#24221F"></div>
+                <div style="height:24px;width:92%;border-radius:6px;background:#24221F"></div>
+                <div style="height:24px;width:58%;border-radius:6px;background:#24221F"></div>
+                <div style="display:flex;gap:12px;align-items:center"><div style="width:32px;height:32px;border-radius:50%;background:#24221F"></div><div style="height:20px;width:50%;border-radius:6px;background:#24221F"></div></div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{notSkel}}" hint-placeholder-val="{{true}}">
+          <div style="display:grid;grid-template-columns:repeat(4,336px);column-gap:32px;row-gap:44px">
+            <sc-for list="{{feed}}" as="c" hint-placeholder-count="8">
+              <div data-fid="{{c.fid}}"><dc-import name="Post Card" p="{{c.p}}" focused="{{c.f}}" hint-size="336px,314px"></dc-import></div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{isLoading}}">
+          <div data-fid="loading" style="display:grid;grid-template-columns:repeat(4,336px);column-gap:32px">
+            <sc-for list="{{sk4}}" as="s" hint-placeholder-count="4">
+              <div style="width:336px;display:flex;flex-direction:column;gap:18px">
+                <div style="aspect-ratio:16/9;border-radius:14px;background:#24221F"></div>
+                <div style="height:24px;width:92%;border-radius:6px;background:#24221F"></div>
+                <div style="height:24px;width:58%;border-radius:6px;background:#24221F"></div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{isError}}">
+          <div data-fid="retry" style="width:1440px;height:120px;box-sizing:border-box;border-radius:16px;background:#221F1D;border:2px solid #3A3532;display:flex;align-items:center;justify-content:space-between;padding:0 24px 0 36px">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="font-size:26px;font-weight:600">Не удалось загрузить следующие публикации</div>
+              <div style="font-size:22px;color:#B7B0A6">Нет соединения с сервером. Загруженное выше остаётся на месте.</div>
+            </div>
+            <dc-import name="TV Button" label="Повторить" f="{{fRetry}}" hint-size="220px,80px"></dc-import>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1920,&quot;height&quot;:1080},&quot;mode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;top&quot;,&quot;skeleton&quot;],&quot;default&quot;:&quot;top&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;focus&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;cont-0&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;more&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;&quot;,&quot;loading&quot;,&quot;error&quot;],&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;all&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;feedN&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:8,&quot;tsType&quot;:&quot;number&quot;},&quot;prog&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object&quot;},&quot;smooth&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  sc = React.createRef();
+  componentDidMount() {
+    const w = window;
+    w.__tvd = w.__tvd || import(new URL('tv-data.js', document.baseURI).href);
+    w.__tvd.then((m) => { this.D = m; this.forceUpdate(); });
+  }
+  componentDidUpdate() { this.scrollToFocus(); }
+  scrollToFocus() {
+    const c = this.sc.current; if (!c) return;
+    const f = this.props.focus ?? 'cont-0';
+    const el = c.querySelector(`[data-fid="${f}"]`); if (!el) return;
+    const cr = c.getBoundingClientRect(), er = el.getBoundingClientRect(), k = cr.height / c.offsetHeight || 1;
+    const top = (er.top - cr.top) / k + c.scrollTop, bot = top + er.height / k;
+    let t = c.scrollTop;
+    if (top - t < 140) t = Math.max(0, top - 140); else if (bot - t > c.clientHeight - 60) t = bot - c.clientHeight + 60;
+    if (f.startsWith('cont-') || f === 'filters' || f === 'refresh') t = 0;
+    if (t !== c.scrollTop) c.scrollTo({ top: t, behavior: this.props.smooth ? 'smooth' : 'auto' });
+  }
+  renderVals() {
+    const D = this.D, F = this.props.focus ?? 'cont-0', mode = this.props.mode ?? 'top', more = this.props.more ?? '';
+    const prog = this.props.prog || {};
+    const arr = (n) => Array.from({ length: n }, (_, i) => i);
+    const n = this.props.all ? 16 : (this.props.feedN ?? 8);
+    const ids = D ? D.ALL_FEED.slice(0, n) : [];
+    return {
+      sc: this.sc,
+      navFocus: F.startsWith('nav-') ? F.slice(4) : '',
+      isSkel: mode === 'skeleton', notSkel: mode !== 'skeleton',
+      isLoading: more === 'loading', isError: more === 'error',
+      cont: D ? D.CONT.map(([id, vi], i) => ({ p: D.contCard(id, vi, prog), f: F === 'cont-' + i, fid: 'cont-' + i })) : [],
+      feed: D ? ids.map((id, i) => ({ p: D.card(id), f: F === 'feed-' + i, fid: 'feed-' + i })) : [],
+      fFil: F === 'filters', fRef: F === 'refresh', fRetry: F === 'retry',
+      sk4: arr(4), sk5: arr(5), sk8: arr(8)
+    };
+  }
+}
+</script>
+</body>
+</html>

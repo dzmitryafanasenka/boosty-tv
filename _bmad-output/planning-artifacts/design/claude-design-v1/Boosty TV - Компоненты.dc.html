@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#E6E3DE;} a{color:#A8581A;} a:hover{color:#7A3F12;}</style>
+</helmet>
+<section style="padding:120px;font-family:'Golos Text',sans-serif;color:#1E1C1A;display:flex;flex-direction:column;gap:72px;width:3200px;box-sizing:border-box">
+  <div style="display:flex;flex-direction:column;gap:16px">
+    <div style="font-size:88px;font-weight:700;letter-spacing:-0.02em">Boosty TV — компоненты и состояния</div>
+    <div style="font-size:30px;line-height:1.45;color:#4F4A44;max-width:2200px">Каждый компонент — с состояниями по умолчанию, в фокусе, выбран/текущий, нажат и недоступен, где они применимы. Фокус везде одинаковый: светлый контур 4 px с зазором 4 px и масштаб. Выбор — оранжевый. Нажатие — ×0.98 на 80 мс.</div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:24px">
+    <div style="font-size:44px;font-weight:600">NavItem</div>
+    <div style="background:#1D1B19;border-radius:16px;padding:56px;display:flex;gap:56px;align-items:flex-start">
+      <sc-for list="{{nav}}" as="c" hint-placeholder-count="4">
+        <div style="display:flex;flex-direction:column;gap:20px">
+          <div style="position:relative;width:240px;height:72px;box-sizing:border-box;padding:0 24px;border-radius:14px;display:flex;align-items:center;font-family:'Golos Text',sans-serif;font-size:28px;font-weight:{{c.w}};background:{{c.bg}};color:{{c.color}};outline:{{c.ring}};outline-offset:4px;transform:{{c.tf}}"><div style="position:absolute;left:0;top:20px;bottom:20px;width:5px;border-radius:3px;background:{{c.bar}}"></div>{{c.label}}</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:20px;color:#8F887F">{{c.state}}</div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:24px">
+    <div style="font-size:44px;font-weight:600">PrimaryButton / Button</div>
+    <div style="background:#1D1B19;border-radius:16px;padding:56px;display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start">
+      <sc-for list="{{btns}}" as="c" hint-placeholder-count="8">
+        <div style="display:flex;flex-direction:column;gap:20px;align-items:flex-start">
+          <dc-import name="TV Button" label="{{c.label}}" sub="{{c.sub}}" kind="{{c.kind}}" f="{{c.f}}" disabled="{{c.dis}}" pressed="{{c.pr}}" hint-size="260px,80px"></dc-import>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:20px;color:#8F887F">{{c.state}}</div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:24px">
+    <div style="font-size:44px;font-weight:600">FilterChip</div>
+    <div style="background:#1D1B19;border-radius:16px;padding:56px;display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start">
+      <sc-for list="{{chips}}" as="c" hint-placeholder-count="5">
+        <div style="display:flex;flex-direction:column;gap:20px;align-items:flex-start">
+          <dc-import name="TV Button" label="{{c.label}}" sub="{{c.sub}}" count="{{c.count}}" pill="{{true}}" size="s" f="{{c.f}}" disabled="{{c.dis}}" pressed="{{c.pr}}" hint-size="260px,64px"></dc-import>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:20px;color:#8F887F">{{c.state}}</div>
+        </div>
+      </sc-for>
+      <sc-for list="{{checks}}" as="c" hint-placeholder-count="3">
+        <div style="display:flex;flex-direction:column;gap:20px;align-items:flex-start">
+          <dc-import name="Setting Row" kind="check" compact="{{true}}" w="{{360}}" label="Выпечка" on="{{c.on}}" f="{{c.f}}" hint-size="360px,76px"></dc-import>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:20px;color:#8F887F">{{c.state}}</div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:24px">
+    <div style="font-size:44px;font-weight:600">TextField — телефон и код</div>
+    <div style="background:#1D1B19;border-radius:16px;padding:56px;display:grid;grid-template-columns:repeat(3,760px);gap:56px">
+      <sc-for list="{{fields}}" as="c" hint-placeholder-count="6">
+        <div style="display:flex;flex-direction:column;gap:14px;font-family:'Golos Text',sans-serif;color:#F4EFE7">
+          <div style="font-size:24px;color:#B7B0A6;font-weight:500">{{c.label}}</div>
+          <div style="height:100px;box-sizing:border-box;border-radius:16px;border:3px solid {{c.border}};background:{{c.bg}};outline:{{c.ring}};outline-offset:4px;display:flex;align-items:center;gap:18px;padding:0 32px;font-size:44px;font-variant-numeric:tabular-nums">
+            <sc-if value="{{c.prefix}}"><span style="color:#8F887F">+7</span></sc-if>
+            <span style="color:{{c.tc}}">{{c.text}}</span>
+            <sc-if value="{{c.caret}}"><span style="width:3px;height:52px;background:#E8914A;margin-left:-14px"></span></sc-if>
+          </div>
+          <sc-if value="{{c.err}}"><div style="display:flex;align-items:center;gap:14px;font-size:24px;color:#F29A8A"><div style="flex:none;width:30px;height:30px;border-radius:50%;background:#E0624F;color:#1A1816;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700">!</div>{{c.err}}</div></sc-if>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:20px;color:#8F887F">{{c.state}}</div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:24px">
+    <div style="font-size:44px;font-weight:600">VideoCard</div>
+    <div style="background:#1D1B19;border-radius:16px;padding:56px 56px 48px;display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start">
+      <sc-for list="{{vcards}}" as="c" hint-placeholder-count="5">
+        <div style="display:flex;flex-direction:column;gap:24px">
+          <dc-import name="Post Card" p="{{c.p}}" focused="{{c.f}}" hint-size="336px,314px"></dc-import>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:20px;color:#8F887F;max-width:336px">{{c.state}}</div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:24px">
+    <div style="font-size:44px;font-weight:600">PostCard — по типам</div>
+    <div style="background:#1D1B19;border-radius:16px;padding:56px 56px 48px;display:grid;grid-template-columns:repeat(4,336px);column-gap:72px;row-gap:56px">
+      <sc-for list="{{types}}" as="c" hint-placeholder-count="8">
+        <div style="display:flex;flex-direction:column;gap:24px">
+          <dc-import name="Post Card" p="{{c.p}}" focused="{{false}}" hint-size="336px,314px"></dc-import>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:20px;color:#8F887F">{{c.state}}</div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:24px">
+    <div style="font-size:44px;font-weight:600">AuthorCard</div>
+    <div style="background:#1D1B19;border-radius:16px;padding:56px;display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start">
+      <sc-for list="{{acards}}" as="c" hint-placeholder-count="4">
+        <div style="display:flex;flex-direction:column;gap:20px">
+          <dc-import name="Author Card" a="{{c.a}}" focused="{{c.f}}" hint-size="464px,152px"></dc-import>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:20px;color:#8F887F">{{c.state}}</div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:24px">
+    <div style="font-size:44px;font-weight:600">LiveCard</div>
+    <div style="background:#1D1B19;border-radius:16px;padding:56px;display:grid;grid-template-columns:repeat(2,1040px);gap:56px">
+      <sc-for list="{{lives}}" as="c" hint-placeholder-count="4">
+        <div style="display:flex;flex-direction:column;gap:20px">
+          <dc-import name="Live Card" s="{{c.s}}" f="{{c.f}}" hint-size="1040px,240px"></dc-import>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:20px;color:#8F887F">{{c.state}}</div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:24px">
+    <div style="font-size:44px;font-weight:600">SettingRow / QualityOption</div>
+    <div style="background:#1D1B19;border-radius:16px;padding:56px;display:grid;grid-template-columns:repeat(2,960px);gap:40px 72px">
+      <sc-for list="{{rows}}" as="c" hint-placeholder-count="8">
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <dc-import name="Setting Row" kind="{{c.kind}}" label="{{c.label}}" value="{{c.value}}" desc="{{c.desc}}" on="{{c.on}}" f="{{c.f}}" disabled="{{c.dis}}" w="{{960}}" hint-size="960px,88px"></dc-import>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:20px;color:#8F887F">{{c.state}}</div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:24px">
+    <div style="font-size:44px;font-weight:600">PollOption</div>
+    <div style="background:#1D1B19;border-radius:16px;padding:56px;display:grid;grid-template-columns:repeat(2,960px);gap:40px 72px">
+      <sc-for list="{{polls}}" as="c" hint-placeholder-count="8">
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <dc-import name="Poll Option" o="{{c.o}}" multi="{{c.multi}}" f="{{c.f}}" checked="{{c.checked}}" pending="{{c.pending}}" sending="{{c.sending}}" finished="{{c.fin}}" hint-size="960px,84px"></dc-import>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:20px;color:#8F887F">{{c.state}}</div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:24px">
+    <div style="font-size:44px;font-weight:600">PlayerControl</div>
+    <div style="background:#1D1B19;border-radius:16px;padding:56px;display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start">
+      <sc-for list="{{pcs}}" as="c" hint-placeholder-count="6">
+        <div style="display:flex;flex-direction:column;gap:20px;align-items:flex-start">
+          <dc-import name="TV Button" icon="{{c.icon}}" label="{{c.label}}" f="{{c.f}}" pressed="{{c.pr}}" disabled="{{c.dis}}" hint-size="200px,80px"></dc-import>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:20px;color:#8F887F">{{c.state}}</div>
+        </div>
+      </sc-for>
+      <sc-for list="{{tls}}" as="c" hint-placeholder-count="2">
+        <div style="display:flex;flex-direction:column;gap:20px">
+          <div style="position:relative;width:640px;height:80px">
+            <div style="position:absolute;left:0;right:0;top:50%;height:{{c.h}};transform:translateY(-50%);border-radius:6px;background:rgba(244,239,231,0.25)"></div>
+            <div style="position:absolute;left:0;top:50%;width:40%;height:{{c.h}};transform:translateY(-50%);border-radius:6px;background:#E8914A"></div>
+            <div style="position:absolute;left:40%;top:50%;width:{{c.k}};height:{{c.k}};transform:translate(-50%,-50%);border-radius:50%;background:#F4EFE7;outline:{{c.ring}};outline-offset:4px"></div>
+          </div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:20px;color:#8F887F">{{c.state}}</div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:24px">
+    <div style="font-size:44px;font-weight:600">QrDialog</div>
+    <div style="display:flex;gap:56px">
+      <div style="width:960px;height:540px;overflow:hidden;border-radius:16px;position:relative;background:#171615">
+        <div style="position:absolute;left:0;top:0;width:1920px;height:1080px;transform:scale(0.5);transform-origin:0 0"><dc-import name="QR Dialog" title="verstak_chertezhi.pdf" sub="Файл · 2,4 МБ" note="Ссылка подписана Boosty и действует ограниченное время." hint-size="1920px,1080px"></dc-import></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px;font-size:26px;line-height:1.5;color:#3B3835;max-width:900px">
+        <div>Варианты: файл (имя и размер), ссылка из текста (домен), внешнее видео (площадка и название), «Поделиться» эфиром (адрес страницы эфира).</div>
+        <div>«Закрыть» — единственный фокус. Back и OK закрывают диалог, фокус возвращается на элемент, который его открыл.</div>
+        <div>Подписанные адреса файлов в текст не выводятся, только в QR.</div>
+      </div>
+    </div>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const navS = (label, state, f, cur) => ({ label, state, bg: f ? '#423D37' : cur ? '#2A2724' : 'transparent', color: f ? '#FFFFFF' : cur ? '#F2A462' : '#A9A299', w: f || cur ? 600 : 500, ring: f ? '4px solid #F4EFE7' : '4px solid transparent', tf: f ? 'scale(1.04)' : 'none', bar: cur ? '#E8914A' : 'transparent' });
+    const nav = [navS('Поиск', 'default', false, false), navS('Подписки', 'focused', true, false), navS('Главная', 'current', false, true), navS('Главная', 'current + focused', true, true)];
+    const btns = [
+      { label: 'Войти', kind: 'primary', state: 'primary · default' }, { label: 'Войти', kind: 'primary', f: true, state: 'primary · focused' }, { label: 'Войти', kind: 'primary', pr: true, state: 'primary · pressed' },
+      { label: 'Изменить номер', state: 'secondary · default' }, { label: 'Изменить номер', f: true, state: 'secondary · focused' }, { label: 'Изменить номер', pr: true, state: 'secondary · pressed' },
+      { label: 'Выслать повторно', sub: 'через 0:42', dis: true, state: 'disabled · не фокусируется' }, { label: 'Продолжить', sub: 'с 33:05', kind: 'primary', f: true, state: 'primary + подпись' }
+    ];
+    const chips = [
+      { label: 'Фильтры', state: 'default' }, { label: 'Фильтры', f: true, state: 'focused' }, { label: 'Фильтры', count: 2, state: 'активно: 2' }, { label: 'Фильтры', count: 2, f: true, state: 'активно + focused' }, { label: 'Фильтры', sub: 'Доступные мне', state: 'с текущим значением' }
+    ];
+    const checks = [{ on: false, state: 'тег · не выбран' }, { on: true, state: 'тег · выбран' }, { on: true, f: true, state: 'тег · выбран + focused' }];
+    const fld = (label, state, o) => ({ label, state, prefix: o.prefix, text: o.text, tc: o.val ? '#F4EFE7' : '#6E6962', caret: !!o.caret,
+      border: o.err ? '#E0624F' : o.edit ? '#F4EFE7' : o.dis ? '#2A2724' : '#3A3632', bg: o.edit || o.f ? '#2A2724' : '#211F1D', ring: o.err && o.f ? '4px solid #F4EFE7' : '4px solid transparent', err: o.err || '' });
+    const fields = [
+      fld('Номер телефона', 'idle', { prefix: true, text: '900 000-00-00' }),
+      fld('Номер телефона', 'focused', { prefix: true, text: '900 000-00-00', edit: true }),
+      fld('Номер телефона', 'typing (клавиатура открыта)', { prefix: true, text: '916 245-1', val: true, edit: true, caret: true }),
+      fld('Номер телефона', 'error + focused', { prefix: true, text: '916 245-1', val: true, f: true, err: 'Некорректный номер. Нужно 10 цифр после +7.' }),
+      fld('Код из сообщения', 'filled', { text: '4821', val: true }),
+      fld('Код из сообщения', 'disabled (идёт проверка)', { text: '4821', dis: true })
+    ];
+    const base = { title: 'Териберка зимой: что посмотреть за два дня, если дорогу замело', name: 'Ольга Никитина', ini: 'ОН', hue: 225, badge: 'Видео' };
+    const vcards = [
+      { p: { ...base, date: 'Сегодня, 12:40' }, state: 'default · без длительности' },
+      { p: { ...base, date: 'Сегодня, 12:40' }, f: true, state: 'focused · ×1.06 + контур' },
+      { p: { ...base, dur: '32:18', prog: 0.12, sub: 'осталось 28 мин' }, state: 'прогресс (длительность известна)' },
+      { p: { ...base, sub: 'остановились на 3:52' }, state: 'позиция без длительности' },
+      { p: { ...base, title: 'Очень длинное название поста, которое не помещается в две строки и обрезается многоточием в конце', date: 'Сегодня, 12:40' }, state: 'длинный заголовок · 2 строки' }
+    ];
+    const T = (badge, state, o) => ({ p: { title: o.title, name: o.name, ini: o.ini, hue: o.hue, date: o.date, badge, ...o }, state });
+    const types = [
+      T('Видео', 'видео', { title: 'Териберка зимой: что посмотреть за два дня', name: 'Ольга Никитина', ini: 'ОН', hue: 225, date: 'Сегодня, 12:40' }),
+      T('3 видео', 'несколько видео', { title: 'Пироги на неделю: пять начинок из одного теста', name: 'Марина Лебедева', ini: 'МЛ', hue: 40, date: 'Вчера, 14:10' }),
+      T('Аудио', 'аудио · длительность из API', { title: 'Выпуск 87. Почему мы перестали ходить в кино', name: 'Даша и Глеб', ini: 'ДГ', hue: 330, date: 'Сегодня, 09:15', dur: '1:12:05', thumbLabel: 'обложка выпуска' }),
+      T('Текст и фото', 'текст / изображение', { title: 'Акварельный скетчинг: свет и тень на крышах', name: 'Вера Соколова', ini: 'ВС', hue: 150, date: 'Вчера, 21:30', thumbLabel: 'изображение из поста' }),
+      T('Опрос', 'опрос · без превью', { title: 'Какую эпоху разбираем в ноябре? Голосуем', name: 'Пётр Аникин', ini: 'ПА', hue: 255, date: 'Вчера, 18:05', kind: 'poll' }),
+      T('Файл', 'файл · без превью', { title: 'Чертежи верстака и список материалов', name: 'Илья Ковалёв', ini: 'ИК', hue: 75, date: '22 октября', kind: 'file' }),
+      T('Нет доступа', 'закрытый пост', { title: 'Архитектура TV-клиента: закрытый разбор', name: 'Кирилл Орлов', ini: 'КО', hue: 110, date: '23 октября', locked: true, thumbLabel: 'тизер' }),
+      T('LIVE', 'эфир', { title: 'Разбор партий турнира в Вейк-ан-Зее', name: 'Артём Брагин', ini: 'АБ', hue: 200, date: 'эфир идёт', live: true })
+    ];
+    const acards = [
+      { a: { title: 'Кухня без спешки', name: 'Марина Лебедева', ini: 'МЛ', hue: 40 }, state: 'default' },
+      { a: { title: 'Кухня без спешки', name: 'Марина Лебедева', ini: 'МЛ', hue: 40 }, f: true, state: 'focused · ×1.05' },
+      { a: { title: 'Дача и вокруг', name: 'Сергей Миронов', ini: 'СМ', hue: 20, mine: true }, state: 'мой блог' },
+      { a: { title: 'Звёздный час: история, которую не рассказывали в школе', name: 'Пётр Аникин', ini: 'ПА', hue: 255 }, state: 'длинное название · 2 строки' }
+    ];
+    const lv = { status: 'live', title: 'Разбор партий турнира в Вейк-ан-Зее', viewers: 1204, likes: 356, elapsed: 4350, access: true };
+    const lives = [
+      { s: lv, state: 'идёт · default' }, { s: lv, f: true, state: 'идёт · focused' },
+      { s: { status: 'scheduled', title: 'Стрим: пишем фокус-менеджер для телевизора', when: '31 октября, 19:00', likes: 12, access: true }, state: 'запланирован · не фокусируется' },
+      { s: { ...lv, access: false, level: 'Гроссмейстер' }, f: true, state: 'идёт · нужен уровень · OK → QR страницы' }
+    ];
+    const rows = [
+      { kind: 'nav', label: 'Качество', value: 'Авто · 1080p', state: 'nav · default' }, { kind: 'nav', label: 'Качество', value: 'Авто · 1080p', f: true, state: 'nav · focused' },
+      { kind: 'toggle', label: 'Системный видеоплеер', on: false, state: 'toggle · off' }, { kind: 'toggle', label: 'Системный видеоплеер', on: true, f: true, state: 'toggle · on + focused' },
+      { kind: 'radio', label: '720p', state: 'QualityOption · default' }, { kind: 'radio', label: '720p', f: true, state: 'QualityOption · focused' },
+      { kind: 'radio', label: 'Авто', desc: 'Подстраивается под скорость сети', on: true, state: 'QualityOption · selected' }, { kind: 'radio', label: 'Авто', desc: 'Подстраивается под скорость сети', on: true, f: true, state: 'QualityOption · selected + focused' },
+      { kind: 'nav', label: 'Диагностика', dis: true, state: 'disabled · не фокусируется' }, { kind: 'info', label: 'Версия', value: '0.1.0 (сборка 12)', state: 'info' }
+    ];
+    const o = (text, pct, count, voted) => ({ text, pct, count, voted });
+    const polls = [
+      { o: o('Смутное время', 38, 81), state: 'один вариант · default' }, { o: o('Смутное время', 38, 81), f: true, state: 'focused' },
+      { o: o('Смутное время', 38, 81), f: true, pending: 'vote', state: 'ожидает второго OK (защита)' }, { o: o('Смутное время', 38, 81), f: true, sending: true, state: 'отправка' },
+      { o: o('Смутное время', 38, 82, true), state: 'мой голос' }, { o: o('Солянка', 43, 41), multi: true, checked: true, f: true, state: 'несколько · отмечен + focused' },
+      { o: o('Петровские реформы', 27, 58), fin: true, state: 'завершён' }, { o: o('Смутное время', 38, 82, true), fin: true, state: 'завершён · мой голос' }
+    ];
+    const pcs = [
+      { icon: 'pause', label: '', state: 'пауза · default' }, { icon: 'pause', label: '', f: true, state: 'focused' }, { icon: 'play', label: '', pr: true, state: 'pressed' },
+      { label: 'Настройки', state: 'default' }, { label: 'Настройки', f: true, state: 'focused' }, { icon: 'heart-on', label: '357', state: 'лайк эфира · выбран' }
+    ];
+    const tls = [{ h: '8px', k: '24px', ring: '4px solid transparent', state: 'таймлайн · без фокуса' }, { h: '12px', k: '36px', ring: '4px solid rgba(244,239,231,0.6)', state: 'таймлайн · focused (← → перемотка)' }];
+    return { nav, btns, chips, checks, fields, vcards, types, acards, lives, rows, polls, pcs, tls };
+  }
+}
+</script>
+</body>
+</html>

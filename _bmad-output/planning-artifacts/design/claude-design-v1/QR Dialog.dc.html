@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"></helmet>
+<div style="position:absolute;left:0;top:0;width:1920px;height:1080px;background:rgba(10,9,8,0.82);display:flex;align-items:center;justify-content:center;font-family:'Golos Text',sans-serif;color:#F4EFE7">
+  <div style="width:1100px;box-sizing:border-box;padding:56px;border-radius:24px;background:#24211E;display:flex;gap:56px;align-items:center">
+    <div style="flex:none;position:relative;width:360px;height:360px;border-radius:16px;background:#F4EFE7">
+      <div style="position:absolute;left:28px;top:28px;width:84px;height:84px;box-sizing:border-box;border:14px solid #1A1816;display:flex;align-items:center;justify-content:center"><div style="width:28px;height:28px;background:#1A1816"></div></div>
+      <div style="position:absolute;right:28px;top:28px;width:84px;height:84px;box-sizing:border-box;border:14px solid #1A1816;display:flex;align-items:center;justify-content:center"><div style="width:28px;height:28px;background:#1A1816"></div></div>
+      <div style="position:absolute;left:28px;bottom:28px;width:84px;height:84px;box-sizing:border-box;border:14px solid #1A1816;display:flex;align-items:center;justify-content:center"><div style="width:28px;height:28px;background:#1A1816"></div></div>
+      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:20px;color:#5A554F">QR-код</div>
+    </div>
+    <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:20px">
+      <div style="font-size:24px;color:#A9A299">Наведите камеру телефона</div>
+      <div style="font-size:40px;line-height:1.15;font-weight:600;text-wrap:balance">{{title}}</div>
+      <sc-if value="{{hasSub}}"><div style="font-size:24px;line-height:1.4;color:#B7B0A6;word-break:break-all">{{sub}}</div></sc-if>
+      <sc-if value="{{hasNote}}"><div style="font-size:22px;line-height:1.45;color:#8F887F;text-wrap:pretty">{{note}}</div></sc-if>
+      <div style="margin-top:16px;display:flex"><dc-import name="TV Button" label="Закрыть" f="{{f}}" hint-size="180px,80px"></dc-import></div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1920,&quot;height&quot;:1080},&quot;title&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;verstak_chertezhi.pdf&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;sub&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;note&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;f&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const P = this.props;
+    return {
+      title: P.title ?? 'Открыть на телефоне', sub: P.sub ?? '', note: P.note ?? '',
+      hasSub: !!P.sub, hasNote: !!P.note, f: P.f ?? true
+    };
+  }
+}
+</script>
+</body>
+</html>

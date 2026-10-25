@@ -1,0 +1,186 @@
+# Feature parity matrix (reference: BoostBuddy)
+
+## Audit metadata
+
+| Item | Value |
+|---|---|
+| Reference repository | https://github.com/slartus/BoostBuddy |
+| Audited revision | tag `1.16.0` = commit `b9acb6c2cde4f37907e70bf166a2f27c7d57c322` (2026-09-05), marked "Latest" on GitHub Releases, APK `BoostBuddy_v1.16.0_c89.apk` |
+| Other heads seen | `origin/master` = `1a4c82a` (v1.15.0, 2026-07-17); `origin/develop` = `87c0852` (2026-04-09, behind the release) |
+| Audit date | 2026-10-25 |
+| Method | Static source reading of `composeApp/src/{commonMain,androidMain}` and release notes for 1.14.0–1.16.0. The reference app was **not** built or run, and no Boosty request was made by us. |
+| Not reviewed | 4pda discussion thread (https://4pda.to/forum/index.php?showtopic=1085976); iOS-specific code beyond spot checks |
+| License | README declares Apache-2.0 (Copyright 2024 Artem Slinkin). There is **no LICENSE/NOTICE file** in the repository. Owner decision (2026-10-25): BoostBuddy is used only as a **behavior and API reference**, as the only existing custom Boosty client for Android TV. Its code is not reused. If code is ever copied, keep attribution and add a NOTICE entry. |
+
+Path shorthands used below:
+- `cm/` = `composeApp/src/commonMain/kotlin/ru/slartus/boostbuddy/`
+- `am/` = `composeApp/src/androidMain/kotlin/ru/slartus/boostbuddy/`
+
+## Classification
+
+- **Confirmed**: the code path is wired from a UI element to a component and repository in release 1.16.0 (traced by reading the code).
+- **Inferred**: the code is wired, but the exact behavior depends on server responses or runtime conditions we have not observed.
+- **Unverified**: the code exists but is not reachable from the UI, or the only evidence is a reverse-engineered spec, a file name or a forum post.
+
+"Confirmed" means only "the reference implements it". **No capability has been verified live against Boosty by this project yet.** Every API dependency still needs the real-device spike (see `docs/android-tv-auth-playback-spike.md`).
+
+Columns:
+- **Class**: confirmed, inferred or unverified, as defined above.
+- **Parity**: `P` = parity obligation; `X` = intentionally excluded; `D` = owner decision required; `R` = reference-app-specific (not a Boosty capability); `N/A` = touch-only, with no TV meaning.
+- **Android**: implementation status in Boosty TV. Every row is currently `not started`.
+
+Every row's Android status is `not started`. The Tests column lists the planned coverage.
+
+## 1. Authentication and session
+
+| ID | Capability | Class | Parity | Evidence | Reference behavior | API | Tests (planned) | Apple TV notes |
+|---|---|---|---|---|---|---|---|---|
+| AUTH-01 | Sign-in through the Boosty website in an embedded WebView | Confirmed | Not selected (owner chose AUTH-03); fallback research only | `cm/components/auth/AuthComponent.kt` (`onCookiesChanged`), `am/ui/widgets/WebView.kt`, `cm/ui/screens/AuthScreen.kt` | Loads `https://boosty.to` with a mobile Chrome UA. On every resource load and page event it reads cookies, finds the `auth` cookie, URL-decodes its JSON `{accessToken, refreshToken, expiresAt}`, stores it, then validates it with `GET v1/user/current`. Tokens that fail validation are blacklisted for the session. An info dialog tells the user to accept cookies and sign in. | `auth` cookie on boosty.to; `GET /v1/user/current` | Integration: cookie parsing with a sanitized fixture; device: end-to-end D-pad sign-in | WebView is unavailable or restricted on tvOS. A different mechanism is needed (phase 4). |
+| AUTH-02 | D-pad aids for WebView sign-in on Android TV | Confirmed | Not selected (virtual cursor conflicts with the no-mouse rule) | `cm/ui/screens/AuthScreen.kt` (`useCursor`, cursor key handling), `am/ui/widgets/WebView.kt` (`getAllButtons`, button bar, `simulateClick`) | Two aids: (a) a red on-screen "software cursor" moved with the D-pad, where Select sends a synthetic touch at that position; (b) a row that lists every `button`, `input` and `[role=button]` element on the page (with a "rescan" action), and clicking an entry triggers it via JS. This means the website itself is **not** natively D-pad navigable. | — | Device: can a user finish sign-in, including captcha and consent, with the remote only? | N/A |
+| AUTH-03 | Sign-in by phone number and one-time code (SMS, messenger or Boosty app) | Confirmed | **P: the selected sign-in method** (owner decision 2026-10-25; explicit approval for a native phone + code form) | `cm/data/api/PhoneAuthApi.kt`, `cm/data/repositories/PhoneAuthRepository.kt`, `AuthComponent.requestCode/onConfirmSmsCodeClick`, `AuthScreen.PhoneAuthContent` | A native form takes the phone number (normalized to `+7…` E.164 when 10 digits are entered), then calls `POST auth/phone/verification_code/send` and receives a challenge `code`. The user enters the received code, and `PUT auth/phone/verification_code/confirm` returns tokens. Resend uses `transport=gate` after a 60 s client-side cooldown. A "change number" action is available. Errors are shown in a dialog. | `/auth/phone/verification_code/send`, `/auth/phone/verification_code/confirm` | Unit: phone normalization, resend cooldown; device: TV keyboard input | Portable if approved. Uses system keyboard. |
+| AUTH-04 | Token persistence across restarts | Confirmed | P | `cm/data/repositories/SettingsRepository.kt` (keys `access_token`, `refresh_token`, `token_expires_at`, `device_id`), `am/data/settings/SettingsFactory.kt` | Stored in **plain SharedPreferences**. A random UUIDv4 `device_id` is generated once and reused for refresh and phone auth. | — | Integration: secure storage adapter; device: restart keeps the session | Keychain. **Do not copy the plain-storage approach.** CLAUDE.md requires Keystore. |
+| AUTH-05 | Proactive and reactive access-token refresh | Confirmed (client logic), Inferred (server semantics) | P | `cm/data/ktor/HttpClient.kt` (`ensureValidToken`, `forceRefresh`, `tokenRefreshPlugin`, `REFRESH_THRESHOLD_SECONDS = 300`) | Mutex-guarded. Before each request, if `expiresAt − now < 300 s`, it calls `POST oauth/token/` (`grant_type=refresh_token`, `device_os=web`, `device_id`, `X-From-Id`). On HTTP 401 it forces one refresh and retries the request once. If refresh fails, the original 401 is propagated. A rotated refresh token is stored when one is returned. Whether cookie `expiresAt` is in seconds or milliseconds has not been verified (the code compares it with epoch seconds). | `POST /oauth/token/` | Unit: single-flight under concurrency, bounded retry, no loop; integration: expiry using mocks | Shared logic is portable. |
+| AUTH-06 | Expired or invalid session returns to sign-in | Confirmed | P | `cm/utils/ServerError.kt` (`toServerException`, `messageOrThrow` → `unauthorizedError()`), `am/App.android.kt` (handler → `root.showAuthorizeComponent()`), `MainComponent.checkToken` | Any 401 that is still present after refresh, or a missing access token, throws `UnauthorizedException`. A global handler replaces the stack with the Auth screen. `AuthComponent.init` clears stored tokens. | — | Integration: 401 after refresh failure leads to the signed-out state | Same intent. |
+| AUTH-07 | Logout with confirmation | Confirmed | P | `TopBarComponent.onLogoutClicked`, `LogoutDialogComponent`, `RootComponent.logout` | A confirmation dialog ("Выйти из аккаунта" / "Отмена"). It clears the stored tokens, expiry, WebView cookies and storage, then navigates to Auth. **No server-side revoke call is made.** Settings and `device_id` are kept. | none (a `DELETE /oauth/token` is listed in the reverse-engineered spec but is unverified and unused) | Integration: logout clears credentials and account caches; device: logout and re-login | Same intent. |
+| AUTH-08 | Session validation via current-user profile | Confirmed | P | `cm/data/repositories/ProfileRepository.kt` | Reads `id` and `blogUrl`. Used to validate new tokens and to find "my blog". | `GET /v1/user/current` | Unit: DTO mapping | — |
+
+## 2. Subscriptions and author (blog) pages
+
+| ID | Capability | Class | Parity | Evidence | Reference behavior | API | Tests (planned) | Apple TV notes |
+|---|---|---|---|---|---|---|---|---|
+| SUB-01 | Subscriptions list | Confirmed | P | `cm/components/subscribes/SubscribesComponent.kt`, `SubscribesRepository.getSubscribes`, `cm/ui/screens/SubscribesScreen.kt`, `main/MainScreen.kt` (shown in a navigation drawer; D-pad Left opens it, Right closes it) | One request with `limit=30&with_follow=true`, **no pagination**, so users with more than 30 subscriptions or follows may be truncated (inferred). Each item shows the blog title and the owner's name and avatar, and opens the author page. Loading, error and retry states exist. | `GET /v1/user/subscriptions` | Unit: mapping, tolerant parsing (1.16.0 removed price fields after a crash); device: long list | — |
+| SUB-02 | "My blog" entry for users who own a blog | Confirmed | P | `SubscribesRepository.getMyBlog`, `SubscribesComponent.fetchMyBlog` (release note 1.14.0 "Мой блог") | If the profile has `blogUrl`, it fetches the blog info and one post. The entry is shown only when the blog has at least one post. | `GET /v1/user/current`, `GET /v1/blog/{blog}`, `GET /v1/blog/{blog}/post/?limit=1` | Unit | — |
+| AUTH-PAGE-01 | Author page: header and post list | Confirmed | P | `cm/components/blog/BlogComponent.kt`, `cm/ui/screens/blog/BlogScreen.kt`, `BlogRepository.fetchInfo/fetchPosts` | Shows the title and owner. Posts are paginated (20 per page) with the same post rendering as the feed. Has a back action, pull-to-refresh, and load-more errors shown as an inline retry item. Can be opened from a subscription, "my blog" or a post's author row. | `GET /v1/blog/{blog}`, `GET /v1/blog/{blog}/post/` | Unit: pagination merge (dedupe by post id); device: hundreds of posts | — |
+| AUTH-PAGE-02 | Search inside an author's posts | Confirmed | P | `BlogComponent.onSearchQueryChange`, `BlogRepository.searchPosts` | A query replaces the list. Combined with the active filter. | `GET /v1/search/blog/post/` | Unit | System keyboard |
+| AUTH-PAGE-03 | Filters inside an author page | Confirmed | P | `BlogComponent.onFilterClick` → `FilterComponent` with `FilterScreenEntryPoint.Blog` | Same filter dialog as the feed (see FILTER-*), but tags come from the blog's tag list. | `GET /v1/blog/{blog}/post/tag/` | — | — |
+
+## 3. Feed, search, pagination, filters
+
+| ID | Capability | Class | Parity | Evidence | Reference behavior | API | Tests (planned) | Apple TV notes |
+|---|---|---|---|---|---|---|---|---|
+| FEED-01 | Home feed of posts from subscriptions | Confirmed | P | `cm/components/feed/FeedComponent.kt`, `PostsFeedComponent.kt`, `FeedRepository.getData`, `cm/ui/screens/FeedScreen.kt` | The main screen after sign-in. Default filter is "available to me". | `GET /v1/feed/post/` | — | — |
+| FEED-02 | Cursor pagination with end-of-list detection | Confirmed | P | `PostsFeedComponent.fetchNext/plusItems`, `cm/ui/common/isEndOfListReached.kt`, `Extra(offset, isLast)` | `offset` is an **opaque string** taken from `extra.offset`. Paging stops when `extra.isLast == true`. Feed pages are 10 posts, blog pages 20. Items are deduplicated by post `id`. A loading item, and an error item that retries on click, are appended at the end. | `extra.offset`, `extra.isLast` | Unit: merge, dedupe, error item; component: focus-safe loading | — |
+| FEED-03 | Refresh (toolbar button) and pull-to-refresh | Confirmed | P | `TopBarComponent.onRefreshClicked`, `PostsFeedComponent.onPullToRefresh` | The refresh button reloads both the feed and subscriptions. Pull-to-refresh is touch-oriented. On TV the equivalent is an explicit refresh action. | — | Component | Same |
+| FEED-04 | Full-text search in the feed | Confirmed | P | `TopAppBar.kt` (search field "Поиск..."), `MainComponent.onSearchQuery`, `FeedRepository.searchData` | Combined with the filter. Clearing the query returns to the normal feed. | `GET /v1/search/feed/post/` | Unit | System keyboard |
+| SEARCH-SCOPES | Search scopes | Confirmed | P | as FEED-04, AUTH-PAGE-02 | Exactly two scopes: **the subscription feed** and **a single blog**. There is no global search for blogs or authors. | — | — | — |
+| FILTER-01 | Access filter: available to me / all posts / only purchased | Confirmed | P | `cm/components/filter/FilterViewState.kt` (`AccessType.Allowed/All/Bought`), `cm/ui/screens/filter/FilterView.kt` labels "Доступные мне", "Все посты", "Только купленные" | Maps to `only_allowed` (feed) or `is_only_allowed` (blog), plus `only_bought`. "All" sends both as `false`. The default is "Allowed". | query params | Unit: filter → params | — |
+| FILTER-02 | Date-range filter | Confirmed | P | `FilterComponent.onPeriodClick/onDateRangeSelected/onDateRangeReset`, `ui/widgets/DateRangePickerDialog.kt` | Material date-range picker. The range is normalized to start of day … end of day in the local time zone and sent as `from_ts`/`to_ts` epoch seconds. Label "За всё время" when unset. | `from_ts`, `to_ts` | Unit: day bounds and time zone | A TV-friendly picker is needed. Material picker usability on D-pad is unverified. |
+| FILTER-03 | Tag filter (multi-select) | Confirmed | P | `cm/components/filter/tags/FilterTagsComponent.kt`, `TagRepository` | Feed tags are paginated (`limit=100`, offset cursor, load more). Blog tags come in one page. Multi-select with reset. Selected IDs are sent as comma-joined `tags_ids`. | `GET /v1/search/feed/tag/`, `GET /v1/blog/{blog}/post/tag/` | Unit: selection state | — |
+| FILTER-04 | Reset filter; filter applies immediately | Confirmed | P | `FilterComponent.onResetClick`, `updateFilter` → `params.onFilter` | Every change immediately re-queries the list (there is no "Apply" button). | — | Unit | — |
+| SORT-01 | Sorting | Unverified (not found) | — | No sort parameter in `BoostyApi.kt` | No sorting UI or parameter exists in the reference. **Not a parity obligation.** | — | — | — |
+
+## 4. Post content rendering
+
+The reference renders the **full post inline in the feed card** (title, date, author, content, poll, counters). There is no separate "post detail" screen apart from the comments screen (see COMM-01).
+
+| ID | Capability | Class | Parity | Evidence | Reference behavior | API | Tests (planned) | Apple TV notes |
+|---|---|---|---|---|---|---|---|---|
+| POST-01 | Post header: title, created date, author (opens author page) | Confirmed | P | `cm/ui/screens/PostsView.kt` (`TitleView`, `DateTimeView`, `BlogInfo`) | — | `createdAt`, `user` | Component | — |
+| POST-02 | Rich text: bold, italic and underline styles, inline links, inline emoji ("smiles") | Confirmed | P | `cm/data/repositories/models/ContentResponse.kt` (`mergeText`), `Posts.kt` (`PostDataTextContent.ofRaw`, style codes `0`=bold, `2`=italic, `4`=underline), `PostDataView.AnnotatedTextView` | `text`, `link` and `smile` blocks are merged into one annotated paragraph until a `BLOCK_END` modifier. `content` is a JSON-encoded array `[text, ?, [[style, from, len], …]]`. Links open a browser on mobile, **or a QR dialog on Android TV**. | block types `text`, `link`, `smile` | Unit: text-block parser with fixtures, unknown style codes | — |
+| POST-03 | Images | Confirmed | P | `PostDataView.PostDataImageView`, block `image` (`url`) | Displayed inline. | block `image` | Component | — |
+| POST-04 | Boosty-hosted video blocks (`ok_video`), several per post | Confirmed | P | `ContentResponse.mapToContentOrNull` (`ok_video`), `PostDataOkVideoView`, `PostsView` iterates over all blocks | Each video shows its preview image with a play icon. Each is played independently by its own `id`. A video is dropped (skipped) if it has no usable `playerUrls` or no preview. | block `ok_video` | Unit: multiple media identity | — |
+| POST-05 | External video (e.g. YouTube) | Confirmed | P | block `video` → `Content.Video`, `PostDataVideoView` | Shows a YouTube thumbnail when the host is `www.youtube.com`. Opens a browser, or on Android TV a **QR dialog** with the URL. It is not played in the app. | block `video` | Component | Same QR approach |
+| POST-06 | Audio files | Confirmed | P | block `audio_file`, `cm/ui/screens/blog/PostDataAudioFileView.kt`, `cm/utils/AudioPlayerHolder.kt`, `am/utils/AudioPlayer.kt` | Inline player: play/pause, a seek slider, and `position / duration` text. A single global player: starting another track pauses the current one. The stream URL is `url + post.signedQuery`. Wakelock is held during playback (1.16.0) and playback is paused when audio becomes noisy. **No progress persistence for audio.** | block `audio_file` + `signedQuery` | Unit: single active track; device: sleep/resume | AVAudioSession |
+| POST-07 | File attachments | Confirmed | P (QR approved by owner 2026-10-25) | block `file`, `PostDataView.PostDataFileView` | Shows the title and size. Opens `url + signedQuery` in a browser, or on Android TV shows it **as a QR code**. That puts a signed URL into the QR shown on screen. | block `file` + `signedQuery` | Component | Same |
+| POST-08 | Locked / no-access posts (teaser) | Confirmed | P | `PostsView.kt` (`if (!post.hasAccess \|\| post.data.isEmpty())` renders `teaser`) | When `hasAccess=false` or `data` is empty, the teaser blocks are shown. There is no explicit "locked" badge or subscription CTA (inferred from code). | `hasAccess`, `teaser` | Component: locked card | — |
+| POST-09 | Unknown block types do not crash | Confirmed | P | `mapToContentOrNull` → `Content.Unknown`, `PostDataUnknownView` ("UNKNOWN_CONTENT") | Unknown types render a placeholder. Malformed known blocks are dropped. | — | Unit: unknown-block fixture | — |
+| POST-10 | Like and comment counters (read-only) | Confirmed | P (likes, read-only), X (comment counter) | `PostsView.kt` `CountView`; the row click → `onCommentsClicked` → PostScreen (comments) | Shows the like count and the comment count. **Clicking the row opens the comments screen.** Boosty TV must not show a comment counter that leads nowhere, and must not link to comments. There is no post-like action in the reference. | `count.likes`, `count.comments` | Component | — |
+| POST-11 | Open a single post (fresh fetch) | Inferred | — (our improvement) | `PostRepository.getPost` is only used by `VideoComponent` (to refresh media) | The reference has no post detail screen besides comments. A dedicated post screen in Boosty TV is **our improvement / TV adaptation**, not parity. | `GET /v1/blog/{blog}/post/{id}` | — | — |
+
+## 5. Polls
+
+| ID | Capability | Class | Parity | Evidence | Reference behavior | API | Tests (planned) | Apple TV notes |
+|---|---|---|---|---|---|---|---|---|
+| POLL-01 | Poll display: title, options, per-option counter and percentage, total voters, finished state | Confirmed | P | `cm/ui/screens/blog/PollView.kt`, `Poll`/`PollOption` models | "Проголосовал: N" and "Опрос завершен". A poll is dropped if `isMultiple`, `isFinished` or `options` is missing. | `poll` in the post | Unit: mapping | — |
+| POLL-02 | Single-choice vote | Confirmed | P | `PostsFeedComponent.onPollOptionClicked` (non-multiple branch) | Selecting an option **votes immediately**. Selecting the already-chosen option **retracts** the vote (`DELETE`). After each change the poll is re-fetched. **Errors are silently ignored.** | `POST /v1/poll/{id}/vote`, `DELETE /v1/poll/{id}/vote`, `GET /v1/blog/{blog}/poll/{id}` | Unit: mutation rules (no blind replay); integration | — |
+| POLL-03 | Multiple-choice vote | Confirmed | P | `onPollOptionClicked` (multiple branch), `onVoteClicked`, PollView "Проголосовать" button | Options are toggled locally, then "Проголосовать" sends all checked IDs (comma-joined). The button is disabled when nothing is checked. | as POLL-02 | Unit | — |
+| POLL-04 | Retract vote | Confirmed | P | `onDeleteVoteClicked`, "Отозвать голос" | — | `DELETE /v1/poll/{id}/vote` | — | — |
+| POLL-05 | Already-voted and closed states | Confirmed | P | `PollView.kt` (`isMultipleUnVoted`, `allowVote = !poll.isFinished`, `voted = option.id in poll.answer`, `PollMultipleButton`) | `answer` marks the user's current choices. A finished poll shows "Опрос завершен" and its options are not clickable. A multiple-choice poll that already has an answer shows the results with only "Отозвать голос". Results (counter and percentage) are always visible, even before voting. Whether the server hides results before a vote is unverified. | `answer`, `isFinished` | Component: each state | — |
+
+## 6. Video player
+
+| ID | Capability | Class | Parity | Evidence | Reference behavior | API | Tests (planned) | Apple TV notes |
+|---|---|---|---|---|---|---|---|---|
+| PLAY-01 | Built-in player (Media3/ExoPlayer 1.7.1) for HLS, DASH and progressive MP4 | Confirmed | P | `am/ui/widgets/VideoPlayer.kt` (`setMediaSource`), `gradle/libs.versions.toml` `media3 = "1.7.1"` | HLS/DASH use dedicated media sources. Other qualities play as progressive URLs. **No auth headers are sent to the CDN**: the signed URLs are used as-is. | `playerUrls[]` | Device spike | AVPlayer: DASH is not supported natively. Only HLS/MP4 can be used on tvOS. |
+| PLAY-02 | Automatic quality choice and quality selection | Confirmed | P | `cm/components/video/PlayerUrlSelection.kt` (`pickPlayerUrl`), `RootComponent.resolveVideoType`, `VideoTypeDialogView`, `VideoScreen.QualityPanel` | Prefers the user's last chosen quality. Otherwise the order is HLS > DASH > 4320p > … > 144p. If nothing can be picked automatically, a quality dialog is shown before playback. In-player quality change reloads the source **at the same position** and stores the choice as the new preference. Quality names are mapped from Boosty types (see api-contract §6). | `playerUrls[].type` | Unit: selection, mapping table | HLS-only list on tvOS |
+| PLAY-03 | Resume from server-side progress | Confirmed | P | `VideoScreen` passes `position = postData.timeCodeMs`; `VideoComponent.refreshData` re-fetches the post to get a fresh `timeCode` | Playback starts at `timeCode` seconds, taken from the `ok_video` block of a freshly fetched post. There is **no "start over" choice** in the reference. Adding one is our improvement, already required by CLAUDE.md. | `ok_video.timeCode`, `GET post` | Integration | — |
+| PLAY-04 | Server-side progress persistence | Confirmed | P | `cm/components/video/TimeCodeManager.kt`, `VideoRepository.putTimeCode` | `PUT v1/viewstat/video/{videoId}/timecode/` with `time_code` in seconds whenever the position moves ≥10 s since the last successful send, and on Stop/Back. Failures are logged and ignored. **Progress is stored on the server and keyed by video `id`**, with no local copy. | `PUT /v1/viewstat/video/{id}/timecode/` | Unit: throttle; device: progress visible after restart and on the web | Portable |
+| PLAY-05 | Controls: play/pause, D-pad seek, scrub bar, elapsed / total time, overlay auto-hide | Confirmed | P | `am/ui/widgets/VideoPlayerControls.kt` (`onPlayerKeyEvent`, `SEEK_INCREMENT = 5 s`, `seekState.calcSeekMultiplier(longPress)`, `HIDE_CONTROLLER_DELAY = 5 s`, `VodProgress`) | Left/Right seek 5 s, accelerating while held. Select toggles play/pause. Up shows the controls. The time text is "position / duration". The overlay auto-hides after 5 s while playing and stays visible while paused. | — | Device | Siri Remote equivalents in phase 4 |
+| PLAY-06 | Remote media keys | Confirmed | P | `VideoPlayerControls.onPlayerKeyEvent` | Handles PLAY_PAUSE, PLAY, PAUSE, STOP, FAST_FORWARD, NEXT, STEP_FORWARD, PREVIOUS and STEP_BACKWARD (seek), and SETTINGS/INFO/MENU (open settings). FAST_FORWARD/NEXT seek forward and PREVIOUS/STEP_BACKWARD seek backward. There is no next/previous item navigation. MEDIA_REWIND is not handled. | — | Device | — |
+| PLAY-07 | Playback speed | Confirmed | P | `VideoScreen.kt` `PLAYBACK_SPEED_PRESETS = 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 3`, `SpeedPanelTv`; `SettingsRepository.preferredPlaybackSpeed` | On TV the presets are shown as a list. The speed is persisted **globally**. For live streams it is forced to 1×. | — | Unit; device | — |
+| PLAY-08 | Player settings sheet (quality, speed; download is excluded, see PLAY-09) | Confirmed | P | `VideoScreen.PlayerSettingsSheet` | Opened with the gear button or Menu/Info/Settings keys. Speed and download are hidden for live streams. | — | Component: Back closes the sheet before exiting the player | — |
+| PLAY-09 | Video download to device storage | Confirmed | **X** (owner decision 2026-10-25) | `VideoComponent.onDownloadQualitySelected`, `am/utils/PlatformConfiguration.downloadVideo` (Android DownloadManager → public Downloads) | Only progressive qualities (not HLS/DASH). The file is named `{title}_{quality}.mp4`. | signed `playerUrls` | — | Not applicable on tvOS (no user file system) |
+| PLAY-10 | Buffering, error, retry and expired-URL recovery | Confirmed (client), Inferred (expiry trigger) | P | `VideoComponent.onVideoStateChanged/recoverPlayback/fetchFreshPlayback`, release note 1.15.0 "auto-recover video playback when signed CDN url expires" | The buffering indicator is debounced by 500 ms. On **any** player error it once automatically re-fetches the post (or stream), takes the same video `id`, re-picks the same quality and reloads at the current position. A second failure shows "Не удалось воспроизвести видео" with Retry / Close. The specific CDN error for an expired URL (HTTP status) has **not** been documented. | `GET post` | Integration: source renewal with mocks; device: long pause | — |
+| PLAY-11 | Title display | Confirmed | P | `VideoPlayerChrome` (`postTitle` in the top bar since 1.15.0, plus the video title if different) | **No author name** is shown in the player. CLAUDE.md requires title and author, so the author name is our addition. | — | — | — |
+| PLAY-12 | Lifecycle: pause on background, keep screen on, release on exit | Confirmed | P | `VideoPlayer.observeLifeCycle` (pause on ON_PAUSE/ON_STOP), `KeepScreenOnEffect`, `onDispose { exoPlayer.release() }` | There is **no explicit progress write on lifecycle pause**: only throttled writes and Stop/Back. Writing progress on pause and lifecycle changes is our improvement, required by CLAUDE.md. | — | Device: sleep/resume | — |
+| PLAY-13 | External / system player option | Confirmed | P (Android), D (UX) | Setting "Системный видео-плеер"; `RootComponent.resolveVideoType/playVideo`; `am/utils/VideoPlayer.android.kt` | When enabled, the quality dialog is always shown, then an `ACTION_VIEW` chooser is launched with the URL plus MX Player / Vimu extras. **Progress is not tracked in this mode.** | signed URL | Device | tvOS has no equivalent. Document as Android-only. |
+| PLAY-14 | Subtitles, audio tracks, aspect ratio, autoplay next | Unverified (not found) | — | No such code in 1.16.0 | Not present in the reference. Expose them only if the stream actually provides them and the owner scopes them in. | — | — | — |
+| PLAY-15 | Pinch zoom, double-tap seek, tap-to-toggle overlay | Confirmed | N/A | `VideoPlayerControls.kt` (zoom, `DOUBLE_TAP_SEEK`) | Touch-only. Has no TV equivalent and is not carried over. | — | — | — |
+
+## 7. Live streams (added in 1.14.0 as "MVP")
+
+| ID | Capability | Class | Parity | Evidence | Reference behavior | API | Tests (planned) | Apple TV notes |
+|---|---|---|---|---|---|---|---|---|
+| LIVE-01 | Live / scheduled stream card on the author page | Confirmed | P | `BlogComponent.fetchLiveStream/updateSchedulePolling` (`SCHEDULE_POLL_INTERVAL_MS = 30_000`), `cm/ui/screens/blog/LiveStreamCard.kt`, `StreamRepository.fetchActive` | Loaded with the blog. `204 No Content` means there is no stream. Shows title, viewer and like counts, cover, a paid badge, and the required subscription level name and RUB price. A scheduled stream (`isTemplate`) is polled every 30 s. | `GET /v1/blog/{blog}/video_stream` | Unit: status mapping | — |
+| LIVE-02 | Watch a live stream (live edge only) | Confirmed | P | `BlogComponent.onLiveStreamClicked`, `RootComponent.resolveLiveStream`, `VideoComponentImpl` live branch, `ContentResponse` `ok_stream` mapping | Plays only when the stream is live, `hasAccess` is true and URLs exist. Otherwise it opens the stream web page in a browser. **DVR/seek is disabled** (`live_playback_*` URLs are filtered out). There are no seek controls, a LIVE badge and elapsed time since `startTime`, speed fixed at 1×, and a "Стрим завершён" overlay when the stream ends. No progress is saved. | `ok_stream` block | Device | HLS on tvOS |
+| LIVE-03 | Viewer heartbeat | Confirmed | P | `cm/components/video/LiveStreamComponentModel.kt` (`HEARTBEAT_INTERVAL_MS = 30_000`) | `PUT …/heartbeat/viewer` every 30 s while watching. `?stop=true` is sent once on exit or end. | `PUT /v1/blog/{blog}/video_stream/heartbeat/viewer` | Unit | — |
+| LIVE-04 | Like / unlike a live stream | Confirmed | P | `BlogComponent.onLiveStreamLikeClicked` | Optimistic toggle with an in-flight guard, rolled back on failure. | `POST`/`DELETE /v1/blog/{blog}/video_stream/like` | Unit: no replay, rollback | — |
+| LIVE-05 | Share stream link | Confirmed | P (as QR on TV; approved) | `BlogComponent.onLiveStreamShareClicked` → `shareText("https://boosty.to/{blog}/streams/video_stream")` | Android share sheet. TV equivalent: a QR code. | — | — | QR |
+| LIVE-06 | Live chat | Unverified (not in client) | X | Only `stream` endpoints in the reverse-engineered spec | Not implemented in the reference. Not parity. | — | — | — |
+
+## 8. Events / notifications
+
+| ID | Capability | Class | Parity | Evidence | Reference behavior | API | Tests (planned) | Apple TV notes |
+|---|---|---|---|---|---|---|---|---|
+| EVT-01 | Events list (e.g. "stream started") | Unverified (**not exposed** in the reference) | **Our addition, approved by owner 2026-10-25** (not reference parity) | `cm/components/events/EventsComponent.kt`, `EventsRepository`, `ui/screens/blog/EventView.kt` exist (commits Aug 2024), but **neither `EventsComponentImpl` nor `EventView` is referenced** from any navigation or screen in 1.16.0 | Dead code in the reference. In Boosty TV it is planned for phase 2 after the endpoint shape is verified live. The reference maps only `video_stream_start`; other types must be shown generically or hidden. Read/unread mutations are out of scope until verified. | `GET /v1/notification/standalone/event/` | — | — |
+
+## 9. Settings and app-level behavior
+
+| ID | Capability | Class | Parity | Evidence | Reference behavior | API | Tests (planned) | Apple TV notes |
+|---|---|---|---|---|---|---|---|---|
+| SET-01 | Settings dialog | Confirmed | P | `cm/ui/screens/SettingsScreen.kt`, `SettingsComponent.kt` | Opened from the top-bar menu. Contains the items below. | — | Component | — |
+| SET-02 | Use system/external video player | Confirmed | P | see PLAY-13 | Toggle. | — | — | Android-only |
+| SET-03 | Light/dark theme toggle | Confirmed | Not required (owner 2026-10-25): dark only; keep tokens theme-ready | `onSetDarkModeClicked`, `dark_mode` key (null = follow system) | — | — | — | — |
+| SET-04 | Preferred quality and speed persisted | Confirmed | P | `preferred_video_quality`, `preferred_playback_speed` | Set implicitly from the player (no separate settings UI). Stored per device, not per account. | — | Unit | — |
+| SET-05 | Debug log collection and "send log" | Confirmed | P (scope: testing and debugging; owner 2026-10-25). Logs must redact tokens, cookies, signed URLs and personal data. Delivery channel on TV (e.g. QR or adb) is to be designed. | `debug_log` setting, `BufferLoggingTracker`, `PlatformConfiguration.shareFile` | Sharing uses the Android share sheet. HTTP logs mask `Bearer` tokens, but **player diagnostics log full CDN URLs** (signed). | — | — | — |
+| SET-06 | App version shown; tap to check for update | Confirmed | P (version); update check depends on UPD-01 | `SettingsScreen` "Версия программы", `onVersionClicked` → `fetchLastReleaseInfo` | — | — | — | — |
+| UPD-01 | Update check on start | Confirmed | Owner 2026-10-25: own release channel or manual install. An in-app update check against our own channel needs a separate design and approval. Never BoostBuddy's GitHub. | `RootComponent.fetchLastReleaseInfo`, `GithubRepository.getLastReleaseInfo` | On start it calls GitHub `releases/latest` for the BoostBuddy repo. If the release version is newer, a dialog shows the changelog. | GitHub API (not Boosty) | — | App Store handles updates; not applicable |
+| UPD-02 | In-app APK download and install | Confirmed | Not planned now: manual install, or our own channel (separate design) | `RootComponent.downloadAndInstallNewVersion`, `GithubRepository.downloadFile`, `PlatformConfiguration.installApp`, manifest `REQUEST_INSTALL_PACKAGES` | **Only after the user accepts** the dialog: asks for the install-unknown-apps permission, downloads the first release asset to the temp dir, then launches the system installer. It is not silent. Our app needs its own distribution channel and owner approval (CLAUDE.md). | — | — | N/A |
+| APP-01 | Snackbar for errors | Confirmed | P (intent) | `RootComponent.onErrorReceived` | — | — | — | — |
+| APP-02 | Back hierarchy | Confirmed | P | Decompose `childStack`/`childSlot` with `handleBackButton = true`; `MainScreen` drawer `BackHandlerEffect`; WebView focus `BackHandlerEffect` | Back closes the dialog, then the drawer, then pops the screen. Root behavior (exit) was not traced in detail. Define it ourselves in `docs/focus-map.md`. | — | Device | — |
+| APP-03 | Android TV launcher entry and banner | Confirmed | P | `AndroidManifest.xml`: `TvAppActivity` with `LEANBACK_LAUNCHER`; `leanback` and `touchscreen` declared `required=false`; banner = launcher icon | — | — | Release build check | tvOS top-shelf in phase 4 |
+
+## 10. Reference-specific or excluded items
+
+| ID | Item | Class | Parity | Evidence | Note |
+|---|---|---|---|---|---|
+| COMM-01 | Comments screen: list, "show more", replies | Confirmed | **X (excluded by CLAUDE.md)** | `cm/components/post/PostComponent.kt`, `CommentsRepository`, `ui/screens/post/PostScreen.kt` | Opened from the post counter row. It also shows the post content above the comments. No comment screens, actions, counters-as-links or `…/comment/` requests in Boosty TV. |
+| REF-01 | Donate prompt (snackbar once per version, QR to YooMoney on TV) | Confirmed | R / X | `RootComponent.donateNotify/onDonateClick`, `SettingsComponent.DONATE_URL` | Funds the reference author. Not Boosty functionality. CLAUDE.md forbids donations. |
+| REF-02 | "Discuss on forum" (QR to 4pda) | Confirmed | R | `TopBarComponent.FORUM_URL` | Reference branding. A feedback channel for Boosty TV needs an owner decision. |
+| REF-03 | Analytics (AppMetrica) | Confirmed | **X** | `am/data/analytic/AppMetricaAnalyticsTracker.kt`, `libs.appmetrica` | Tracking is forbidden without approval. |
+| REF-04 | Release keystore committed in repo | Confirmed | **X** | `keystore/release.keystore` | Never import (CLAUDE.md). |
+
+## 11. Security and robustness issues in the reference (do not copy)
+
+1. `am/ui/widgets/WebView.kt` `onReceivedSslError → handler.proceed()` accepts **any** TLS error in the sign-in WebView. On Android 7 a trust-all OkHttp client also re-fetches HTML with cookies.
+2. Tokens are stored in plain SharedPreferences (AUTH-04).
+3. Debug HTTP engine `UnsafeOkHttp` trusts all certificates.
+4. Player diagnostics log full signed CDN URLs and response headers.
+5. All non-401 HTTP errors are mapped to a generic `ServerException.Request`. 403, 404, 429 and network errors are not distinguished.
+6. Poll mutations ignore failures, and retries are user-driven. There is no automatic replay, which is good, but there is also no error UI.
+7. Subscriptions are limited to 30 without pagination.
+
+## 12. Owner decisions (2026-10-25)
+
+| # | Question | Decision | Related |
+|---|---|---|---|
+| Q1 | Sign-in method | **Phone number + one-time code** in a native TV form, calling the Boosty phone-auth API. This is an explicit owner approval for this form, which CLAUDE.md otherwise forbids for third-party credentials. The WebView website sign-in is not implemented; it is kept only as fallback research if phone auth fails. | AUTH-01..03 |
+| Q2 | Video download | **Excluded** | PLAY-09 |
+| Q3 | Updates | **Own release channel or manual install.** No in-app installer now. Any update check needs a separate design. | UPD-01/02 |
+| Q4 | Light theme | **Not required.** Dark only. | SET-03 |
+| Q5 | Debug logs | **Yes, for testing and debugging**, with redaction | SET-05 |
+| Q6 | QR codes for links, files and stream share | **Allowed** | POST-02, POST-05, POST-07, LIVE-05 |
+| Q7 | Events list | **Allowed** as our addition (phase 2, after live verification of the endpoint) | EVT-01 |
+| Q8 | BoostBuddy code reuse | **Not needed.** BoostBuddy is only a behavior example, as the only custom Boosty Android TV client. | Audit metadata |
+
+Remaining open item: the phone-auth risks (captcha, rate limits, code delivery channel) must be measured in spike S2. If captcha cannot be passed on TV, that is a release blocker and goes back to the owner.

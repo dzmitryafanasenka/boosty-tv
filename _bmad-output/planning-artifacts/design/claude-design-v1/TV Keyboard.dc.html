@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="width:1920px;height:400px;box-sizing:border-box;background:#2B2C2F;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;font-family:Roboto,Arial,sans-serif">
+  <sc-for list="{{rows}}" as="r" hint-placeholder-count="4">
+    <div style="display:flex;gap:10px">
+      <sc-for list="{{r.keys}}" as="k" hint-placeholder-count="10">
+        <div style="width:{{k.w}};height:68px;border-radius:10px;background:{{k.bg}};color:{{k.c}};display:flex;align-items:center;justify-content:center;font-size:28px">{{k.l}}</div>
+      </sc-for>
+    </div>
+  </sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1920,&quot;height&quot;:400},&quot;hi&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;п&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const hi = this.props.hi ?? 'п';
+    const mk = (l, w = 88, accent) => ({ l, w: w + 'px', bg: l === hi ? '#E8EAED' : accent ? '#8AB4F8' : '#3C3D41', c: l === hi || accent ? '#202124' : '#E8EAED' });
+    const rows = ['йцукенгшщзхъ', 'фывапролджэ', 'ячсмитьбю.'].map((s) => ({ keys: [...s].map((l) => mk(l)) }));
+    rows.push({ keys: [mk('?123', 160), mk('Пробел', 560), mk('Стереть', 200), mk('Готово', 220, true)] });
+    return { rows };
+  }
+}
+</script>
+</body>
+</html>

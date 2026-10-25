@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&display=swap" rel="stylesheet"></helmet>
+<div style="height:{{h}};min-width:{{minW}};box-sizing:border-box;padding:{{pad}};border-radius:{{rad}};display:inline-flex;align-items:center;justify-content:center;gap:14px;font-family:'Golos Text',sans-serif;font-size:{{fs}};font-weight:600;white-space:nowrap;background:{{bg}};color:{{color}};outline:{{ring}};outline-offset:4px;transform:{{tf}};box-shadow:{{shadow}};transition:transform 160ms cubic-bezier(0.2,0,0,1), background-color 160ms cubic-bezier(0.2,0,0,1)">
+  <sc-if value="{{isPlay}}"><div style="width:0;height:0;border-left:22px solid {{color}};border-top:13px solid transparent;border-bottom:13px solid transparent;margin-left:5px"></div></sc-if>
+  <sc-if value="{{isPause}}"><div style="display:flex;gap:7px"><div style="width:7px;height:26px;border-radius:2px;background:{{color}}"></div><div style="width:7px;height:26px;border-radius:2px;background:{{color}}"></div></div></sc-if>
+  <sc-if value="{{isHeart}}"><span style="font-size:30px;line-height:1;color:{{heartColor}}">♥</span></sc-if>
+  <sc-if value="{{hasLabel}}" hint-placeholder-val="{{true}}"><span>{{label}}</span></sc-if>
+  <sc-if value="{{hasSub}}"><span style="font-weight:500;color:{{subColor}};font-variant-numeric:tabular-nums">{{sub}}</span></sc-if>
+  <sc-if value="{{hasCount}}"><span style="min-width:36px;height:36px;padding:0 10px;box-sizing:border-box;border-radius:18px;background:#E8914A;color:#1E140A;font-size:22px;display:flex;align-items:center;justify-content:center">{{count}}</span></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:480,&quot;height&quot;:140},&quot;label&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Кнопка&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;sub&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;kind&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;primary&quot;,&quot;secondary&quot;,&quot;ghost&quot;],&quot;default&quot;:&quot;secondary&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;f&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;disabled&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;pressed&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;pill&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;size&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;m&quot;,&quot;s&quot;],&quot;default&quot;:&quot;m&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;icon&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;&quot;,&quot;play&quot;,&quot;pause&quot;,&quot;heart&quot;,&quot;heart-on&quot;],&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;count&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:0,&quot;tsType&quot;:&quot;number&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const P = this.props;
+    const kind = P.kind ?? 'secondary', f = !!P.f, dis = !!P.disabled, pr = !!P.pressed;
+    const small = P.size === 's';
+    const iconOnly = !!P.icon && !P.label;
+    let bg, color;
+    if (dis) { bg = '#201E1C'; color = '#6E6962'; }
+    else if (kind === 'primary') { bg = f || pr ? '#F2A05A' : '#E8914A'; color = '#1E140A'; }
+    else if (kind === 'ghost') { bg = f ? '#46413B' : 'transparent'; color = '#F4EFE7'; }
+    else { bg = f || pr ? '#46413B' : '#2E2B28'; color = '#F4EFE7'; }
+    const h = small ? 64 : 80;
+    return {
+      label: P.label ?? 'Кнопка', sub: P.sub ?? '', count: P.count,
+      hasLabel: !!(P.label ?? 'Кнопка'), hasSub: !!P.sub, hasCount: P.count != null && P.count !== 0,
+      h: h + 'px', minW: iconOnly ? h + 'px' : '0',
+      pad: iconOnly ? '0' : small ? '0 28px' : '0 40px',
+      rad: P.pill || iconOnly ? h / 2 + 'px' : small ? '14px' : '16px',
+      fs: small ? '24px' : '28px',
+      bg, color,
+      ring: f && !dis ? '4px solid #F4EFE7' : '4px solid transparent',
+      tf: pr ? 'scale(0.98)' : f && !dis ? 'scale(1.04)' : 'none',
+      shadow: f && !dis ? '0 12px 28px rgba(0,0,0,0.45)' : 'none',
+      subColor: dis ? '#6E6962' : kind === 'primary' ? '#4A2E14' : '#A9A299',
+      isPlay: P.icon === 'play', isPause: P.icon === 'pause', isHeart: P.icon === 'heart' || P.icon === 'heart-on',
+      heartColor: P.icon === 'heart-on' ? '#E8914A' : color
+    };
+  }
+}
+</script>
+</body>
+</html>

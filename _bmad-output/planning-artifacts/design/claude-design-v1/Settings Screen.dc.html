@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"></helmet>
+<div style="position:relative;width:1920px;height:1080px;background:#171615;overflow:hidden;display:flex;font-family:'Golos Text',sans-serif;color:#F4EFE7">
+  <dc-import name="TV Sidebar" current="settings" focus="{{navFocus}}" hint-size="336px,1080px"></dc-import>
+  <div style="flex:1;min-width:0;padding:54px 96px 54px 48px;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:baseline;gap:20px">
+      <div style="font-size:44px;font-weight:600">{{title}}</div>
+      <sc-if value="{{isDiag}}"><div style="font-size:24px;color:#8F887F">для тестирования</div></sc-if>
+    </div>
+    <div style="margin-top:40px;display:flex;flex-direction:column;gap:14px">
+      <sc-for list="{{rows}}" as="r" hint-placeholder-count="4">
+        <dc-import name="Setting Row" kind="{{r.kind}}" label="{{r.label}}" value="{{r.value}}" desc="{{r.desc}}" on="{{r.on}}" f="{{r.f}}" w="{{1040}}" hint-size="1040px,88px"></dc-import>
+      </sc-for>
+    </div>
+    <sc-if value="{{isDiag}}">
+      <div style="margin-top:32px;width:1040px;box-sizing:border-box;padding:28px 32px;border-radius:16px;background:#1D1B19;display:flex;flex-direction:column;gap:10px;font-size:24px;line-height:1.45;color:#B7B0A6">
+        <div>Журнал хранится только на этом устройстве и никуда не отправляется. Токены, cookies, подписанные ссылки и номер телефона из него вырезаются.</div>
+        <sc-if value="{{saved}}"><div style="color:#F4EFE7">Сохранено: <span style="font-family:'JetBrains Mono',monospace;font-size:22px">/sdcard/Android/data/…/files/logs/2026-10-25.txt</span>. Забрать: <span style="font-family:'JetBrains Mono',monospace;font-size:22px">adb pull</span>.</div></sc-if>
+      </div>
+    </sc-if>
+  </div>
+  <sc-if value="{{hasModal}}">
+    <div style="position:absolute;inset:0;background:rgba(10,9,8,0.82);display:flex;align-items:center;justify-content:center">
+      <div style="width:880px;box-sizing:border-box;padding:56px;border-radius:24px;background:#24211E;display:flex;flex-direction:column;gap:18px">
+        <div style="font-size:44px;font-weight:600">Выйти из аккаунта?</div>
+        <div style="font-size:26px;line-height:1.45;color:#B7B0A6">Чтобы снова войти, понадобятся номер телефона и код из сообщения. Это коснётся всех, кто смотрит на этом телевизоре.</div>
+        <div style="display:flex;gap:20px;margin-top:20px">
+          <dc-import name="TV Button" label="Отмена" f="{{mCancel}}" hint-size="200px,80px"></dc-import>
+          <dc-import name="TV Button" label="Выйти" f="{{mConfirm}}" hint-size="180px,80px"></dc-import>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1920,&quot;height&quot;:1080},&quot;focus&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;sys&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;mode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;main&quot;,&quot;diag&quot;],&quot;default&quot;:&quot;main&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;sys&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;diagUnlocked&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;modal&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;&quot;,&quot;logout&quot;],&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;mf&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;cancel&quot;,&quot;confirm&quot;],&quot;default&quot;:&quot;cancel&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;logOn&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;saved&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const P = this.props;
+    const F = P.focus ?? 'sys', mode = P.mode ?? 'main';
+    const diag = mode === 'diag';
+    const rows = diag ? [
+      { kind: 'toggle', label: 'Сбор журнала', desc: 'Записывать сетевые запросы и ошибки плеера', on: P.logOn ?? true, f: F === 'log' },
+      { kind: 'nav', label: 'Сохранить журнал', desc: 'Файл в памяти приставки, передача через adb', f: F === 'save' }
+    ] : [
+      { kind: 'toggle', label: 'Системный видеоплеер', desc: 'Открывать видео во внешнем плеере Android. В этом режиме позиция просмотра не сохраняется.', on: !!P.sys, f: F === 'sys' },
+      { kind: 'info', label: 'Версия', value: '0.1.0 (сборка 12)', f: F === 'ver' }
+    ];
+    if (!diag && P.diagUnlocked) rows.push({ kind: 'nav', label: 'Диагностика', desc: 'Для тестирования', f: F === 'diag' });
+    if (!diag) rows.push({ kind: 'nav', label: 'Выйти из аккаунта', desc: 'Аккаунт Boosty: +7 916 ***-**-07', f: F === 'logout' });
+    return {
+      navFocus: F.startsWith('nav-') ? F.slice(4) : '',
+      title: diag ? 'Диагностика' : 'Настройки', isDiag: diag, rows,
+      saved: !!P.saved,
+      hasModal: P.modal === 'logout', mCancel: (P.mf ?? 'cancel') === 'cancel', mConfirm: P.mf === 'confirm'
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&display=swap" rel="stylesheet"></helmet>
+<div style="position:relative;width:1920px;height:1080px;background:#171615;overflow:hidden;display:flex;font-family:'Golos Text',sans-serif;color:#F4EFE7">
+  <dc-import name="TV Sidebar" current="subs" focus="{{navFocus}}" hint-size="336px,1080px"></dc-import>
+  <div style="flex:1;min-width:0;position:relative;padding:54px 0 0 48px;box-sizing:border-box">
+    <div style="position:relative;z-index:2;width:1440px;height:96px;display:flex;align-items:center;justify-content:space-between;background:#171615">
+      <div style="display:flex;align-items:baseline;gap:20px">
+        <div style="font-size:44px;font-weight:600">Подписки</div>
+        <div style="font-size:24px;color:#8F887F">{{countLabel}}</div>
+      </div>
+      <sc-if value="{{isLong}}"><div style="font-size:24px;color:#8F887F;font-variant-numeric:tabular-nums">28 из 55</div></sc-if>
+    </div>
+    <sc-if value="{{isEmpty}}">
+      <div style="position:absolute;left:48px;right:96px;top:150px;bottom:54px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:24px">
+        <div style="font-size:44px;font-weight:600">Подписок пока нет</div>
+        <div style="font-size:28px;line-height:1.45;color:#B7B0A6;max-width:820px;text-wrap:pretty">Подписаться на авторов можно на сайте или в приложении Boosty. После этого нажмите «Обновить», и авторы появятся здесь.</div>
+        <div style="margin-top:24px;height:80px;box-sizing:border-box;padding:0 40px;border-radius:16px;display:flex;align-items:center;font-size:28px;font-weight:600;background:#423D37;color:#FFFFFF;outline:4px solid #F4EFE7;outline-offset:4px;transform:scale(1.04)">Обновить</div>
+      </div>
+    </sc-if>
+    <sc-if value="{{hasGrid}}" hint-placeholder-val="{{true}}">
+      <div style="margin-top:{{gridTop}};display:grid;grid-template-columns:repeat(3,464px);gap:24px">
+        <sc-for list="{{tiles}}" as="t" hint-placeholder-count="9">
+          <dc-import name="Author Card" a="{{t.a}}" focused="{{t.f}}" hint-size="464px,152px"></dc-import>
+        </sc-for>
+      </div>
+    </sc-if>
+    <sc-if value="{{isLong}}">
+      <div style="position:absolute;right:56px;top:170px;width:6px;height:840px;border-radius:3px;background:#2A2724">
+        <div style="position:absolute;left:0;right:0;top:300px;height:240px;border-radius:3px;background:#8F887F"></div>
+      </div>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1920,&quot;height&quot;:1080},&quot;mode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;grid&quot;,&quot;long&quot;,&quot;empty&quot;],&quot;default&quot;:&quot;grid&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;focus&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;tile-0&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const mode = this.props.mode ?? 'grid';
+    const F = this.props.focus ?? 'tile-0';
+    const mine = { title: 'Дача и вокруг', name: 'Сергей Миронов', ini: 'СМ', hue: 20, mine: true };
+    const main = [
+      { title: 'Кухня без спешки', name: 'Марина Лебедева', ini: 'МЛ', hue: 40 },
+      { title: 'Гаражный цех', name: 'Илья Ковалёв', ini: 'ИК', hue: 75 },
+      { title: 'Звёздный час: история, которую не рассказывали в школе', name: 'Пётр Аникин', ini: 'ПА', hue: 255 },
+      { title: 'Ламповый подкаст', name: 'Даша и Глеб', ini: 'ДГ', hue: 330 },
+      { title: 'Рисуем с Верой', name: 'Вера Соколова', ini: 'ВС', hue: 150 },
+      { title: 'Шахматы по пятницам', name: 'Артём Брагин', ini: 'АБ', hue: 200 },
+      { title: 'Северные маршруты', name: 'Ольга Никитина', ini: 'ОН', hue: 225 },
+      { title: 'Код на диване', name: 'Кирилл Орлов', ini: 'КО', hue: 110 }
+    ];
+    const T = ['Велосипед и город','Огород на балконе','Физика на пальцах','Японский с нуля','Ремонт без бригады','Книжный клуб Лены','Кофе и обжарка','Горы Кавказа','Старые карты','Электроника для взрослых','Мастерская кукол','Кино за кадром: как снимают сериалы','Аквариум дома','Шитьё и выкройки','Беговой дневник','Пиксельная графика','Домашняя пекарня','Радиолюбитель','Сад камней','Философия по вечерам','Гитара без нот','Рыбалка на Оке','Математика для родителей первоклассников','Лес и грибы','Реставрация мебели','Настольные игры: разборы','Фотоплёнка','Байкал круглый год','Звук и сведение','Уроки рисования для детей'];
+    const N = ['Антон Белов','Елена Громова','Николай Жуков','Анна Фролова','Дмитрий Королёв','Лена Шубина','Максим Ершов','Тимур Алиев','Игорь Савин','Роман Пестов','Ксения Лаврова','Денис Карпов','Олег Сухов','Наталья Мельник','Юлия Рябова','Степан Ивлев','Ирина Зайцева','Виктор Носов','Алексей Ким','Мария Тарасова','Павел Гусев','Григорий Панин','Светлана Орехова','Фёдор Лапин','Евгений Соловьёв','Михаил Дорохов','Алина Чернова','Вадим Устинов','Борис Ефимов','Ольга Дьяченко'];
+    const extra = Array.from({ length: 46 }, (_, i) => {
+      const n = N[i % 30];
+      return { title: T[i % 30] + (i >= 30 ? ' · архив' : ''), name: n, ini: n.split(' ').map(w => w[0]).join(''), hue: (i * 47 + 15) % 360 };
+    });
+    const all = [mine, ...main, ...extra];
+    const isLong = mode === 'long', isEmpty = mode === 'empty';
+    const slice = isLong ? all.slice(18, 36).map((a, i) => ({ a, f: i + 18 === 27 })) : all.slice(0, 9).map((a, i) => ({ a, f: F === 'tile-' + i }));
+    return {
+      navFocus: F.startsWith('nav-') ? F.slice(4) : '',
+      isLong, isEmpty, hasGrid: !isEmpty,
+      tiles: slice,
+      gridTop: isLong ? '-80px' : '30px',
+      countLabel: isEmpty ? '' : isLong ? '54 автора' : '8 авторов'
+    };
+  }
+}
+</script>
+</body>
+</html>
