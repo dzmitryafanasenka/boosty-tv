@@ -1,6 +1,6 @@
 # ADR 0008: Two API request profiles — auth and content
 
-- Status: proposed (2026-10-26; written before Story 2.2 as a condition of the owner's Epic 2 go, `docs/testing.md` «Spike report»)
+- Status: accepted (owner, 2026-10-26, PR #10; written before Story 2.2 as a condition of the owner's Epic 2 go, `docs/testing.md` «Spike report»)
 - Date: 2026-10-26
 - Relates to: architecture spine AD-3 (SessionManager, refresh), AD-11 (media resolution); `docs/api-contract.md` §1, §2.2, §2.3, §6, §8 item 3
 

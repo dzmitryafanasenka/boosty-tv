@@ -30,6 +30,15 @@ const featureEdgePolicies = Object.entries(FEATURE_EDGES).map(
   }),
 );
 
+const COPY_MESSAGE = 'UI strings come from the i18n catalog (t / tp).';
+/** A JS expression rendered as a JSX child (not an attribute value). */
+const JSX_CHILD = ':matches(JSXElement, JSXFragment) > JSXExpressionContainer';
+/** A non-blank string literal or any template literal. */
+const STRING = ':matches(Literal[value=/\\S/], TemplateLiteral)';
+/** Props that carry user-facing copy. */
+const COPY_PROPS =
+  '/^(label|accessibilityLabel|accessibilityHint|placeholder|title)$/';
+
 module.exports = {
   root: true,
   extends: '@react-native',
@@ -84,4 +93,46 @@ module.exports = {
     ],
     'boundaries/no-unknown-dependencies': 2,
   },
+  overrides: [
+    {
+      // UI copy only through the typed i18n catalog (src/shared/i18n).
+      // no-raw-text catches literals outside <Text>; it allows any element
+      // named Text, so no-restricted-syntax also rejects literal JSX
+      // children (also inside ternaries, && and +, and in fragments) and
+      // literal copy-bearing props. __tests__/noRawText.test.js proves each.
+      files: [
+        'src/app/**',
+        'src/features/**',
+        'src/shared/ui/**',
+        'src/shared/focus/**',
+      ],
+      excludedFiles: ['**/__tests__/**'],
+      rules: {
+        'react-native/no-raw-text': 2,
+        'no-restricted-syntax': [
+          2,
+          {
+            selector: 'JSXText[value=/\\S/]',
+            message: COPY_MESSAGE,
+          },
+          {
+            selector: `${JSX_CHILD} > ${STRING}`,
+            message: COPY_MESSAGE,
+          },
+          {
+            selector: `${JSX_CHILD} > :matches(ConditionalExpression, LogicalExpression, BinaryExpression) > ${STRING}`,
+            message: COPY_MESSAGE,
+          },
+          {
+            selector: `JSXAttribute[name.name=${COPY_PROPS}] > ${STRING}`,
+            message: COPY_MESSAGE,
+          },
+          {
+            selector: `JSXAttribute[name.name=${COPY_PROPS}] > JSXExpressionContainer > ${STRING}`,
+            message: COPY_MESSAGE,
+          },
+        ],
+      },
+    },
+  ],
 };
