@@ -351,8 +351,44 @@ const FIXTURE_ENUM_KEYS = new Set(['type', 'modificator', 'error', 'status']);
 const ID_KEY = /^(id|int_id|vid|uuid)$|Id$|_id$/;
 const BLOG_KEY = /^(blogUrl|blog_url)$/;
 const PHONE_KEY = /phone/i;
-const TIME_OR_SIZE_KEY =
-  /(At|Time|_at|_time|_ts|Timestamp|timestamp)$|^(size|fileSize|file_size)$/;
+/*
+ * Numbers can identify the owner's subscriptions in combination (publish
+ * times, view and like counts, prices, exact durations), so none is kept
+ * verbatim except structural ones. The same rules are enforced by
+ * scripts/check-fixtures.mjs.
+ */
+const TIME_KEY = /(At|Time|_at|_time|_ts|Timestamp|timestamp)$/;
+const SIZE_KEY = /^(size|fileSize|file_size)$/;
+const DURATION_KEY = /^(duration|timeCode|time_code)$/;
+/** Structural numbers kept as-is (paging, dimensions, statuses, units). */
+const KEEP_NUMBER_KEY =
+  /^(status|statusCode|width|height|total|offset|limit|unread|period|priority|showcase|expiresIn|expires_in)$/;
+/** Synthetic times: base + rank * 1 h, order kept across the whole run. */
+export const SYNTHETIC_TIME_BASE = 1_700_000_000;
+export const SYNTHETIC_TIME_STEP = 3600;
+export const SIZE_STEP = 102_400;
+/** Every other positive number (counts, money, sort orders) becomes this. */
+export const SYNTHETIC_COUNT = 5;
+
+/** Distinct time values in the bodies, for the order-preserving mapping. */
+function collectTimes(bodies: readonly unknown[]): number[] {
+  const out = new Set<number>();
+  const walk = (v: unknown, key: string) => {
+    if (typeof v === 'number') {
+      if (TIME_KEY.test(key) && Number.isFinite(v)) {
+        out.add(v);
+      }
+    } else if (Array.isArray(v)) {
+      v.forEach(x => walk(x, key));
+    } else if (v && typeof v === 'object') {
+      for (const [k, child] of Object.entries(v as Obj)) {
+        walk(child, k);
+      }
+    }
+  };
+  bodies.forEach(b => walk(b, ''));
+  return [...out].sort((a, b) => a - b);
+}
 const URL_VALUE = /^(https?:)?\/\//i;
 const SAFE_KEY = /^[A-Za-z_$][\w$-]{0,40}$/;
 const URL_KINDS = new Set([
@@ -410,7 +446,16 @@ export type FixtureSanitizer = (json: unknown) => unknown;
  * One sanitizer per run so synthetic ids stay consistent across fixtures
  * (the same post id in E4, E5 and E8 maps to the same synthetic id).
  */
-export function createFixtureSanitizer(): FixtureSanitizer {
+/**
+ * `corpus`: every body that will be sanitized in this run, so synthetic
+ * times keep their relative order across fixtures.
+ */
+export function createFixtureSanitizer(
+  corpus: readonly unknown[] = [],
+): FixtureSanitizer {
+  const timeRank = new Map(collectTimes(corpus).map((v, i) => [v, i] as const));
+  const syntheticTime = (v: number) =>
+    SYNTHETIC_TIME_BASE + (timeRank.get(v) ?? 0) * SYNTHETIC_TIME_STEP;
   const stringIds = new Map<string, string>();
   const numberIds = new Map<number, number>();
   const blogs = new Map<string, string>();
@@ -468,17 +513,25 @@ export function createFixtureSanitizer(): FixtureSanitizer {
       if (ID_KEY.test(key)) {
         return syntheticNumber(v);
       }
-      if (PHONE_KEY.test(key)) {
+      if (PHONE_KEY.test(key) || !Number.isFinite(v)) {
         return 0;
       }
-      if (
-        Number.isFinite(v) &&
-        Math.abs(Math.trunc(v)) >= 1e8 &&
-        !TIME_OR_SIZE_KEY.test(key)
-      ) {
-        return syntheticNumber(v);
+      if (TIME_KEY.test(key)) {
+        return syntheticTime(v);
       }
-      return v;
+      if (SIZE_KEY.test(key)) {
+        return Math.ceil(v / SIZE_STEP) * SIZE_STEP;
+      }
+      if (DURATION_KEY.test(key)) {
+        // duration rounds up and timeCode down, so timeCode <= duration holds.
+        return key === 'duration'
+          ? Math.ceil(v / 60) * 60
+          : Math.floor(v / 60) * 60;
+      }
+      if (KEEP_NUMBER_KEY.test(key)) {
+        return v;
+      }
+      return v === 0 ? 0 : SYNTHETIC_COUNT;
     }
     if (typeof v === 'string') {
       if (v === '') {
@@ -536,7 +589,7 @@ export function createFixtureSanitizer(): FixtureSanitizer {
 
 /** Single-body convenience (fresh id maps). */
 export const sanitizeFixture = (json: unknown) =>
-  createFixtureSanitizer()(json);
+  createFixtureSanitizer([json])(json);
 
 // --------------------------------------------------------------- runner ----
 
@@ -853,20 +906,19 @@ const FIXTURE_CASE = /^(e2|e3|e4|e5|e8|e15|e18|e1-no-token)/;
 export function buildFixtures(
   captures: readonly Capture[],
 ): Array<{ name: string; text: string }> {
-  const sanitize = createFixtureSanitizer();
-  return captures
-    .filter(c => FIXTURE_CASE.test(c.case))
-    .map(c => ({
-      name: `${c.case}.json`,
-      text:
-        JSON.stringify(
-          {
-            case: c.case,
-            status: c.status,
-            body: c.json === undefined ? null : sanitize(c.json),
-          },
-          null,
-          2,
-        ) + '\n',
-    }));
+  const written = captures.filter(c => FIXTURE_CASE.test(c.case));
+  const sanitize = createFixtureSanitizer(written.map(c => c.json));
+  return written.map(c => ({
+    name: `${c.case}.json`,
+    text:
+      JSON.stringify(
+        {
+          case: c.case,
+          status: c.status,
+          body: c.json === undefined ? null : sanitize(c.json),
+        },
+        null,
+        2,
+      ) + '\n',
+  }));
 }

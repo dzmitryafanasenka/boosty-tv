@@ -8,8 +8,12 @@
  * - an opaque run of 40+ token characters, or `Bearer`;
  * - a URL outside `https://example.invalid/`;
  * - a query string other than `?sig=REDACTED`;
- * - a run of 9+ digits in a string or key (phone-like), or a 9+ digit
- *   integer under a key that is not a timestamp or size;
+ * - a run of 9+ digits in a string or key (phone-like);
+ * - a number that does not follow the sanitizer's number rules: ids are
+ *   synthetic (1001–9999), times are synthetic (base + n hours), sizes are
+ *   multiples of 100 KiB, durations and time codes are whole minutes,
+ *   structural numbers (paging, dimensions, statuses) are kept, and every
+ *   other number is 0 or the synthetic count;
  * - an `@`-email;
  * - any string that is not a placeholder, a synthetic value or an
  *   allowlisted enum.
@@ -30,13 +34,63 @@ const ENUM_KEYS = new Set(['type', 'modificator', 'error', 'status']);
 const ENUM_VALUE = /^[A-Za-z][A-Za-z0-9_.-]{0,39}$/;
 const CASE_VALUE = /^[a-z0-9-]{1,40}$/;
 const SAFE_KEY = /^[A-Za-z_$][\w$-]{0,40}$/;
-const TIME_OR_SIZE_KEY =
-  /(At|Time|_at|_time|_ts|Timestamp|timestamp)$|^(size|fileSize|file_size)$/;
+// Number rules: keep in sync with createFixtureSanitizer (contentShapesApi.ts).
+const ID_KEY = /^(id|int_id|vid|uuid)$|Id$|_id$/;
+const PHONE_KEY = /phone/i;
+const TIME_KEY = /(At|Time|_at|_time|_ts|Timestamp|timestamp)$/;
+const SIZE_KEY = /^(size|fileSize|file_size)$/;
+const DURATION_KEY = /^(duration|timeCode|time_code)$/;
+const KEEP_NUMBER_KEY =
+  /^(status|statusCode|width|height|total|offset|limit|unread|period|priority|showcase|expiresIn|expires_in)$/;
+const SYNTHETIC_TIME_BASE = 1_700_000_000;
+const SYNTHETIC_TIME_STEP = 3600;
+const SIZE_STEP = 102_400;
+const SYNTHETIC_COUNT = 5;
+
+/** Rule name when the number breaks the sanitizer's rules, else null. */
+function numberProblem(value, key) {
+  if (!Number.isFinite(value)) {
+    return 'non-finite number';
+  }
+  if (ID_KEY.test(key)) {
+    return Number.isInteger(value) && value >= 1001 && value <= 9999
+      ? null
+      : 'id number is not synthetic';
+  }
+  if (PHONE_KEY.test(key)) {
+    return value === 0 ? null : 'phone number not zeroed';
+  }
+  if (TIME_KEY.test(key)) {
+    const steps = (value - SYNTHETIC_TIME_BASE) / SYNTHETIC_TIME_STEP;
+    return Number.isInteger(steps) && steps >= 0 && steps < 100_000
+      ? null
+      : 'time is not synthetic';
+  }
+  if (SIZE_KEY.test(key)) {
+    return value % SIZE_STEP === 0 ? null : 'size is not rounded';
+  }
+  if (DURATION_KEY.test(key)) {
+    return Number.isInteger(value) && value % 60 === 0
+      ? null
+      : 'duration/time code is not whole minutes';
+  }
+  if (KEEP_NUMBER_KEY.test(key)) {
+    return Math.abs(Math.trunc(value)) >= 1e8
+      ? '9+ digit structural number'
+      : null;
+  }
+  return value === 0 || value === SYNTHETIC_COUNT
+    ? null
+    : 'number is not 0 or the synthetic count';
+}
 
 const RAW_RULES = [
   ['opaque 40+ run', /[A-Za-z0-9_\-+/=.~%]{40,}/],
   ['Bearer', /bearer/i],
-  ['URL outside example.invalid', /(https?:)?\/\/(?!example\.invalid\/)[^\s"]/i],
+  [
+    'URL outside example.invalid',
+    /(https?:)?\/\/(?!example\.invalid\/)[^\s"]/i,
+  ],
   ['query string', /\?(?!sig=REDACTED")[^"\s]*=/],
   ['email', /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/],
 ];
@@ -91,17 +145,17 @@ export function checkJson(json) {
         problems.push([path, '9+ digit run']);
       }
       if (!allowedString(value, key, path)) {
-        problems.push([path, 'string is not a placeholder, synthetic value or allowlisted enum']);
+        problems.push([
+          path,
+          'string is not a placeholder, synthetic value or allowlisted enum',
+        ]);
       }
       return;
     }
     if (typeof value === 'number') {
-      if (
-        Number.isFinite(value) &&
-        Math.abs(Math.trunc(value)) >= 1e8 &&
-        !TIME_OR_SIZE_KEY.test(key)
-      ) {
-        problems.push([path, '9+ digit number outside a timestamp/size key']);
+      const problem = numberProblem(value, key);
+      if (problem) {
+        problems.push([path, problem]);
       }
       return;
     }
@@ -185,7 +239,9 @@ function main() {
     }
   }
   if (failed > 0) {
-    console.error(`check-fixtures: ${failed} file(s) failed, ${checked} JSON checked`);
+    console.error(
+      `check-fixtures: ${failed} file(s) failed, ${checked} JSON checked`,
+    );
     process.exit(1);
   }
   console.log(`check-fixtures: ${checked} JSON fixture(s) clean`);

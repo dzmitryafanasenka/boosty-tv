@@ -1,0 +1,991 @@
+{
+  "case": "e8-post-accessible",
+  "status": 200,
+  "body": {
+    "reactionsDisabled": false,
+    "user": {
+      "avatarUrl": "https://example.invalid/avatar",
+      "id": 1002,
+      "name": "redacted",
+      "blogUrl": "synthetic-blog-1",
+      "isOfficial": false,
+      "hasAvatar": true,
+      "flags": {
+        "showPostDonations": false
+      },
+      "currency": "redacted"
+    },
+    "isMarketing": false,
+    "isWaitingVideo": false,
+    "updatedAt": 1700302400,
+    "isCommentsDenied": false,
+    "hasAccess": true,
+    "createdAt": 1700298800,
+    "currencyDonations": {
+      "EUR": 0,
+      "USD": 0,
+      "RUB": 0
+    },
+    "id": "synthetic-id-4",
+    "title": "redacted",
+    "isRecord": false,
+    "advertiserInfo": null,
+    "subscriptionLevel": {
+      "isArchived": false,
+      "data": [
+        {
+          "size": 102400,
+          "width": 240,
+          "isInvalid": null,
+          "height": 150,
+          "id": "synthetic-id-8",
+          "url": "https://example.invalid/image",
+          "rendition": "",
+          "type": "image"
+        },
+        {
+          "modificator": "",
+          "type": "text",
+          "content": "[\"Sample text\",\"unstyled\",[]]"
+        },
+        {
+          "type": "text",
+          "content": "",
+          "modificator": "BLOCK_END"
+        },
+        {
+          "content": "[\"Sample text\",\"unstyled\",[]]",
+          "type": "text",
+          "modificator": ""
+        },
+        {
+          "type": "text",
+          "content": "",
+          "modificator": "BLOCK_END"
+        }
+      ],
+      "price": 5,
+      "ownerId": 1002,
+      "deleted": false,
+      "currencyPrices": {
+        "USD": 5,
+        "EUR": 5,
+        "RUB": 5
+      },
+      "flags": {
+        "isLimited": false,
+        "isHidden": false,
+        "isArchived": false
+      },
+      "promos": [],
+      "id": 1011,
+      "name": "redacted",
+      "createdAt": 1700014400,
+      "isLimited": false,
+      "isHidden": false
+    },
+    "signedQuery": "?sig=REDACTED",
+    "isPinned": false,
+    "bundleIds": [],
+    "intId": 1010,
+    "data": [
+      {
+        "timeCode": 3900,
+        "complete": true,
+        "width": 2560,
+        "failoverHost": "redacted",
+        "isInvalid": null,
+        "id": "synthetic-id-7",
+        "title": "redacted",
+        "preview": "https://example.invalid/preview",
+        "type": "ok_video",
+        "viewsCounter": 5,
+        "previewId": "synthetic-id-6",
+        "defaultPreview": "https://example.invalid/preview",
+        "duration": 3960,
+        "status": "ok",
+        "playerUrls": [
+          {
+            "url": "",
+            "type": "live_playback_hls"
+          },
+          {
+            "url": "",
+            "type": "live_hls"
+          },
+          {
+            "type": "live_playback_dash",
+            "url": ""
+          },
+          {
+            "type": "lowest",
+            "url": "https://example.invalid/player"
+          },
+          {
+            "url": "",
+            "type": "dash_uni"
+          },
+          {
+            "url": "https://example.invalid/player",
+            "type": "dash"
+          },
+          {
+            "type": "ondemand_dash",
+            "url": ""
+          },
+          {
+            "type": "medium",
+            "url": "https://example.invalid/player"
+          },
+          {
+            "type": "live_ondemand_hls",
+            "url": ""
+          },
+          {
+            "type": "live_cmaf",
+            "url": ""
+          },
+          {
+            "url": "https://example.invalid/player",
+            "type": "quad_hd"
+          },
+          {
+            "url": "https://example.invalid/player",
+            "type": "tiny"
+          },
+          {
+            "type": "full_hd",
+            "url": "https://example.invalid/player"
+          },
+          {
+            "type": "high",
+            "url": "https://example.invalid/player"
+          },
+          {
+            "url": "",
+            "type": "ultra_hd"
+          },
+          {
+            "url": "https://example.invalid/player",
+            "type": "low"
+          },
+          {
+            "type": "live_dash",
+            "url": ""
+          },
+          {
+            "type": "hls",
+            "url": "https://example.invalid/player"
+          },
+          {
+            "type": "ondemand_hls",
+            "url": ""
+          }
+        ],
+        "height": 1440,
+        "uploadStatus": "redacted",
+        "vid": "synthetic-id-5",
+        "url": "",
+        "showViewsCounter": true
+      },
+      {
+        "modificator": "",
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "type": "text"
+      },
+      {
+        "modificator": "BLOCK_END",
+        "content": "",
+        "type": "text"
+      },
+      {
+        "modificator": "",
+        "type": "text",
+        "content": "[\"Sample text\",\"unstyled\",[]]"
+      },
+      {
+        "content": "",
+        "type": "text",
+        "modificator": "BLOCK_END"
+      },
+      {
+        "modificator": "",
+        "type": "text",
+        "content": "[\"Sample text\",\"unstyled\",[]]"
+      },
+      {
+        "content": "",
+        "type": "text",
+        "modificator": "BLOCK_END"
+      },
+      {
+        "modificator": "",
+        "type": "text",
+        "content": "[\"Sample text\",\"unstyled\",[]]"
+      },
+      {
+        "content": "",
+        "type": "text",
+        "modificator": "BLOCK_END"
+      },
+      {
+        "type": "text",
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "modificator": ""
+      },
+      {
+        "content": "",
+        "type": "text",
+        "modificator": "BLOCK_END"
+      },
+      {
+        "modificator": "",
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "type": "text"
+      },
+      {
+        "content": "",
+        "type": "text",
+        "modificator": "BLOCK_END"
+      },
+      {
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "type": "text",
+        "modificator": ""
+      },
+      {
+        "modificator": "BLOCK_END",
+        "type": "text",
+        "content": ""
+      },
+      {
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "type": "text",
+        "modificator": ""
+      },
+      {
+        "modificator": "BLOCK_END",
+        "type": "text",
+        "content": ""
+      },
+      {
+        "modificator": "",
+        "type": "text",
+        "content": "[\"Sample text\",\"unstyled\",[]]"
+      },
+      {
+        "modificator": "BLOCK_END",
+        "content": "",
+        "type": "text"
+      },
+      {
+        "modificator": "",
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "type": "text"
+      },
+      {
+        "type": "text",
+        "content": "",
+        "modificator": "BLOCK_END"
+      },
+      {
+        "modificator": "",
+        "type": "text",
+        "content": "[\"Sample text\",\"unstyled\",[]]"
+      },
+      {
+        "content": "",
+        "type": "text",
+        "modificator": "BLOCK_END"
+      },
+      {
+        "modificator": "",
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "type": "text"
+      },
+      {
+        "type": "text",
+        "content": "",
+        "modificator": "BLOCK_END"
+      },
+      {
+        "modificator": "",
+        "type": "text",
+        "content": "[\"Sample text\",\"unstyled\",[[0,0,6]]]"
+      },
+      {
+        "type": "text",
+        "content": "",
+        "modificator": "BLOCK_END"
+      },
+      {
+        "type": "text",
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "modificator": ""
+      },
+      {
+        "type": "link",
+        "content": "[\"Sample text\",\"unstyled\",[[4,0,6]]]",
+        "url": "https://example.invalid/link",
+        "explicit": false
+      },
+      {
+        "modificator": "BLOCK_END",
+        "type": "text",
+        "content": ""
+      },
+      {
+        "modificator": "",
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "type": "text"
+      },
+      {
+        "explicit": false,
+        "url": "https://example.invalid/link",
+        "content": "[\"Sample text\",\"unstyled\",[[4,0,6]]]",
+        "type": "link"
+      },
+      {
+        "type": "text",
+        "content": "",
+        "modificator": "BLOCK_END"
+      },
+      {
+        "type": "text",
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "modificator": ""
+      },
+      {
+        "url": "https://example.invalid/link",
+        "type": "link",
+        "content": "[\"Sample text\",\"unstyled\",[[4,0,6]]]",
+        "explicit": false
+      },
+      {
+        "modificator": "BLOCK_END",
+        "content": "",
+        "type": "text"
+      },
+      {
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "type": "text",
+        "modificator": ""
+      },
+      {
+        "modificator": "BLOCK_END",
+        "type": "text",
+        "content": ""
+      },
+      {
+        "modificator": "",
+        "content": "[\"Sample text\",\"unstyled\",[[0,0,6]]]",
+        "type": "text"
+      },
+      {
+        "modificator": "BLOCK_END",
+        "content": "",
+        "type": "text"
+      },
+      {
+        "explicit": false,
+        "url": "https://example.invalid/link",
+        "type": "link",
+        "content": "[\"Sample text\",\"unstyled\",[]]"
+      },
+      {
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "type": "text",
+        "modificator": ""
+      },
+      {
+        "modificator": "BLOCK_END",
+        "content": "",
+        "type": "text"
+      },
+      {
+        "modificator": "BLOCK_END",
+        "type": "text",
+        "content": ""
+      },
+      {
+        "url": "https://example.invalid/link",
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "type": "link",
+        "explicit": false
+      },
+      {
+        "modificator": "",
+        "type": "text",
+        "content": "[\"Sample text\",\"unstyled\",[]]"
+      },
+      {
+        "modificator": "BLOCK_END",
+        "content": "",
+        "type": "text"
+      },
+      {
+        "modificator": "BLOCK_END",
+        "content": "",
+        "type": "text"
+      },
+      {
+        "url": "https://example.invalid/link",
+        "type": "link",
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "explicit": false
+      },
+      {
+        "modificator": "",
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "type": "text"
+      },
+      {
+        "modificator": "BLOCK_END",
+        "content": "",
+        "type": "text"
+      },
+      {
+        "modificator": "BLOCK_END",
+        "content": "",
+        "type": "text"
+      },
+      {
+        "explicit": false,
+        "url": "https://example.invalid/link",
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "type": "link"
+      },
+      {
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "type": "text",
+        "modificator": ""
+      },
+      {
+        "modificator": "BLOCK_END",
+        "type": "text",
+        "content": ""
+      },
+      {
+        "modificator": "BLOCK_END",
+        "type": "text",
+        "content": ""
+      },
+      {
+        "explicit": false,
+        "url": "https://example.invalid/link",
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "type": "link"
+      },
+      {
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "type": "text",
+        "modificator": ""
+      },
+      {
+        "modificator": "BLOCK_END",
+        "type": "text",
+        "content": ""
+      },
+      {
+        "content": "",
+        "type": "text",
+        "modificator": "BLOCK_END"
+      },
+      {
+        "explicit": false,
+        "url": "https://example.invalid/link",
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "type": "link"
+      },
+      {
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "type": "text",
+        "modificator": ""
+      },
+      {
+        "modificator": "BLOCK_END",
+        "type": "text",
+        "content": ""
+      },
+      {
+        "type": "text",
+        "content": "",
+        "modificator": "BLOCK_END"
+      },
+      {
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "type": "link",
+        "url": "https://example.invalid/link",
+        "explicit": false
+      },
+      {
+        "modificator": "",
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "type": "text"
+      },
+      {
+        "modificator": "BLOCK_END",
+        "content": "",
+        "type": "text"
+      },
+      {
+        "modificator": "BLOCK_END",
+        "type": "text",
+        "content": ""
+      },
+      {
+        "url": "https://example.invalid/link",
+        "type": "link",
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "explicit": false
+      },
+      {
+        "type": "text",
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "modificator": ""
+      },
+      {
+        "modificator": "BLOCK_END",
+        "content": "",
+        "type": "text"
+      },
+      {
+        "type": "text",
+        "content": "",
+        "modificator": "BLOCK_END"
+      },
+      {
+        "url": "https://example.invalid/link",
+        "type": "link",
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "explicit": false
+      },
+      {
+        "type": "text",
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "modificator": ""
+      },
+      {
+        "modificator": "BLOCK_END",
+        "content": "",
+        "type": "text"
+      },
+      {
+        "content": "",
+        "type": "text",
+        "modificator": "BLOCK_END"
+      },
+      {
+        "explicit": false,
+        "url": "https://example.invalid/link",
+        "type": "link",
+        "content": "[\"Sample text\",\"unstyled\",[]]"
+      },
+      {
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "type": "text",
+        "modificator": ""
+      },
+      {
+        "type": "text",
+        "content": "",
+        "modificator": "BLOCK_END"
+      },
+      {
+        "content": "",
+        "type": "text",
+        "modificator": "BLOCK_END"
+      },
+      {
+        "url": "https://example.invalid/link",
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "type": "link",
+        "explicit": false
+      },
+      {
+        "type": "text",
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "modificator": ""
+      },
+      {
+        "content": "",
+        "type": "text",
+        "modificator": "BLOCK_END"
+      },
+      {
+        "content": "",
+        "type": "text",
+        "modificator": "BLOCK_END"
+      },
+      {
+        "explicit": false,
+        "url": "https://example.invalid/link",
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "type": "link"
+      },
+      {
+        "type": "text",
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "modificator": ""
+      },
+      {
+        "modificator": "BLOCK_END",
+        "content": "",
+        "type": "text"
+      },
+      {
+        "modificator": "BLOCK_END",
+        "content": "",
+        "type": "text"
+      },
+      {
+        "explicit": false,
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "type": "link",
+        "url": "https://example.invalid/link"
+      },
+      {
+        "modificator": "",
+        "type": "text",
+        "content": "[\"Sample text\",\"unstyled\",[]]"
+      },
+      {
+        "type": "text",
+        "content": "",
+        "modificator": "BLOCK_END"
+      },
+      {
+        "type": "text",
+        "content": "",
+        "modificator": "BLOCK_END"
+      },
+      {
+        "type": "link",
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "url": "https://example.invalid/link",
+        "explicit": false
+      },
+      {
+        "modificator": "",
+        "type": "text",
+        "content": "[\"Sample text\",\"unstyled\",[]]"
+      },
+      {
+        "content": "",
+        "type": "text",
+        "modificator": "BLOCK_END"
+      },
+      {
+        "type": "text",
+        "content": "",
+        "modificator": "BLOCK_END"
+      },
+      {
+        "explicit": false,
+        "url": "https://example.invalid/link",
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "type": "link"
+      },
+      {
+        "type": "text",
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "modificator": ""
+      },
+      {
+        "modificator": "BLOCK_END",
+        "content": "",
+        "type": "text"
+      },
+      {
+        "content": "",
+        "type": "text",
+        "modificator": "BLOCK_END"
+      },
+      {
+        "explicit": false,
+        "type": "link",
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "url": "https://example.invalid/link"
+      },
+      {
+        "modificator": "",
+        "type": "text",
+        "content": "[\"Sample text\",\"unstyled\",[]]"
+      },
+      {
+        "modificator": "BLOCK_END",
+        "content": "",
+        "type": "text"
+      },
+      {
+        "content": "",
+        "type": "text",
+        "modificator": "BLOCK_END"
+      },
+      {
+        "url": "https://example.invalid/link",
+        "type": "link",
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "explicit": false
+      },
+      {
+        "modificator": "",
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "type": "text"
+      },
+      {
+        "content": "",
+        "type": "text",
+        "modificator": "BLOCK_END"
+      },
+      {
+        "modificator": "BLOCK_END",
+        "type": "text",
+        "content": ""
+      },
+      {
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "type": "link",
+        "url": "https://example.invalid/link",
+        "explicit": false
+      },
+      {
+        "modificator": "",
+        "type": "text",
+        "content": "[\"Sample text\",\"unstyled\",[]]"
+      },
+      {
+        "content": "",
+        "type": "text",
+        "modificator": "BLOCK_END"
+      },
+      {
+        "content": "",
+        "type": "text",
+        "modificator": "BLOCK_END"
+      }
+    ],
+    "contentCounters": [
+      {
+        "type": "ok_video",
+        "count": 5,
+        "size": 0
+      },
+      {
+        "type": "text",
+        "count": 5,
+        "size": 0
+      }
+    ],
+    "isShowcaseVisible": false,
+    "int_id": 1010,
+    "currencyPrices": {
+      "RUB": 0,
+      "EUR": 0,
+      "USD": 0
+    },
+    "isBlocked": false,
+    "promo": null,
+    "isPublished": true,
+    "donators": {
+      "extra": {
+        "isLast": true
+      },
+      "data": []
+    },
+    "tags": [],
+    "comments": {
+      "data": [],
+      "extra": {
+        "isFirst": true,
+        "isLast": false
+      }
+    },
+    "isLiked": false,
+    "donations": 0,
+    "sortOrder": 5,
+    "count": {
+      "likes": 5,
+      "reactions": {
+        "heart": 5,
+        "laught": 5,
+        "angry": 0,
+        "like": 5,
+        "sad": 0,
+        "wonder": 5,
+        "fire": 5,
+        "dislike": 0
+      },
+      "comments": 5
+    },
+    "isDeleted": false,
+    "publishTime": 1700298800,
+    "teaser": [
+      {
+        "id": "synthetic-id-3",
+        "height": 623,
+        "type": "image",
+        "rendition": "",
+        "url": "https://example.invalid/image",
+        "size": 102400,
+        "isInvalid": null,
+        "width": 575
+      }
+    ],
+    "showViewsCounter": false,
+    "hasAIContent": false,
+    "forbiddenChangeHasAIContent": false,
+    "hasAdultContent": false,
+    "price": 0,
+    "frame": {
+      "next": null,
+      "previous": {
+        "publishTime": 1700284400,
+        "id": "synthetic-id-12",
+        "title": "redacted"
+      }
+    },
+    "reactionCounters": [
+      {
+        "type": "like",
+        "count": 5
+      },
+      {
+        "count": 0,
+        "type": "dislike"
+      },
+      {
+        "type": "fire",
+        "count": 5
+      },
+      {
+        "count": 5,
+        "type": "heart"
+      },
+      {
+        "type": "laugh",
+        "count": 5
+      },
+      {
+        "count": 0,
+        "type": "laught"
+      },
+      {
+        "count": 5,
+        "type": "wonder"
+      },
+      {
+        "type": "sad",
+        "count": 0
+      },
+      {
+        "count": 0,
+        "type": "angry"
+      },
+      {
+        "type": "funny",
+        "count": 0
+      },
+      {
+        "count": 0,
+        "type": "check"
+      },
+      {
+        "type": "thinking",
+        "count": 0
+      },
+      {
+        "count": 0,
+        "type": "clown"
+      },
+      {
+        "count": 0,
+        "type": "swearing"
+      },
+      {
+        "count": 0,
+        "type": "applause"
+      },
+      {
+        "type": "call-me",
+        "count": 0
+      },
+      {
+        "type": "cold",
+        "count": 0
+      },
+      {
+        "type": "eggplant",
+        "count": 0
+      },
+      {
+        "type": "blowing-up",
+        "count": 0
+      },
+      {
+        "count": 0,
+        "type": "scream"
+      },
+      {
+        "count": 0,
+        "type": "crown"
+      },
+      {
+        "count": 0,
+        "type": "diamond"
+      },
+      {
+        "type": "melting",
+        "count": 0
+      },
+      {
+        "count": 0,
+        "type": "money"
+      },
+      {
+        "count": 0,
+        "type": "nausea"
+      },
+      {
+        "type": "confetti",
+        "count": 0
+      },
+      {
+        "count": 0,
+        "type": "banana"
+      },
+      {
+        "count": 0,
+        "type": "peach"
+      },
+      {
+        "type": "pizza",
+        "count": 0
+      },
+      {
+        "count": 0,
+        "type": "love"
+      },
+      {
+        "type": "rocket",
+        "count": 0
+      },
+      {
+        "count": 0,
+        "type": "splash"
+      },
+      {
+        "type": "lightning",
+        "count": 0
+      },
+      {
+        "type": "cry",
+        "count": 0
+      },
+      {
+        "type": "folded-hands",
+        "count": 0
+      }
+    ]
+  }
+}

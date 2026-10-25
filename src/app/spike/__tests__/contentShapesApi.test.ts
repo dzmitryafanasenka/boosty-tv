@@ -337,7 +337,8 @@ test('sanitizer: rules for ids, urls, signedQuery, content, numbers', () => {
   const p = out.data[0];
   expect(p.id).toBe('synthetic-id-1');
   expect(p.int_id).toBe(1001);
-  expect(p.createdAt).toBe(1_761_000_000);
+  // No corpus given: every time maps to the synthetic base.
+  expect(p.createdAt).toBe(1_700_000_000);
   expect(p.hasAccess).toBe(true);
   expect(p.signedQuery).toBe('?sig=REDACTED');
   expect(p.title).toBe('redacted');
@@ -365,8 +366,8 @@ test('sanitizer: rules for ids, urls, signedQuery, content, numbers', () => {
     type: 'ok_video',
     id: 'synthetic-id-2',
     vid: 'synthetic-id-3',
-    duration: 754,
-    timeCode: 12,
+    duration: 780,
+    timeCode: 0,
     preview: 'https://example.invalid/preview',
     playerUrls: [
       { type: 'hd', url: 'https://example.invalid/player' },
@@ -377,7 +378,7 @@ test('sanitizer: rules for ids, urls, signedQuery, content, numbers', () => {
     type: 'audio_file',
     url: 'https://example.invalid/audio-file',
     fileType: 'redacted',
-    size: 12_345_678_901,
+    size: 12345753600,
   });
   expect(unknown).toEqual({ type: 'brand_new_block', payload: 'redacted' });
   expect(out.extra).toEqual({ offset: 'redacted', isLast: false });
@@ -389,6 +390,48 @@ test('sanitizer: rules for ids, urls, signedQuery, content, numbers', () => {
   expect((sanitize({ id: SECRET_STRINGS[3] }) as { id: string }).id).toBe(
     'synthetic-id-1',
   );
+});
+
+test('sanitizer: numbers cannot identify content (times, counts, money, durations)', () => {
+  const a = {
+    createdAt: 1_792_000_000,
+    likes: 313,
+    price: 500,
+    duration: 3903,
+    timeCode: 3901,
+  };
+  const b = {
+    publishTime: 1_785_000_000,
+    viewsCounter: 0,
+    count: { likes: 7 },
+    currentSum: 2.6,
+  };
+  const c = {
+    offset: 0,
+    limit: 30,
+    total: 3,
+    width: 1920,
+    height: 1080,
+    status: 404,
+    size: 4_487_786,
+  };
+  const sanitize = createFixtureSanitizer([a, b]);
+  // Times keep their relative order across bodies, in whole synthetic hours.
+  expect(sanitize(a)).toEqual({
+    createdAt: 1_700_003_600,
+    likes: 5,
+    price: 5,
+    duration: 3960,
+    timeCode: 3900,
+  });
+  expect(sanitize(b)).toEqual({
+    publishTime: 1_700_000_000,
+    viewsCounter: 0,
+    count: { likes: 5 },
+    currentSum: 5,
+  });
+  // Structural numbers are kept; sizes are rounded up to 100 KiB.
+  expect(sanitize(c)).toEqual({ ...c, size: 4_505_600 });
 });
 
 // --------------------------------------------------------------- runner ----
