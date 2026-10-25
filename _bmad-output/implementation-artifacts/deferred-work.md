@@ -94,3 +94,9 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-7-spike-audio-and-files.md`
   summary: Record the live shape of the `video` content block (keys only) and decide its parity treatment.
   evidence: Story 1.7 saw `video` blocks in accessible posts; §4.1 has it only as REF.
+- source_spec: `_bmad-output/implementation-artifacts/spec-2-1-welcome-screen-on-the-design-foundation.md`
+  summary: Decide the font-scale policy (cap `maxFontSizeMultiplier` or let fixed-height controls grow) and check A1 and Button at the largest Android TV text size on the device.
+  evidence: maybe-false (would be medium). Button has a fixed height with numberOfLines=1 and Text keeps allowFontScaling; A1 places the column and the footer absolutely, so a large system font scale may clip labels or overlap the footer. DESIGN.md sizes are "at default font scale" only. Settle in Story 9.4 (accessibility pass) by setting the device font scale to max and taking a screenshot.
+- source_spec: `_bmad-output/implementation-artifacts/spec-2-1-welcome-screen-on-the-design-foundation.md`
+  summary: Bundle Golos Text for tvOS (Info.plist UIAppFonts) in phase 4; today the fonts exist only under android/app/src/main/assets/fonts.
+  evidence: Typography tokens resolve fontFamily by PostScript name (`GolosText-Regular`, `GolosText-SemiBold`); without the iOS bundle entry tvOS would silently fall back to the system font.

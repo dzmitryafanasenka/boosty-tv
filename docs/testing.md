@@ -453,3 +453,28 @@ Branch `spike/1-7-audio-files` (throwaway, Story 1.6 spike + `main`). Spike scre
 | logcat scan | Full `adb logcat -v time` captured for each round (about 9 400 lines, then about 8 000 for the review re-scan), searched locally, matches never recorded: `sig=`, `sign=`, `user_id=`, `content_id=`, `expire_time=`, `srcIp=`, `expires=`, `signedQuery=`, `Bearer <value>`, URL with a query, `okcdn` → **0** each; `boosty.to` outside `SpikeNet` lines → 0; 7+ digit runs and `+` digit runs on app lines → 0; 40+ and 60+ runs on app lines → 0. Device buffer cleared (`adb logcat -c`) and the local copies deleted after each round | agent via adb |
 
 Open: S9 needs an accessible `audio_file` and `file` post within the scanned range of a subscribed blog. A re-run is one press of «Найти аудио и файлы» on this branch; then the owner checks the sound and scans the QR (without photographing it).
+
+### Story 2.1 — Welcome screen on the design foundation, 2026-10-26
+
+**Status: A1 verified on the pinned device by adb (screenshot, uiautomator, injected keys). TalkBack announcement and the look with the physical remote are owner checks, not done yet.**
+
+First production screen on `main`: design tokens (`src/shared/ui/tokens.ts`), bundled Golos Text 400/600 (`android/app/src/main/assets/fonts/`, OFL), `FocusableSurface`, `Button`, `Spinner`, `Text`, `useReducedMotion`, the shared `Screen` wrapper (`src/shared/focus`), the typed `ru` catalog (`src/shared/i18n`) and A1 `WelcomeScreen` (`src/features/auth`) as the app's only screen.
+
+**Host checks:** `npm run lint -- --max-warnings 0`, `npm run typecheck`, `npm test`, `npm run check:fixtures` pass. New tests: `tokens.test.js` (every DESIGN.md color, typography, rounded, spacing, focus, motion and component token matches `tokens.ts`; no `fontWeight`; nothing under 11 sp; font files and OFL present), `catalog.test.ts` (welcome copy, `error.<kind>` for all 15 AD-5 kinds, `test.lesson` plurals 1/2/5/21, invalid counts throw, unknown keys fail typecheck), `Button.test.tsx` (focused ring/lift/scale with `motion.focus` and the native driver, pressed 0.98 with `motion.press`, disabled, busy with a constant width, secondary, reduce motion on / change event / change event before a slow query / rejected query), `Screen.test.tsx` (trap on all four sides, `colors.bg`, full size), `App.test.tsx` (one focusable element, initial focus, catalog label and accessibility label) and `noRawText.test.js` (the lint override fails on raw literals outside and inside `<Text>`, in ternaries, `&&`, `+`, fragments and copy-bearing props, in `src/app`, `src/features`, `src/shared/ui` and `src/shared/focus`).
+
+**Build:** `./gradlew assembleRelease -PreactNativeArchitectures=armeabi-v7a` BUILD SUCCESSFUL; the APK contains `assets/fonts/GolosText-Regular.ttf`, `GolosText-SemiBold.ttf` and `OFL.txt`. Release-like (`zipalign -p 4` + `apksigner`, SDK debug key outside the repo) installed with `adb install -r` over the spike build (app data kept, nothing uninstalled or cleared).
+
+| Row | Result | Who |
+|---|---|---|
+| Launch | Started with the launcher intent (`monkey -c android.intent.category.LEANBACK_LAUNCHER`) from the Home screen; `MainActivity` resumed, A1 shown. Not opened by navigating the launcher with the remote | agent via adb |
+| Font | Golos Text rendered: hero and button label are SemiBold although no `fontWeight` is set (a fallback to the system font would render weight 400); Cyrillic glyphs match Golos Text | agent via adb (screenshot) |
+| Layout (px at 1920×1080 = dp × 2) | Column x 520–1400 (440 dp, centered), hero top 300 (150 dp); body 24 px below the hero (12 dp); button 48 px below the body (24 dp), height 80 (40 dp); footer x 96–1824, bottom 1026 (48 dp sides, 27 dp from the bottom). Everything inside the safe area; no wordmark in the corner | agent via adb (uiautomator bounds, screenshot) |
+| Focus | Button is the only focusable node and has focus at launch (`focused=true`); ring visible around the scaled button (≈ 1.04, ring not clipped), `accent-focus` lift | agent via adb |
+| Accessibility label | uiautomator `content-desc` = «Войти в Boosty» (`android.widget.Button`) | agent via adb |
+| OK | `KEYCODE_DPAD_CENTER`: screenshot pixel-identical to before; focus kept | agent via adb (injected key) |
+| D-pad | Up, down, left, right: screenshot pixel-identical; focus stays on the button | agent via adb (injected keys) |
+| Back | `KEYCODE_BACK` → Google TV Home (`launcherx HomeActivity` resumed) | agent via adb (injected key) |
+| Pressed scale 0.98 | Not observable by screenshot (80 ms); covered by the component test only | — |
+| TalkBack announcement | **Not verified** — owner check | — |
+| Physical remote look and feel | **Not verified** — owner check | — |
+| Reduce motion on the device | **Not verified** on the device; component tests only | — |
