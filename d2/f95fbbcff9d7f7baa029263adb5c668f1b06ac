@@ -1,0 +1,29 @@
+_bmad-output/implementation-artifacts/spec-1-3-spike-phone-sign-in-and-token-persistence.md
+  s_5af4f680824905::t_82fa7f8719397b 1-106
+_bmad-output/implementation-artifacts/epic-1-context.md
+  s_d43e352286a38c::t_511b4e23e588da 7,11-12,22-34,38-53,57-58,62-64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "d2f95fbbcff9d7f7baa029263adb5c668f1b06ac",
+  "prompts": {},
+  "sessions": {
+    "s_5af4f680824905": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "860bc0b2-9104-4116-8ba2-01ba7d4ffe79",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_d43e352286a38c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ac0fc86c71a28c4ce",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
