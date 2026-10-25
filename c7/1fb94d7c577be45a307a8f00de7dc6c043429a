@@ -1,0 +1,29 @@
+_bmad-output/implementation-artifacts/spec-1-1-production-project-skeleton.md
+  s_5af4f680824905::t_4b78f8cfa805bf 1-107
+_bmad-output/implementation-artifacts/epic-1-context.md
+  s_0083016706f94a::t_fdce84a476c649 1-136
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "c71fb94d7c577be45a307a8f00de7dc6c043429a",
+  "prompts": {},
+  "sessions": {
+    "s_0083016706f94a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ac8afffcc931fb88a",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_5af4f680824905": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "860bc0b2-9104-4116-8ba2-01ba7d4ffe79",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
