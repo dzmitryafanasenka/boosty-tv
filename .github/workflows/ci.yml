@@ -25,6 +25,7 @@ jobs:
       - run: npm run lint -- --max-warnings 0
       - run: npm run typecheck
       - run: npm test -- --ci
+      - run: npm run check:fixtures
 
   android:
     name: Android builds and release manifest check

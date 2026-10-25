@@ -85,6 +85,7 @@ Changes on top of the template:
 
 ```sh
 npm ci && npm run lint && npm run typecheck && npm test
+npm run check:fixtures   # sanitization check for src/test/fixtures (Story 1.5)
 npm ls react-native        # react-native@npm:react-native-tvos@0.87.1-1, deduped
 cd android && ./gradlew assembleDebug assembleRelease
 aapt dump badging app/build/outputs/apk/debug/app-debug.apk   # leanback-launchable-activity + banner
@@ -268,4 +269,32 @@ Notes:
 - The account is **signed out** on the device after this story (planned). The owner signs in again with the Story 1.3 screen before Story 1.5.
 - After the run, two log-only fixes were made and the build was reinstalled (no scenario re-run): E1 log lines now carry their own request number (concurrent calls all printed the final count), and the refresh log says "attempt" instead of "request sent", because the simulated failure sends nothing.
 - Log hygiene: the spike logs the last 4 characters of `device_id` (an install identifier, not account data). Production logging must not include it. The Story 1.4 logcat scan looked for 60+ character token runs, `Bearer `, and full and partial phone numbers (country code plus trailing digits); nothing matched.
-- Open for production: whether a `device_id` mismatch alone rejects a refresh (needs one refresh with a different `device_id` on a session with no prior token reuse, followed by one with the real `device_id`); the real access and refresh token lifetimes.
+- (Closed in Story 1.5 as not needed for production, owner decision 2026-10-25; see api-contract §2.3.) Open for production: whether a `device_id` mismatch alone rejects a refresh (needs one refresh with a different `device_id` on a session with no prior token reuse, followed by one with the real `device_id`); the real access and refresh token lifetimes.
+
+### Story 1.5 — entitlement, errors and events shapes, 2026-10-25
+
+**Blocked on sign-in (2026-10-25):** the owner's new sign-in got HTTP 429 `sms_gate_ratelimit` on every first send (18:34, 18:35, 18:42, 18:52). The boosty.to website got the same error, so the limit is server-side (`docs/api-contract.md` §2.2 «Rate limit, longer window»). The spike sign-in screen now shows the 429 details on screen: rate-limit header values, all header names without values, and the `error_description` text when it is safe. The server sent no wait hint. The limit lifted the same evening: 429 again at 19:36, then 200 at 19:45, and the owner signed in (E1 200, session saved).
+
+Branch `spike/1-5-entitlement-errors-events` (throwaway, Story 1.4 spike + `main`). Spike screen «Контент: доступ, ошибки, события» (`src/app/spike/ContentShapesCheck.tsx`, first menu entry) runs the fixed read-only request set from `src/app/spike/contentShapesApi.ts` once: E1 → E2 → E4 (at most 5 subscribed blogs, until an accessible and a locked post are found) → E5 → E3 → E8 accessible/locked (`comments_limit=0&reply_limit=0`) → E15 per chosen blog → E1/E8 without `Authorization` → E8 random post id / E3 random slug → E18 (+ one page only if the response offers `extra.offset`). Budget: at most 30 requests including refreshes. Sanitized fixtures go to the app's external files directory (`SpikeFiles` native module) for `adb pull`.
+
+**Host checks:** `npm run lint -- --max-warnings 0`, `npm run typecheck`, `npm test` (13 suites, 169 tests after the review fixes), `npm run check:fixtures` pass. New tests: `contentShapesApi.test.ts` (request paths, picking, analysis lines without values, sanitizer: no input string survives except allowlisted enums, runner order, 5-blog cap, budget stop, no page 2 without a cursor), `ContentShapesCheck.test.tsx` (one run, request count, fixtures written, second run refused, no token/title/URL in console, screen or files) and `__tests__/checkFixtures.test.js` (the real CLI passes clean fixtures, the repository fixtures and, on the spike branch only, spike sanitizer output; fails on a planted token, `Bearer`, signed URL, query string, phone string and number, email, free-form string, unsafe key, real text content, real timestamp, count, price, exact duration and id number). The number rules (synthetic times in whole hours with order kept, counts and money as 0 or 5, durations in whole minutes, sizes rounded to 100 KiB, ids synthetic) are enforced by both the sanitizer and the check script. They were tightened after the first device run: verbatim publish times, view, like and subscriber counts, prices and exact durations could identify the owner's subscriptions in combination (owner decision: tighten and re-run).
+
+**Build:** `./gradlew assembleRelease -PreactNativeArchitectures=armeabi-v7a` BUILD SUCCESSFUL; release-like (`zipalign` + `apksigner`, SDK debug key outside the repo) installed on the pinned device. The screen opens and reads the store without a request: **signed-out** (expected after the Story 1.4 logout).
+
+**Device run** (2026-10-25, owner signed in by phone; the run was started by the agent via adb keys; release-like build). One run of 15 requests out of the 30 budget, no refresh needed. It was repeated once after the number sanitizing was tightened, with identical results. 14 fixtures were pulled to `src/test/fixtures/boosty/`, `npm run check:fixtures` passed, and the files were deleted on the device.
+
+| Row | Result |
+|---|---|
+| S5 accessible post | **Pass.** Found in E4 (blog #1), E5 (first page) and E8: `hasAccess=true`, `data` has 112 blocks (`ok_video`×1, `text`×90, `link`×21), `teaser` one image, `signedQuery` non-empty. `ok_video`: 19 `playerUrls`, 9 non-empty (`tiny`…`quad_hd`, `hls`, `dash`), `duration` and `timeCode` present in E4, E5 and E8 |
+| S5 locked post | **Pass.** Found in E4 (blog #2), not on the first E5 page. E4 and E8: HTTP 200, `hasAccess=false`, `data` empty, `teaser` one image, `signedQuery` empty; no video, no `playerUrls` |
+| S5 live stream | E15 → **204** for both blogs (no stream at the time) |
+| Errors: no token | E1 → **401** `unauthorized`. E8 (accessible post) → **200** as an anonymous viewer (`hasAccess=false`, empty `data`), **not 401** |
+| Errors: missing | E8 random post id → **404** `not_found`; E3 random slug → **404** `blog_not_found` |
+| Errors: 403 / 429 | Not observed (locked content is a 200; no 429 on content endpoints; none triggered on purpose) |
+| S11 events | E18 → **200**: 1 event (`target_new`), `count{total, unread, byEventType[17 types]}`, `updateTime`; no cursor, so no page 2. EVT-01 verified as reachable; paging unverified |
+| Unknown blocks | `list` (nested `items[]{data[], items[]}`) seen and kept in the fixtures |
+| Review fixes (after the device runs) | `total`/`unread` counts were made 0 or 5 like other counts (3 values changed in `e2-subscriptions.json` and `e18-events.json`, by applying the same rule to the committed files; the rule needs only the sanitized value). Time values of 0 are now kept as an "unset" sentinel; the committed fixtures were sanitized before this rule, so a 0 time may appear there as the earliest synthetic time. `check:fixtures` now runs in CI and as a jest test on the repository fixtures |
+| Log hygiene | logcat scan of the app lines after each run: no `Bearer`, no 60+ character runs, no 9+ digit runs, no `sig=`, no URL with a query; only key paths, types and lengths. Buffer cleared after each run |
+
+`device_id` / refresh-token reuse re-test: closed as not needed for production (owner decision 2026-10-25; no requests), see api-contract §2.3.
+
