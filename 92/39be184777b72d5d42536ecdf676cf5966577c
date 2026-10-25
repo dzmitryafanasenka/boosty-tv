@@ -1,0 +1,27 @@
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_fce05da352b4dc::t_cf7ec2989a5dde 74
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_fce05da352b4dc::t_03e0c908151978 32,38,45-46
+docs/adr/0008-api-request-profiles.md
+  s_fce05da352b4dc::t_5608d4e1d0902b 1-42
+docs/api-contract.md
+  s_fce05da352b4dc::t_773d125ae2f44d 33,394
+docs/testing.md
+  s_fce05da352b4dc::t_6e1cd4d5bd0541 156
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "9239be184777b72d5d42536ecdf676cf5966577c",
+  "prompts": {},
+  "sessions": {
+    "s_fce05da352b4dc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1d96fc39-0a81-40cc-a1ff-5557f210c17b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
