@@ -1,0 +1,27 @@
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_fa8f7b4ebc3498::t_e88bed6c975fba 86-94
+_bmad-output/implementation-artifacts/spec-1-7-spike-audio-and-files.md
+  s_fa8f7b4ebc3498::t_2b8555ffe1488e 1-123
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_fa8f7b4ebc3498::t_7b312c507d9297 32,44-45
+docs/api-contract.md
+  s_fa8f7b4ebc3498::t_cce838744ae84a 282-306,322,365-368,397
+docs/testing.md
+  s_fa8f7b4ebc3498::t_2dea89887344b8 345-379
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "08f81709eabb63fa13f76840746e2b27f905d181",
+  "prompts": {},
+  "sessions": {
+    "s_fa8f7b4ebc3498": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e85fa150-3d17-4cac-84c8-4bb1e5a38a91",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
