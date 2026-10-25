@@ -8,7 +8,7 @@
 | Android TV OS version | Android TV OS 14 (API 34), build `UTTC.250917.004` (`google/sabrina_prod_stable/sabrina:14/UTTC.250917.004/14193937`) |
 | Security patch level | 2025-10-01 |
 | Android System WebView version | 156.0.8078.47 |
-| Remote | Stock Chromecast voice remote (to confirm) |
+| Remote | Stock Chromecast with Google TV voice remote: D-pad, OK, Back, Home, voice; **no media keys** (owner, Story 1.6). D-pad left/right reach `useTVEventHandler` as key up only |
 | Display | Physical 3840×2160; UI override 1920×1080 px at density 320 |
 | Reported window size (dp) | **960×540 dp** (1920 × 160 / 320 = 960; 1080 × 160 / 320 = 540). Matches the DESIGN.md assumption (design px ÷ 2). |
 | adb connection | Wireless debugging (Android 11+ pairing): `adb pair <ip>:<pair-port> <code>` once, then `adb connect <ip>:<port>` (the port changes after a reboot) |
@@ -105,6 +105,82 @@ adb shell wm size && adb shell wm density   # dp = px * 160 / density
 ## Test account
 
 An owner-provided Boosty account with subscriptions is available. Credentials are never stored in the repository. Content coverage against spike prerequisite P2 is checked at spike start.
+
+## Spike report (Story 1.8, 2026-10-26)
+
+Compiled from the Story 1.2–1.7 results below (exit criteria in `docs/android-tv-auth-playback-spike.md` §3). Every device result was obtained on the pinned **physical** Chromecast with Google TV 4K. **No emulator was used**, so there are no emulator results to label. "Owner" means the owner with the physical remote or phone; "adb" means the agent with keys injected via adb. Real Boosty API with the owner's account throughout.
+
+Verdicts: **passed**, **failed**, **not verified** (the scenario ran but a required condition could not be produced), **not run**. «Passed after a fallback» means passed once the listed fallback was applied.
+
+**Exit criteria gap.** The spike plan (§3) and the Story 1.8 acceptance criteria allow only *passed* or *failed with a blocker*. **S7 and S9 meet neither**: nothing failed, but the condition needed to test them (a URL older than 24 h; an accessible audio or file post) was not produced, by owner decisions of 2026-10-25. The spike is therefore **not fully complete**. Going ahead requires the owner to accept S7 and S9 as *not verified, deferred* to the stories named below; that acceptance is part of the go/no-go.
+
+### Scenario verdicts
+
+| Scenario | Story | Verdict | Evidence (physical device) | Not covered |
+|---|---|---|---|---|
+| S1 website sign-in (fallback research) | — | **Not run** | Not triggered: S2 met no captcha, so the fallback was not needed | — |
+| S2 phone sign-in | 1.3 | **Passed** (owner) | Phone + code with the remote and the system keyboard → E1 200; code arrived via Telegram (`sentTransport=gate`); wrong code → 400 `invalid_sms_code`; resend too soon → 429 `sms_gate_ratelimit`; no captcha | Expired challenge, too many confirm attempts, `expiresIn` units. A longer server send limit (429 on a first send, about 2 h, Story 1.5) was observed once |
+| S3 token persistence | 1.3 | **Passed** (adb, owner) | Session survives kill, cold start and reboot; ADR 0006 gate passed (file corruption → helper → reset → save + read in the same process; ciphertext corruption; transient error keeps data) | Corruption hit first by a save: unit test only |
+| S4 refresh | 1.4 | **Passed** (adb) | 5 concurrent calls past expiry → exactly 1 refresh; 401 → 1 refresh → 1 retry; rotation on every refresh (single-use); rejected refresh = 400 `invalid_grant` → «expired», no loop | Real network drop during refresh (simulated only) |
+| S5 entitlement and errors | 1.5 | **Passed** (adb) | Accessible vs locked post on E4, E5, E8 (`hasAccess`, `data` vs `teaser`, `playerUrls`, duration); 401 and 404 bodies; locked content is a 200 with `hasAccess=false`; E8 without or with an invalid token = anonymous 200 | 403 and 429 on content endpoints not observed; E15 returned only 204 (no live stream) |
+| S6 authorized playback | 1.6 | **Passed after a fallback** (adb, owner) | First run **failed** (CDN 400 on every source with the web header profile). With E8 sent with the reference-like mobile profile: HLS → MP4 144p–1440p → DASH, position kept, TTFF 0.9–2.5 s; no Boosty auth on CDN hosts; picture, sound, Select and D-pad seek checked by the owner | Media keys (the remote has none); one decoder failure on adaptive HLS 1440p |
+| S7 media URL expiry | 1.6 | **Not verified** | `expires` = 24 h after E8 (measured); probe at 15 min → 200; the E8 re-resolve by `ok_video.id` resumed at the same position after other player errors | The CDN response to a really expired URL and recovery from it (owner skipped the long pauses; needs a pause over 24 h) |
+| S8 progress | 1.6 | **Passed** (adb, owner) | E9 every ~10 s of movement, on pause, exit and background; exit `t=1743` → next E8 `timeCode=1743`; the website offered the same position | — |
+| S9 audio and files | 1.7 | **Not verified** | No accessible `audio_file` or `file` in the 60 newest posts of each of the 3 subscribed blogs. `Post.signedQuery` measured on 131 posts: `user_id`, `content_id`, `expire_time` (24 h), `sign` | Audio play/pause/seek/sleep, file QR on a phone, enforcement of `expire_time` by audio/file hosts |
+| S10 logout | 1.4 | **Passed** (adb) | Store cleared and read back empty, also after cold start; `device_id` kept; no request after logout | Second-account isolation (no second account) |
+| S11 events | 1.5 | **Passed** (adb) | E18 → 200, `count{total, unread, byEventType}`, `updateTime`; EVT-01 endpoint reachable | Paging (1 event, no cursor); event types other than `target_new` |
+| Library compatibility | 1.2 | **Passed with fallbacks** (adb, owner) | JS stack navigation 50/50 push/pop in debug and release-like; keychain survives reboot; react-native-video HLS/DASH/MP4; Zod 4 in Hermes release bytecode; QR scanned by a phone | — |
+
+### Spike deliverables (plan §3)
+
+| Deliverable | Status |
+|---|---|
+| Per-scenario results in this file | Done (this report and the per-story sections below) |
+| `LIVE` entries in `docs/api-contract.md` | Done for §2.2, §2.3, §3, §4.1, §6, §7; open items in §8 |
+| ADR: sign-in method | **No ADR.** Recorded as owner decision Q1 in `docs/feature-parity.md` §12 and in `CLAUDE.md` |
+| ADR: secure storage | [ADR 0002](adr/0002-secure-storage-keychain.md), [ADR 0006](adr/0006-secure-storage-keychain-reset-helper.md) |
+| ADR: video library | **No ADR.** react-native-video 6.19.x is pinned in the architecture spine (AD-2 `PlayerEngine`, version table) and passed on the device (Stories 1.2, 1.6) |
+| ADR: refresh coordinator design | **No ADR.** Rules in the architecture spine AD-3 and the production requirements in `docs/api-contract.md` §2.3 |
+| Sanitized fixtures | Post (accessible, locked, missing), feed, blog posts, blog, subscriptions, events, no-token errors, live stream **204 only** (`src/test/fixtures/boosty/`). **Missing:** a poll fixture (no poll seen in the scanned posts) and a live-stream 200 body (no stream at the time) |
+
+The three missing ADRs are recorded elsewhere as decisions; the owner can accept that or ask for the ADRs before Epic 2.
+
+### Blockers and fallbacks
+
+**No release blocker was found.** Sign-in needs no captcha; playback, refresh and progress work on the real API.
+
+| Finding | Fallback taken | Record |
+|---|---|---|
+| native-stack intermittently fails to show a pushed screen (`MissingViewState`), debug and release-like | JS stack `@react-navigation/stack`, react-native-screens not rendered, per-screen focus trap and explicit restoration | [ADR 0005](adr/0005-native-stack-debug-build-push-defect.md) (superseded), [ADR 0007](adr/0007-navigation-js-stack.md), `docs/focus-map.md` §1.3, §1.6 |
+| react-native-keychain cannot recover from a corrupted storage file | Native helper deletes `RN_KEYCHAIN.preferences_pb`, then reset → signed-out; gate passed in Story 1.3 | [ADR 0006](adr/0006-secure-storage-keychain-reset-helper.md) |
+| CDN URLs are signed per client family (`srcAg` from the E8 User-Agent); the web desktop profile gives HTTP 400 on the player | Content requests that yield played URLs use the reference-like mobile Android profile | **No ADR yet.** The production header profile is undecided: auth and refresh were tested only with the web profile. To be decided with an ADR before the first production API story (Story 2.2); tracked in `_bmad-output/implementation-artifacts/deferred-work.md` (entry "Decide the production API header profile", Story 1.6) |
+| The physical remote delivers D-pad only as key up to `useTVEventHandler` | Raw D-pad handlers act on key up; the press that moves focus onto the player must not seek | `docs/focus-map.md` §1.1, deferred-work (Story 1.6) |
+| Zod 4 breaks the Metro release bundle without `@babel/plugin-transform-export-namespace-from` | Add the plugin with Zod on `main` | Story 1.2 results; deferred-work (Metro bundle check in CI) |
+
+### Open risks carried into later stories
+
+| Risk | Impact | Owner story |
+|---|---|---|
+| Header profile for auth and refresh vs content | A wrong profile breaks playback or sign-in | ADR before Story 2.2; used by 2.2, 2.5, 3.1 |
+| Server send limit for codes (window, threshold, phone vs IP unknown) | Sign-in blocked for about 2 h after a few sends; A9 must say so without a timer | Story 2.2 (A9), observed passively only |
+| Invalid token on content endpoints returns an anonymous 200, not 401 | Refresh would never fire from content calls | Story 2.5: validate the session with E1 at start and on resume |
+| Real signed-URL expiry unverified | Recovery after a pause over 24 h is unproven | Story 4.4 (one re-resolve via E8); a 24 h re-test is possible on the Story 1.6 spike branch |
+| Player resumed by itself after device wake; `t=0` E9 write during a source switch (fixed in the spike) | Unwanted playback; lost progress | Stories 4.2, 4.6 |
+| Adaptive HLS climbed above the decoder (1440p AVC High) once | Decoder error mid-playback | Stories 4.1, 4.3 (cap to the display and decoder) |
+| Media keys untested (no media keys on the remote) | Mapping may differ on other remotes | Story 4.1; unverified until such a remote is available |
+| Audio and file blocks unverified (no sample) | POST-06/POST-07 rest on reference code | Stories 6.3, 6.4 re-run the scan first (one press on `spike/1-7-audio-files`; a followed free blog with public audio/files would supply a sample) |
+| `Post.signedQuery` measured only with the web profile; it may depend on the profile like the video URLs | Audio and file links could fail with the chosen profile | Header-profile ADR (before Story 2.2); Stories 6.3, 6.4 |
+| Live shape and parity treatment of the `video` block (seen in accessible posts, REF only in api-contract §4.1) | An unknown block type in posts | Story 6.3 (external videos via QR) |
+| Second-account isolation not tested | Cross-account leakage | Story 2.8 |
+| Subscriptions beyond 30, E18 paging, feed cursor format unverified | Missing items or broken paging | Stories 3.2, 7.5, 3.1 |
+| JS stack keeps covered screens mounted (memory unmeasured on a 32-bit device with ~350 MB free) | Memory pressure with Shell + Post + Player | Story 9.3 |
+| Focus restoration by id on a long virtualized list unverified | Focus lands on the wrong card after Back | Story 2.4 (device) |
+
+### Recommendation
+
+**Go for Epic 2**, on three conditions: (1) the owner accepts S7 and S9 as not verified and deferred; (2) the owner accepts the missing ADRs and fixtures listed above, or asks for them first; (3) the header-profile ADR is written before Story 2.2 starts. Every scenario that Epic 2 depends on (S2, S3, S4, S10) passed on the physical device. The not-verified scenarios (S7, S9) and the open risks belong to later epics and are tracked above and in `_bmad-output/implementation-artifacts/deferred-work.md`.
+
+**Owner decision:** pending. Epic 2 production work starts only after the owner's explicit go.
 
 ## Results
 
