@@ -1,6 +1,6 @@
 # ADR 0002: Secure storage with react-native-keychain plus corruption recovery
 
-- Status: accepted (pending verification in spike S3)
+- Status: accepted, amended by [ADR 0006](0006-secure-storage-keychain-reset-helper.md) (native storage-reset helper for file-level corruption)
 - Date: 2026-10-25
 
 ## Context
