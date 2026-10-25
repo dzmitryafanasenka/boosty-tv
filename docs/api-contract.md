@@ -30,7 +30,7 @@ Rules:
 | Timeouts (reference) | connect 15 s, request 30 s, socket 30 s | `REF` |
 | `device_id` | A client-generated UUIDv4, persisted once per install and sent with refresh and phone auth | `REF` `SettingsRepository.getOrCreateDeviceId` |
 
-Whether Boosty requires the UA or web headers on normal API calls is **unverified**. The spike should test the minimal header set.
+Boosty TV decision: two request profiles, `auth` (phone auth, refresh: the web-style set) and `content` (every other call: mobile Android Chrome UA, `Accept`, Bearer), as in the reference. See [ADR 0008](adr/0008-api-request-profiles.md). The content profile is `LIVE` only for E8 so far; the other content endpoints are checked by the first production story that sends them.
 
 ## 2. Authentication
 
@@ -391,7 +391,7 @@ Retry policy for Boosty TV (our policy, not the reference's):
 
 1. The real lifetime behind `expires_in` (2592000 from phone auth and refresh) and the refresh-token lifetime. Rotation and the rejection signal are resolved (§2.3, Story 1.4). The `device_id`-mismatch and refresh-token-reuse questions are closed as not needed for production (owner decision 2026-10-25, §2.3).
 2. Phone auth (partly resolved in Story 1.3, see §2.2 "Live evidence"): still open are the expired-challenge shape, the confirm attempt limit, whether captcha can be demanded, the challenge `expiresIn` units, the exact server resend window (a resend was allowed at 32 s and rejected at 2–5 s), and the longer send limit (window, threshold, phone vs IP; §2.2 «Rate limit, longer window»).
-3. Minimal required headers (UA, `X-App`, `X-From-Id`) for normal calls and for refresh. Partly resolved: content requests whose media URLs are played must use the reference-like profile (mobile Android Chrome UA, no web headers), because the signed URLs follow the request's client family (Story 1.6, §6). Open: whether auth and refresh accept that profile, so one profile could serve every call. E9 was verified only with the web profile (Story 1.6 sent E9 with the web headers and E8 with the reference profile in the same session).
+3. Minimal required headers (UA, `X-App`, `X-From-Id`) for normal calls and for refresh. Partly resolved: content requests whose media URLs are played must use the reference-like profile (mobile Android Chrome UA, no web headers), because the signed URLs follow the request's client family (Story 1.6, §6). Decided without that test ([ADR 0008](adr/0008-api-request-profiles.md)): auth and refresh keep the verified web-style set; every other call uses the reference-like content profile. E9 was verified only with the web profile (Story 1.6 sent E9 with the web headers and E8 with the reference profile in the same session).
 4. Events (E18): shape and event types resolved (§3 «Live evidence (Story 1.5)»). Open: pagination (no cursor field in a 1-event response).
 5. ~~E8 with `comments_limit=0`~~: accepted, HTTP 200 (Story 1.5).
 6. ~~Signed media URL TTL~~: 24 h by `expires` (Story 1.6, §6). Still open: the CDN error after a real expiry (needs a pause over 24 h), and whether `signedQuery` for audio and files expires. Story 1.7: `Post.signedQuery` carries `expire_time` (epoch s) = **24 h** after the response on every accessible post (§4.1 «Live evidence (Story 1.7)»). Still open: whether audio/file hosts enforce it. No accessible `audio_file` or `file` block was found in the 60 newest posts of each of the 3 subscribed blogs, so audio playback, the file QR and the enforcement stay unverified.
