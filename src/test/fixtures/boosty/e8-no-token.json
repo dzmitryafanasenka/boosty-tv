@@ -1,0 +1,315 @@
+{
+  "case": "e8-no-token",
+  "status": 200,
+  "body": {
+    "teaser": [
+      {
+        "rendition": "",
+        "url": "https://example.invalid/image",
+        "size": 102400,
+        "isInvalid": null,
+        "id": "synthetic-id-3",
+        "type": "image",
+        "width": 575,
+        "height": 623
+      }
+    ],
+    "hasAccess": false,
+    "isWaitingVideo": false,
+    "updatedAt": 1700302400,
+    "contentCounters": [
+      {
+        "count": 5,
+        "type": "ok_video",
+        "size": 0
+      },
+      {
+        "size": 0,
+        "type": "text",
+        "count": 5
+      }
+    ],
+    "tags": [],
+    "price": 0,
+    "isRecord": false,
+    "hasAdultContent": false,
+    "showViewsCounter": false,
+    "frame": {
+      "next": null,
+      "previous": {
+        "id": "synthetic-id-12",
+        "title": "redacted",
+        "publishTime": 1700284400
+      }
+    },
+    "count": {
+      "likes": 5,
+      "comments": 5,
+      "reactions": {
+        "angry": 0,
+        "laught": 5,
+        "like": 5,
+        "wonder": 5,
+        "sad": 0,
+        "fire": 5,
+        "dislike": 0,
+        "heart": 5
+      }
+    },
+    "currencyDonations": {
+      "RUB": 0,
+      "EUR": 0,
+      "USD": 0
+    },
+    "subscriptionLevel": {
+      "id": 1011,
+      "price": 5,
+      "data": [
+        {
+          "width": 240,
+          "height": 150,
+          "id": "synthetic-id-8",
+          "type": "image",
+          "isInvalid": null,
+          "rendition": "",
+          "url": "https://example.invalid/image",
+          "size": 102400
+        },
+        {
+          "modificator": "",
+          "content": "[\"Sample text\",\"unstyled\",[]]",
+          "type": "text"
+        },
+        {
+          "type": "text",
+          "modificator": "BLOCK_END",
+          "content": ""
+        },
+        {
+          "modificator": "",
+          "content": "[\"Sample text\",\"unstyled\",[]]",
+          "type": "text"
+        },
+        {
+          "content": "",
+          "modificator": "BLOCK_END",
+          "type": "text"
+        }
+      ],
+      "deleted": false,
+      "flags": {
+        "isArchived": false,
+        "isLimited": false,
+        "isHidden": false
+      },
+      "isHidden": false,
+      "createdAt": 1700014400,
+      "isLimited": false,
+      "ownerId": 1002,
+      "name": "redacted",
+      "currencyPrices": {
+        "USD": 5,
+        "EUR": 5,
+        "RUB": 5
+      },
+      "promos": [],
+      "isArchived": false
+    },
+    "hasAIContent": false,
+    "signedQuery": "",
+    "int_id": 1010,
+    "advertiserInfo": null,
+    "isLiked": false,
+    "currencyPrices": {
+      "USD": 0,
+      "RUB": 0,
+      "EUR": 0
+    },
+    "isPinned": false,
+    "bundleIds": [],
+    "id": "synthetic-id-4",
+    "isBlocked": false,
+    "intId": 1010,
+    "donations": 0,
+    "forbiddenChangeHasAIContent": false,
+    "reactionsDisabled": false,
+    "isShowcaseVisible": false,
+    "data": [],
+    "isDeleted": false,
+    "publishTime": 1700298800,
+    "isCommentsDenied": false,
+    "donators": {
+      "extra": {
+        "isLast": true
+      },
+      "data": []
+    },
+    "reactionCounters": [
+      {
+        "count": 5,
+        "type": "like"
+      },
+      {
+        "count": 0,
+        "type": "dislike"
+      },
+      {
+        "count": 5,
+        "type": "fire"
+      },
+      {
+        "count": 5,
+        "type": "heart"
+      },
+      {
+        "count": 5,
+        "type": "laugh"
+      },
+      {
+        "type": "laught",
+        "count": 0
+      },
+      {
+        "type": "wonder",
+        "count": 5
+      },
+      {
+        "type": "sad",
+        "count": 0
+      },
+      {
+        "count": 0,
+        "type": "angry"
+      },
+      {
+        "type": "funny",
+        "count": 0
+      },
+      {
+        "count": 0,
+        "type": "check"
+      },
+      {
+        "type": "thinking",
+        "count": 0
+      },
+      {
+        "count": 0,
+        "type": "clown"
+      },
+      {
+        "count": 0,
+        "type": "swearing"
+      },
+      {
+        "type": "applause",
+        "count": 0
+      },
+      {
+        "type": "call-me",
+        "count": 0
+      },
+      {
+        "count": 0,
+        "type": "cold"
+      },
+      {
+        "count": 0,
+        "type": "eggplant"
+      },
+      {
+        "type": "blowing-up",
+        "count": 0
+      },
+      {
+        "type": "scream",
+        "count": 0
+      },
+      {
+        "count": 0,
+        "type": "crown"
+      },
+      {
+        "type": "diamond",
+        "count": 0
+      },
+      {
+        "count": 0,
+        "type": "melting"
+      },
+      {
+        "type": "money",
+        "count": 0
+      },
+      {
+        "count": 0,
+        "type": "nausea"
+      },
+      {
+        "count": 0,
+        "type": "confetti"
+      },
+      {
+        "count": 0,
+        "type": "banana"
+      },
+      {
+        "type": "peach",
+        "count": 0
+      },
+      {
+        "count": 0,
+        "type": "pizza"
+      },
+      {
+        "type": "love",
+        "count": 0
+      },
+      {
+        "type": "rocket",
+        "count": 0
+      },
+      {
+        "count": 0,
+        "type": "splash"
+      },
+      {
+        "type": "lightning",
+        "count": 0
+      },
+      {
+        "type": "cry",
+        "count": 0
+      },
+      {
+        "type": "folded-hands",
+        "count": 0
+      }
+    ],
+    "isMarketing": false,
+    "sortOrder": 5,
+    "isPublished": true,
+    "user": {
+      "avatarUrl": "https://example.invalid/avatar",
+      "currency": "redacted",
+      "hasAvatar": true,
+      "name": "redacted",
+      "isOfficial": false,
+      "flags": {
+        "showPostDonations": false
+      },
+      "id": 1002,
+      "blogUrl": "synthetic-blog-1"
+    },
+    "createdAt": 1700298800,
+    "title": "redacted",
+    "promo": null,
+    "comments": {
+      "extra": {
+        "isLast": true,
+        "isFirst": true
+      },
+      "data": []
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "case": "e8-missing-post",
+  "status": 404,
+  "body": {
+    "error": "not_found",
+    "error_description": "redacted"
+  }
+}

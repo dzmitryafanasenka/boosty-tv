@@ -1,0 +1,8 @@
+{
+  "case": "e3-missing-blog",
+  "status": 404,
+  "body": {
+    "error": "blog_not_found",
+    "error_description": "redacted"
+  }
+}

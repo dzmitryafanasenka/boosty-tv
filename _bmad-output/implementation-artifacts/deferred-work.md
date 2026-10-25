@@ -30,9 +30,28 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-4-spike-refresh-and-logout-behavior.md`
   summary: Settle the device_id dependency and refresh-token reuse detection on a fresh session (refresh with a foreign device_id first, then with the real one), and test a real network drop during refresh.
   evidence: The Story 1.4 device_id result is ambiguous because a rotated-out token had been reused just before; real network loss was only simulated. Needs owner approval; proposed at the start of Story 1.5 after re-sign-in.
+  note: Story 1.5 (owner decision 2026-10-25) closed the device_id and reuse-detection parts as not needed for production, with no requests (api-contract §2.3/§8). Only the real network drop during refresh remains open.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-4-spike-refresh-and-logout-behavior.md`
   summary: Second-account isolation check for S10 (sign in as a different Boosty account after logout and confirm that no data from the first account is visible).
   evidence: No second account was available; required by CLAUDE.md (no cross-account leakage). Story 2.8 covers it in production.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-4-spike-refresh-and-logout-behavior.md`
   summary: Production refresh-coordinator tests: a late 401 after another caller's completed refresh (staggered timing), signOut/reload during an in-flight refresh, save failure on adopt, and expires_in edge values.
   evidence: The spike tests use uniform delays and sequential calls; requirements are listed in api-contract §2.3.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-5-spike-entitlement-errors-and-events-shapes.md`
+  summary: Check whether content endpoints (E4/E5/E8) return 401 or an anonymous 200 for an expired or invalid access token, before the production session story.
+  evidence: Story 1.5 saw 200 anonymous for a missing token on E8 and 401 on E1 for a corrupted token (1.4). If content endpoints answer 200 for a bad token, refresh would never fire. One E8 request with a corrupted Bearer settles it.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-5-spike-entitlement-errors-and-events-shapes.md`
+  summary: E18 events pagination and E2 subscriptions paging beyond 30 are unverified.
+  evidence: Story 1.5 saw 1 event with no cursor field, and 3 subscriptions with top-level offset/limit/total. Needs an account with more events and subscriptions.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-5-spike-entitlement-errors-and-events-shapes.md`
+  summary: Phone-auth send limit (sms_gate_ratelimit on a first send) — window, threshold, and phone vs IP key are unknown.
+  evidence: Story 1.5 sign-in was blocked about 2 h after 2 successful codes; the website got the same 429; it lifted at 19:45. Observe passively only; never trigger it on purpose.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-5-spike-entitlement-errors-and-events-shapes.md`
+  summary: Feed cursor (`extra.offset`) format is not recorded; fixtures carry it as a placeholder, so pagination-merge tests need synthetic cursors.
+  evidence: The sanitizer replaces every string; the spike did not log the cursor structure. A shape-only log (character classes, separators) on a later run would settle it.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-5-spike-entitlement-errors-and-events-shapes.md`
+  summary: Fixture number rules live in two copies (contentShapesApi.ts sanitizer and scripts/check-fixtures.mjs), joined by a comment and a cross-check test only.
+  evidence: The production fixture tooling should share one rules module when the sanitizer moves out of the spike.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-5-spike-entitlement-errors-and-events-shapes.md`
+  summary: E15 live-stream 200 shape (an active stream) is unverified; both checked blogs returned 204.
+  evidence: Needs a run while a subscribed blog is streaming.

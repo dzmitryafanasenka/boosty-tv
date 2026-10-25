@@ -1,0 +1,339 @@
+{
+  "case": "e2-subscriptions",
+  "status": 200,
+  "body": {
+    "offset": 0,
+    "limit": 30,
+    "total": 5,
+    "data": [
+      {
+        "id": 1001,
+        "onTime": 1700032400,
+        "price": 5,
+        "isArchived": false,
+        "period": 1,
+        "isSuspended": false,
+        "canBePaused": true,
+        "canManualRecurrent": true,
+        "externalApps": {
+          "telegram": {
+            "groups": [],
+            "isJoined": false
+          },
+          "max": {
+            "isJoined": false,
+            "groups": []
+          }
+        },
+        "isFeePaid": false,
+        "isPaused": false,
+        "isApplePayed": false,
+        "blog": {
+          "acceptedCurrencies": [
+            "redacted",
+            "redacted",
+            "redacted"
+          ],
+          "title": "redacted",
+          "currency": "redacted",
+          "blogUrl": "synthetic-blog-1",
+          "flags": {
+            "hasSubscriptionLevels": true,
+            "isShowcaseEnabled": true,
+            "hasTargets": true,
+            "showPostDonations": false,
+            "allowGoogleIndex": true,
+            "isRssFeedEnabled": true,
+            "isContentSaleDisabled": false,
+            "allowIndex": true,
+            "hasAdultContent": false,
+            "forbiddenChangeHasAIContent": false,
+            "acceptDonationMessages": false,
+            "hasAIContent": false,
+            "isAlien": false,
+            "forbiddenChangeHasAdultContent": false
+          },
+          "coverUrl": "https://example.invalid/url",
+          "owner": {
+            "hasAvatar": true,
+            "name": "redacted",
+            "avatarUrl": "https://example.invalid/avatar",
+            "id": 1002,
+            "isOfficial": false
+          },
+          "hasAdultContent": false
+        },
+        "nextPayTime": 1700334800,
+        "isPause": false,
+        "parentId": null,
+        "name": "redacted",
+        "offTime": null,
+        "levelId": 1003,
+        "subscriptionLevel": {
+          "id": 1003,
+          "price": 5,
+          "isArchived": false,
+          "isHidden": false,
+          "data": [
+            {
+              "height": 1606,
+              "type": "image",
+              "size": 819200,
+              "rendition": "",
+              "isInvalid": null,
+              "url": "https://example.invalid/image",
+              "width": 1822,
+              "id": "synthetic-id-1"
+            },
+            {
+              "type": "text",
+              "content": "[\"Sample text\",\"unstyled\",[]]",
+              "modificator": ""
+            },
+            {
+              "type": "text",
+              "content": "",
+              "modificator": "BLOCK_END"
+            }
+          ],
+          "deleted": false,
+          "isLimited": false,
+          "flags": {
+            "isHidden": false,
+            "isArchived": false,
+            "isLimited": false
+          },
+          "createdAt": 1700025200,
+          "name": "redacted",
+          "currencyPrices": {
+            "USD": 5,
+            "RUB": 5,
+            "EUR": 5
+          },
+          "ownerId": 1002
+        },
+        "currencyPrices": {
+          "USD": 5,
+          "RUB": 5,
+          "EUR": 5
+        },
+        "ownerId": 1002
+      },
+      {
+        "isSuspended": false,
+        "isArchived": false,
+        "period": 1,
+        "id": 1004,
+        "onTime": 1700028800,
+        "price": 0,
+        "subscriptionLevel": {
+          "id": 1005,
+          "price": 0,
+          "isArchived": false,
+          "isHidden": false,
+          "data": [],
+          "isLimited": false,
+          "deleted": false,
+          "flags": {
+            "isHidden": false,
+            "isArchived": false,
+            "isLimited": false
+          },
+          "createdAt": 1700000000,
+          "name": "redacted",
+          "currencyPrices": {
+            "USD": 0,
+            "EUR": 0,
+            "RUB": 0
+          },
+          "ownerId": 1006
+        },
+        "currencyPrices": {
+          "USD": 0,
+          "RUB": 0,
+          "EUR": 0
+        },
+        "ownerId": 1006,
+        "nextPayTime": null,
+        "isPause": false,
+        "parentId": null,
+        "name": "redacted",
+        "offTime": null,
+        "levelId": 1005,
+        "blog": {
+          "coverUrl": "https://example.invalid/url",
+          "flags": {
+            "hasSubscriptionLevels": true,
+            "isShowcaseEnabled": true,
+            "hasTargets": true,
+            "showPostDonations": true,
+            "isRssFeedEnabled": false,
+            "allowGoogleIndex": true,
+            "isContentSaleDisabled": false,
+            "allowIndex": true,
+            "hasAdultContent": false,
+            "forbiddenChangeHasAIContent": false,
+            "acceptDonationMessages": true,
+            "hasAIContent": false,
+            "isAlien": false,
+            "forbiddenChangeHasAdultContent": false
+          },
+          "blogUrl": "synthetic-blog-2",
+          "owner": {
+            "name": "redacted",
+            "avatarUrl": "https://example.invalid/avatar",
+            "id": 1006,
+            "isOfficial": false,
+            "hasAvatar": true
+          },
+          "hasAdultContent": false,
+          "acceptedCurrencies": [
+            "redacted",
+            "redacted",
+            "redacted"
+          ],
+          "currency": "redacted",
+          "title": "redacted"
+        },
+        "canManualRecurrent": false,
+        "canBePaused": false,
+        "externalApps": {
+          "max": {
+            "isJoined": false,
+            "groups": []
+          },
+          "telegram": {
+            "groups": [],
+            "isJoined": false
+          }
+        },
+        "isFeePaid": false,
+        "isPaused": false,
+        "isApplePayed": false
+      },
+      {
+        "isSuspended": false,
+        "id": 1007,
+        "onTime": 1700021600,
+        "price": 5,
+        "period": 1,
+        "isArchived": false,
+        "isPause": false,
+        "nextPayTime": 1700338400,
+        "levelId": 1008,
+        "offTime": null,
+        "name": "redacted",
+        "parentId": null,
+        "currencyPrices": {
+          "RUB": 5,
+          "EUR": 5,
+          "USD": 5
+        },
+        "subscriptionLevel": {
+          "ownerId": 1009,
+          "currencyPrices": {
+            "EUR": 5,
+            "RUB": 5,
+            "USD": 5
+          },
+          "name": "redacted",
+          "createdAt": 1700018000,
+          "flags": {
+            "isHidden": true,
+            "isArchived": false,
+            "isLimited": false
+          },
+          "isLimited": false,
+          "deleted": false,
+          "data": [
+            {
+              "url": "https://example.invalid/image",
+              "isInvalid": null,
+              "size": 102400,
+              "rendition": "",
+              "id": "synthetic-id-2",
+              "width": 240,
+              "height": 150,
+              "type": "image"
+            },
+            {
+              "type": "text",
+              "modificator": "",
+              "content": "[\"Sample text\",\"unstyled\",[]]"
+            },
+            {
+              "type": "text",
+              "modificator": "BLOCK_END",
+              "content": ""
+            },
+            {
+              "content": "[\"Sample text\",\"unstyled\",[]]",
+              "modificator": "",
+              "type": "text"
+            },
+            {
+              "type": "text",
+              "modificator": "BLOCK_END",
+              "content": ""
+            }
+          ],
+          "isHidden": true,
+          "isArchived": false,
+          "price": 5,
+          "id": 1008
+        },
+        "ownerId": 1009,
+        "externalApps": {
+          "telegram": {
+            "groups": [],
+            "isJoined": false
+          },
+          "max": {
+            "groups": [],
+            "isJoined": false
+          }
+        },
+        "canManualRecurrent": true,
+        "canBePaused": true,
+        "isPaused": false,
+        "isApplePayed": false,
+        "isFeePaid": false,
+        "blog": {
+          "title": "redacted",
+          "currency": "redacted",
+          "acceptedCurrencies": [
+            "redacted",
+            "redacted",
+            "redacted"
+          ],
+          "owner": {
+            "hasAvatar": true,
+            "name": "redacted",
+            "avatarUrl": "https://example.invalid/avatar",
+            "id": 1009,
+            "isOfficial": false
+          },
+          "hasAdultContent": false,
+          "blogUrl": "synthetic-blog-3",
+          "coverUrl": "https://example.invalid/url",
+          "flags": {
+            "isAlien": false,
+            "forbiddenChangeHasAdultContent": false,
+            "hasAIContent": false,
+            "isContentSaleDisabled": false,
+            "isRssFeedEnabled": true,
+            "allowGoogleIndex": true,
+            "hasAdultContent": false,
+            "forbiddenChangeHasAIContent": false,
+            "allowIndex": true,
+            "acceptDonationMessages": true,
+            "hasSubscriptionLevels": true,
+            "isShowcaseEnabled": false,
+            "hasTargets": true,
+            "showPostDonations": true
+          }
+        }
+      }
+    ]
+  }
+}
