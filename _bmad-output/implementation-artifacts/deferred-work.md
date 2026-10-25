@@ -40,6 +40,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-5-spike-entitlement-errors-and-events-shapes.md`
   summary: Check whether content endpoints (E4/E5/E8) return 401 or an anonymous 200 for an expired or invalid access token, before the production session story.
   evidence: Story 1.5 saw 200 anonymous for a missing token on E8 and 401 on E1 for a corrupted token (1.4). If content endpoints answer 200 for a bad token, refresh would never fire. One E8 request with a corrupted Bearer settles it.
+  note: Resolved in Story 1.6 (2026-10-25): E8 with a synthetic Bearer returns HTTP 200 as an anonymous viewer, not 401 (api-contract §7). The production session must validate the token via E1 at start and on resume; the session story owns that.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-5-spike-entitlement-errors-and-events-shapes.md`
   summary: E18 events pagination and E2 subscriptions paging beyond 30 are unverified.
   evidence: Story 1.5 saw 1 event with no cursor field, and 3 subscriptions with top-level offset/limit/total. Needs an account with more events and subscriptions.
@@ -55,3 +56,30 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-5-spike-entitlement-errors-and-events-shapes.md`
   summary: E15 live-stream 200 shape (an active stream) is unverified; both checked blogs returned 204.
   evidence: Needs a run while a subscribed blog is streaming.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-6-spike-authorized-playback-expiry-and-progress-round-trip.md`
+  summary: Observe the CDN response after a real signed-URL expiry (pause over 24 h, then probe and play) and confirm one E8 re-resolve recovers it.
+  evidence: Story 1.6 measured `expires` = 24 h; the 30 min and ≥2 h pauses were skipped by the owner because they cannot reach expiry. The re-resolve path worked after other player errors.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-6-spike-authorized-playback-expiry-and-progress-round-trip.md`
+  summary: Production player: act on D-pad key up for seek, ignore a key up whose key down happened before the player got focus, and accumulate the target of repeated presses during an in-flight seek.
+  evidence: Story 1.6 device run: the physical remote delivers only key up for left/right to useTVEventHandler; moving focus onto the player fired a seek; presses during a seek were computed from a stale position.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-6-spike-authorized-playback-expiry-and-progress-round-trip.md`
+  summary: Production player: stay paused after the app returns from background or device sleep, and do not write E9 or keep a position until a new source has reached its start position.
+  evidence: Story 1.6: after KEYCODE_WAKEUP playback resumed by itself; during a quality switch the spike wrote time_code=0 before the seek-after-load (fixed in the spike only).
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-6-spike-authorized-playback-expiry-and-progress-round-trip.md`
+  summary: Production player: cap adaptive HLS/DASH selection to the display and decoder (the Chromecast decoder failed once on 2560x1440 AVC High from adaptive HLS).
+  evidence: Story 1.6: ERROR_CODE_DECODING_FAILED once on adaptive HLS 1440p right after a seek; MP4 1440p played fine; the E8 re-resolve recovered.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-6-spike-authorized-playback-expiry-and-progress-round-trip.md`
+  summary: Decide the production API header profile: content requests must use the reference-like mobile Android profile for playable URLs; check whether phone auth and refresh work with it (one profile for all calls) or keep the web profile there.
+  evidence: Story 1.6: URLs fetched with the web desktop profile (srcAg=CHROME_MAC) return HTTP 400 on the device player; the reference-like profile (srcAg=CHROME_ANDROID) plays. Auth/refresh were only tested with the web profile (1.3/1.4).
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-6-spike-authorized-playback-expiry-and-progress-round-trip.md`
+  summary: Production progress writes: serialize E9 (or ignore completions older than the newest sent), do not rely on a background/exit write completing, and decide whether a local `{postId, mediaId, positionSeconds}` copy reconciles on next start.
+  evidence: Story 1.6 review: event writes are not serialized with progress writes, so an older PUT can land last; the background E9 during device sleep only completed after wake (testing.md sleep/wake row).
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-6-spike-authorized-playback-expiry-and-progress-round-trip.md`
+  summary: Production player: fall back when the re-resolved post no longer offers the same quality type (HLS or nearest), start over when `timeCode` is at or near the end, and clear the start-pending gate even if the seek-after-load lands more than 2 s from the target.
+  evidence: Story 1.6 review: the spike stops on `no-type`, starts a finished video at its end, and keeps ignoring positions if the seek snaps away from the start (not observed: Media3 seeks landed exactly).
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-6-spike-authorized-playback-expiry-and-progress-round-trip.md`
+  summary: Media keys: verify key-down/key-up semantics of `useTVEventHandler` for media keys and define stop/next/previous, on a remote or keyboard that has media keys.
+  evidence: Story 1.6: the Chromecast with Google TV remote has no media keys; the D-pad delivers only key up, so the spike's key-down media handling is unverified.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-6-spike-authorized-playback-expiry-and-progress-round-trip.md`
+  summary: Update docs/feature-parity.md PLAY-01/03/04 with the Story 1.6 device evidence (playback formats, resume from timeCode, E9 round-trip, re-resolve) when Story 1.8 compiles the spike results.
+  evidence: Story 1.6 review: the parity matrix still shows these as reference-only evidence.
