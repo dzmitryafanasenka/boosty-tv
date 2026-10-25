@@ -1,0 +1,9 @@
+# Non-app content (planning artifacts, BMAD installer, design exports)
+_bmad/
+_bmad-output/
+.claude/
+docs/
+
+# Build output
+android/
+coverage/
