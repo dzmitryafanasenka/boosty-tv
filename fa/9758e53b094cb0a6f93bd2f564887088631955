@@ -1,0 +1,19 @@
+_bmad-output/implementation-artifacts/spec-1-8-focus-map-and-spike-decision.md
+  s_fce05da352b4dc::t_4ec804bb710af5 39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "fa9758e53b094cb0a6f93bd2f564887088631955",
+  "prompts": {},
+  "sessions": {
+    "s_fce05da352b4dc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1d96fc39-0a81-40cc-a1ff-5557f210c17b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
