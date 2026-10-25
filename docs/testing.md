@@ -187,3 +187,53 @@ Build-time findings:
 Host checks on the spike branch: `npm run lint -- --max-warnings 0`, `npm run typecheck`, `npm test` (5 suites, 47 tests) pass; `./gradlew assembleDebug assembleRelease` BUILD SUCCESSFUL.
 
 Per-scenario results for `docs/android-tv-auth-playback-spike.md` go here. Physical-device and emulator results are labeled separately.
+
+### Story 1.3 — phone sign-in and token persistence (physical device), 2026-10-25
+
+**Review follow-ups (2026-10-25):**
+- Before the fix, logcat lines contained the country code and the last 4 digits of the owner's phone (from the masked hint). The device log buffer was cleared (`adb logcat -c`) and local copies were deleted. The fixed build was not reinstalled on the device, so there is no post-fix device rescan; the fix is covered by a unit test.
+- The logcat token scan was re-run with a wider pattern (`[A-Za-z0-9._~+/=-]{60,}`) on the app's log lines. The only matches were file paths and package names; no tokens. Future scans should also look for partial phone numbers (country code plus trailing digits).
+- `spikeSecureStore.clear()` (session clear / logout path) is unit-tested only and was not exercised on the device. Handed to Story 1.4.
+
+Branch `spike/1-3-phone-auth` (throwaway). Device: the pinned Chromecast with Google TV 4K, wireless adb. Spike screen «Вход по телефону» (`src/app/spike/PhoneAuthCheck.tsx`), first entry of the spike menu. Tokens go through the spike SecureStore wrapper (`spikeSecureStore.ts`: react-native-keychain 10.0.0 + ADR 0006 classification + native `KeychainStorageReset.deleteKeychainStorage()`). The install-scoped `device_id` is a UUIDv4 kept in a non-secret SharedPreferences file by the native `InstallId` module.
+
+**Builds:** `./gradlew assembleDebug assembleRelease -PreactNativeArchitectures=armeabi-v7a` BUILD SUCCESSFUL. Release-like = `zipalign -p 4` + `apksigner` with the SDK debug key, outside the repo. The storage matrix ran on the **debug** build, because `run-as` (needed to corrupt the file) only works on a debuggable package. The release-like build was then installed over it (same key, data kept) for the owner's sign-in.
+
+**Host checks:** `npm run lint -- --max-warnings 0`, `npm run typecheck`, `npm test` (8 suites, 106 tests) pass. Unit tests cover the store classification and the helper path (mocked), request building (form encoding, headers, E.164), the sanitizers (no values leak), masking, and a flow test of the screen with mocked `fetch` (send → code → confirm → E1 → save; E1 failure saves nothing; wrong code; captcha stop; resend with `transport=gate`).
+
+"Keys injected via adb" means `adb shell input keyevent`; outcomes were read from `adb logcat -s ReactNativeJS`, `uiautomator dump` and screenshots. No owner or physical-remote check is included unless stated. No Boosty API request was made by the agent.
+
+| Check | Build | Result | How observed |
+|---|---|---|---|
+| Menu → «Вход по телефону»; initial focus on «Получить код»; UP reaches the phone field; DOWN walks every control to «Назад в меню»; RIGHT reaches the log ScrollView, LEFT returns; Back returns to the menu | debug, release-like | Pass | uiautomator focus dump; keys injected via adb |
+| OK on the phone field opens the system keyboard (numeric panel); Back closes the keyboard first and keeps focus on the field | debug, release-like | Pass | Screenshot, `dumpsys input_method` (`mInputShown=true`); keys injected via adb |
+| Phone field is a password field; the screen shows only the masked hint (fake number typed via `adb shell input text` → `+375 •• ••• 00 00`) | release-like | Pass. With `keyboardType="phone-pad"` the field ignored `secureTextEntry` and showed the digits in clear (found and fixed: now `number-pad` + `secureTextEntry` = Android numberPassword). Android still shows the last typed digit for about a second (system password behavior) | Screenshot, uiautomator (`password="true"`, text shown as bullets) |
+| Code-phase screen (code field, «Войти», «Отправить код повторно», «Сменить номер») | release-like | Not reached by the agent (it needs a real send). Used by the owner in the session below | Owner, physical remote; Jest |
+| Storage: save → read (dummy value, separate service) | debug | Pass (`KeystoreAESGCM_NoAuth`) | logcat |
+| Storage: value survives force-stop + cold start | debug, release-like | Pass (also across the debug → release-like reinstall) | logcat (read on screen mount) |
+| Storage: transient error (in-app «Тест: временная ошибка», a forced generic error) → «recoverable storage error», data kept, `retriesLeft=1`; «Повторить чтение» → value returned; not signed out | debug | Pass | logcat, uiautomator |
+| Storage: ciphertext corruption (one base64 character of the stored value changed in `RN_KEYCHAIN.preferences_pb` via `run-as`, app stopped) → cold start | debug | Pass — `E_CRYPTO_FAILED CryptoFailedException` → classified `value-undecryptable` → reset (helper not called) → signed-out; then save + read in the same process work | logcat |
+| Storage: file corruption (the file overwritten with 618 random bytes via `run-as`, app stopped) → cold start | debug | **Pass (ADR 0006 gate, same process)** — read rejects with `E_UNKNOWN_ERROR` + `androidx.datastore.core.CorruptionException: Unable to parse preferences proto` → classified `storage-unreadable` → helper deleted the file (`fileDeleted=true`) → reset OK → signed-out; the other service then read `empty` without error; save + read of a new value succeeded **in the same process** (same pid); the value also survived a later force-stop + cold start | logcat, `run-as ls files/datastore`, `pidof` |
+| Storage: corruption hit first by a **save** | — | Not run on the device (the screen always reads first). Unit-tested only | Jest |
+| `device_id`: generated once, unchanged across cold starts, reinstall and both corruption runs (helper deletes only the keychain file) | debug, release-like | Pass (only the last 4 characters are logged) | logcat |
+| logcat during the agent's runs: no fake phone digits typed in the test, no `eyJ` | release-like | Pass (only fake values existed; see the owner-session scan below) | `adb logcat -d \| grep` |
+
+**Owner session — release-like build, physical device, 2026-10-25 (S2/S3).** The owner typed the phone and the codes with the physical remote and the system keyboard. Statuses and shapes come from the spike's sanitized log. The response shapes are recorded in `docs/api-contract.md` §2.2 "Live evidence".
+
+| Scenario | Steps | Result |
+|---|---|---|
+| S2 sign-in | Phone + code with the remote and the system keyboard → «Сессия сохранена» (E1 HTTP 200, `storage=KeystoreAESGCM_NoAuth`) | **Pass (owner, physical remote)** |
+| S2 code delivery | Where the code arrived; `sentTransport`; `expiresIn` | Telegram (owner-reported); `sentTransport=gate` even on the first send; `expiresIn=604800` (units unverified: about 10 min in ms or 7 days in s) |
+| S2 resend | «Отправить код повторно» 32 s after the send | HTTP 200, a new challenge issued |
+| S2 resend too soon | Resend 2 s and 5 s after the previous resend (pressed three times in total, not once) | HTTP 429 `sms_gate_ratelimit` (both) |
+| S2 wrong code (once) | Wrong code → «Войти» | HTTP 400 `invalid_sms_code`; the code field cleared for retyping |
+| S2 correct code | Latest challenge, 31 s after the resend | HTTP 200, tokens (64-character opaque, not JWT), `expires_in=2592000` |
+| S2 expired code | Wait past `expiresIn`, then enter the real code | **Not verified** (the code was entered within the window) |
+| S2 too many attempts | — | Not triggered (owner decision 2026-10-25); shape unverified |
+| S2 captcha | — | Not observed |
+| S3 kill / cold start | Force-stop, start, «Проверить сессию» | **Pass** — session present, «Сессия действительна (E1 HTTP 200)» |
+| S3 reboot | `adb reboot` (uptime 1 min afterwards; adb reconnected automatically via mDNS, no new port), cold start, «Проверить сессию» | **Pass** — session present, E1 HTTP 200, `device_id` unchanged |
+| ADR 0006 matrix: reboot | Covered by the S3 reboot row | **Pass** — the gate is fully passed |
+| logcat secret scan | Full `adb logcat -d` after sign-in and again after the reboot, searched locally (matches never recorded): full phone-number patterns (country code + 9 digits), alphanumeric runs of 60+ characters (the tokens are 64-character opaque strings, so the earlier `eyJ` JWT check means nothing here), `Bearer ` | **Pass** — 0 matches for each pattern |
+
+Finding after the session: the debug log line for a successful send contained the masked phone hint (country code and the last 4 digits). Fixed: the masked hint stays on screen only; the log line says "phone hint shown" and carries no phone digits (covered by `PhoneAuthCheck.test.tsx`). The logcat scan above looked for full numbers, so it did not catch this partial-digit line.

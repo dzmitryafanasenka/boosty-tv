@@ -1,6 +1,6 @@
 # ADR 0006: Keep react-native-keychain and add a native storage-reset helper
 
-- Status: accepted by the owner (2026-10-25), with a verification gate. If the gate fails, the own Keystore module described under Alternatives applies.
+- Status: accepted by the owner (2026-10-25), with a verification gate. If the gate fails, the own Keystore module described under Alternatives applies. Gate: **passed** on the device (2026-10-25, see "Gate result").
 - Date: 2026-10-25
 - Amends: [ADR 0002](0002-secure-storage-keychain.md). The library choice stays; the corruption-recovery mechanism is added.
 
@@ -49,5 +49,18 @@ If the library's in-process DataStore cannot recover without a restart, or the f
 - **expo-secure-store.** Needs Expo, which requires owner approval. Not tested.
 
 ## Consequences
+- File-level recovery deletes the whole shared DataStore file, so it wipes **every** react-native-keychain entry, not only the failing service. Keep only data that may be lost together (session tokens, stored phone) in react-native-keychain.
+- The production helper must check the result of `file.delete()` (not only `!exists()`), also remove a leftover `RN_KEYCHAIN.preferences_pb.tmp` if present, and report a non-sensitive failure reason. The spike helper did neither.
 - The helper depends on the library's private file name (`RN_KEYCHAIN.preferences_pb`). Pin the library version, and re-run the gate on every keychain update.
 - tvOS (phase 4) still needs a Keychain adapter; the port does not change.
+
+## Gate result (Story 1.3, 2026-10-25): passed
+Run on the pinned Chromecast with Google TV 4K, debug build (file edits need `run-as`), branch `spike/1-3-phone-auth`. Details are in `docs/testing.md` (Story 1.3).
+
+- The helper is `KeychainStorageResetModule.deleteKeychainStorage()` (deletes only `files/datastore/RN_KEYCHAIN.preferences_pb`). On the JS side the rejection is `code=E_UNKNOWN_ERROR` with `androidx.datastore.core.CorruptionException` in the message; the classification matches on that class name.
+- **File corruption: passed in the same process.** After the file was overwritten with random bytes, the first read rejected with `CorruptionException`; the helper deleted the file, reset succeeded, the result was «signed-out», and then `set` + `get` of a new value worked in the same process with no restart. The value also survived a later force-stop + cold start.
+- Ciphertext corruption: passed (`CryptoFailedException` → reset → signed-out; save and read work afterwards).
+- Transient non-corruption error (forced in the app): data kept, recoverable error, one retry, no sign-out.
+- Kill and cold start: passed.
+- Reboot: passed (release-like build, owner session with a real session). After `adb reboot` and a cold start, the stored session was read and E1 returned 200; `device_id` was unchanged.
+- Result: the full matrix passes, so the own Keystore module alternative is not needed. Re-run the gate on every react-native-keychain update.
