@@ -36,6 +36,7 @@ context:
 - The header-profile fallback (S6) has no ADR yet; the report says so and puts the ADR before Story 2.2.
 - After review: the report states that S7 and S9 do not meet the plan's passed/failed exit criteria and makes the owner's acceptance a Go condition; added a deliverables table (no ADR for the sign-in method, the video library or the refresh coordinator; no poll or live-200 fixture); Live notes extended to AUTH-03..07, POST-08, PLAY-10 and EVT-01 with a stated rule. The focus map got sign-in, dialog, period and player ids, block keys from the fixtures (`text`/`link`/`list` have no id), the AudioBlock ← exception, the AD-19 audio/video rule, settings submenu, diagnostics, system-player and update-notice rows, the A11 mid-session rule, a testable focus-entry key-up guard and a full verification-ownership table.
 - Checks run: relative links in `docs/focus-map.md`, `docs/testing.md` and `docs/feature-parity.md` resolve; every story number cited in the report and in focus-map §6 exists in `epics.md`; fixture block-id facts computed from `src/test/fixtures/boosty/*.json`. No code changed, so lint/typecheck/tests were not run. No device check (documentation only).
+- Owner decision 2026-10-26: Go for Epic 2 on the recommended conditions (recorded in docs/testing.md «Spike report»).
 
 ## Review Triage Log
 
@@ -58,4 +59,3 @@ context:
 | 15 | Fallback key for id-less blocks undefined | medium | patch | Fixtures show `text`/`link`/`list` have no id; `<type>@<index>` rule |
 | 16 | No verification record in the spec | low | patch | Checks-run note above; owner outcome is recorded after the presentation |
 | 17 | Sign-out row omits the stored phone and FocusRestoration | low | patch | Row completed |
-- Owner decision 2026-10-26: Go for Epic 2 on the recommended conditions (recorded in docs/testing.md «Spike report»).
