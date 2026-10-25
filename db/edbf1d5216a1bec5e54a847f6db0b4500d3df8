@@ -1,0 +1,49 @@
+__tests__/App.test.tsx
+  s_fa8f7b4ebc3498::t_cfdf505f5e444f 24-26,40,59
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_fa8f7b4ebc3498::t_e10a8d2c036afc 86-94
+_bmad-output/implementation-artifacts/spec-1-7-spike-audio-and-files.md
+  s_fa8f7b4ebc3498::t_eccbba1046868d 1-123
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_fa8f7b4ebc3498::t_59ca1b2386158d 32,44-45
+docs/api-contract.md
+  s_fa8f7b4ebc3498::t_e34a1b947d423e 282-306,322,365-368,397
+docs/testing.md
+  s_fa8f7b4ebc3498::t_a79dedd735f796 345-379
+src/app/App.tsx
+  s_fa8f7b4ebc3498::t_5606ac2056f1b0 3,17-19,28,79
+src/app/spike/AudioFilesCheck.tsx
+  s_fa8f7b4ebc3498::t_7f646f4bfa5ae6 1-902
+src/app/spike/__tests__/AudioFilesCheck.test.tsx
+  s_fa8f7b4ebc3498::t_f35929c2638e95 1-523
+src/app/spike/__tests__/playbackApi.test.ts
+  s_fa8f7b4ebc3498::t_a4b08026ff3ca5 2-3,6,8-9,11,13-14,20-22,26,339-611
+src/app/spike/playbackApi.ts
+  s_fa8f7b4ebc3498::t_a32fa2e53fc9d4 469-840
+src/app/spike/contentShapesApi.ts
+  s_a7090646c1fffc::t_3b499e70cb3b4b 50-60
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "dbedbf1d5216a1bec5e54a847f6db0b4500d3df8",
+  "prompts": {},
+  "sessions": {
+    "s_a7090646c1fffc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a989523d5d8915eed",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_fa8f7b4ebc3498": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e85fa150-3d17-4cac-84c8-4bb1e5a38a91",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
