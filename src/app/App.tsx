@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { StatusBar, StyleSheet, Text, View } from 'react-native';
+import { AudioFilesCheck } from './spike/AudioFilesCheck';
 import { ContentShapesCheck } from './spike/ContentShapesCheck';
 import { JsStackCheck } from './spike/JsStackCheck';
 import { KeychainCheck } from './spike/KeychainCheck';
@@ -13,8 +14,9 @@ import { VideoCheck } from './spike/VideoCheck';
 import { ZodPluralCheck } from './spike/ZodPluralCheck';
 
 /**
- * Spike menu (spike branches only; never merged). Story 1.6 adds the playback,
- * expiry and progress check as the first entry, then the Story 1.5 content
+ * Spike menu (spike branches only; never merged). Story 1.7 adds the audio
+ * and files check as the first entry, then Story 1.6's playback,
+ * expiry and progress check, then the Story 1.5 content
  * shapes check, the Story 1.4 session refresh/logout
  * check and the Story 1.3 phone sign-in;
  * the Story 1.2 library checks follow. Each entry opens one check screen.
@@ -23,6 +25,7 @@ import { ZodPluralCheck } from './spike/ZodPluralCheck';
  */
 
 const CHECKS = [
+  { id: 'audiofiles', label: 'Аудио и файлы', Screen: AudioFilesCheck },
   {
     id: 'playback',
     label: 'Плеер: доступ, истечение, прогресс',
@@ -73,7 +76,7 @@ function App() {
   return (
     <View style={styles.screen}>
       <StatusBar hidden />
-      <Text style={styles.title}>Boosty TV — спайк 1.6</Text>
+      <Text style={styles.title}>Boosty TV — спайк 1.7</Text>
       <Text style={styles.subtitle}>
         {`Проверки на устройстве (${__DEV__ ? 'debug' : 'release'})`}
       </Text>

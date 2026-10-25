@@ -1,18 +1,29 @@
 import {
+  audioFileCandidates,
+  blockTypeSummary,
   buildBadTokenPostRequest,
   buildProgressRequest,
+  describeSignedQuery,
   describeUrlShape,
+  fileCandidates,
+  findSameFile,
   findSameMedia,
+  formatExpiry,
   mapPlayerUrls,
+  mediaFileBlockCounts,
+  nextPageOffset,
   PROGRESS_STEP_S,
   ProgressThrottle,
   randomOpaqueToken,
   redactForLog,
   REFERENCE_USER_AGENT,
+  signedQueryExpiry,
+  signedQuerySummary,
+  signedUrl,
   videoCandidates,
   withApiProfile,
 } from '../playbackApi';
-import { buildPostRequest } from '../contentShapesApi';
+import { buildBlogPostsRequest, buildPostRequest } from '../contentShapesApi';
 
 /**
  * Story 1.6 spike: E9 and corrupted-Bearer builders, the api-contract §6
@@ -324,4 +335,277 @@ test('describeUrlShape keeps structure and short enums, never secrets', () => {
   expect(shape).not.toContain('example.invalid');
   expect(shape).not.toMatch(/:\/\/|\?/);
   expect(redactForLog(shape)).toBe(shape);
+});
+
+// ------------------------------------------- Story 1.7: audio and files ----
+
+describe('Story 1.7 audio_file / file helpers', () => {
+  const SQ = '?expires=1761400000&sig=SQSECRETVALUE';
+  const post = (extra: Record<string, unknown>) => ({
+    id: 'post-1',
+    title: 'Post Secret Title',
+    hasAccess: true,
+    signedQuery: SQ,
+    user: { blogUrl: 'blog-x' },
+    data: [
+      { type: 'text', content: 'x' },
+      {
+        type: 'audio_file',
+        id: 'a-1',
+        url: 'https://cdn.example.invalid/audio/a1.mp3',
+        title: 'Track Secret',
+        duration: 245,
+      },
+      {
+        type: 'file',
+        id: 'f-1',
+        url: 'https://cdn.example.invalid/file/f1.pdf',
+        title: 'Doc Secret',
+        size: 2_000_000,
+      },
+      { type: 'audio_file', url: '' },
+    ],
+    ...extra,
+  });
+
+  test('candidates: accessible posts only, url/title/duration/size, signedQuery kept', () => {
+    const locked = post({
+      id: 'post-2',
+      hasAccess: false,
+      signedQuery: '',
+    });
+    const missing = post({ id: 'post-3', hasAccess: undefined });
+    const a = audioFileCandidates([locked, missing, post({})], 'fallback');
+    expect(a).toEqual([
+      {
+        kind: 'audio',
+        blogUrl: 'blog-x',
+        postId: 'post-1',
+        blockId: 'a-1',
+        url: 'https://cdn.example.invalid/audio/a1.mp3',
+        signedQuery: SQ,
+        title: 'Track Secret',
+        duration: 245,
+        size: undefined,
+      },
+    ]);
+    const f = fileCandidates([locked, post({})], 'fallback');
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({
+      kind: 'file',
+      blockId: 'f-1',
+      size: 2_000_000,
+      duration: undefined,
+      title: 'Doc Secret',
+    });
+  });
+
+  test('candidates: empty or missing signedQuery is kept as empty; block title falls back to the post title', () => {
+    const p = post({ signedQuery: undefined, user: {} });
+    (p.data[1] as Record<string, unknown>).title = '';
+    const [a] = audioFileCandidates([p], 'fallback');
+    expect(a.signedQuery).toBe('');
+    expect(a.blogUrl).toBe('fallback');
+    expect(a.title).toBe('Post Secret Title');
+    expect(signedUrl(a.url, a.signedQuery)).toBe(a.url);
+  });
+
+  test('signedUrl joins with ? or & correctly', () => {
+    const u = 'https://h.example.invalid/p/a.mp3';
+    expect(signedUrl(u, '?a=1&b=2')).toBe(`${u}?a=1&b=2`);
+    expect(signedUrl(u, 'a=1')).toBe(`${u}?a=1`);
+    expect(signedUrl(u, '&a=1')).toBe(`${u}?a=1`);
+    expect(signedUrl(`${u}?x=0`, '?a=1')).toBe(`${u}?x=0&a=1`);
+    expect(signedUrl(`${u}?x=0&`, '?a=1')).toBe(`${u}?x=0&a=1`);
+    expect(signedUrl(`${u}?`, 'a=1')).toBe(`${u}?a=1`);
+    expect(signedUrl(u, '')).toBe(u);
+    expect(signedUrl(u, '?')).toBe(u);
+  });
+
+  test('the joined URL is fully redacted and its shapes reveal no values', () => {
+    const joined = signedUrl('https://cdn.example.invalid/audio/a1.mp3', SQ);
+    const line = redactForLog(`player error for ${joined} (${SQ})`);
+    expect(line).not.toContain('SQSECRETVALUE');
+    expect(line).not.toContain('cdn.example');
+    expect(line).not.toContain('1761400000');
+    const shape = describeSignedQuery(SQ);
+    expect(shape).toBe(
+      'lead=qmark query=[expires:digits(10),sig:opaque(13)] flags=[]',
+    );
+    expect(describeSignedQuery('')).toBe('empty');
+    expect(describeUrlShape(joined)).not.toContain('SQSECRETVALUE');
+  });
+
+  test('signedQueryExpiry: expiry-like digit keys only, ms or s', () => {
+    const now = 1_761_400_000_000 - 3600_000;
+    expect(signedQueryExpiry(SQ, now)).toEqual([{ key: 'expires', inS: 3600 }]);
+    expect(signedQueryExpiry('?exp=1761400000000', now)).toEqual([
+      { key: 'exp', inS: 3600 },
+    ]);
+    expect(signedQueryExpiry('?sig=123456789012&id=1761400000', now)).toEqual(
+      [],
+    );
+    expect(signedQueryExpiry('', now)).toEqual([]);
+    // The live Post.signedQuery key (Story 1.7).
+    expect(
+      signedQueryExpiry('?user_id=1&expire_time=1761400000&sign=x', now),
+    ).toEqual([{ key: 'expire_time', inS: 3600 }]);
+    // One-letter keys are not taken as an expiry.
+    expect(signedQueryExpiry('?e=1761400000&t=1761400000', now)).toEqual([]);
+    // A past timestamp is reported as such, not as an expiry.
+    const past = signedQueryExpiry('?expires=1761390000', now);
+    expect(past).toEqual([{ key: 'expires', inS: -6400 }]);
+    expect(formatExpiry(past)).toBe('expires past timestamp');
+    expect(formatExpiry(signedQueryExpiry(SQ, now))).toBe('expires in 3600 s');
+    expect(formatExpiry([])).toBe('no expiry field (unverified)');
+  });
+
+  test('signedQuerySummary: presence, distinct shapes, expiry min/max, no values', () => {
+    const now = 1_761_400_000_000 - 3600_000;
+    const posts = [
+      post({}),
+      post({ id: 'p2', signedQuery: '?expires=1761403600&sig=SQSECRETVALUE' }),
+      post({ id: 'p3', signedQuery: '?expires=1761390000&sig=SQSECRETVALUE' }),
+      post({ id: 'p4', signedQuery: '' }),
+      post({ id: 'p5', hasAccess: false, signedQuery: '' }),
+      post({ id: 'p6', signedQuery: 'token=OTHERSECRET' }),
+    ];
+    const line = signedQuerySummary(posts, now);
+    expect(line).toBe(
+      'accessible=5 nonEmpty=4 withExpiry=3 shapes=2 ' +
+        '[{lead=qmark query=[expires:digits(10),sig:opaque(13)] flags=[]} ' +
+        '{lead=none query=[token:opaque(11)] flags=[]}] ' +
+        'expiry=expires:3600..7200 s past=1',
+    );
+    for (const secret of ['SQSECRET', 'OTHERSECRET', '17614', '17613']) {
+      expect(line).not.toContain(secret);
+    }
+    expect(signedQuerySummary([], now)).toBe(
+      'accessible=0 nonEmpty=0 withExpiry=0 shapes=0 [] expiry=none',
+    );
+  });
+
+  test('audio_file / file nested in list items are candidates and counted', () => {
+    const nested = post({
+      id: 'p-list',
+      data: [
+        {
+          type: 'list',
+          items: [
+            {
+              data: [{ type: 'text' }],
+              items: [
+                {
+                  data: [
+                    {
+                      type: 'audio_file',
+                      id: 'a-n',
+                      url: 'https://cdn.example.invalid/audio/n.mp3',
+                      duration: 60,
+                    },
+                  ],
+                  items: [],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    const a = audioFileCandidates([nested], 'fallback');
+    expect(a).toHaveLength(1);
+    expect(a[0]).toMatchObject({
+      blockId: 'a-n',
+      duration: 60,
+      signedQuery: SQ,
+    });
+    expect(fileCandidates([nested], 'fallback')).toEqual([]);
+    expect(mediaFileBlockCounts([nested])).toEqual({
+      audio: 1,
+      file: 0,
+      lockedPosts: 0,
+    });
+    expect(findSameFile(nested, a[0])).toMatchObject({
+      kind: 'found',
+      matchedBy: 'id',
+    });
+  });
+
+  test('findSameFile: by block id first, else by url; locked → no-access', () => {
+    const [orig] = audioFileCandidates([post({})], 'fallback');
+    const fresh = post({ signedQuery: '?expires=1761500000&sig=NEW' });
+    const byId = findSameFile(fresh, orig);
+    expect(byId).toMatchObject({ kind: 'found', matchedBy: 'id' });
+    expect(byId.kind === 'found' && byId.candidate.signedQuery).toBe(
+      '?expires=1761500000&sig=NEW',
+    );
+    const noIds = post({});
+    for (const b of noIds.data as Array<Record<string, unknown>>) {
+      delete b.id;
+    }
+    expect(findSameFile(noIds, { ...orig, blockId: undefined })).toMatchObject({
+      kind: 'found',
+      matchedBy: 'url',
+    });
+    expect(findSameFile(noIds, orig)).toMatchObject({
+      kind: 'found',
+      matchedBy: 'url',
+    });
+    expect(
+      findSameFile(post({}), { ...orig, blockId: 'zzz', url: 'other' }),
+    ).toEqual({ kind: 'no-block' });
+    expect(findSameFile(post({ hasAccess: false }), orig)).toEqual({
+      kind: 'no-access',
+    });
+  });
+
+  test('E4 paging: nextPageOffset and the offset argument', () => {
+    expect(nextPageOffset({ extra: { offset: 'abc:1', isLast: false } })).toBe(
+      'abc:1',
+    );
+    expect(
+      nextPageOffset({ extra: { offset: 'abc:1', isLast: true } }),
+    ).toBeUndefined();
+    expect(nextPageOffset({ extra: {} })).toBeUndefined();
+    expect(nextPageOffset({})).toBeUndefined();
+    expect(buildBlogPostsRequest('b').url).toBe(
+      `${BASE}/v1/blog/b/post/?limit=20&comments_limit=0&reply_limit=0`,
+    );
+    expect(buildBlogPostsRequest('b', 'x:1&y').url).toBe(
+      `${BASE}/v1/blog/b/post/?limit=20&comments_limit=0&reply_limit=0&offset=x%3A1%26y`,
+    );
+  });
+
+  test('mediaFileBlockCounts counts blocks and locked posts', () => {
+    expect(
+      mediaFileBlockCounts([post({}), post({ hasAccess: false, data: [] })]),
+    ).toEqual({ audio: 2, file: 1, lockedPosts: 1 });
+  });
+});
+
+test('blockTypeSummary: accessible posts only, nested list blocks, unsafe types masked', () => {
+  const posts = [
+    {
+      hasAccess: true,
+      data: [
+        { type: 'text' },
+        { type: 'audio_file' },
+        { type: 'Weird Type!' },
+        {
+          type: 'list',
+          items: [
+            {
+              data: [{ type: 'file' }],
+              items: [{ data: [{ type: 'audio_file' }], items: [] }],
+            },
+          ],
+        },
+      ],
+    },
+    { hasAccess: false, data: [{ type: 'ok_video' }] },
+  ];
+  expect(blockTypeSummary(posts)).toBe(
+    '<other>×1,audio_file×1,list×1,list>audio_file×1,list>file×1,text×1',
+  );
+  expect(blockTypeSummary([])).toBe('-');
 });

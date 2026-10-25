@@ -83,3 +83,12 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-6-spike-authorized-playback-expiry-and-progress-round-trip.md`
   summary: Update docs/feature-parity.md PLAY-01/03/04 with the Story 1.6 device evidence (playback formats, resume from timeCode, E9 round-trip, re-resolve) when Story 1.8 compiles the spike results.
   evidence: Story 1.6 review: the parity matrix still shows these as reference-only evidence.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-7-spike-audio-and-files.md`
+  summary: Verify S9 on the device once an accessible `audio_file` and `file` exist in a subscribed or followed blog: playback/pause/seek/sleep of `url + signedQuery`, the file QR scanned by a phone, whether audio/file hosts enforce `expire_time`, and the probe's abort-at-headers behavior.
+  evidence: Story 1.7 found no sample in the 60 newest posts of each of 3 subscribed blogs (owner decision: auto-scan only). A re-run is one press of «Найти аудио и файлы» on spike/1-7-audio-files; following a free blog with public audio/file posts would supply a sample.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-7-spike-audio-and-files.md`
+  summary: Check whether `Post.signedQuery` depends on the request profile (web vs the reference mobile profile), as the video URLs do.
+  evidence: Story 1.7 measured signedQuery (user_id, content_id, expire_time = 24 h, sign) only on E4 with the web headers.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-7-spike-audio-and-files.md`
+  summary: Record the live shape of the `video` content block (keys only) and decide its parity treatment.
+  evidence: Story 1.7 saw `video` blocks in accessible posts; §4.1 has it only as REF.

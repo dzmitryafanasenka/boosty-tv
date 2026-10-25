@@ -21,6 +21,9 @@ jest.mock('../src/app/spike/SessionRefreshCheck', () => ({
 jest.mock('../src/app/spike/ContentShapesCheck', () => ({
   ContentShapesCheck: () => null,
 }));
+jest.mock('../src/app/spike/AudioFilesCheck', () => ({
+  AudioFilesCheck: () => null,
+}));
 jest.mock('../src/app/spike/PlaybackCheck', () => ({
   PlaybackCheck: () => null,
 }));
@@ -34,6 +37,7 @@ test('renders the spike menu with one D-pad focusable entry per check', async ()
   });
 
   const ids = [
+    'audiofiles',
     'playback',
     'contentshapes',
     'sessionrefresh',
@@ -52,7 +56,7 @@ test('renders the spike menu with one D-pad focusable entry per check', async ()
     expect(entry).toHaveLength(1);
     expect(entry[0].props.focusable).toBe(true);
     expect(Boolean(entry[0].props.hasTVPreferredFocus)).toBe(
-      id === 'playback',
+      id === 'audiofiles',
     );
   }
 

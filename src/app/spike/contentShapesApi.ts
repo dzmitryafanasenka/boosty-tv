@@ -47,9 +47,17 @@ export const buildBlogRequest = (
   name: 'E3' | 'E3-missing' = 'E3',
 ) => get(name, `/v1/blog/${seg(blogUrl)}`);
 
-/** E4 `GET /v1/blog/{blogUrl}/post/`, first page, no comments. */
-export const buildBlogPostsRequest = (blogUrl: string) =>
-  get('E4', `/v1/blog/${seg(blogUrl)}/post/?limit=20&${NO_COMMENTS}`);
+/**
+ * E4 `GET /v1/blog/{blogUrl}/post/`, no comments. First page without
+ * `offset`; later pages pass the previous `extra.offset` verbatim (§5).
+ */
+export const buildBlogPostsRequest = (blogUrl: string, offset?: string) =>
+  get(
+    'E4',
+    `/v1/blog/${seg(blogUrl)}/post/?limit=20&${NO_COMMENTS}${
+      offset === undefined ? '' : `&offset=${encodeURIComponent(offset)}`
+    }`,
+  );
 
 /** E5 `GET /v1/feed/post/`, first page, no comments. */
 export const buildFeedRequest = () =>

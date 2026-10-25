@@ -279,6 +279,31 @@ The type is selected by `type`. Fields come from `ContentResponse`.
 
 `fileType` (for example `MP3`) is present in the DTO but unused.
 
+#### Live evidence (Story 1.7, 2026-10-25): no sample in the scanned posts
+
+The Story 1.7 spike screen («Аудио и файлы», `src/app/spike/AudioFilesCheck.tsx`) scanned the owner's subscriptions on the pinned device (release-like build, started by the agent via adb keys): E2, then E4 (web-style headers) for every subscribed blog (3 blogs; the cap was 5), 3 pages each, paged only with the returned `extra.offset` (§5). 10 API requests per run, all HTTP 200. Four runs gave the same counts.
+
+**Scope of «no sample»:** only the **60 newest posts of each of the 3 subscribed blogs** (180 posts) were seen. Page 3 still had `isLast=false`, so older posts were not scanned. E5 (feed) and E4 filters were not used. «No sample» means «none in these 180 posts», not «none in the account».
+
+| Item | Result | Level |
+|---|---|---|
+| `audio_file` blocks | **None** in `data[]` of the 131 accessible posts, including blocks nested in `list` items. Locked posts (49 of 180, all in one blog) have an empty `data`, so their blocks cannot be seen | `LIVE` (no sample, scope above) |
+| `file` blocks | **None**, as above | `LIVE` (no sample, scope above) |
+| Block types seen in accessible posts | `text`, `link`, `ok_video`, `image`, `video`, `list` (with nested `text`). No other type name that could stand for audio or a file. `video` is in the table above (`REF`: external player page, `url`); its live keys were not logged in this story, so its field set stays unaudited | `LIVE` (types only) |
+| E4 paging with `offset` | Every page returned `extra.offset` with `isLast=false`; passing the offset back verbatim (URL-encoded) returned the next 20 posts (HTTP 200) | `LIVE` |
+| `Post.signedQuery` presence | **Non-empty on all 131 accessible posts**, also on posts without any audio or file block. Empty on locked posts (§7) | `LIVE` |
+| `Post.signedQuery` shape | Leading `?`, then exactly 4 keys: `user_id` (7 digits), `content_id` (7 or 8 digits), `expire_time` (10 digits, epoch seconds), `sign` (64-character opaque value). Values never recorded. It carries the account's user id, so it is account-scoped personal data: never log, persist or put it in fixtures | `LIVE` |
+| `Post.signedQuery` expiry | `expire_time` is **86 399–86 400 s (24 h) after the E4 response** on every accessible post, the same window as the `ok_video` `expires` (§6). Whether the server rejects a link after `expire_time` is **unverified** (no audio/file URL was requested) | `LIVE` (field), unverified (enforcement) |
+| Playback of `url + signedQuery`, seek, sleep/wake | **Not verified** (no sample) | unverified (`REF`) |
+| `file` link opened from a QR on a phone | **Not verified** (no sample) | unverified (`REF`) |
+| Status-only probe (`Range: bytes=0-0`, aborted at the headers, nothing downloaded) | **Not verified on the device:** 0 probes ran (nothing to probe). Covered by a Jest test with a fake XHR only | unverified |
+
+POST-06 and POST-07 rest on the reference code until a subscribed blog has an accessible `audio_file` or `file` post within the scanned range (owner decision 2026-10-25: auto-scan only, no blog typed in). The spike screen is ready for a re-run: it builds `url + signedQuery` in memory (dropping a leading `?`/`&` of the query and joining with `?` or `&`), logs the `signedQuery` shape (keys and value classes only) and the expiry field, plays audio with react-native-video, shows a file link only as a QR, and probes the URL status.
+
+Open:
+- The `video` block's live field set (keys only) and whether its `url` is always an external page.
+- Whether `audio_file`/`file` URLs reject requests after `expire_time`, and whether `signedQuery` depends on the request profile (E4 here used web-style headers; no `srcAg`-like key was seen).
+
 ### 4.2 Poll
 
 ```text
@@ -294,6 +319,7 @@ Required by the reference: `id`, `isMultiple`, `isFinished`, a non-empty `option
 - End of list: `extra.isLast == true`. When `extra` or `extra.offset` is missing, the reference treats it as having no next page.
 - Page sizes used: feed 10, blog 20, feed tags 100.
 - Merge rule (reference): append, then deduplicate by post `id`, keeping the first occurrence.
+- `LIVE` (Story 1.7): E4 pages 2 and 3 fetched with the previous `extra.offset` (URL-encoded) returned the next posts, HTTP 200, for 3 blogs.
 - Unverified: whether the cursor stays stable while new posts arrive, and how long a cursor is valid.
 - Subscriptions (E2): no pagination in the reference. Whether `offset` is supported is unverified.
 
@@ -336,6 +362,10 @@ Signed `ok_video` URLs from E8, played with react-native-video 6.19.3 (Media3 1.
 - **E9:** HTTP 200 for every write at a ~10 s cadence, on pause, on exit and on background. A write of `t=1743` came back as `timeCode=1743` on the next E8, and a later `t=1802` showed as 30:02 on the website (`LIVE`). Write only after a new source has reached its start position: a new source reports `t=0` before the seek-after-load, and the spike once wrote that 0.
 - Do not persist URLs. Persist only `{postId, mediaId, positionSeconds}`. The server-side copy is E9.
 
+### Audio and file URLs (`audio_file`, `file`)
+
+These are not `playerUrls`: the URL is the block `url` plus `Post.signedQuery` (§4.1, `REF`). `Post.signedQuery` is `?user_id=…&content_id=…&expire_time=…&sign=…` with `expire_time` 24 h ahead (`LIVE`, Story 1.7). Whether the media host enforces `expire_time`, whether the query depends on the request profile (no `srcAg`-like key was seen), and which host serves audio and files are **unverified**: Story 1.7 found no accessible sample (§4.1 «Live evidence (Story 1.7)»). Until verified, apply the `ok_video` rules: fetch the post with the reference profile before playing, send no Boosty `Authorization` to the media host, keep the URL in memory only, and re-resolve once via E8 (same block `id`, else the same `url`) after a player error.
+
 ## 7. Entitlement and error semantics
 
 | Situation | Signal (reference evidence) | Status |
@@ -364,7 +394,7 @@ Retry policy for Boosty TV (our policy, not the reference's):
 3. Minimal required headers (UA, `X-App`, `X-From-Id`) for normal calls and for refresh. Partly resolved: content requests whose media URLs are played must use the reference-like profile (mobile Android Chrome UA, no web headers), because the signed URLs follow the request's client family (Story 1.6, §6). Open: whether auth and refresh accept that profile, so one profile could serve every call. E9 was verified only with the web profile (Story 1.6 sent E9 with the web headers and E8 with the reference profile in the same session).
 4. Events (E18): shape and event types resolved (§3 «Live evidence (Story 1.5)»). Open: pagination (no cursor field in a 1-event response).
 5. ~~E8 with `comments_limit=0`~~: accepted, HTTP 200 (Story 1.5).
-6. ~~Signed media URL TTL~~: 24 h by `expires` (Story 1.6, §6). Still open: the CDN error after a real expiry (needs a pause over 24 h), and whether `signedQuery` for audio and files expires (Story 1.7).
+6. ~~Signed media URL TTL~~: 24 h by `expires` (Story 1.6, §6). Still open: the CDN error after a real expiry (needs a pause over 24 h), and whether `signedQuery` for audio and files expires. Story 1.7: `Post.signedQuery` carries `expire_time` (epoch s) = **24 h** after the response on every accessible post (§4.1 «Live evidence (Story 1.7)»). Still open: whether audio/file hosts enforce it. No accessible `audio_file` or `file` block was found in the 60 newest posts of each of the 3 subscribed blogs, so audio playback, the file QR and the enforcement stay unverified.
 7. 401 and 404 bodies resolved (§7). 403 was not observed: locked content is a 200 with `hasAccess=false`.
 8. ~~Whether E9 progress is reflected in `timeCode` on the next E8 and on the web~~: yes, exact round-trip on E8 and the website (Story 1.6, §6).
 9. Subscriptions pagination beyond 30: E2 returns top-level `offset`, `limit`, `total`; whether `offset` pages further was not tested (3 subscriptions).

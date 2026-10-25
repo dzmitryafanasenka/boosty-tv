@@ -466,3 +466,375 @@ export function withApiProfile(
     },
   };
 }
+
+// ------------------------------------------- Story 1.7: audio and files ----
+//
+// Story 1.7 spike only (branch spike/1-7-audio-files). `audio_file` and
+// `file` blocks (api-contract §4.1): the playable or downloadable URL is
+// `url + Post.signedQuery`. Signed URLs stay in memory only.
+
+export type MediaFileKind = 'audio' | 'file';
+
+const BLOCK_TYPE: Record<MediaFileKind, string> = {
+  audio: 'audio_file',
+  file: 'file',
+};
+
+export type MediaFileCandidate = {
+  kind: MediaFileKind;
+  blogUrl: string;
+  postId: string;
+  /** Block `id` when present (re-resolve key); never logged. */
+  blockId?: string;
+  /** Block `url` without the signed query. Memory only. */
+  url: string;
+  /** `Post.signedQuery` as received (may be empty). Memory only. */
+  signedQuery: string;
+  /** On screen only; never logged. */
+  title: string;
+  /** `audio_file.duration` (seconds), when a finite number. */
+  duration?: number;
+  /** `file.size` (bytes, inferred), when a finite number. */
+  size?: number;
+};
+
+const finite = (v: unknown) =>
+  typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+
+const blockIdOf = (block: Obj): string | undefined => {
+  const id = block.id;
+  if (typeof id === 'string' && id.length > 0) {
+    return id;
+  }
+  return typeof id === 'number' && Number.isFinite(id) ? String(id) : undefined;
+};
+
+/**
+ * Blocks of `data[]` in order, with blocks nested in `list` items
+ * (`items[]{data: ContentBlock[], items[]}`, recursively) right after
+ * their list block.
+ */
+function flatBlocks(data: unknown): Obj[] {
+  const out: Obj[] = [];
+  const visit = (blocks: unknown) => {
+    for (const block of (arr(blocks) ?? []).map(obj)) {
+      if (block) {
+        out.push(block);
+        visitItems(block.items);
+      }
+    }
+  };
+  const visitItems = (items: unknown) => {
+    for (const item of (arr(items) ?? []).map(obj)) {
+      visit(item?.data);
+      visitItems(item?.items);
+    }
+  };
+  visit(data);
+  return out;
+}
+
+function mediaFileCandidates(
+  kind: MediaFileKind,
+  posts: readonly Obj[],
+  fallbackBlog: string,
+): MediaFileCandidate[] {
+  const out: MediaFileCandidate[] = [];
+  for (const post of posts) {
+    if (post.hasAccess !== true || typeof post.id !== 'string' || !post.id) {
+      continue;
+    }
+    const blog = obj(post.user)?.blogUrl;
+    const blogUrl =
+      typeof blog === 'string' && blog.length > 0 ? blog : fallbackBlog;
+    const signedQuery =
+      typeof post.signedQuery === 'string' ? post.signedQuery : '';
+    for (const block of flatBlocks(post.data)) {
+      if (block.type !== BLOCK_TYPE[kind]) {
+        continue;
+      }
+      if (typeof block.url !== 'string' || block.url === '') {
+        continue;
+      }
+      const blockTitle =
+        typeof block.title === 'string' && block.title.length > 0
+          ? block.title
+          : '';
+      const postTitle = typeof post.title === 'string' ? post.title : '';
+      out.push({
+        kind,
+        blogUrl,
+        postId: post.id,
+        blockId: blockIdOf(block),
+        url: block.url,
+        signedQuery,
+        title: blockTitle || postTitle,
+        duration: kind === 'audio' ? finite(block.duration) : undefined,
+        size: kind === 'file' ? finite(block.size) : undefined,
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * Accessible `audio_file` blocks of one E4 page, in order, including blocks
+ * nested in `list` items. Locked posts (`hasAccess !== true`) and blocks
+ * without a `url` are skipped.
+ */
+export const audioFileCandidates = (
+  posts: readonly Obj[],
+  fallbackBlog: string,
+) => mediaFileCandidates('audio', posts, fallbackBlog);
+
+/** Accessible `file` blocks of one E4 page, as `audioFileCandidates`. */
+export const fileCandidates = (posts: readonly Obj[], fallbackBlog: string) =>
+  mediaFileCandidates('file', posts, fallbackBlog);
+
+/**
+ * `url + signedQuery` with a correct separator: the query's own leading `?`
+ * or `&` is dropped, then joined with `?` (no query in `url`) or `&`. An
+ * empty `signedQuery` returns the bare `url`.
+ */
+export function signedUrl(url: string, signedQuery: string): string {
+  const q = signedQuery.replace(/^[?&]+/, '');
+  if (q === '') {
+    return url;
+  }
+  if (!url.includes('?')) {
+    return `${url}?${q}`;
+  }
+  return url.endsWith('?') || url.endsWith('&') ? `${url}${q}` : `${url}&${q}`;
+}
+
+/** Shape of a `signedQuery` for logs (keys and value classes, no values). */
+export function describeSignedQuery(signedQuery: string): string {
+  const q = signedQuery.replace(/^[?&]+/, '');
+  if (q === '') {
+    return 'empty';
+  }
+  // Words, not `?`/`&`: `redactForLog` would turn a bare `?` into `?<query>`.
+  const lead =
+    signedQuery[0] === '?' ? 'qmark' : signedQuery[0] === '&' ? 'amp' : 'none';
+  const shape = describeUrlShape(`?${q}`).replace(/^scheme=- path=\[\] /, '');
+  return `lead=${lead} ${shape}`;
+}
+
+/**
+ * Expiry-like key names (`expire_time` is the key seen live on
+ * `Post.signedQuery`, Story 1.7). One-letter keys (`e`, `t`) are not
+ * accepted: they are as likely an issue or start time as an expiry.
+ */
+const EXPIRY_KEY =
+  /^(expires?|exp|expiry|expire_?time|expire_at|expires_at|expiresAt|valid_?until|deadline)$/i;
+
+export type ExpiryField = { key: string; inS: number };
+
+/**
+ * Expiry candidates in a `signedQuery`: keys that look like an expiry with
+ * an all-digits value, as seconds until then (epoch ms when 13+ digits,
+ * else epoch s). A negative `inS` is a past timestamp, not an expiry. An
+ * empty list means no expiry field was found ("unverified").
+ */
+export function signedQueryExpiry(
+  signedQuery: string,
+  nowMs: number,
+): ExpiryField[] {
+  const out: ExpiryField[] = [];
+  for (const pair of signedQuery.replace(/^[?&]+/, '').split('&')) {
+    const i = pair.indexOf('=');
+    if (i <= 0) {
+      continue;
+    }
+    const key = pair.slice(0, i);
+    const value = pair.slice(i + 1);
+    if (!EXPIRY_KEY.test(key) || !/^\d{9,14}$/.test(value)) {
+      continue;
+    }
+    const raw = Number(value);
+    const ms = value.length >= 13 ? raw : raw * 1000;
+    out.push({ key, inS: Math.round((ms - nowMs) / 1000) });
+  }
+  return out;
+}
+
+/** Log text for `signedQueryExpiry` results; never a value. */
+export function formatExpiry(fields: readonly ExpiryField[]): string {
+  if (fields.length === 0) {
+    return 'no expiry field (unverified)';
+  }
+  return fields
+    .map(f =>
+      f.inS < 0 ? `${f.key} past timestamp` : `${f.key} in ${f.inS} s`,
+    )
+    .join(', ');
+}
+
+/**
+ * Post-level `signedQuery` facts of one page, for logs: accessible posts,
+ * how many have a non-empty `signedQuery`, the distinct shapes (keys and
+ * value classes only, at most 3 listed) and the expiry fields as min/max
+ * seconds until expiry per key, with past timestamps counted apart.
+ */
+export function signedQuerySummary(
+  posts: readonly Obj[],
+  nowMs: number,
+): string {
+  const accessible = posts.filter(p => p.hasAccess === true);
+  const queries = accessible
+    .map(p => (typeof p.signedQuery === 'string' ? p.signedQuery : ''))
+    .filter(q => q.replace(/^[?&]+/, '') !== '');
+  const shapes = [...new Set(queries.map(describeSignedQuery))];
+  const perKey = new Map<string, { min: number; max: number; past: number }>();
+  let withExpiry = 0;
+  for (const q of queries) {
+    const fields = signedQueryExpiry(q, nowMs);
+    if (fields.length > 0) {
+      withExpiry += 1;
+    }
+    for (const f of fields) {
+      const e = perKey.get(f.key) ?? { min: Infinity, max: -Infinity, past: 0 };
+      if (f.inS < 0) {
+        e.past += 1;
+      } else {
+        e.min = Math.min(e.min, f.inS);
+        e.max = Math.max(e.max, f.inS);
+      }
+      perKey.set(f.key, e);
+    }
+  }
+  const expiry =
+    perKey.size === 0
+      ? 'none'
+      : [...perKey]
+          .map(
+            ([k, e]) =>
+              `${k}:${e.min === Infinity ? '-' : `${e.min}..${e.max} s`} past=${
+                e.past
+              }`,
+          )
+          .join(';');
+  const listed = shapes.slice(0, 3).map(sh => `{${sh}}`);
+  if (shapes.length > 3) {
+    listed.push(`+${shapes.length - 3} more`);
+  }
+  return (
+    `accessible=${accessible.length} nonEmpty=${queries.length} ` +
+    `withExpiry=${withExpiry} shapes=${shapes.length} ` +
+    `[${listed.join(' ')}] expiry=${expiry}`
+  );
+}
+
+export type SameFileResult =
+  | { kind: 'found'; candidate: MediaFileCandidate; matchedBy: 'id' | 'url' }
+  | { kind: 'no-access' }
+  | { kind: 'no-block' };
+
+/**
+ * Re-resolve after an E8 re-fetch: the block of the same kind with the same
+ * block `id` (when the original had one), else with the same `url`. The
+ * fresh candidate carries the fresh `signedQuery`.
+ */
+export function findSameFile(
+  post: unknown,
+  original: MediaFileCandidate,
+): SameFileResult {
+  const p = obj(post);
+  if (!p || p.hasAccess !== true) {
+    return { kind: 'no-access' };
+  }
+  const fresh = mediaFileCandidates(original.kind, [p], original.blogUrl);
+  if (original.blockId !== undefined) {
+    const byId = fresh.find(c => c.blockId === original.blockId);
+    if (byId) {
+      return { kind: 'found', candidate: byId, matchedBy: 'id' };
+    }
+  }
+  const byUrl = fresh.find(c => c.url === original.url);
+  return byUrl
+    ? { kind: 'found', candidate: byUrl, matchedBy: 'url' }
+    : { kind: 'no-block' };
+}
+
+/**
+ * E4 next-page cursor: `extra.offset` (opaque, passed back verbatim) unless
+ * `extra.isLast` is true or the offset is missing (api-contract §5).
+ */
+export function nextPageOffset(json: unknown): string | undefined {
+  const extra = obj(obj(json)?.extra);
+  if (!extra || extra.isLast === true) {
+    return undefined;
+  }
+  const offset = extra.offset;
+  if (typeof offset === 'string' && offset.length > 0) {
+    return offset;
+  }
+  return typeof offset === 'number' && Number.isFinite(offset)
+    ? String(offset)
+    : undefined;
+}
+
+/**
+ * Counts of `audio_file` / `file` blocks in a page (also inside `list`
+ * items), accessible or not, and of locked posts.
+ */
+export function mediaFileBlockCounts(posts: readonly Obj[]) {
+  const counts = { audio: 0, file: 0, lockedPosts: 0 };
+  for (const post of posts) {
+    if (post.hasAccess !== true) {
+      counts.lockedPosts += 1;
+    }
+    for (const block of flatBlocks(post.data)) {
+      if (block.type === 'audio_file') {
+        counts.audio += 1;
+      } else if (block.type === 'file') {
+        counts.file += 1;
+      }
+    }
+  }
+  return counts;
+}
+
+const SAFE_TYPE = /^[a-z][a-z0-9_]{0,29}$/;
+
+/**
+ * Block types seen in `data[]` of accessible posts, including blocks nested
+ * in `list` items, as `type×n` sorted by name. Types that are not short
+ * lowercase enums are counted as `<other>`. Shows whether an audio or file
+ * block exists under another type name or inside a list.
+ */
+export function blockTypeSummary(posts: readonly Obj[]): string {
+  const counts = new Map<string, number>();
+  const visit = (blocks: unknown, nested: boolean) => {
+    for (const block of (arr(blocks) ?? []).map(obj)) {
+      if (!block) {
+        continue;
+      }
+      const t =
+        typeof block.type === 'string' && SAFE_TYPE.test(block.type)
+          ? block.type
+          : '<other>';
+      const key = nested ? `list>${t}` : t;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+      visitItems(block.items);
+    }
+  };
+  // `list` items: `{data: ContentBlock[], items: Item[]}`, nested.
+  const visitItems = (items: unknown) => {
+    for (const item of (arr(items) ?? []).map(obj)) {
+      visit(item?.data, true);
+      visitItems(item?.items);
+    }
+  };
+  for (const post of posts) {
+    if (post.hasAccess === true) {
+      visit(post.data, false);
+    }
+  }
+  return (
+    [...counts]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([t, n]) => `${t}×${n}`)
+      .join(',') || '-'
+  );
+}
