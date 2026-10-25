@@ -23,3 +23,6 @@ _bmad/config.user.toml
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# BMAD generated render cache
+_bmad/render/
