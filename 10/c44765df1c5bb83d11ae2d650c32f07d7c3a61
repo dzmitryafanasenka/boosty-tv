@@ -1,0 +1,21 @@
+_bmad-output/implementation-artifacts/spec-1-2-library-compatibility-on-the-device.md
+  s_5af4f680824905::t_92431d053715d3 1-112
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_5af4f680824905::t_315ca798ea365b 39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "10c44765df1c5bb83d11ae2d650c32f07d7c3a61",
+  "prompts": {},
+  "sessions": {
+    "s_5af4f680824905": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "860bc0b2-9104-4116-8ba2-01ba7d4ffe79",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
