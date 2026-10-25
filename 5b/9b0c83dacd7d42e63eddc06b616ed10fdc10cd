@@ -1,0 +1,43 @@
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_5af4f680824905::t_18e91656e91377 15-20
+_bmad-output/implementation-artifacts/spec-1-2-library-compatibility-on-the-device.md
+  s_5af4f680824905::t_224218bf6b07db 1-142
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_5af4f680824905::t_c78cd1ba1657e0 32,39-40
+_bmad-output/planning-artifacts/architecture/architecture-boosty-tv-2026-10-25/ARCHITECTURE-SPINE.md
+  s_5af4f680824905::t_92b5b5c3814bbd 242,353-355,357,360,438
+_bmad-output/planning-artifacts/epics.md
+  s_5af4f680824905::t_2c7c0e7623c0d0 380-383
+docs/adr/0002-secure-storage-keychain.md
+  s_5af4f680824905::t_4e87753ee7a08c 3
+docs/adr/0003-navigation-react-navigation.md
+  s_5af4f680824905::t_5c0bb79a365a5d 3,7
+docs/adr/0005-native-stack-debug-build-push-defect.md
+  s_5af4f680824905::t_9fb84d8c419c34 1-33
+docs/adr/0006-secure-storage-keychain-reset-helper.md
+  s_5af4f680824905::t_d47c0ca70cb574 1-53
+docs/adr/0007-navigation-js-stack.md
+  s_5af4f680824905::t_2feeacac69e417 1-31
+docs/testing.md
+  s_5af4f680824905::t_0136c0064d530b 125,128-188
+src/shared/i18n/__tests__/plural.test.ts
+  s_5af4f680824905::t_8563b11fa04c57 1-42
+src/shared/i18n/plural.ts
+  s_5af4f680824905::t_7f90494afee732 1-45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "5b9b0c83dacd7d42e63eddc06b616ed10fdc10cd",
+  "prompts": {},
+  "sessions": {
+    "s_5af4f680824905": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "860bc0b2-9104-4116-8ba2-01ba7d4ffe79",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
