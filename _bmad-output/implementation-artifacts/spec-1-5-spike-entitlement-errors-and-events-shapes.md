@@ -68,6 +68,8 @@ context:
 - **Spec length:** keep it whole (about 1960 tokens, single goal).
 - **`device_id` and refresh-token reuse re-test (open since 1.4):** closed as "not needed for production", with no requests. Production always sends the same install `device_id`, and a rotated-out refresh token fails anyway (single-use), so neither answer changes client behavior. Record this in api-contract §2.3/§8.
 
+- **Fixture numbers (owner, after the first device run):** numbers are no longer kept verbatim. Publish times, counts, prices and exact durations could identify the owner's subscriptions in combination. Times become synthetic with their order kept, counts and money become 0 or 5, durations are rounded to whole minutes, sizes to 100 KiB, and structural numbers (paging, dimensions, statuses) are kept. `check:fixtures` enforces the same rules. The run is repeated once (about 15 requests, no sign-in).
+
 </frozen-after-approval>
 
 ## Code Map
@@ -87,13 +89,23 @@ context:
 - [x] `SpikeFiles` native module + `spikeNative.ts` binding -- write/clear sanitized fixture files.
 - [x] `src/app/spike/ContentShapesCheck.tsx` + menu entry + test -- runs the matrix in order, shows shapes and the request count, and writes fixtures.
 - [x] `scripts/check-fixtures.mjs` + `npm run check:fixtures` (goes to `main`) -- fails on: 40+ char opaque runs, `Bearer`, URLs outside `example.invalid`, query strings other than `?sig=REDACTED`, 9+ digit runs, `@`-emails, or any string that is not a placeholder, synthetic value or allowlisted enum.
-- [ ] On the device: the owner signs in; one run; pull the fixtures to `src/test/fixtures/boosty/`; delete them on the device; logcat scan.
-- [ ] `docs/api-contract.md` §3/§4/§7/§8 and `docs/testing.md` -- `LIVE` results for S5/S11, the AD-5 mapping notes, and the closed `device_id`/reuse question (decision above); update the matching deferred-work entry note.
+- [x] On the device: the owner signs in; one run; pull the fixtures to `src/test/fixtures/boosty/`; delete them on the device; logcat scan.
+- [x] `docs/api-contract.md` §3/§4/§7/§8 and `docs/testing.md` -- `LIVE` results for S5/S11, the AD-5 mapping notes, and the closed `device_id`/reuse question (decision above); update the matching deferred-work entry note.
 
 **Acceptance Criteria:**
 - Given the owner's session, when the run completes, then each matrix row has a recorded status and shape, and the run sent at most 30 requests.
 - Given the pulled fixtures, when `npm run check:fixtures` runs, then it passes; and it fails on a planted token, signed URL or phone number (test).
 - Given the logcat captured during the story, when it is scanned, then nothing sensitive matches.
+
+## Implementation Notes
+
+- Sign-in was blocked for about 2 h by a server-side 429 `sms_gate_ratelimit` on the first send; the website got the same error. The spike sign-in screen now shows 429 details (limit headers, header names, safe `error_description`). The limit lifted at 19:45 (api-contract §2.2).
+- Device runs: 2 (the second after the owner-decided number rules), 15 requests each, results identical. Started via adb keys after the owner signed in.
+- Findings beyond the matrix: E8 without a token returns 200 as an anonymous viewer (`hasAccess=false`), not 401; a `list` content block exists; `ok_video.duration` is present in the feed; E2 returns `offset/limit/total`.
+
+## Spec Change Log
+
+## Review Triage Log
 
 ## Verification
 
