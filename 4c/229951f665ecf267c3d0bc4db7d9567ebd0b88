@@ -1,0 +1,105 @@
+.github/workflows/ci.yml
+  s_fce05da352b4dc::t_d45ad2b8b9a942 29-32
+__tests__/App.test.tsx
+  s_fce05da352b4dc::t_4ace08c848a782 31
+__tests__/signInFlow.test.tsx
+  s_fce05da352b4dc::t_88d2950c93031f 1-582
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_fce05da352b4dc::t_8699c9a6856cef 103-105
+_bmad-output/implementation-artifacts/spec-2-2-request-a-sign-in-code-by-phone.md
+  s_fce05da352b4dc::t_85e8fbec138a9a 1-173
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_fce05da352b4dc::t_3cbeb6432de797 32,50-51
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/BoostyNativePackage.kt
+  s_fce05da352b4dc::t_fdf1d6f199b5c4 1-16
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/InstallIdModule.kt
+  s_fce05da352b4dc::t_d6298bdb3eb55b 1-49
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/MainApplication.kt
+  s_fce05da352b4dc::t_ee07e1ef35f93c 17
+babel.config.js
+  s_fce05da352b4dc::t_9c52bf6c647b1f 3-5
+docs/focus-map.md
+  s_fce05da352b4dc::t_3d0f83e8d1e86a 60,110-116
+docs/testing.md
+  s_fce05da352b4dc::t_28256cce3417bb 89,482-506
+jest.config.js
+  s_fce05da352b4dc::t_c372c8928fafd9 4-9
+package-lock.json
+  s_fce05da352b4dc::t_b3a05017d74091 11-12,14-18,22,3395-3486,3655-3663,4961-4973,4992-5001,9627-9644,10468-10479,10540-10577,11306-11320,11460-11468,12229-12246,12304-12309
+package.json
+  s_fce05da352b4dc::t_732c456ac18c4a 14-15,17-21,25
+src/app/App.tsx
+  s_fce05da352b4dc::t_8388d890b87536 1-35,38-41,45,47-58,62-68
+src/app/routes.ts
+  s_fce05da352b4dc::t_5dc171a0b9d2cb 1-13
+src/features/auth/CodeScreen.tsx
+  s_fce05da352b4dc::t_2ff364cb8fb75b 1-77
+src/features/auth/PhoneScreen.tsx
+  s_fce05da352b4dc::t_55a8c83fdcca90 1-463
+src/features/auth/WelcomeScreen.tsx
+  s_fce05da352b4dc::t_fa4523b944ce67 1-2,6-12,20-24,27-29,32-40,55,58
+src/features/auth/__tests__/authFlow.test.ts
+  s_fce05da352b4dc::t_98a3287bc9b5ab 1-29
+src/features/auth/__tests__/phone.test.ts
+  s_fce05da352b4dc::t_1b61faa07249ba 1-50
+src/features/auth/authFlow.ts
+  s_fce05da352b4dc::t_53f07ceeeae606 1-51
+src/features/auth/index.ts
+  s_fce05da352b4dc::t_dc3199dd80c6ec 1-3
+src/features/auth/phone.ts
+  s_fce05da352b4dc::t_ffed29ddbb06f1 1-44
+src/shared/api/__tests__/authApiClient.test.ts
+  s_fce05da352b4dc::t_fd9149b573dc64 1-240
+src/shared/api/__tests__/profiles.test.ts
+  s_fce05da352b4dc::t_57a15538256991 1-60
+src/shared/api/authApiClient.ts
+  s_fce05da352b4dc::t_4c1f98f5bd2d66 1-155
+src/shared/api/authError.ts
+  s_fce05da352b4dc::t_97e86324b7d707 1-51
+src/shared/api/dto/phoneCode.ts
+  s_fce05da352b4dc::t_d391a34b131676 1-20
+src/shared/api/index.ts
+  s_fce05da352b4dc::t_a65bc6e450e21d 1-7
+src/shared/api/profiles.ts
+  s_fce05da352b4dc::t_117b27e67fb917 1-89
+src/shared/i18n/ru.ts
+  s_fce05da352b4dc::t_efd6933b84f509 21-50
+src/shared/platform/__tests__/deviceId.test.ts
+  s_fce05da352b4dc::t_915a35850ec5f6 1-50
+src/shared/platform/deviceId.ts
+  s_fce05da352b4dc::t_1a4df87f8d6537 1-43
+src/shared/services/__tests__/logger.test.ts
+  s_fce05da352b4dc::t_8f31ab81740a51 1-114
+src/shared/services/logger.ts
+  s_fce05da352b4dc::t_55d975c83d8213 1-150
+src/shared/ui/Button.tsx
+  s_fce05da352b4dc::t_a4c5296e8bf9c7 1,3-7,27-28,77,98
+src/shared/ui/FocusableSurface.tsx
+  s_fce05da352b4dc::t_c65b414d86cb0f 1-8,25-27,48-49,77,118
+src/shared/ui/TextField.tsx
+  s_fce05da352b4dc::t_2cb458a6d15739 1-170
+src/shared/ui/__tests__/TextField.test.tsx
+  s_fce05da352b4dc::t_3842de654b23c1 1-116
+src/shared/ui/__tests__/requestHostFocus.test.ts
+  s_fce05da352b4dc::t_aa4ad3dab77cda 1-15
+src/shared/ui/index.ts
+  s_fce05da352b4dc::t_62b524bacc055f 5,8,13
+src/shared/ui/requestHostFocus.ts
+  s_fce05da352b4dc::t_f3a2f406be850b 1-11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "4c229951f665ecf267c3d0bc4db7d9567ebd0b88",
+  "prompts": {},
+  "sessions": {
+    "s_fce05da352b4dc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1d96fc39-0a81-40cc-a1ff-5557f210c17b",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
