@@ -1,0 +1,49 @@
+.github/workflows/ci.yml
+  s_5af4f680824905::t_e8e6948f6e372a 28
+__tests__/checkFixtures.test.js
+  s_5af4f680824905::t_8a38eca555bbae 172-186
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_5af4f680824905::t_bcd3b15058aac5 40-57
+_bmad-output/implementation-artifacts/spec-1-5-spike-entitlement-errors-and-events-shapes.md
+  s_5af4f680824905::t_676d3f17684f77 5,108-109,112-138
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_5af4f680824905::t_7f5aa557a098fa 43
+docs/api-contract.md
+  s_5af4f680824905::t_0d7f03ddde0b87 333-334
+docs/testing.md
+  s_5af4f680824905::t_1094127d75c9f6 272,296
+scripts/check-fixtures.mjs
+  s_5af4f680824905::t_fbc2da1b7560a2 20,44,64-66,227-228
+src/app/spike/__tests__/ContentShapesCheck.test.tsx
+  s_5af4f680824905::t_1dadf283a8c4d8 100-108
+src/app/spike/__tests__/PhoneAuthCheck.test.tsx
+  s_5af4f680824905::t_30c8bb4dc082fd 251
+src/app/spike/__tests__/contentShapesApi.test.ts
+  s_5af4f680824905::t_e93ac7e39dee70 434-439,498-510,620
+src/app/spike/__tests__/phoneAuthApi.test.ts
+  s_5af4f680824905::t_4b07c9755f49db 304-332,415,424,428,431-441,443-445
+src/app/spike/contentShapesApi.ts
+  s_5af4f680824905::t_4bf9caed8a97fa 365,378,520-521,575-578,580
+src/app/spike/phoneAuthApi.ts
+  s_5af4f680824905::t_5f5314eea89788 328-329,339-341,365,368,437-439,453-454
+src/test/fixtures/boosty/e18-events.json
+  s_5af4f680824905::t_154aee717f4eee 52,131
+src/test/fixtures/boosty/e2-subscriptions.json
+  s_5af4f680824905::t_c5f9c24f336319 7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "0f0d0f36e7c3247b30480a20d6012da74e445080",
+  "prompts": {},
+  "sessions": {
+    "s_5af4f680824905": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "860bc0b2-9104-4116-8ba2-01ba7d4ffe79",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
