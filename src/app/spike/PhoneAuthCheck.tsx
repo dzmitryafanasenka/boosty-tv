@@ -41,7 +41,8 @@ import {
  * shown; the phone is shown only as a masked hint.
  */
 
-const SESSION_SERVICE = 'io.github.dzmitryafanasenka.boostytv.spike.session';
+export const SESSION_SERVICE =
+  'io.github.dzmitryafanasenka.boostytv.spike.session';
 const TEST_SERVICE = 'io.github.dzmitryafanasenka.boostytv.spike.storagetest';
 
 type Phase = 'phone' | 'code' | 'signed-in';

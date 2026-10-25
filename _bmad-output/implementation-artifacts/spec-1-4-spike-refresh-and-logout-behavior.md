@@ -2,7 +2,8 @@
 title: 'Story 1.4: Spike — refresh and logout behavior'
 type: 'chore'
 created: '2026-10-25'
-status: 'draft'
+status: 'done'
+baseline_commit: 'a2ff49239af13996e5572244b72baa8b26264602'
 route: 'dispatch'
 review_loop_iteration: 0
 context:
@@ -72,10 +73,10 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `refreshCoordinator.ts` + unit tests -- single-flight, proactive, reactive, rejected (no loop) and network (tokens kept), with mocked fetch.
-- [ ] `SessionRefreshCheck.tsx` + menu entry -- runs the matrix on the device and shows request counts.
-- [ ] On the device: each matrix row once, using the stored session; record rotation (does refresh return a new `refresh_token`? does the old one still work?) and the `device_id` result (last check before logout).
-- [ ] `docs/api-contract.md` §2.3, `docs/testing.md` -- results.
+- [x] `refreshCoordinator.ts` + unit tests -- single-flight, proactive, reactive, rejected (no loop) and network (tokens kept), with mocked fetch.
+- [x] `SessionRefreshCheck.tsx` + menu entry -- runs the matrix on the device and shows request counts.
+- [x] On the device: each matrix row once, using the stored session; record rotation (does refresh return a new `refresh_token`? does the old one still work?) and the `device_id` result (last check before logout).
+- [x] `docs/api-contract.md` §2.3, `docs/testing.md` -- results.
 
 **Acceptance Criteria:**
 - Given the forced-expiry state, when 5 E1 calls start together, then the device log shows exactly 1 refresh request and 5 successful E1 calls.
@@ -85,9 +86,27 @@ context:
 
 ## Implementation Notes
 
+- Device run 2026-10-25 (release-like, keys injected via adb): all matrix rows passed; rotation yes, rotated-out token → 400 `invalid_grant`; rejected refresh signal = 400 `invalid_grant`; different `device_id` → 400 `invalid_grant` (ambiguous, see `docs/api-contract.md` §2.3); logout clean, `device_id` kept. The account is signed out on the device.
+
 ## Spec Change Log
 
 ## Review Triage Log
+
+| # | Layer | Finding | Verdict | Route | Evidence |
+|---|---|---|---|---|---|
+| 1 | blind, edge | The default rejection predicate treated every 400/401 from refresh as «expired»; a non-`invalid_grant` 4xx would sign the user out | high | patch | `defaultIsRefreshRejected` narrowed to `400 && error === "invalid_grant"`; tests cover other 4xx |
+| 2 | verification-gap | No test for "proactive refresh, then 401 on the probe" (must not refresh twice) | medium | patch | Test added in `refreshCoordinator.test.ts` |
+| 3 | blind, edge | No timeout or abort on refresh; a hung request holds the single-flight promise | medium | patch | Production requirement in api-contract §2.3; deferred-work |
+| 4 | blind | New pair adopted in memory even if the save fails; refresh tokens are single-use, so the session is lost on restart | high | patch | "Persist before adopt" requirement in api-contract §2.3 |
+| 5 | edge | An unparseable 200, or a lost response after the server processed the refresh, burns the refresh token | medium | patch | "Burned-token risk" requirement in api-contract §2.3 |
+| 6 | edge | signOut or reload during an in-flight refresh can turn «signed-out» into «expired» or resurrect the session | medium | patch | Generation-guard requirement in api-contract §2.3; tests deferred |
+| 7 | blind | `expires_in` not validated; 0 or NaN would cause a refresh storm | medium | patch | Validation requirement in api-contract §2.3 |
+| 8 | blind | Logout clears memory before the store; a failed clear leaves tokens on disk silently | low | patch | Logout-order requirement in api-contract §2.3 |
+| 9 | verification-gap | Network-loss row is simulated in JS; a real network drop was not tested | medium | patch | Labeled in testing.md; deferred-work |
+| 10 | verification-gap | The `device_id` result is confounded by the earlier reuse of a rotated-out token | medium | defer | api-contract §2.3 marks it ambiguous; deferred-work (re-test at Story 1.5 with owner approval) |
+| 11 | blind | The `device_id` suffix is logged; earlier scans missed partial phone numbers | low | patch | testing.md log-hygiene note; the Story 1.4 scan included partial numbers |
+| 12 | verification-gap | Second-account isolation (S10) not tested | low | defer | deferred-work (Story 2.8) |
+| 13 | edge, blind | Spike-only screen issues (button busy guards, result overwrite, restore helper edge cases) | low | reject | Throwaway spike; production stories get their own specs and tests |
 
 ## Verification
 

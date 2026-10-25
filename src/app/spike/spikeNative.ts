@@ -38,3 +38,14 @@ export function getInstallId(): Promise<string> {
   }
   return installId;
 }
+
+/**
+ * Story 1.4: reads the native install id again, bypassing the JS cache, so a
+ * logout check proves the value persisted natively.
+ */
+export function readInstallIdUncached(): Promise<string> {
+  if (!native.InstallId) {
+    return Promise.reject(new Error('InstallId not linked'));
+  }
+  return native.InstallId.getOrCreate();
+}

@@ -5,18 +5,25 @@ import { KeychainCheck } from './spike/KeychainCheck';
 import { NavigationCheck } from './spike/NavigationCheck';
 import { PhoneAuthCheck } from './spike/PhoneAuthCheck';
 import { QrCheck } from './spike/QrCheck';
+import { SessionRefreshCheck } from './spike/SessionRefreshCheck';
 import { SpikeButton, spikeColors } from './spike/SpikeUi';
 import { VideoCheck } from './spike/VideoCheck';
 import { ZodPluralCheck } from './spike/ZodPluralCheck';
 
 /**
- * Spike menu (spike branches only; never merged). Story 1.3 adds the phone
- * sign-in check as the first entry; the Story 1.2 library checks follow.
- * Each entry opens one check screen. The menu is also present in the locally
- * signed release-like build, where the device checks run.
+ * Spike menu (spike branches only; never merged). Story 1.4 adds the session
+ * refresh/logout check as the first entry, then the Story 1.3 phone sign-in;
+ * the Story 1.2 library checks follow. Each entry opens one check screen.
+ * The menu is also present in the locally signed release-like build, where
+ * the device checks run.
  */
 
 const CHECKS = [
+  {
+    id: 'sessionrefresh',
+    label: 'Сессия: обновление и выход',
+    Screen: SessionRefreshCheck,
+  },
   { id: 'phoneauth', label: 'Вход по телефону', Screen: PhoneAuthCheck },
   {
     id: 'navigation',
@@ -52,7 +59,7 @@ function App() {
   return (
     <View style={styles.screen}>
       <StatusBar hidden />
-      <Text style={styles.title}>Boosty TV — спайк 1.3</Text>
+      <Text style={styles.title}>Boosty TV — спайк 1.4</Text>
       <Text style={styles.subtitle}>
         {`Проверки на устройстве (${__DEV__ ? 'debug' : 'release'})`}
       </Text>

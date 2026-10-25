@@ -122,7 +122,7 @@ export function normalizeSmsCode(raw: string): string | null {
 // ------------------------------------------------------------- requests ----
 
 export type ApiRequest = {
-  name: 'send' | 'resend' | 'confirm' | 'E1';
+  name: 'send' | 'resend' | 'confirm' | 'E1' | 'refresh';
   url: string;
   method: 'GET' | 'POST' | 'PUT';
   headers: Record<string, string>;
