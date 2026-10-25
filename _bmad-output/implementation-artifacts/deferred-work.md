@@ -83,6 +83,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-6-spike-authorized-playback-expiry-and-progress-round-trip.md`
   summary: Update docs/feature-parity.md PLAY-01/03/04 with the Story 1.6 device evidence (playback formats, resume from timeCode, E9 round-trip, re-resolve) when Story 1.8 compiles the spike results.
   evidence: Story 1.6 review: the parity matrix still shows these as reference-only evidence.
+  note: Resolved in Story 1.8 (2026-10-26): Live notes added to PLAY-01, PLAY-03, PLAY-04 and PLAY-10 in docs/feature-parity.md.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-7-spike-audio-and-files.md`
   summary: Verify S9 on the device once an accessible `audio_file` and `file` exist in a subscribed or followed blog: playback/pause/seek/sleep of `url + signedQuery`, the file QR scanned by a phone, whether audio/file hosts enforce `expire_time`, and the probe's abort-at-headers behavior.
   evidence: Story 1.7 found no sample in the 60 newest posts of each of 3 subscribed blogs (owner decision: auto-scan only). A re-run is one press of «Найти аудио и файлы» on spike/1-7-audio-files; following a free blog with public audio/file posts would supply a sample.
