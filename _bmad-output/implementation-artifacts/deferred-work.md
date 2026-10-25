@@ -71,6 +71,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-6-spike-authorized-playback-expiry-and-progress-round-trip.md`
   summary: Decide the production API header profile: content requests must use the reference-like mobile Android profile for playable URLs; check whether phone auth and refresh work with it (one profile for all calls) or keep the web profile there.
   evidence: Story 1.6: URLs fetched with the web desktop profile (srcAg=CHROME_MAC) return HTTP 400 on the device player; the reference-like profile (srcAg=CHROME_ANDROID) plays. Auth/refresh were only tested with the web profile (1.3/1.4).
+  note: Decided 2026-10-26 in docs/adr/0008-api-request-profiles.md (auth profile for phone auth and refresh, content profile for everything else). Per-endpoint device checks of the content profile are assigned there.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-6-spike-authorized-playback-expiry-and-progress-round-trip.md`
   summary: Production progress writes: serialize E9 (or ignore completions older than the newest sent), do not rely on a background/exit write completing, and decide whether a local `{postId, mediaId, positionSeconds}` copy reconciles on next start.
   evidence: Story 1.6 review: event writes are not serialized with progress writes, so an older PUT can land last; the background E9 during device sleep only completed after wake (testing.md sleep/wake row).
