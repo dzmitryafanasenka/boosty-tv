@@ -1,0 +1,63 @@
+__tests__/App.test.tsx
+  s_5af4f680824905::t_ce8aafacfa5d96 15-17,27-35,43
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_5af4f680824905::t_ad3c6db51e5127 21-29
+_bmad-output/implementation-artifacts/spec-1-3-spike-phone-sign-in-and-token-persistence.md
+  s_5af4f680824905::t_c2f86caf6c44b1 5-6,82-87,98-108,113-130,136
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_5af4f680824905::t_ec27ae9dbed46a 32,41
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/BoostyNativePackage.kt
+  s_5af4f680824905::t_d791e34a98bf53 1-16
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/InstallIdModule.kt
+  s_5af4f680824905::t_a1ffa22f6de774 1-43
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/KeychainStorageResetModule.kt
+  s_5af4f680824905::t_d6112390c19864 1-44
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/MainApplication.kt
+  s_5af4f680824905::t_2d01b12d3e7d01 17
+docs/adr/0006-secure-storage-keychain-reset-helper.md
+  s_5af4f680824905::t_4c06fd08dab05d 3,52-53,56-66
+docs/api-contract.md
+  s_5af4f680824905::t_68fd7896f784a8 12,80,84-113,275
+docs/testing.md
+  s_5af4f680824905::t_103d822dcde7b7 190-239
+src/app/App.tsx
+  s_5af4f680824905::t_c857d3e1294983 6,13-16,20,55,57
+src/app/spike/PhoneAuthCheck.tsx
+  s_5af4f680824905::t_b4e1a3125b4ff3 1-572
+src/app/spike/__tests__/PhoneAuthCheck.test.tsx
+  s_5af4f680824905::t_4212afaac3a834 1-261
+src/app/spike/__tests__/phoneAuthApi.test.ts
+  s_5af4f680824905::t_68c5f4fb17a32b 1-372
+src/app/spike/phoneAuthApi.ts
+  s_5af4f680824905::t_0e5c382cd582d6 1-511
+src/app/spike/spikeSecureStore.ts
+  s_5af4f680824905::t_5bdc16b6f8eb2b 1-281
+src/app/spike/__tests__/spikeSecureStore.test.ts
+  s_90da2e5b413ab7::t_8c0e1f1bf72abf 1-237
+src/app/spike/spikeNative.ts
+  s_90da2e5b413ab7::t_74323da1ace60b 1-40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "130c82a5e1e1ad0143ec5e7278fe20407aab364b",
+  "prompts": {},
+  "sessions": {
+    "s_5af4f680824905": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "860bc0b2-9104-4116-8ba2-01ba7d4ffe79",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_90da2e5b413ab7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a8d8fec01f7388cc7",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
