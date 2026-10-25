@@ -12,6 +12,9 @@ jest.mock('../src/app/spike/KeychainCheck', () => ({
 jest.mock('../src/app/spike/NavigationCheck', () => ({
   NavigationCheck: () => null,
 }));
+jest.mock('../src/app/spike/PhoneAuthCheck', () => ({
+  PhoneAuthCheck: () => null,
+}));
 jest.mock('../src/app/spike/QrCheck', () => ({ QrCheck: () => null }));
 jest.mock('../src/app/spike/VideoCheck', () => ({ VideoCheck: () => null }));
 
@@ -21,7 +24,15 @@ test('renders the spike menu with one D-pad focusable entry per check', async ()
     renderer.render(<App />);
   });
 
-  const ids = ['navigation', 'jsstack', 'keychain', 'video', 'zod', 'qr'];
+  const ids = [
+    'phoneauth',
+    'navigation',
+    'jsstack',
+    'keychain',
+    'video',
+    'zod',
+    'qr',
+  ];
   for (const id of ids) {
     const entry = renderer.container.queryAll(
       node => node.props.testID === `menu-${id}`,
@@ -29,7 +40,7 @@ test('renders the spike menu with one D-pad focusable entry per check', async ()
     expect(entry).toHaveLength(1);
     expect(entry[0].props.focusable).toBe(true);
     expect(Boolean(entry[0].props.hasTVPreferredFocus)).toBe(
-      id === 'navigation',
+      id === 'phoneauth',
     );
   }
 

@@ -3,19 +3,21 @@ import { StatusBar, StyleSheet, Text, View } from 'react-native';
 import { JsStackCheck } from './spike/JsStackCheck';
 import { KeychainCheck } from './spike/KeychainCheck';
 import { NavigationCheck } from './spike/NavigationCheck';
+import { PhoneAuthCheck } from './spike/PhoneAuthCheck';
 import { QrCheck } from './spike/QrCheck';
 import { SpikeButton, spikeColors } from './spike/SpikeUi';
 import { VideoCheck } from './spike/VideoCheck';
 import { ZodPluralCheck } from './spike/ZodPluralCheck';
 
 /**
- * Story 1.2 spike menu (branch spike/1-2-library-compat only; never merged).
- * Each entry opens one library check screen. The menu is also present in the
- * locally signed release-like build, because the Zod/Hermes check must run
- * there.
+ * Spike menu (spike branches only; never merged). Story 1.3 adds the phone
+ * sign-in check as the first entry; the Story 1.2 library checks follow.
+ * Each entry opens one check screen. The menu is also present in the locally
+ * signed release-like build, where the device checks run.
  */
 
 const CHECKS = [
+  { id: 'phoneauth', label: 'Вход по телефону', Screen: PhoneAuthCheck },
   {
     id: 'navigation',
     label: 'Навигация (native-stack)',
@@ -50,9 +52,9 @@ function App() {
   return (
     <View style={styles.screen}>
       <StatusBar hidden />
-      <Text style={styles.title}>Boosty TV — спайк 1.2</Text>
+      <Text style={styles.title}>Boosty TV — спайк 1.3</Text>
       <Text style={styles.subtitle}>
-        {`Проверка библиотек на устройстве (${__DEV__ ? 'debug' : 'release'})`}
+        {`Проверки на устройстве (${__DEV__ ? 'debug' : 'release'})`}
       </Text>
       {CHECKS.map(c => (
         <SpikeButton
