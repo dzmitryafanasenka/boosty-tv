@@ -1,0 +1,27 @@
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_fa8f7b4ebc3498::t_b9bbfe53d3227b 43,59-85
+_bmad-output/implementation-artifacts/spec-1-6-spike-authorized-playback-expiry-and-progress-round-trip.md
+  s_fa8f7b4ebc3498::t_69a375e8cd47c5 1-142
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_fa8f7b4ebc3498::t_ed9385e1307a18 32,44
+docs/api-contract.md
+  s_fa8f7b4ebc3498::t_6285ca30fa0f02 203,321-336,349,364,367,369
+docs/testing.md
+  s_fa8f7b4ebc3498::t_bd0c290abba369 301-344
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "e4b820bc51ac02ea582e8f5f4931617b968812ed",
+  "prompts": {},
+  "sessions": {
+    "s_fa8f7b4ebc3498": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e85fa150-3d17-4cac-84c8-4bb1e5a38a91",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
