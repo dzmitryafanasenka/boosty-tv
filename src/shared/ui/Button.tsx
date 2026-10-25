@@ -1,5 +1,10 @@
+import type { Ref } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import { FocusableSurface, type SurfaceState } from './FocusableSurface';
+import {
+  FocusableSurface,
+  type HostView,
+  type SurfaceState,
+} from './FocusableSurface';
 import { Spinner } from './Spinner';
 import { Text } from './Text';
 import { colors, components, focus, rounded } from './tokens';
@@ -19,6 +24,8 @@ export type ButtonProps = {
   hasTVPreferredFocus?: boolean;
   testID?: string;
   style?: StyleProp<ViewStyle>;
+  /** The focusable host view (for `requestTVFocus()` and focus guides). */
+  ref?: Ref<HostView>;
 };
 
 const KIND = {
@@ -67,6 +74,7 @@ export function Button({
   hasTVPreferredFocus,
   testID,
   style,
+  ref,
 }: ButtonProps) {
   const k = KIND[kind];
   const s = SIZE[size];
@@ -87,6 +95,7 @@ export function Button({
 
   return (
     <FocusableSurface
+      ref={ref}
       testID={testID}
       style={style}
       radius={s.radius}

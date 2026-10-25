@@ -100,3 +100,6 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-2-1-welcome-screen-on-the-design-foundation.md`
   summary: Bundle Golos Text for tvOS (Info.plist UIAppFonts) in phase 4; today the fonts exist only under android/app/src/main/assets/fonts.
   evidence: Typography tokens resolve fontFamily by PostScript name (`GolosText-Regular`, `GolosText-SemiBold`); without the iOS bundle entry tvOS would silently fall back to the system font.
+- source_spec: `_bmad-output/implementation-artifacts/spec-2-2-request-a-sign-in-code-by-phone.md`
+  summary: Before the first live send in Story 2.3, check on the device that `NativeModules.InstallId` exists under the new architecture and `getOrCreate()` returns the same UUID across two calls and an app restart; then record the send request details (header set, `X-From-Id`, `device_os=web`, no `transport`, `credentials: 'omit'`, 30 s timeout, error mapping) in docs/api-contract.md §2.2.
+  evidence: Story 2.2 ran no send by owner decision; every test fakes the native module, and the release build only proves the package links. A broken module would make every «Получить код» fail with Unknown.

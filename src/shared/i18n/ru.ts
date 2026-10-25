@@ -18,6 +18,36 @@ export const ru = {
     disclaimer:
       'Неофициальный клиент, не связан с Boosty. Вход по номеру телефона и коду.',
   },
+  auth: {
+    // A2 (form), A4 (invalid number), A9 (too many attempts), A10 (extra
+    // verification). Copy from the A2/A4/A9/A10 mocks (Claude Design
+    // «Boosty TV - A B C»), with the any-country-code field split.
+    phone: {
+      step: 'Шаг 1 из 2',
+      title: 'Номер телефона',
+      body: 'Номер, привязанный к вашему аккаунту Boosty. На него придёт код для входа.',
+      countryLabel: 'Код страны',
+      numberLabel: 'Номер телефона',
+      numberPlaceholder: '900 000-00-00',
+      send: 'Получить код',
+      back: 'Назад',
+      tooManyBody: 'Boosty временно ограничил вход по этому номеру.',
+      verificationBody:
+        'Boosty попросил подтвердить, что входит человек. Пройти эту проверку с телевизора сейчас нельзя.',
+      verificationBody2:
+        'Попробуйте войти позже. Если проверка появляется снова, вход через приложение временно недоступен.',
+      changeNumber: 'Изменить номер',
+      toWelcome: 'На первый экран',
+      retry: 'Попробовать снова',
+    },
+    // A5, minimal in Story 2.2 (the code field and confirm are Story 2.3).
+    code: {
+      step: 'Шаг 2 из 2',
+      title: 'Код из сообщения',
+      body: 'Код может прийти по SMS, в мессенджер или в приложение Boosty.',
+      changeNumber: 'Изменить номер',
+    },
+  },
   error: {
     // AppError.kind
     SessionExpired: 'Сессия истекла. Войдите снова',

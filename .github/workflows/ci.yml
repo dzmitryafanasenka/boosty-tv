@@ -26,6 +26,10 @@ jobs:
       - run: npm run typecheck
       - run: npm test -- --ci
       - run: npm run check:fixtures
+      # Release Metro bundle: catches syntax the RN Babel preset does not
+      # transform in production dependencies (Zod 4 `export * as ns`).
+      - name: Release JS bundle
+        run: npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output "$RUNNER_TEMP/index.android.bundle"
 
   android:
     name: Android builds and release manifest check
