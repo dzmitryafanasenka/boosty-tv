@@ -2,7 +2,8 @@
 title: 'Story 1.2: Library compatibility on the device'
 type: 'chore'
 created: '2026-10-25'
-status: 'draft'
+status: 'done'
+baseline_commit: '10c44765df1c5bb83d11ae2d650c32f07d7c3a61'
 route: 'dispatch'
 review_loop_iteration: 0
 context:
@@ -77,16 +78,16 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `package.json`, `package-lock.json` -- add the pinned libraries listed above; `npm ls` shows a single react-native (tvos).
-- [ ] `src/shared/i18n/plural.ts` + `__tests__/plural.test.ts` -- ru plural selector and the matrix cases.
-- [ ] `src/app/spike/NavigationCheck.tsx` -- a two-screen native-stack: screen A has 3 focusable items; OK on item 2 pushes B; Back pops; focus must return to item 2. Show on screen which item is focused.
-- [ ] `src/app/spike/KeychainCheck.tsx` -- buttons: save, read, simulate corruption; each shows the result on screen. Simulate corruption by deliberately corrupting the library's storage, or by forcing its error path. Any read error leads to wipe + «signed-out».
-- [ ] `src/app/spike/VideoCheck.tsx` -- plays public HLS, DASH and MP4 test URLs; seek ±10 s, rate 1.5×, and an invalid URL to see the error event; events are shown on screen.
-- [ ] `src/app/spike/ZodPluralCheck.tsx` -- runs the Zod matrix and the plural matrix in-app and prints pass/fail.
-- [ ] `src/app/spike/QrCheck.tsx` -- renders a QR for a ~300-character URL, offline.
-- [ ] `src/app/App.tsx` -- debug-only spike menu with D-pad focusable entries.
-- [ ] `docs/testing.md` -- results table for every check, with how each was observed (device screen, logcat, owner).
-- [ ] `docs/adr/0005+` and the spine Stack row -- only if a check fails.
+- [x] `package.json`, `package-lock.json` -- add the pinned libraries listed above; `npm ls` shows a single react-native (tvos).
+- [x] `src/shared/i18n/plural.ts` + `__tests__/plural.test.ts` -- ru plural selector and the matrix cases.
+- [x] `src/app/spike/NavigationCheck.tsx` -- a two-screen native-stack: screen A has 3 focusable items; OK on item 2 pushes B; Back pops; focus must return to item 2. Show on screen which item is focused.
+- [x] `src/app/spike/KeychainCheck.tsx` -- buttons: save, read, simulate corruption; each shows the result on screen. Simulate corruption by deliberately corrupting the library's storage, or by forcing its error path. Any read error leads to wipe + «signed-out».
+- [x] `src/app/spike/VideoCheck.tsx` -- plays public HLS, DASH and MP4 test URLs; seek ±10 s, rate 1.5×, and an invalid URL to see the error event; events are shown on screen.
+- [x] `src/app/spike/ZodPluralCheck.tsx` -- runs the Zod matrix and the plural matrix in-app and prints pass/fail.
+- [x] `src/app/spike/QrCheck.tsx` -- renders a QR for a ~300-character URL, offline.
+- [x] `src/app/App.tsx` -- debug-only spike menu with D-pad focusable entries.
+- [x] `docs/testing.md` -- results table for every check, with how each was observed (device screen, logcat, owner).
+- [x] `docs/adr/0005+` and the spine Stack row -- only if a check fails.
 
 **Acceptance Criteria:**
 - Given the spike build on the device, when each check screen is run, then its outcome is visible on screen and recorded in `docs/testing.md`.
@@ -97,9 +98,38 @@ context:
 
 ## Implementation Notes
 
+- Implementation by the dev agent, plus orchestrator follow-ups; see `docs/testing.md` (Story 1.2) for every result and how it was observed.
+- Deviations: the plural test lives at `src/shared/i18n/__tests__/plural.test.ts`. The spike menu is also in the release-like build, because the Hermes check must run there. A dev dependency `@babel/plugin-transform-export-namespace-from` is required for Zod 4 in the release bundle.
+- Device facts: 32-bit only (`armeabi-v7a`), ~350 MB free; device builds use `-PreactNativeArchitectures=armeabi-v7a`.
+- **native-stack: fail.** Intermittent `MissingViewState` in the debug and the release-like build (owner-reported, then reproduced). Owner decision: (b) the JS stack, else an own stack. The JS stack passed 50/50 cycles in each build and the owner's physical-remote check, given a per-screen `TVFocusGuideView` trap and explicit focus restoration. Recorded in ADR 0007; ADR 0005 is superseded and ADR 0003 amended.
+- **keychain:** passes save/read, cold start, reinstall, reboot and ciphertext corruption. File-level corruption leaves a dead end. Owner decision: option (b), a native storage-reset helper (ADR 0006), gated in Story 1.3.
+- **Zod 4 + plural selector:** pass under Hermes in the release-like build; `jitless` is not needed. **Video:** HLS/DASH/MP4 load, seek and change rate, and `onError` fires on an invalid URL; the picture was confirmed by the owner. **QR:** scans on a phone (owner).
+
 ## Spec Change Log
 
 ## Review Triage Log
+
+| # | Layer | Finding | Verdict | Route | Evidence |
+|---|---|---|---|---|---|
+| 1 | blind | ADR 0007 still says the physical-remote check is pending | low | patch | Updated: owner check passed |
+| 2 | blind | `RNScreensFragmentFactory`: testing.md says "keep in production", ADR 0007 says unnecessary | medium | patch | Resolved: not carried to production (spike only) |
+| 3 | blind | ADR 0006 gate not in Story 1.3 acceptance | medium | patch | AC added to epics.md Story 1.3 |
+| 4 | blind | Keychain wipe on any error vs CorruptionException-only: no error classification | medium | patch | ADR 0006 now classifies unreadable / undecryptable / transient; transient never signs out |
+| 5 | blind | Focus restoration proven only by index on a static list; virtualized lists and focus-map not covered | medium | patch | ADR 0007 consequence + Story 2.4 device check + focus-map requirement for Story 1.8 |
+| 6 | blind | `detachInactiveScreens={false}` memory cost unmeasured on a 32-bit device | medium | patch | ADR 0007 consequence; measured in Story 9.3 |
+| 7 | blind | Video rate evidence ≈1.7× and release seek/rate not re-checked | low | patch | testing.md row marked event-level, release not re-checked |
+| 8 | blind | ADR 0005 Context misleading; testing.md links ADR 0005 without "superseded" | low | patch | Superseded banner added; link annotated |
+| 9 | blind | `pluralRu` throws on invalid counts at render time | low | patch | Contract documented: validate at the boundary (Zod); throwing stays so bugs surface in tests |
+| 10 | blind | Spike vs main mixing; native-stack still in package.json | medium | patch | Handled by the results PR: only docs, ADRs, spine, epics and `src/shared/i18n/plural.ts` (+test) go to main; spike code and packages stay on the branch |
+| 11 | blind | ABI / APK size follow-up missing | medium | defer | deferred-work.md (Story 9.1) |
+| 12 | verification-gap | Babel export-namespace-from not exercised by Jest | medium | defer | deferred-work.md: Metro bundle check in CI once zod is a production dependency |
+| 13 | verification-gap, blind | App menu test no longer presses entries / restores focus | low | reject | Spike-only menu, not merged; the production Shell gets its own focus tests (Story 2.4) |
+| 14 | edge | KeychainCheck module-level corruption flag survives unmount; race with mount-time read | low | reject | Spike check screen only; results were gathered deliberately, and the production adapter follows ADR 0006 |
+| 15 | edge | VideoCheck seek not clamped, reselecting the same source, controls before a source | low | reject | Spike check screen only; it does not affect the recorded results |
+| 16 | edge | NavigationCheck preferredFocus hard-wired to item 1 may explain the focus-return issues | false | reject | The decisive native-stack failure was B never appearing (`MissingViewState`), not focus return |
+| 17 | blind | sprint-status `in-progress` vs spec `in-review` | false | reject | Step 5 syncs the status |
+| 18 | blind | Spec Change Log empty / checkbox semantics | low | reject | The fix would edit this build's spec; outcomes are recorded in Implementation Notes and testing.md |
+| 19 | blind | `docs/focus-map.md` not updated | low | defer | The file is produced by Story 1.8; requirement added in ADR 0007 |
 
 ## Verification
 
