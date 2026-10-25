@@ -1,0 +1,65 @@
+__tests__/App.test.tsx
+  s_5af4f680824905::t_3e6680271b54a5 21-23,34,51
+__tests__/checkFixtures.test.js
+  s_5af4f680824905::t_c1210a0c68c78f 1-157
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_5af4f680824905::t_e35d22d7890754 33
+_bmad-output/implementation-artifacts/spec-1-5-spike-entitlement-errors-and-events-shapes.md
+  s_5af4f680824905::t_18882e89fe8fe1 5-6,86-89
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_5af4f680824905::t_a64021bf582e1d 32,43
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/BoostyNativePackage.kt
+  s_5af4f680824905::t_a5c66fd9801775 11-15
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/SpikeFilesModule.kt
+  s_5af4f680824905::t_bb66409580a086 1-59
+docs/api-contract.md
+  s_5af4f680824905::t_51759763dcccc1 88,115-128,149,180,320-321
+docs/testing.md
+  s_5af4f680824905::t_8312d77da1b32e 88,273-287
+package.json
+  s_5af4f680824905::t_2ed7eac8f58e3a 10-11
+scripts/check-fixtures.mjs
+  s_5af4f680824905::t_44e97a6f200dca 1-194
+src/app/App.tsx
+  s_5af4f680824905::t_d4a6ba75d47fa9 3,15-17,24-28,69
+src/app/spike/PhoneAuthCheck.tsx
+  s_5af4f680824905::t_ed93f9b8606752 11,227-230
+src/app/spike/__tests__/ContentShapesCheck.test.tsx
+  s_5af4f680824905::t_6ddbc2d6b72859 1-262
+src/app/spike/__tests__/contentShapesApi.test.ts
+  s_5af4f680824905::t_c829adb383cb1b 1-685
+src/app/spike/__tests__/phoneAuthApi.test.ts
+  s_5af4f680824905::t_f421555599fb1c 16-18,375-442
+src/app/spike/contentShapesApi.ts
+  s_5af4f680824905::t_7dfe9f84804255 1-872
+src/app/spike/phoneAuthApi.ts
+  s_5af4f680824905::t_c0448092922364 124-138,140,316-329,332-374,384-385,409-411,421,425-461,578-581,609-610,617
+src/app/spike/spikeNative.ts
+  s_5af4f680824905::t_ce973ab6b4c451 52-78
+src/app/spike/ContentShapesCheck.tsx
+  s_aa8124b377c22e::t_25ef2d1a0d912c 1-184
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "4e3e360bbe0ddac24eaa87a26eac82e4e53e8f26",
+  "prompts": {},
+  "sessions": {
+    "s_5af4f680824905": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "860bc0b2-9104-4116-8ba2-01ba7d4ffe79",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_aa8124b377c22e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a79b2a8d1fb44d484",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
