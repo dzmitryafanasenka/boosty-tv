@@ -1,0 +1,31 @@
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_5af4f680824905::t_150abbd4dab7c4 21-29
+_bmad-output/implementation-artifacts/epic-1-context.md
+  s_5af4f680824905::t_0b3ccaaafb3877 7,11-12,22-34,38-53,57-58,62-64
+_bmad-output/implementation-artifacts/spec-1-3-spike-phone-sign-in-and-token-persistence.md
+  s_5af4f680824905::t_124df6a0110377 1-136
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_5af4f680824905::t_b9eb80f951613e 32,41
+docs/adr/0006-secure-storage-keychain-reset-helper.md
+  s_5af4f680824905::t_2d04b08836d4dd 3,52-53,56-66
+docs/api-contract.md
+  s_5af4f680824905::t_3f4b5274a05157 12,80,84-113,275
+docs/testing.md
+  s_5af4f680824905::t_7ddb55adba0513 190-239
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "f83a94ae0197e70aeb3a4b9653507516454e35de",
+  "prompts": {},
+  "sessions": {
+    "s_5af4f680824905": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "860bc0b2-9104-4116-8ba2-01ba7d4ffe79",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
