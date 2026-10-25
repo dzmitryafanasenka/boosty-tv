@@ -1,0 +1,47 @@
+__tests__/App.test.tsx
+  s_fa8f7b4ebc3498::t_e156c5f5cbb663 24-26,37,55
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_fa8f7b4ebc3498::t_f5ec8369ff77ed 43,59-85
+_bmad-output/implementation-artifacts/spec-1-6-spike-authorized-playback-expiry-and-progress-round-trip.md
+  s_fa8f7b4ebc3498::t_160fd96b9e4939 1-142
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_fa8f7b4ebc3498::t_3f66dc701eae15 32,44
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/MainApplication.kt
+  s_fa8f7b4ebc3498::t_2d5cd2f17838c1 9-10,26-37
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/SpikeNetInterceptor.kt
+  s_fa8f7b4ebc3498::t_4a6ccfbffad80a 1-54
+docs/api-contract.md
+  s_fa8f7b4ebc3498::t_d7c51e3f901445 203,321-336,349,364,367,369
+docs/testing.md
+  s_fa8f7b4ebc3498::t_a13fbc8e5887a4 301-344
+src/app/App.tsx
+  s_fa8f7b4ebc3498::t_74009c95d61b17 8,16-18,26-30,76
+src/app/spike/PlaybackCheck.tsx
+  s_fa8f7b4ebc3498::t_d40afb543bc204 1-1025
+src/app/spike/__tests__/PlaybackCheck.test.tsx
+  s_fa8f7b4ebc3498::t_bfd73fc95fcf7a 1-462
+src/app/spike/__tests__/playbackApi.test.ts
+  s_fa8f7b4ebc3498::t_36c9596641c9bc 1-327
+src/app/spike/contentShapesApi.ts
+  s_fa8f7b4ebc3498::t_017120664b05fd 62
+src/app/spike/phoneAuthApi.ts
+  s_fa8f7b4ebc3498::t_1331199e7d334d 124-128,139-140
+src/app/spike/playbackApi.ts
+  s_fa8f7b4ebc3498::t_d624dcd0800ef4 1-468
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "aee70664be5bbf4c08062a6b31a55bbd3157d511",
+  "prompts": {},
+  "sessions": {
+    "s_fa8f7b4ebc3498": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e85fa150-3d17-4cac-84c8-4bb1e5a38a91",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
