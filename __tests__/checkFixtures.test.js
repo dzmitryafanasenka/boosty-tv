@@ -169,3 +169,18 @@ test('spike sanitizer output passes the check', () => {
     out: 'check-fixtures: 3 JSON fixture(s) clean\n',
   });
 });
+
+test('only exact .gitkeep and .DS_Store are skipped', () => {
+  expect(run({ 'boosty/a.json': clean, '.DS_Store': 'x' }).code).toBe(0);
+  const result = run({ 'dump.gitkeep': 'Real title +79991234567' });
+  expect(result.code).toBe(1);
+  expect(result.out).toContain('not a .json fixture');
+});
+
+test('the committed repository fixtures pass', () => {
+  const out = execFileSync(process.execPath, [SCRIPT], {
+    cwd: path.join(__dirname, '..'),
+    encoding: 'utf8',
+  });
+  expect(out).toMatch(/fixture\(s\) clean/);
+});

@@ -97,6 +97,15 @@ function fakeServer() {
         text: async () => (body === undefined ? '' : JSON.stringify(body)),
       });
       if (!auth) {
+        // Live (Story 1.5): a post without a token is 200 as for an anonymous viewer.
+        if (/\/post\/[^/]+$/.test(path.split('?')[0])) {
+          return reply(200, {
+            id: 'p',
+            hasAccess: false,
+            data: [],
+            teaser: [],
+          });
+        }
         return reply(401, { error: 'unauthorized', error_description: 'x' });
       }
       if (path === '/v1/user/current') {

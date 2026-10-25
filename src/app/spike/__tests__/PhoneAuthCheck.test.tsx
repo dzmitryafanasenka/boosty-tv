@@ -248,6 +248,7 @@ test('resend sends transport=gate with the same phone', async () => {
   expect(calls[1].body).toContain('transport=gate');
   expect(calls[1].body).toContain('phone=%2B375291234567');
   expect(allText(root)).toContain('Код не отправлен: HTTP 429');
+  expect(allText(root)).toContain('сервер не указал, когда можно повторить');
   expectNoSecrets(root);
 });
 

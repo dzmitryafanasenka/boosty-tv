@@ -362,7 +362,7 @@ const SIZE_KEY = /^(size|fileSize|file_size)$/;
 const DURATION_KEY = /^(duration|timeCode|time_code)$/;
 /** Structural numbers kept as-is (paging, dimensions, statuses, units). */
 const KEEP_NUMBER_KEY =
-  /^(status|statusCode|width|height|total|offset|limit|unread|period|priority|showcase|expiresIn|expires_in)$/;
+  /^(status|statusCode|width|height|offset|limit|period|priority|showcase|expiresIn|expires_in)$/;
 /** Synthetic times: base + rank * 1 h, order kept across the whole run. */
 export const SYNTHETIC_TIME_BASE = 1_700_000_000;
 export const SYNTHETIC_TIME_STEP = 3600;
@@ -375,7 +375,7 @@ function collectTimes(bodies: readonly unknown[]): number[] {
   const out = new Set<number>();
   const walk = (v: unknown, key: string) => {
     if (typeof v === 'number') {
-      if (TIME_KEY.test(key) && Number.isFinite(v)) {
+      if (TIME_KEY.test(key) && Number.isFinite(v) && v > 0) {
         out.add(v);
       }
     } else if (Array.isArray(v)) {
@@ -517,7 +517,8 @@ export function createFixtureSanitizer(
         return 0;
       }
       if (TIME_KEY.test(key)) {
-        return syntheticTime(v);
+        // 0 or negative is an "unset" sentinel: keep it as 0.
+        return v <= 0 ? 0 : syntheticTime(v);
       }
       if (SIZE_KEY.test(key)) {
         return Math.ceil(v / SIZE_STEP) * SIZE_STEP;
@@ -571,9 +572,12 @@ export function createFixtureSanitizer(
           : undefined;
       const out: Obj = {};
       for (const [k, child] of Object.entries(o)) {
-        out[safeKey(k)] = walk(
+        const name = safeKey(k);
+        // A renamed key loses its meaning: classify its value as unknown
+        // (placeholder / count rule), the way check-fixtures sees it.
+        out[name] = walk(
           child,
-          k,
+          name === k ? k : '<unsafe>',
           ownType ?? blockType,
           inPlayer || k === 'playerUrls',
         );

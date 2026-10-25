@@ -269,7 +269,7 @@ Notes:
 - The account is **signed out** on the device after this story (planned). The owner signs in again with the Story 1.3 screen before Story 1.5.
 - After the run, two log-only fixes were made and the build was reinstalled (no scenario re-run): E1 log lines now carry their own request number (concurrent calls all printed the final count), and the refresh log says "attempt" instead of "request sent", because the simulated failure sends nothing.
 - Log hygiene: the spike logs the last 4 characters of `device_id` (an install identifier, not account data). Production logging must not include it. The Story 1.4 logcat scan looked for 60+ character token runs, `Bearer `, and full and partial phone numbers (country code plus trailing digits); nothing matched.
-- Open for production: whether a `device_id` mismatch alone rejects a refresh (needs one refresh with a different `device_id` on a session with no prior token reuse, followed by one with the real `device_id`); the real access and refresh token lifetimes.
+- (Closed in Story 1.5 as not needed for production, owner decision 2026-10-25; see api-contract §2.3.) Open for production: whether a `device_id` mismatch alone rejects a refresh (needs one refresh with a different `device_id` on a session with no prior token reuse, followed by one with the real `device_id`); the real access and refresh token lifetimes.
 
 ### Story 1.5 — entitlement, errors and events shapes, 2026-10-25
 
@@ -293,6 +293,7 @@ Branch `spike/1-5-entitlement-errors-events` (throwaway, Story 1.4 spike + `main
 | Errors: 403 / 429 | Not observed (locked content is a 200; no 429 on content endpoints; none triggered on purpose) |
 | S11 events | E18 → **200**: 1 event (`target_new`), `count{total, unread, byEventType[17 types]}`, `updateTime`; no cursor, so no page 2. EVT-01 verified as reachable; paging unverified |
 | Unknown blocks | `list` (nested `items[]{data[], items[]}`) seen and kept in the fixtures |
+| Review fixes (after the device runs) | `total`/`unread` counts were made 0 or 5 like other counts (3 values changed in `e2-subscriptions.json` and `e18-events.json`, by applying the same rule to the committed files; the rule needs only the sanitized value). Time values of 0 are now kept as an "unset" sentinel; the committed fixtures were sanitized before this rule, so a 0 time may appear there as the earliest synthetic time. `check:fixtures` now runs in CI and as a jest test on the repository fixtures |
 | Log hygiene | logcat scan of the app lines after each run: no `Bearer`, no 60+ character runs, no 9+ digit runs, no `sig=`, no URL with a query; only key paths, types and lengths. Buffer cleared after each run |
 
 `device_id` / refresh-token reuse re-test: closed as not needed for production (owner decision 2026-10-25; no requests), see api-contract §2.3.

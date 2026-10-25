@@ -301,6 +301,35 @@ describe('parsing', () => {
 });
 
 describe('execute', () => {
+  test('429: enumerates response headers into rateLimit, never header values except limit ones', async () => {
+    const all: Array<[string, string]> = [
+      ['content-type', 'application/json'],
+      ['retry-after', '120'],
+      ['set-cookie', 'session=secretvalue'],
+    ];
+    const fetchImpl: FetchLike = async () => ({
+      status: 429,
+      headers: {
+        get: (n: string) =>
+          all.find(([k]) => k === n.toLowerCase())?.[1] ?? null,
+        forEach: (cb: (value: string, name: string) => void) =>
+          all.forEach(([k, v]) => cb(v, k)),
+      },
+      text: async () =>
+        '{"error":"sms_gate_ratelimit","error_description":"wait"}',
+    });
+    const result = await execute(buildCurrentUserRequest(ACCESS), fetchImpl);
+    if (result.kind !== 'response') {
+      throw new Error('expected a response');
+    }
+    expect(result.sanitized.rateLimit).toMatchObject({
+      limitHeaders: [['retry-after', '120']],
+      headerNames: ['content-type', 'retry-after', 'set-cookie'],
+      description: 'wait',
+    });
+    expect(JSON.stringify(result.sanitized)).not.toContain('secretvalue');
+  });
+
   function response(
     status: number,
     body: string,
@@ -383,7 +412,7 @@ describe('execute', () => {
     test('safe description, limit header values, all header names without values', () => {
       const info = describeRateLimit(headers, {
         error: 'sms_gate_ratelimit',
-        error_description: 'Too many attempts, try again in 15 minutes',
+        error_description: 'Too many attempts, try again later',
       });
       expect(info.limitHeaders).toEqual([['x-ratelimit-reset', '3600']]);
       expect(info.headerNames).toEqual([
@@ -392,23 +421,28 @@ describe('execute', () => {
         'x-ratelimit-reset',
       ]);
       expect(info.description).toBe(
-        'Too many attempts, try again in 15 minutes',
+        'Too many attempts, try again later',
       );
       const text = formatRateLimit(info).join('\n');
       expect(text).not.toContain('secretvalue');
-      expect(rateLimitSummary(info)).toContain('15 minutes');
+      expect(rateLimitSummary(info)).toContain('try again later');
     });
 
-    test('description with a long digit run or "@" is hidden, short numbers kept', () => {
-      const info = describeRateLimit([], {
-        error_description: 'Phone 375291234567 blocked for 30 min',
-      });
-      expect(info.description).toBeUndefined();
-      expect(info.descriptionNumbers).toEqual(['30']);
-      expect(formatRateLimit(info).join('\n')).not.toContain('375291234567');
+    test('description with any digit or "@" is hidden; only length and digit count kept', () => {
+      for (const text of [
+        'Phone +7 999 123-45-67 blocked',
+        'Code 1234 rejected, wait 30 min',
+        'a@b.c',
+      ]) {
+        const info = describeRateLimit([], { error_description: text });
+        expect(info.description).toBeUndefined();
+        const out = formatRateLimit(info).join('\n') + rateLimitSummary(info);
+        expect(out).not.toMatch(/999|123-|1234|wait 30|@b|Phone|Code/);
+      }
       expect(
-        describeRateLimit([], { error_description: 'a@b.c' }).description,
-      ).toBeUndefined();
+        describeRateLimit([], { error_description: 'Code 1234' })
+          .descriptionDigits,
+      ).toBe(4);
     });
 
     test('unsafe limit header value is replaced by its length', () => {

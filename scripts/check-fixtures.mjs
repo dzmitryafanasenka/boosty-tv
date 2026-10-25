@@ -17,7 +17,7 @@
  * - an `@`-email;
  * - any string that is not a placeholder, a synthetic value or an
  *   allowlisted enum.
- * Files other than `*.json` (and `.gitkeep`) also fail.
+ * Files other than `*.json` (except `.gitkeep` and `.DS_Store`) also fail.
  * Output names the file, the JSON path and the rule, never the value.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -41,7 +41,7 @@ const TIME_KEY = /(At|Time|_at|_time|_ts|Timestamp|timestamp)$/;
 const SIZE_KEY = /^(size|fileSize|file_size)$/;
 const DURATION_KEY = /^(duration|timeCode|time_code)$/;
 const KEEP_NUMBER_KEY =
-  /^(status|statusCode|width|height|total|offset|limit|unread|period|priority|showcase|expiresIn|expires_in)$/;
+  /^(status|statusCode|width|height|offset|limit|period|priority|showcase|expiresIn|expires_in)$/;
 const SYNTHETIC_TIME_BASE = 1_700_000_000;
 const SYNTHETIC_TIME_STEP = 3600;
 const SIZE_STEP = 102_400;
@@ -61,6 +61,9 @@ function numberProblem(value, key) {
     return value === 0 ? null : 'phone number not zeroed';
   }
   if (TIME_KEY.test(key)) {
+    if (value === 0) {
+      return null; // "unset" sentinel
+    }
     const steps = (value - SYNTHETIC_TIME_BASE) / SYNTHETIC_TIME_STEP;
     return Number.isInteger(steps) && steps >= 0 && steps < 100_000
       ? null
@@ -221,7 +224,8 @@ function main() {
   let checked = 0;
   for (const file of files) {
     const rel = relative(root, file);
-    if (file.endsWith('.gitkeep')) {
+    const base = file.split(/[\\/]/).pop();
+    if (base === '.gitkeep' || base === '.DS_Store') {
       continue;
     }
     if (!file.endsWith('.json')) {

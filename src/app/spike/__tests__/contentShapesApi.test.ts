@@ -431,7 +431,12 @@ test('sanitizer: numbers cannot identify content (times, counts, money, duration
     currentSum: 5,
   });
   // Structural numbers are kept; sizes are rounded up to 100 KiB.
-  expect(sanitize(c)).toEqual({ ...c, size: 4_505_600 });
+  expect(sanitize(c)).toEqual({ ...c, total: 5, size: 4_505_600 });
+  // Unset times stay 0; a renamed (unsafe) key gets the count rule, as in check-fixtures.
+  expect(sanitize({ nextPayTime: 0, 'x 1Time': 1_792_000_000 })).toEqual({
+    nextPayTime: 0,
+    'synthetic-key-1': 5,
+  });
 });
 
 // --------------------------------------------------------------- runner ----
@@ -490,6 +495,19 @@ function fakeCaller(route: Route) {
 
 const happyRoute: Route = (path, auth) => {
   if (!auth) {
+    // Live (Story 1.5): E1 is 401 without a token; a post is 200 as for an
+    // anonymous viewer (hasAccess=false, empty data, teaser only).
+    if (/\/post\/[^/]+$/.test(path.split('?')[0])) {
+      return {
+        status: 200,
+        body: {
+          id: 'p',
+          hasAccess: false,
+          data: [],
+          teaser: [{ type: 'image', url: 'https://img/x' }],
+        },
+      };
+    }
     return {
       status: 401,
       body: { error: 'unauthorized', error_description: 'x' },
@@ -599,7 +617,7 @@ test('runner: full matrix in order within the budget', async () => {
   expect(byId.locked).toBe('E4 found=true, E5 found=true, E8 HTTP 200');
   expect(byId.live).toBe('blog #1: HTTP 204');
   expect(byId['no-token']).toMatch(
-    /^E1 HTTP 401 .*E8 \(accessible post\) HTTP 401/,
+    /^E1 HTTP 401 .*E8 \(accessible post\) HTTP 200/,
   );
   expect(byId.missing).toBe(
     'E8 random post id HTTP 404; E3 random slug HTTP 404',

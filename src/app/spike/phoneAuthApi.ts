@@ -325,8 +325,8 @@ export type RateLimitInfo = {
   /** `error_description` text when it is safe to show, else undefined. */
   description?: string;
   descriptionLength?: number;
-  /** Short numbers (1–4 digits) found in an unsafe description. */
-  descriptionNumbers?: string[];
+  /** Number of digits in a hidden description (the digits are never kept). */
+  descriptionDigits?: number;
 };
 
 const RATE_LIMIT_HEADER =
@@ -336,8 +336,9 @@ const SAFE_HEADER_VALUE = /^[\w :,.;=/-]{1,80}$/;
 
 /**
  * Rate-limit details for a 429. The description is shown only when it has no
- * run of 5+ digits and no "@" (it can never carry a phone or code then);
- * otherwise only its length and short numbers are kept.
+ * digit at all and no "@": a phone can be written in short groups and an SMS
+ * code can be 4 digits, so any digit hides the text; only its length and
+ * digit count are kept.
  */
 export function describeRateLimit(
   headers: ReadonlyArray<[string, string]>,
@@ -361,12 +362,10 @@ export function describeRateLimit(
       : undefined;
   if (typeof raw === 'string') {
     info.descriptionLength = raw.length;
-    if (!/\d{5,}/.test(raw) && !raw.includes('@') && raw.length <= 200) {
+    if (!/\d/.test(raw) && !raw.includes('@') && raw.length <= 200) {
       info.description = raw;
     } else {
-      info.descriptionNumbers = (raw.match(/\d+/g) ?? []).filter(
-        n => n.length <= 4,
-      );
+      info.descriptionDigits = (raw.match(/\d/g) ?? []).length;
     }
   }
   return info;
@@ -435,9 +434,9 @@ export function formatRateLimit(r: RateLimitInfo): string[] {
     lines.push(`  429 error_description: ${r.description}`);
   } else if (r.descriptionLength !== undefined) {
     lines.push(
-      `  429 error_description hidden (len ${r.descriptionLength}), numbers: ${
-        r.descriptionNumbers?.join(', ') || 'none'
-      }`,
+      `  429 error_description hidden (len ${r.descriptionLength}, digits ${
+        r.descriptionDigits ?? 0
+      })`,
     );
   }
   return lines;
@@ -451,8 +450,8 @@ export function rateLimitSummary(r: RateLimitInfo): string {
   }
   if (r.description !== undefined) {
     parts.push(`«${r.description}»`);
-  } else if (r.descriptionNumbers && r.descriptionNumbers.length > 0) {
-    parts.push(`числа в ответе: ${r.descriptionNumbers.join(', ')}`);
+  } else if (r.descriptionLength !== undefined) {
+    parts.push('текст ответа скрыт: в нём есть цифры');
   }
   return parts.length > 0
     ? parts.join('; ')

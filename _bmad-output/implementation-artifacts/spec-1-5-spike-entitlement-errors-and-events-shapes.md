@@ -2,7 +2,7 @@
 title: 'Story 1.5: Spike — entitlement, errors and events shapes'
 type: 'chore'
 created: '2026-10-25'
-status: 'in-progress'
+status: 'done'
 baseline_commit: '3e13e5db3d92bf51627f90fa30f7da7a3f71275a'
 route: 'dispatch'
 review_loop_iteration: 0
@@ -105,7 +105,36 @@ context:
 
 ## Spec Change Log
 
+- Owner decision after the first device run (recorded in Decisions): fixture numbers are no longer kept verbatim, and the run was repeated once. Trigger: the first fixtures carried exact publish times, counts, prices and durations that could identify the owner's subscriptions in combination. Amended: the sanitizer number rules and `check:fixtures`. Avoids: identifying data in a public repo. KEEP: string sanitizing and the request set unchanged.
+
 ## Review Triage Log
+
+| # | Layer | Finding | Verdict | Route | Evidence |
+|---|---|---|---|---|---|
+| 1 | blind, edge | 429 `error_description` filter could show a phone in short groups or a 4-digit code | medium | patch | Description now shown only with no digit and no `@`; only length and digit count otherwise; tests with a grouped phone and a 4-digit code |
+| 2 | verification-gap | `check:fixtures` not run in CI or on the repo fixtures | medium | patch | Added to the CI `js` job and as a jest test on the repository fixtures |
+| 3 | verification-gap | 429 header capture in `execute` untested | medium | patch | `execute` test with a 429 and `forEach` headers; cookie value absent |
+| 4 | verification-gap | On-screen 429 summary not asserted | low | patch | One `toContain` in the existing resend test |
+| 5 | blind | `total`/`unread` kept verbatim, against the owner's number rule (per-type event counts) | medium | patch | Removed from the kept keys in both copies; the 3 affected committed values were mapped with the same rule |
+| 6 | edge, verification-gap | Sanitizer classifies a renamed key's number by the original key, the check by the synthetic key | low | patch | Sanitizer now classifies renamed keys as unknown (count rule); test added. Fail-closed before the fix |
+| 7 | edge | Time sentinel 0 becomes a real-looking time | low | patch | 0 kept for time keys in both copies; committed fixtures predate it (noted in testing.md) |
+| 8 | edge | Any `*.gitkeep` file bypasses the check; `.DS_Store` fails it | low | patch | Exact basenames only; tests added |
+| 9 | blind | Test mocks return 401 for a no-token post, contradicting the live 200 | low | patch | Mocks follow the live behavior; the runner test now expects 200 |
+| 10 | blind | Expired/invalid token on content endpoints untested | medium | defer | api-contract §7 row marked unverified; deferred-work entry (one E8 request settles it) |
+| 11 | blind | No-token conclusion rests on one post | low | patch | api-contract §7 states the sample and marks the rule inferred |
+| 12 | blind | New open questions missing from deferred-work | low | patch | Entries added: E18/E2 paging, send-limit window, cursor format, E15 200 shape |
+| 13 | blind | testing.md Story 1.4 still says the `device_id` question is open | low | patch | Closure note added |
+| 14 | blind | Number rules duplicated in two files | low | defer | Cross-check test exists; a shared module belongs to production tooling (deferred-work) |
+| 15 | blind | Cursors erased, so fixtures cannot drive pagination tests | low | defer | deferred-work: record the cursor structure on a later run |
+| 16 | blind | `checkFixtures.test.js` imports the spike sanitizer and breaks on `main` | medium | patch | The docs PR to `main` carries the script and the CLI tests without the spike-sanitizer case |
+| 17 | blind | Frozen block edited after approval | false | reject | The owner made the decision in this session; it is recorded as an owner decision plus a change-log entry |
+| 18 | blind | Status mismatch spec vs sprint-status | false | reject | Step 5 syncs sprint-status |
+| 19 | blind | Envelope not validated; root resolves from cwd | low | reject | `npm run` always runs from the repo root; the envelope is written only by `buildFixtures` |
+| 20 | edge | 40-char enums/keys, structural ≥1e8, id-space exhaustion | low | reject | All fail-closed (the check rejects; nothing leaks) and not met by real data |
+| 21 | edge | E2 non-200 reported as "no posts", E18 offset 0, nested unknown blocks in `list`, stale device files, unmount during run, symlinks | low | reject | Spike-only runner/screen paths that did not occur; the device directory was deleted between runs |
+| 22 | edge | Allowlisted enum keys keep any one-word value | low | reject | Audited the committed fixtures: only API enums under those keys |
+| 23 | edge | Fixtures absent from the reviewed diff | false | reject | Excluded from the review diff on purpose (about 800 KB); they are committed and checked by `check:fixtures` |
+| 24 | edge | Resend/confirm 429 without details | false | reject | Resend uses the same send path; confirm has never returned 429 |
 
 ## Verification
 
