@@ -200,7 +200,7 @@ All of these are under `https://api.boosty.to` and use a Bearer token.
 | E6 | `GET /v1/search/feed/post/` | Feed search | E5 params + `search_query` | `data.searchPosts[].post: Post`, `extra` |
 | E7 | `GET /v1/search/blog/post/` | Blog search | `blog_url`, `search_query`, E4 params (with `is_only_allowed`) | `data.searchPosts[].post: Post`, `extra` |
 | E8 | `GET /v1/blog/{blogUrl}/post/{postId}` | Single post (the reference uses it to refresh media URLs and `timeCode`) | `comments_limit`, `reply_limit` (the reference sends 20. **We must send 0**. 0 is accepted: `LIVE`, Story 1.5) | `Post` (top level, no `data` wrapper) |
-| E9 | `PUT /v1/viewstat/video/{videoId}/timecode/` | Save playback progress | form `time_code` = integer seconds | body ignored |
+| E9 | `PUT /v1/viewstat/video/{videoId}/timecode/` | Save playback progress | form `time_code` = integer seconds | body ignored. **HTTP 200** on every write; the value comes back as `ok_video.timeCode` on the next E8 and on the website (`LIVE`, Story 1.6, §6) |
 | E10 | `GET /v1/blog/{blogUrl}/poll/{pollId}` | Refresh poll | — | `data.poll: Poll` |
 | E11 | `POST /v1/poll/{pollId}/vote` | Vote | form `answer` = comma-joined option ids | body ignored |
 | E12 | `DELETE /v1/poll/{pollId}/vote` | Retract vote | — | body ignored |
@@ -318,7 +318,22 @@ Required by the reference: `id`, `isMultiple`, `isFinished`, a non-empty `option
 Entries with an empty `url` are ignored. The reference's 4320p enum value has no source string mapped to it.
 
 - The URLs are **signed CDN URLs**, already authorized. The reference plays them **without** sending the Boosty Bearer token. Boosty TV must not forward auth headers to CDN hosts either.
-- Expiry: the reference re-fetches the post (E8) or stream (E15) after any player error, finds the block with the same `id`, and re-picks the same quality. The URL lifetime and the exact CDN error (HTTP status) are **unverified**. The spike must measure both.
+- Expiry: the reference re-fetches the post (E8) or stream (E15) after any player error, finds the block with the same `id`, and re-picks the same quality. The URL lifetime is 24 h (below); the CDN error after a real expiry is **unverified**.
+
+### Live evidence (Story 1.6, 2026-10-25, physical device)
+
+Signed `ok_video` URLs from E8, played with react-native-video 6.19.3 (Media3 1.8.0 over the React Native OkHttp client) on the pinned Chromecast. Values never recorded; only query keys, value classes and statuses.
+
+- **The signature is bound to the client profile of the request that fetched the post.** The query has `cmd=videoPlayerCdn`, `expires` (epoch ms), `srcIp` (= the device's egress IP), `srcAg` (client family), `sig`, `urls`, `ms`, `clientType`, `id`, `type`, `ct`, `pr`, `ch`, `zs`, `scl`. `srcAg` follows the E8 request's User-Agent: `CHROME_MAC` for a desktop Chrome UA with web headers, `CHROME_ANDROID` for the reference's mobile Android Chrome UA without `X-App`/`Referer`/`Origin` (BoostBuddy `composeApp/src/commonMain/kotlin/ru/slartus/boostbuddy/data/ktor/HttpClient.kt` `USER_AGENT`, commit `87c0852044d9b98b3ee1e94a544e78e250f4b5c9`; only the UA string and the header choice are reused, no code). The spike's reference profile sends only `Accept` and that UA, so `X-Locale` was dropped too; whether `X-Locale` matters is untested.
+  - `CHROME_MAC` URLs: every request from the device player got **HTTP 400, body `8`**, whatever the User-Agent, `Referer` or `Origin`. Unplayable.
+  - `CHROME_ANDROID` URLs: the player (Media3 UA) and a probe with no UA or with only `Referer` get **200**. A desktop Chrome UA on the same URL gets **HTTP 400, body `10`**.
+  - **Rule for Boosty TV:** fetch posts whose media will be played (at least E8, and E4/E5 if their URLs are played directly) with the reference-like profile, mobile Android Chrome UA and no web headers, and play with the player's own UA. Whether auth, refresh and other endpoints need the web headers stays §8 item 3.
+- **Lifetime:** `expires` is 86 400 s (24 h) after the response on every fetch. The CDN response after expiry was not observed (a pause over 24 h was not run; owner decision). Treat any player HTTP error as "re-resolve once via E8".
+- **Headers to the CDN:** none of Boosty's. Requests carry only `Accept-Encoding`, `Connection`, `Host`, `User-Agent`, plus `Cookie` after the first response: the CDN sets its own cookie and the shared React Native cookie jar returns it to the same host. No `Authorization` (`LIVE`).
+- **Re-resolve:** after a player error, one E8, the block with the same `ok_video.id` and `playerUrls` type, a seek to the last position → playback resumed (`LIVE`, after a decoder error and after the 400s).
+- **Formats:** HLS, MP4 144p–1440p and DASH all play and keep the position across switches (seek after load). TTFF 0.9–2.5 s (one 6.9 s outlier).
+- **Decoder limit:** once, adaptive HLS switched to 2560×1440 AVC High (`avc1.640032`, 8 Mbit/s) and the hardware decoder failed (`ERROR_CODE_DECODING_FAILED`). Not reproduced with MP4 1440p. Production should cap adaptive selection to what the display and decoder support, and keep the single re-resolve as the fallback.
+- **E9:** HTTP 200 for every write at a ~10 s cadence, on pause, on exit and on background. A write of `t=1743` came back as `timeCode=1743` on the next E8, and a later `t=1802` showed as 30:02 on the website (`LIVE`). Write only after a new source has reached its start position: a new source reports `t=0` before the seek-after-load, and the spike once wrote that 0.
 - Do not persist URLs. Persist only `{postId, mediaId, positionSeconds}`. The server-side copy is E9.
 
 ## 7. Entitlement and error semantics
@@ -331,7 +346,7 @@ Entries with an empty `url` are ignored. The reference's 4320p enum value has no
 | No live stream | HTTP **204**, empty body, on E15 | `LIVE` (Story 1.5) |
 | Unauthorized / expired access token | HTTP **401** `{error: "unauthorized", error_description}` on E1 (`/v1/user/current`) without a token, and with a corrupted token (Story 1.4) | `LIVE` |
 | **Content request without a token** | E8 for a post the user can access returns HTTP **200** as for an anonymous viewer: `hasAccess=false`, empty `data`, teaser only. **Not a 401.** Observed on one paid post; free posts without a token were not checked, so the general rule is inferred. A missing `Authorization` header on content endpoints looks like "locked", not like a session problem. The client must always attach the token when signed in and must not show "subscribe to access" for posts fetched without one | `LIVE` (one post, Story 1.5) |
-| **Content request with an expired or invalid token** | **Unverified.** E1 returns 401 for a corrupted token (Story 1.4). Whether E4/E5/E8 also return 401, or 200 as an anonymous viewer (which would never trigger a refresh and would show everything as locked), was not tested. Check it before the production session story (E8 with a corrupted Bearer, one request) | unverified |
+| **Content request with an expired or invalid token** | E8 with a synthetic 64-character Bearer returns HTTP **200 as an anonymous viewer** (`hasAccess=false`, empty `data`, no `error`), **not 401**. So an invalid or expired token on content endpoints never triggers the 401 refresh path and makes everything look locked. The session must be validated separately: proactive refresh by expiry, and E1 (which does return 401) at app start and on resume before trusting `hasAccess=false`. One request on E8; E4/E5 inferred to behave the same | `LIVE` (E8, Story 1.6) |
 | Nonexistent post | E8 with a random UUID: HTTP **404** `{error: "not_found", error_description}` | `LIVE` (Story 1.5) |
 | Nonexistent blog | E3 with a random slug: HTTP **404** `{error: "blog_not_found", error_description}` | `LIVE` (Story 1.5) |
 | 403, 410, 429 (content), 5xx | **Not observed.** A locked post is a 200 with `hasAccess=false`, not a 403. 429 was seen only on the phone-auth send (§2.2) | unverified. **Do not treat 403 as an expired session.** Map unobserved 4xx to a generic non-retried error |
@@ -346,10 +361,10 @@ Retry policy for Boosty TV (our policy, not the reference's):
 
 1. The real lifetime behind `expires_in` (2592000 from phone auth and refresh) and the refresh-token lifetime. Rotation and the rejection signal are resolved (§2.3, Story 1.4). The `device_id`-mismatch and refresh-token-reuse questions are closed as not needed for production (owner decision 2026-10-25, §2.3).
 2. Phone auth (partly resolved in Story 1.3, see §2.2 "Live evidence"): still open are the expired-challenge shape, the confirm attempt limit, whether captcha can be demanded, the challenge `expiresIn` units, the exact server resend window (a resend was allowed at 32 s and rejected at 2–5 s), and the longer send limit (window, threshold, phone vs IP; §2.2 «Rate limit, longer window»).
-3. Minimal required headers (UA, `X-App`, `X-From-Id`) for normal calls and for refresh.
+3. Minimal required headers (UA, `X-App`, `X-From-Id`) for normal calls and for refresh. Partly resolved: content requests whose media URLs are played must use the reference-like profile (mobile Android Chrome UA, no web headers), because the signed URLs follow the request's client family (Story 1.6, §6). Open: whether auth and refresh accept that profile, so one profile could serve every call. E9 was verified only with the web profile (Story 1.6 sent E9 with the web headers and E8 with the reference profile in the same session).
 4. Events (E18): shape and event types resolved (§3 «Live evidence (Story 1.5)»). Open: pagination (no cursor field in a 1-event response).
 5. ~~E8 with `comments_limit=0`~~: accepted, HTTP 200 (Story 1.5).
-6. Signed media URL TTL, the CDN error on expiry, and whether `signedQuery` for audio and files expires.
+6. ~~Signed media URL TTL~~: 24 h by `expires` (Story 1.6, §6). Still open: the CDN error after a real expiry (needs a pause over 24 h), and whether `signedQuery` for audio and files expires (Story 1.7).
 7. 401 and 404 bodies resolved (§7). 403 was not observed: locked content is a 200 with `hasAccess=false`.
-8. Whether E9 progress is reflected in `timeCode` on the next E8 and on the web.
+8. ~~Whether E9 progress is reflected in `timeCode` on the next E8 and on the web~~: yes, exact round-trip on E8 and the website (Story 1.6, §6).
 9. Subscriptions pagination beyond 30: E2 returns top-level `offset`, `limit`, `total`; whether `offset` pages further was not tested (3 subscriptions).
