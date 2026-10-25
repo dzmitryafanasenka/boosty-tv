@@ -239,7 +239,7 @@ Arrows mean "may import". `shared` never imports `features` or `app`. Features n
 - **Binds:** FR-9, FR-10
 - **Prevents:** competing Back handling and section/stack confusion.
 - **Rule:**
-  - **Root:** one React Navigation native-stack, with screens Auth*, Shell, Author, Post, Player and SessionExpired.
+  - **Root:** one React Navigation JS stack (`@react-navigation/stack`, ADR 0007), with screens Auth*, Shell, Author, Post, Player and SessionExpired. Each screen traps D-pad focus and restores its return focus explicitly.
   - **Shell:** owns the sidebar and swaps section content *in place*. Sections are not stack entries.
   - **Back order:**
     1. the modal host (keyboard, dialog, sheet, QR);
@@ -350,13 +350,14 @@ Arrows mean "may import". `shared` never imports `features` or `app`. Features n
 | TypeScript | ^6.0.3 (from the 0.87.1 template), strict |
 | Jest / @react-native/jest-preset | ^29.6.3 / 0.87.x (template) |
 | @testing-library/react-native / test-renderer | 14.1.x / 1.3.x |
-| @react-navigation/native / native-stack | 7.5.x / 7.21.x |
-| react-native-screens / react-native-safe-area-context | 4.30.x / 5.10.x |
+| @react-navigation/native / stack (JS stack) | 7.5.x / 7.12.x (ADR 0007: `detachInactiveScreens={false}`, focus trap per screen, explicit focus restoration; native-stack dropped after the Story 1.2 device defect) |
+| react-native-gesture-handler | 3.4.x (required peer of the JS stack; gestures disabled) |
+| react-native-screens / react-native-safe-area-context | 4.30.x (peer of the JS stack only; its views are not rendered, ADR 0007) / 5.10.x |
 | react-native-video | 6.19.x (v6 support line; v7 is in beta) |
-| react-native-keychain | 10.0.x (with the AD-3 corruption recovery) |
+| Secure storage (Android) | react-native-keychain 10.0.0 + native storage-reset helper behind `SecureStore` (ADR 0006; verification gate in Story 1.3; fallback: own Keystore module) |
 | @react-native-async-storage/async-storage | 3.1.x (`createAsyncStorage` API) |
 | @tanstack/react-query | 5.104.x |
-| zod | 4.6.x [ASSUMPTION: Hermes compatibility, incl. jitless mode, verified in spike] |
+| zod | 4.6.x (Hermes release build verified in Story 1.2; JIT works, jitless not needed; needs `@babel/plugin-transform-export-namespace-from` in `babel.config.js`) |
 | zustand | 5.0.x |
 | react-native-qrcode-svg / react-native-svg | 6.3.x / 15.16.x |
 | eslint-plugin-boundaries | 7.3.x (ESLint version as set by the template) |
@@ -434,7 +435,7 @@ flowchart LR
 
 - **Bootstrap details and device compatibility.** Spike step 1 confirms both. Each fallback gets an ADR:
   - own navigation stack instead of React Navigation (TV support is unofficial);
-  - own Keystore module instead of react-native-keychain;
+  - own Keystore module instead of react-native-keychain + reset helper, if the ADR 0006 gate fails;
   - Zod jitless mode.
 - **Exact refresh-rejection status (AD-3)** and the **CDN expired-URL signal (AD-11)**: spikes S4 and S7.
 - **Server `timeCode` round-trip:** spike S8. AD-10 already covers both outcomes.

@@ -377,6 +377,10 @@ So that we know the chosen sign-in method really works before building it.
 **Then** the session is restored without signing in again (S3)
 **And** logcat contains no token, phone, challenge or code.
 
+**Given** the ADR 0006 storage-reset helper behind `SecureStore`
+**When** the keychain storage file is overwritten with garbage, and separately a stored value is corrupted
+**Then** the helper + reset leave the store able to save and read again **in the same process** (or the need for a restart is recorded), the full matrix (kill, cold start, reboot, ciphertext corruption, file corruption) passes, and a transient non-corruption error does not sign the user out. If the gate fails, switch to the own Keystore module with a new ADR.
+
 ### Story 1.4: Spike — refresh and logout behavior
 
 As the owner,
