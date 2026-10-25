@@ -9,7 +9,7 @@ Status: **draft from reference-code audit.** The reference is BoostBuddy `1.16.0
 | `REF` | Request and fields are used by the shipped BoostBuddy 1.16.0 client (`cm/data/api/BoostyApi.kt`, `PhoneAuthApi.kt`, repositories). This is strong evidence that the endpoint worked for the reference author, but it is **not verified by us**. |
 | `REF-DEAD` | Present in the reference client but not reachable from its UI. |
 | `RE-SPEC` | Listed only in the reference's reverse-engineered `cm/data/api/openapi/boosty-api.yaml` ("extracted from the public web bundle and Android APK; not official"). Treat it as **unverified**. Do not build on it without a live check. |
-| `LIVE` | Verified by this project on a real device or account. **No entry has this level yet.** |
+| `LIVE` | Verified by this project on a real device or account. First entries: §2.2 phone sign-in (Story 1.3, 2026-10-25). |
 
 Rules:
 - Do not add endpoints that are not listed here.
@@ -77,9 +77,39 @@ Response, as used by the reference:
 
 Response: `{ "access_token": "...", "refresh_token": "...", "expires_in": <seconds> }` (snake_case). The reference treats `expires_in` as seconds.
 
-Error shapes (wrong code, expired challenge, rate limit, captcha required) are **unverified**. The reverse-engineered spec mentions `/auth/phone/mobile_captcha/send` (`RE-SPEC`), which suggests captcha can be required.
+Error shapes: wrong code (400 `invalid_sms_code`) and resend rate limit (429 `sms_gate_ratelimit`) are `LIVE`, see below. Expired challenge and captcha required are still **unverified**. The reverse-engineered spec mentions `/auth/phone/mobile_captcha/send` (`RE-SPEC`), which suggests captcha can be required.
 
 **This is the selected sign-in flow for Boosty TV** (owner decision 2026-10-25, feature-parity Q1). §2.1 is kept as reference knowledge and fallback research only.
+
+#### Live evidence (Story 1.3)
+
+Implementation guidance derived from the live run (for Stories 2.2/2.3):
+- Keep a client resend cooldown (60 s, as the reference does). The server allowed a resend at 32 s, but rapid resends return 429 `sms_gate_ratelimit`.
+- Detect captcha or extra verification only on the auth endpoints (send/resend/confirm) and only on non-2xx responses. Never scan successful bodies such as E1 (`/v1/user/current` carries many `flags.*` fields).
+- Guard non-idempotent auth requests (send, confirm) with an in-flight ref, not React state, so that a held or auto-repeated remote key cannot fire them twice.
+
+Recorded 2026-10-25 on the pinned Chromecast with Google TV 4K (Android TV 14), release-like build, branch `spike/1-3-phone-auth`. The owner typed the phone and the code with the physical remote. Results are taken from the spike's sanitized log.
+
+The spike client (`src/app/spike/phoneAuthApi.ts`) sends exactly the two requests above plus E1:
+- send/confirm: form-encoded body (`+` → `%2B`), headers `X-App: web`, `X-Locale: ru_RU`, `Referer: https://boosty.to/`, `Origin: https://boosty.to`, `Accept: application/json, text/plain, */*`, desktop Chrome `User-Agent`, `X-From-Id: <device_id>`, no `Authorization`;
+- E1: the same web headers (no `X-From-Id`) plus `Authorization: Bearer`;
+- `credentials: 'omit'`, so no cookie is sent or stored in the native cookie jar; one 30 s timeout; no automatic retry.
+
+Recordings keep only the HTTP status, content type, `Retry-After`, key paths with value types and string lengths, and the values of `sentTransport`, `error`-like enums and `expiresIn`/`expires_in`. Phone, challenge, SMS code and tokens are never recorded. Whether this full header set is required was not tested (the minimal set is still open).
+
+| Case | Request | Status | Sanitized shape | Level |
+|---|---|---|---|---|
+| Send, first time (no `transport`) | `POST …/send` | **200** `application/json` | `data.phoneCode{code: string (len 64), expiresIn: number = 604800, phone: string (len 13), sentTransport: string = "gate"}`. `sentTransport` is `gate` even on the first send. The code arrived in **Telegram** (owner-reported) | `LIVE` |
+| Resend, 32 s after the send | `POST …/send` `transport=gate` | **200** | Same shape; a new challenge `code` is issued (`expiresIn` 604800, `sentTransport` `gate`). The server allowed a resend at 32 s, so the reference's 60 s client cooldown is stricter than the server | `LIVE` |
+| Resend too soon (2 s and 5 s after the previous resend) | `POST …/send` `transport=gate` | **429** `application/json` | `{error: string = "sms_gate_ratelimit", error_description: string (len 48)}`. Maps to a rate-limited / too-many-attempts error for resend. The owner pressed resend three times in total, not once | `LIVE` |
+| Confirm, wrong code | `PUT …/confirm` | **400** `application/json` | `{error: string = "invalid_sms_code", error_description: string (len 15)}`. Maps to a wrong-code error | `LIVE` |
+| Confirm, correct code (latest challenge, 31 s after the resend) | `PUT …/confirm` | **200** | `{access_token: string (len 64), refresh_token: string (len 64), expires_in: number = 2592000}`. Tokens are 64-character opaque strings, **not JWTs**. `expires_in` = 2 592 000 = 30 days if seconds, which matches the reference's reading | `LIVE` |
+| E1 with the new token | `GET /v1/user/current` | **200** | Large object, including many `flags.*` fields. Not recorded further | `LIVE` |
+| Confirm, expired challenge | `PUT …/confirm` | **not verified** (the owner entered the real code within the window) | — | unverified |
+| Too many confirm attempts | — | not triggered (owner decision) | — | unverified |
+| Captcha demanded | any | **Not observed** in this session (send, 3 resends, wrong and correct confirm) | — | `LIVE` (not observed, not proof of absence) |
+| `expiresIn` units (send) | — | 604800 is either about 10 min in milliseconds or 7 days in seconds | — | **unverified** |
+| `expires_in` units (confirm) | — | 2592000. Seconds per the reference (30 days); the real lifetime is not measured yet (Story 1.4) | — | unverified |
 
 ### 2.3 Token refresh (`REF`)
 
@@ -242,7 +272,7 @@ Retry policy for Boosty TV (our policy, not the reference's):
 ## 8. Unverified items to resolve in the spike
 
 1. The real `expires_in` from phone auth and refresh; refresh-token rotation and lifetime.
-2. Phone-auth error shapes, captcha requirement, rate limits, challenge `expiresIn` units and code delivery channels.
+2. Phone auth (partly resolved in Story 1.3, see §2.2 "Live evidence"): still open are the expired-challenge shape, the confirm attempt limit, whether captcha can be demanded, the challenge `expiresIn` units, and the exact server resend window (a resend was allowed at 32 s and rejected at 2–5 s).
 3. Minimal required headers (UA, `X-App`, `X-From-Id`) for normal calls and for refresh.
 4. Events (E18): response shape, pagination and the list of event types.
 5. E8 with `comments_limit=0`.
