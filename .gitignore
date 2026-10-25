@@ -26,3 +26,24 @@ _bmad/config.user.toml
 
 # BMAD generated render cache
 _bmad/render/
+
+# Node / React Native
+node_modules/
+npm-debug.log
+yarn-error.log
+.metro-health-check*
+*.jsbundle
+/coverage
+
+# Android / Gradle build output and machine-local config
+build/
+.gradle/
+.kotlin/
+.cxx/
+local.properties
+*.iml
+*.hprof
+*.apk
+*.aab
+*.idsig
+output-metadata.json

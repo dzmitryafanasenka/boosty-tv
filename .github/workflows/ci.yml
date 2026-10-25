@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  js:
+    name: Lint, typecheck, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run lint -- --max-warnings 0
+      - run: npm run typecheck
+      - run: npm test -- --ci
+
+  android:
+    name: Android builds and release manifest check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: gradle/actions/wrapper-validation@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - run: npm ci
+      # No signing secrets: debug uses the runner's generated debug keystore,
+      # release stays unsigned (the owner signs locally). One ABI keeps CI fast.
+      - name: assembleDebug assembleRelease
+        working-directory: android
+        run: ./gradlew assembleDebug assembleRelease -PreactNativeArchitectures=x86_64 --no-daemon
+      - name: Check release manifest
+        working-directory: android
+        run: |
+          AAPT="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)aapt"
+          "$AAPT" dump xmltree app/build/outputs/apk/release/app-release-unsigned.apk AndroidManifest.xml > release-manifest.txt
+          grep -q 'usesCleartextTraffic(0x[0-9a-f]*)=(type 0x12)0x0' release-manifest.txt || { echo "release must not allow cleartext"; exit 1; }
+          grep -q 'allowBackup(0x[0-9a-f]*)=(type 0x12)0x0' release-manifest.txt || { echo "release must disable backup"; exit 1; }
+          grep -q 'android.intent.category.LEANBACK_LAUNCHER' release-manifest.txt || { echo "LEANBACK_LAUNCHER missing"; exit 1; }
+          grep -q 'banner(0x' release-manifest.txt || { echo "TV banner missing"; exit 1; }
