@@ -180,7 +180,7 @@ The three missing ADRs are recorded elsewhere as decisions; the owner can accept
 
 **Go for Epic 2**, on three conditions: (1) the owner accepts S7 and S9 as not verified and deferred; (2) the owner accepts the missing ADRs and fixtures listed above, or asks for them first; (3) the header-profile ADR is written before Story 2.2 starts. Every scenario that Epic 2 depends on (S2, S3, S4, S10) passed on the physical device. The not-verified scenarios (S7, S9) and the open risks belong to later epics and are tracked above and in `_bmad-output/implementation-artifacts/deferred-work.md`.
 
-**Owner decision:** pending. Epic 2 production work starts only after the owner's explicit go.
+**Owner decision (2026-10-26): Go for Epic 2** on the recommended conditions: S7 and S9 are accepted as not verified and deferred to the named stories; the missing ADRs (sign-in method, video library, refresh coordinator) and the missing poll and live-200 fixtures are accepted as recorded above; the header-profile ADR is written before Story 2.2.
 
 ## Results
 

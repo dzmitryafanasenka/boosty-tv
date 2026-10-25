@@ -58,3 +58,4 @@ context:
 | 15 | Fallback key for id-less blocks undefined | medium | patch | Fixtures show `text`/`link`/`list` have no id; `<type>@<index>` rule |
 | 16 | No verification record in the spec | low | patch | Checks-run note above; owner outcome is recorded after the presentation |
 | 17 | Sign-out row omits the stored phone and FocusRestoration | low | patch | Row completed |
+- Owner decision 2026-10-26: Go for Epic 2 on the recommended conditions (recorded in docs/testing.md «Spike report»).
