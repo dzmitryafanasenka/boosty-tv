@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { StatusBar, StyleSheet, Text, View } from 'react-native';
+import { ContentShapesCheck } from './spike/ContentShapesCheck';
 import { JsStackCheck } from './spike/JsStackCheck';
 import { KeychainCheck } from './spike/KeychainCheck';
 import { NavigationCheck } from './spike/NavigationCheck';
@@ -11,14 +12,20 @@ import { VideoCheck } from './spike/VideoCheck';
 import { ZodPluralCheck } from './spike/ZodPluralCheck';
 
 /**
- * Spike menu (spike branches only; never merged). Story 1.4 adds the session
- * refresh/logout check as the first entry, then the Story 1.3 phone sign-in;
+ * Spike menu (spike branches only; never merged). Story 1.5 adds the content
+ * shapes check as the first entry, then the Story 1.4 session refresh/logout
+ * check and the Story 1.3 phone sign-in;
  * the Story 1.2 library checks follow. Each entry opens one check screen.
  * The menu is also present in the locally signed release-like build, where
  * the device checks run.
  */
 
 const CHECKS = [
+  {
+    id: 'contentshapes',
+    label: 'Контент: доступ, ошибки, события',
+    Screen: ContentShapesCheck,
+  },
   {
     id: 'sessionrefresh',
     label: 'Сессия: обновление и выход',
@@ -59,7 +66,7 @@ function App() {
   return (
     <View style={styles.screen}>
       <StatusBar hidden />
-      <Text style={styles.title}>Boosty TV — спайк 1.4</Text>
+      <Text style={styles.title}>Boosty TV — спайк 1.5</Text>
       <Text style={styles.subtitle}>
         {`Проверки на устройстве (${__DEV__ ? 'debug' : 'release'})`}
       </Text>

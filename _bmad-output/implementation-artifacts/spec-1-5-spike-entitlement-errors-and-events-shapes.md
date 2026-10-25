@@ -2,7 +2,8 @@
 title: 'Story 1.5: Spike — entitlement, errors and events shapes'
 type: 'chore'
 created: '2026-10-25'
-status: 'ready-for-dev'
+status: 'in-progress'
+baseline_commit: '3e13e5db3d92bf51627f90fa30f7da7a3f71275a'
 route: 'dispatch'
 review_loop_iteration: 0
 context:
@@ -82,10 +83,10 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `src/app/spike/contentShapesApi.ts` + test -- request builders (E1–E5, E8, E15, E18, no-token variants), post picking (accessible/locked, by `hasAccess`) and `sanitizeFixture(json)` per the rules above. Tests prove that no input string survives except allowlisted enums.
-- [ ] `SpikeFiles` native module + `spikeNative.ts` binding -- write/clear sanitized fixture files.
-- [ ] `src/app/spike/ContentShapesCheck.tsx` + menu entry + test -- runs the matrix in order, shows shapes and the request count, and writes fixtures.
-- [ ] `scripts/check-fixtures.mjs` + `npm run check:fixtures` (goes to `main`) -- fails on: 40+ char opaque runs, `Bearer`, URLs outside `example.invalid`, query strings other than `?sig=REDACTED`, 9+ digit runs, `@`-emails, or any string that is not a placeholder, synthetic value or allowlisted enum.
+- [x] `src/app/spike/contentShapesApi.ts` + test -- request builders (E1–E5, E8, E15, E18, no-token variants), post picking (accessible/locked, by `hasAccess`) and `sanitizeFixture(json)` per the rules above. Tests prove that no input string survives except allowlisted enums.
+- [x] `SpikeFiles` native module + `spikeNative.ts` binding -- write/clear sanitized fixture files.
+- [x] `src/app/spike/ContentShapesCheck.tsx` + menu entry + test -- runs the matrix in order, shows shapes and the request count, and writes fixtures.
+- [x] `scripts/check-fixtures.mjs` + `npm run check:fixtures` (goes to `main`) -- fails on: 40+ char opaque runs, `Bearer`, URLs outside `example.invalid`, query strings other than `?sig=REDACTED`, 9+ digit runs, `@`-emails, or any string that is not a placeholder, synthetic value or allowlisted enum.
 - [ ] On the device: the owner signs in; one run; pull the fixtures to `src/test/fixtures/boosty/`; delete them on the device; logcat scan.
 - [ ] `docs/api-contract.md` §3/§4/§7/§8 and `docs/testing.md` -- `LIVE` results for S5/S11, the AD-5 mapping notes, and the closed `device_id`/reuse question (decision above); update the matching deferred-work entry note.
 

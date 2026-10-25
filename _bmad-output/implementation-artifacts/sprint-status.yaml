@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 10-25-2026 14:34
-last_updated: 10-25-2026 17:45
+last_updated: 10-25-2026 18:17
 project: Boosty TV
 project_key: NOKEY
 tracking_system: file-system
@@ -40,7 +40,7 @@ development_status:
   1-2-library-compatibility-on-the-device: done
   1-3-spike-phone-sign-in-and-token-persistence: done
   1-4-spike-refresh-and-logout-behavior: done
-  1-5-spike-entitlement-errors-and-events-shapes: backlog
+  1-5-spike-entitlement-errors-and-events-shapes: in-progress
   1-6-spike-authorized-playback-expiry-and-progress-round-trip: backlog
   1-7-spike-audio-and-files: backlog
   1-8-focus-map-and-spike-decision: backlog

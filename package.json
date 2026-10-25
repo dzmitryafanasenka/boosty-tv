@@ -7,7 +7,8 @@
     "start": "react-native start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "jest"
+    "test": "jest",
+    "check:fixtures": "node scripts/check-fixtures.mjs"
   },
   "dependencies": {
     "@react-navigation/native": "7.5.1",

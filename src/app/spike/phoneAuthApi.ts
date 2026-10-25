@@ -121,8 +121,23 @@ export function normalizeSmsCode(raw: string): string | null {
 
 // ------------------------------------------------------------- requests ----
 
+/** Story 1.5 adds the read-only content requests (contentShapesApi.ts). */
+export type ContentRequestName =
+  | 'E1-noauth'
+  | 'E2'
+  | 'E3'
+  | 'E3-missing'
+  | 'E4'
+  | 'E5'
+  | 'E8'
+  | 'E8-noauth'
+  | 'E8-missing'
+  | 'E15'
+  | 'E18'
+  | 'E18-page2';
+
 export type ApiRequest = {
-  name: 'send' | 'resend' | 'confirm' | 'E1' | 'refresh';
+  name: 'send' | 'resend' | 'confirm' | 'E1' | 'refresh' | ContentRequestName;
   url: string;
   method: 'GET' | 'POST' | 'PUT';
   headers: Record<string, string>;
@@ -298,7 +313,64 @@ export type SanitizedResponse = {
   /** The raw body mentions a captcha. Only the boolean leaves this module. */
   captchaMentioned: boolean;
   retryAfter?: string;
+  /** Only for HTTP 429: what the server says about the limit. */
+  rateLimit?: RateLimitInfo;
 };
+
+export type RateLimitInfo = {
+  /** Every response header name, no values. */
+  headerNames: string[];
+  /** Values of rate-limit headers only (Retry-After, X-RateLimit-*, RateLimit-*). */
+  limitHeaders: Array<[string, string]>;
+  /** `error_description` text when it is safe to show, else undefined. */
+  description?: string;
+  descriptionLength?: number;
+  /** Short numbers (1–4 digits) found in an unsafe description. */
+  descriptionNumbers?: string[];
+};
+
+const RATE_LIMIT_HEADER =
+  /^(retry-after|x-rate-?limit.*|rate-?limit.*|x-ratelimit.*)$/i;
+const SAFE_HEADER_NAME = /^[A-Za-z0-9-]{1,60}$/;
+const SAFE_HEADER_VALUE = /^[\w :,.;=/-]{1,80}$/;
+
+/**
+ * Rate-limit details for a 429. The description is shown only when it has no
+ * run of 5+ digits and no "@" (it can never carry a phone or code then);
+ * otherwise only its length and short numbers are kept.
+ */
+export function describeRateLimit(
+  headers: ReadonlyArray<[string, string]>,
+  json: unknown,
+): RateLimitInfo {
+  const headerNames = headers
+    .map(([name]) =>
+      SAFE_HEADER_NAME.test(name) ? name.toLowerCase() : '<redacted>',
+    )
+    .sort();
+  const limitHeaders = headers
+    .filter(([name]) => RATE_LIMIT_HEADER.test(name))
+    .map(([name, value]): [string, string] => [
+      name.toLowerCase(),
+      SAFE_HEADER_VALUE.test(value) ? value : `<unsafe, len ${value.length}>`,
+    ]);
+  const info: RateLimitInfo = { headerNames, limitHeaders };
+  const raw =
+    json && typeof json === 'object'
+      ? (json as Record<string, unknown>).error_description
+      : undefined;
+  if (typeof raw === 'string') {
+    info.descriptionLength = raw.length;
+    if (!/\d{5,}/.test(raw) && !raw.includes('@') && raw.length <= 200) {
+      info.description = raw;
+    } else {
+      info.descriptionNumbers = (raw.match(/\d+/g) ?? []).filter(
+        n => n.length <= 4,
+      );
+    }
+  }
+  return info;
+}
 
 const SAFE_CONTENT_TYPE = /^[\w.+-]+\/[\w.+-]+/;
 const SAFE_RETRY_AFTER = /^[\w :,-]{1,40}$/;
@@ -309,6 +381,8 @@ export function sanitizeResponse(args: {
   contentType: string | null;
   retryAfter: string | null;
   rawText: string;
+  /** All response headers; used only to describe a 429. */
+  headers?: ReadonlyArray<[string, string]>;
 }): { sanitized: SanitizedResponse; json: unknown } {
   let json: unknown;
   let isJson = false;
@@ -332,6 +406,9 @@ export function sanitizeResponse(args: {
   if (args.retryAfter && SAFE_RETRY_AFTER.test(args.retryAfter)) {
     sanitized.retryAfter = args.retryAfter;
   }
+  if (args.status === 429) {
+    sanitized.rateLimit = describeRateLimit(args.headers ?? [], json);
+  }
   return { sanitized, json };
 }
 
@@ -341,7 +418,45 @@ export function formatSanitized(s: SanitizedResponse): string[] {
       (s.captchaMentioned ? ' CAPTCHA MENTIONED' : '') +
       (s.retryAfter ? ` retry-after=${s.retryAfter}` : ''),
     ...s.shape.map(line => `  ${line}`),
+    ...(s.rateLimit ? formatRateLimit(s.rateLimit) : []),
   ];
+}
+
+export function formatRateLimit(r: RateLimitInfo): string[] {
+  const lines = [
+    `  429 limit headers: ${
+      r.limitHeaders.length > 0
+        ? r.limitHeaders.map(([n, v]) => `${n}=${v}`).join(', ')
+        : 'none'
+    }`,
+    `  429 header names: ${r.headerNames.join(', ') || 'none'}`,
+  ];
+  if (r.description !== undefined) {
+    lines.push(`  429 error_description: ${r.description}`);
+  } else if (r.descriptionLength !== undefined) {
+    lines.push(
+      `  429 error_description hidden (len ${r.descriptionLength}), numbers: ${
+        r.descriptionNumbers?.join(', ') || 'none'
+      }`,
+    );
+  }
+  return lines;
+}
+
+/** One-line summary for the status text on screen. */
+export function rateLimitSummary(r: RateLimitInfo): string {
+  const parts: string[] = [];
+  if (r.limitHeaders.length > 0) {
+    parts.push(r.limitHeaders.map(([n, v]) => `${n}=${v}`).join(', '));
+  }
+  if (r.description !== undefined) {
+    parts.push(`«${r.description}»`);
+  } else if (r.descriptionNumbers && r.descriptionNumbers.length > 0) {
+    parts.push(`числа в ответе: ${r.descriptionNumbers.join(', ')}`);
+  }
+  return parts.length > 0
+    ? parts.join('; ')
+    : 'сервер не указал, когда можно повторить';
 }
 
 // -------------------------------------------------------------- parsing ----
@@ -460,7 +575,10 @@ export type FetchLike = (
   },
 ) => Promise<{
   status: number;
-  headers: { get(name: string): string | null };
+  headers: {
+    get(name: string): string | null;
+    forEach?(cb: (value: string, name: string) => void): void;
+  };
   text(): Promise<string>;
 }>;
 
@@ -488,12 +606,15 @@ export async function execute(
       signal: controller.signal,
     });
     const rawText = await response.text();
+    const headers: Array<[string, string]> = [];
+    response.headers.forEach?.((value, name) => headers.push([name, value]));
     const { sanitized, json } = sanitizeResponse({
       request: request.name,
       status: response.status,
       contentType: response.headers.get('content-type'),
       retryAfter: response.headers.get('retry-after'),
       rawText,
+      headers,
     });
     return { kind: 'response', sanitized, json };
   } catch (error) {

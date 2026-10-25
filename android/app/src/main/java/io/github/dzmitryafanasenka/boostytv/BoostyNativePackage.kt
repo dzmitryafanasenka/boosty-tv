@@ -8,7 +8,11 @@ import com.facebook.react.uimanager.ViewManager
 /** App-local native modules (not autolinked). */
 class BoostyNativePackage : ReactPackage {
   override fun createNativeModules(reactContext: ReactApplicationContext): List<NativeModule> =
-    listOf(KeychainStorageResetModule(reactContext), InstallIdModule(reactContext))
+    listOf(
+      KeychainStorageResetModule(reactContext),
+      InstallIdModule(reactContext),
+      SpikeFilesModule(reactContext),
+    )
 
   override fun createViewManagers(
     reactContext: ReactApplicationContext,

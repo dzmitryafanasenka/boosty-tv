@@ -8,6 +8,7 @@ import {
   decodeSession,
   execute,
   formatSanitized,
+  rateLimitSummary,
   maskPhone,
   normalizePhone,
   normalizeSmsCode,
@@ -223,7 +224,10 @@ export function PhoneAuthCheck({ onExit }: { onExit: () => void }) {
         if (!challenge) {
           report(
             result.kind === 'response'
-              ? `Код не отправлен: HTTP ${result.sanitized.status}`
+              ? `Код не отправлен: HTTP ${result.sanitized.status}` +
+                  (result.sanitized.rateLimit
+                    ? ` — ${rateLimitSummary(result.sanitized.rateLimit)}`
+                    : '')
               : `Код не отправлен: сеть (${result.error})`,
           );
           return;

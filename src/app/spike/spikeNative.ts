@@ -49,3 +49,30 @@ export function readInstallIdUncached(): Promise<string> {
   }
   return native.InstallId.getOrCreate();
 }
+
+type SpikeFilesNative = {
+  write(name: string, text: string): Promise<boolean>;
+  clear(): Promise<number>;
+};
+
+const spikeFilesNative = (NativeModules as { SpikeFiles?: SpikeFilesNative })
+  .SpikeFiles;
+
+/**
+ * Story 1.5: sanitized fixture files under the app's external files
+ * directory (`files/fixtures`), pulled with adb and then cleared.
+ */
+export const spikeFiles = {
+  write(name: string, text: string): Promise<boolean> {
+    if (!spikeFilesNative) {
+      return Promise.reject(new Error('SpikeFiles not linked'));
+    }
+    return spikeFilesNative.write(name, text);
+  },
+  clear(): Promise<number> {
+    if (!spikeFilesNative) {
+      return Promise.reject(new Error('SpikeFiles not linked'));
+    }
+    return spikeFilesNative.clear();
+  },
+};

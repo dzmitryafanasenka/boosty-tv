@@ -18,6 +18,9 @@ jest.mock('../src/app/spike/PhoneAuthCheck', () => ({
 jest.mock('../src/app/spike/SessionRefreshCheck', () => ({
   SessionRefreshCheck: () => null,
 }));
+jest.mock('../src/app/spike/ContentShapesCheck', () => ({
+  ContentShapesCheck: () => null,
+}));
 jest.mock('../src/app/spike/QrCheck', () => ({ QrCheck: () => null }));
 jest.mock('../src/app/spike/VideoCheck', () => ({ VideoCheck: () => null }));
 
@@ -28,6 +31,7 @@ test('renders the spike menu with one D-pad focusable entry per check', async ()
   });
 
   const ids = [
+    'contentshapes',
     'sessionrefresh',
     'phoneauth',
     'navigation',
@@ -44,7 +48,7 @@ test('renders the spike menu with one D-pad focusable entry per check', async ()
     expect(entry).toHaveLength(1);
     expect(entry[0].props.focusable).toBe(true);
     expect(Boolean(entry[0].props.hasTVPreferredFocus)).toBe(
-      id === 'sessionrefresh',
+      id === 'contentshapes',
     );
   }
 

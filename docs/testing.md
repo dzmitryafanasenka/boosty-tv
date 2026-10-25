@@ -85,6 +85,7 @@ Changes on top of the template:
 
 ```sh
 npm ci && npm run lint && npm run typecheck && npm test
+npm run check:fixtures   # sanitization check for src/test/fixtures (Story 1.5)
 npm ls react-native        # react-native@npm:react-native-tvos@0.87.1-1, deduped
 cd android && ./gradlew assembleDebug assembleRelease
 aapt dump badging app/build/outputs/apk/debug/app-debug.apk   # leanback-launchable-activity + banner
@@ -269,3 +270,18 @@ Notes:
 - After the run, two log-only fixes were made and the build was reinstalled (no scenario re-run): E1 log lines now carry their own request number (concurrent calls all printed the final count), and the refresh log says "attempt" instead of "request sent", because the simulated failure sends nothing.
 - Log hygiene: the spike logs the last 4 characters of `device_id` (an install identifier, not account data). Production logging must not include it. The Story 1.4 logcat scan looked for 60+ character token runs, `Bearer `, and full and partial phone numbers (country code plus trailing digits); nothing matched.
 - Open for production: whether a `device_id` mismatch alone rejects a refresh (needs one refresh with a different `device_id` on a session with no prior token reuse, followed by one with the real `device_id`); the real access and refresh token lifetimes.
+
+### Story 1.5 — entitlement, errors and events shapes (in progress), 2026-10-25
+
+**Blocked on sign-in (2026-10-25):** the owner's new sign-in got HTTP 429 `sms_gate_ratelimit` on every first send (18:34, 18:35, 18:42, 18:52). The boosty.to website got the same error, so the limit is server-side (`docs/api-contract.md` §2.2 «Rate limit, longer window»). The spike sign-in screen now shows the 429 details on screen: rate-limit header values, all header names without values, and the `error_description` text when it is safe. The server sent no wait hint. Next: one attempt the next day; no attempts in between.
+
+Branch `spike/1-5-entitlement-errors-events` (throwaway, Story 1.4 spike + `main`). Spike screen «Контент: доступ, ошибки, события» (`src/app/spike/ContentShapesCheck.tsx`, first menu entry) runs the fixed read-only request set from `src/app/spike/contentShapesApi.ts` once: E1 → E2 → E4 (at most 5 subscribed blogs, until an accessible and a locked post are found) → E5 → E3 → E8 accessible/locked (`comments_limit=0&reply_limit=0`) → E15 per chosen blog → E1/E8 without `Authorization` → E8 random post id / E3 random slug → E18 (+ one page only if the response offers `extra.offset`). Budget: at most 30 requests including refreshes. Sanitized fixtures go to the app's external files directory (`SpikeFiles` native module) for `adb pull`.
+
+**Host checks:** `npm run lint -- --max-warnings 0`, `npm run typecheck`, `npm test` (13 suites, 156 tests), `npm run check:fixtures` pass. New tests: `contentShapesApi.test.ts` (request paths, picking, analysis lines without values, sanitizer: no input string survives except allowlisted enums, runner order, 5-blog cap, budget stop, no page 2 without a cursor), `ContentShapesCheck.test.tsx` (one run, request count, fixtures written, second run refused, no token/title/URL in console, screen or files) and `__tests__/checkFixtures.test.js` (the real CLI passes clean fixtures and spike sanitizer output; fails on a planted token, `Bearer`, signed URL, query string, phone string and number, email, free-form string, unsafe key, real text content).
+
+**Build:** `./gradlew assembleRelease -PreactNativeArchitectures=armeabi-v7a` BUILD SUCCESSFUL; release-like (`zipalign` + `apksigner`, SDK debug key outside the repo) installed on the pinned device. The screen opens and reads the store without a request: **signed-out** (expected after the Story 1.4 logout).
+
+**Device run: not done yet.** It needs the owner to sign in on «Вход по телефону» (SMS code). Pending: one run, `adb pull` of the fixtures to `src/test/fixtures/boosty/`, deletion on the device, logcat scan, and the `LIVE` results in `docs/api-contract.md` §3/§4/§7/§8.
+
+`device_id` / refresh-token reuse re-test: closed as not needed for production (owner decision 2026-10-25; no requests), see api-contract §2.3.
+

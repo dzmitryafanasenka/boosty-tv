@@ -13,6 +13,9 @@ import {
   parseSendCode,
   parseTokens,
   sanitizeResponse,
+  describeRateLimit,
+  formatRateLimit,
+  rateLimitSummary,
   sessionFromTokens,
   type FetchLike,
 } from '../phoneAuthApi';
@@ -368,5 +371,73 @@ describe('execute', () => {
       error: 'Timeout',
     });
     jest.useRealTimers();
+  });
+
+  describe('429 rate-limit details', () => {
+    const headers: Array<[string, string]> = [
+      ['Content-Type', 'application/json'],
+      ['X-RateLimit-Reset', '3600'],
+      ['Set-Cookie', 'session=secretvalue'],
+    ];
+
+    test('safe description, limit header values, all header names without values', () => {
+      const info = describeRateLimit(headers, {
+        error: 'sms_gate_ratelimit',
+        error_description: 'Too many attempts, try again in 15 minutes',
+      });
+      expect(info.limitHeaders).toEqual([['x-ratelimit-reset', '3600']]);
+      expect(info.headerNames).toEqual([
+        'content-type',
+        'set-cookie',
+        'x-ratelimit-reset',
+      ]);
+      expect(info.description).toBe(
+        'Too many attempts, try again in 15 minutes',
+      );
+      const text = formatRateLimit(info).join('\n');
+      expect(text).not.toContain('secretvalue');
+      expect(rateLimitSummary(info)).toContain('15 minutes');
+    });
+
+    test('description with a long digit run or "@" is hidden, short numbers kept', () => {
+      const info = describeRateLimit([], {
+        error_description: 'Phone 375291234567 blocked for 30 min',
+      });
+      expect(info.description).toBeUndefined();
+      expect(info.descriptionNumbers).toEqual(['30']);
+      expect(formatRateLimit(info).join('\n')).not.toContain('375291234567');
+      expect(
+        describeRateLimit([], { error_description: 'a@b.c' }).description,
+      ).toBeUndefined();
+    });
+
+    test('unsafe limit header value is replaced by its length', () => {
+      const info = describeRateLimit([['Retry-After', 'x'.repeat(100)]], {});
+      expect(info.limitHeaders).toEqual([['retry-after', '<unsafe, len 100>']]);
+      expect(rateLimitSummary(describeRateLimit([], {}))).toBe(
+        'сервер не указал, когда можно повторить',
+      );
+    });
+
+    test('sanitizeResponse attaches rateLimit only for 429', () => {
+      const body = JSON.stringify({
+        error: 'sms_gate_ratelimit',
+        error_description: 'wait',
+      });
+      const args = {
+        request: 'send' as const,
+        contentType: 'application/json',
+        retryAfter: null,
+        rawText: body,
+        headers,
+      };
+      expect(
+        sanitizeResponse({ ...args, status: 429 }).sanitized.rateLimit
+          ?.description,
+      ).toBe('wait');
+      expect(
+        sanitizeResponse({ ...args, status: 400 }).sanitized.rateLimit,
+      ).toBeUndefined();
+    });
   });
 });
