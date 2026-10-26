@@ -1,0 +1,51 @@
+__tests__/accountScopeRegistry.test.js
+  s_476416fbc7fdcb::t_a5180706084f2e 14-17,23,25-39,44,47-50
+__tests__/sessionRefresh.test.ts
+  s_476416fbc7fdcb::t_410a75bbe126ab 625,629
+__tests__/signOutFlow.test.tsx
+  s_476416fbc7fdcb::t_8f12d9e7c4c05c 174-176,197-211,359-360,362,435-441,443,445,456-460,464-506
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_476416fbc7fdcb::t_34ccf67b42e1b3 124,143-145
+_bmad-output/implementation-artifacts/spec-2-7-minimal-settings-and-sign-out.md
+  s_476416fbc7fdcb::t_fd187c4ef32dd1 5,8,121-122,124,130-151
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_476416fbc7fdcb::t_d45824d10d7658 32,56
+docs/api-contract.md
+  s_476416fbc7fdcb::t_88d7348be1f16b 198
+docs/feature-parity.md
+  s_476416fbc7fdcb::t_b30490c1e8f099 44
+docs/focus-map.md
+  s_476416fbc7fdcb::t_e7ba6e893499d8 48-49,228
+src/app/session.ts
+  s_476416fbc7fdcb::t_87c2f4c80d420c 28
+src/features/settings/SignOutDialog.tsx
+  s_476416fbc7fdcb::t_a8097b7345138e 42-46,48,50
+src/shared/account/__tests__/accountScope.test.ts
+  s_476416fbc7fdcb::t_e47731623c8933 68-69,102-103,106-112,114-115,118-126
+src/shared/account/accountScope.ts
+  s_476416fbc7fdcb::t_310f63c6dafc26 16-20,66-68
+src/shared/account/defineAccountScoped.ts
+  s_476416fbc7fdcb::t_19261c55bf9e22 6
+src/shared/api/__tests__/sessionManager.test.ts
+  s_476416fbc7fdcb::t_86c32cf130c5a9 406,424,434,439,447-462
+src/shared/api/sessionManager.ts
+  s_476416fbc7fdcb::t_f423601dd18d8c 118-123,452-453,456
+src/shared/focus/ModalHost.tsx
+  s_476416fbc7fdcb::t_06f66b1b475d79 28-32,58-60,67-73,85-86,96-97,100-108,116
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "09e4661e568bb1e3c41becbc6f18a619a6a74a7d",
+  "prompts": {},
+  "sessions": {
+    "s_476416fbc7fdcb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "08ebeb55-8b1a-43e7-b7ba-11e4b9745838",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
