@@ -1,0 +1,107 @@
+__tests__/codeFlow.test.tsx
+  s_476416fbc7fdcb::t_49fc42cc15d5f7 717,723-725
+__tests__/demoFlow.test.tsx
+  s_476416fbc7fdcb::t_360f3e0545a096 1-98
+__tests__/demoModeOff.test.js
+  s_476416fbc7fdcb::t_b9db31579dcb99 1-18
+__tests__/releaseBundle.test.js
+  s_476416fbc7fdcb::t_0e892efbe1d667 3-4,14-26,73-74
+__tests__/sessionFlow.test.tsx
+  s_476416fbc7fdcb::t_545fa109b67590 1-367
+__tests__/sessionRefresh.test.ts
+  s_476416fbc7fdcb::t_a3e5dc5c80e01a 1-660
+__tests__/shellFlow.test.tsx
+  s_476416fbc7fdcb::t_4f68ddaf97747b 113-120
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_476416fbc7fdcb::t_7de6bea4a54830 124-129
+_bmad-output/implementation-artifacts/spec-2-5-stay-signed-in-across-restarts-and-expiry.md
+  s_476416fbc7fdcb::t_e6d5e94cab5145 1-187
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_476416fbc7fdcb::t_96e2ae004725eb 32,53-54
+android/app/build.gradle
+  s_476416fbc7fdcb::t_429527e9f59b46 99-122
+docs/api-contract.md
+  s_476416fbc7fdcb::t_8ae9ec0c263e5d 202-232
+docs/focus-map.md
+  s_476416fbc7fdcb::t_1d5c77946c4701 142
+docs/testing.md
+  s_476416fbc7fdcb::t_5a2f32195914cb 117-142
+src/app/App.tsx
+  s_476416fbc7fdcb::t_393b367340d291 11-12,15-19,21-24,27,39-50,100-109,114,121-126,131-147,152-159,168-177,180-198,201-208,210-212,214-250,256-261,263-291,295,300-301,307-320
+src/app/Shell.tsx
+  s_476416fbc7fdcb::t_2d269db475833d 4,23-26,63,152-168,220-225,234-235,239-240,244,246-251
+src/app/appConfig.ts
+  s_476416fbc7fdcb::t_2ac035991f2005 1-12
+src/app/dev/demo.ts
+  s_476416fbc7fdcb::t_551f487111f514 1-53
+src/app/sessionUi.ts
+  s_476416fbc7fdcb::t_e8a442894a8ca7 1-25
+src/features/home/HomeScreen.tsx
+  s_476416fbc7fdcb::t_1084b252024bc3 2,4-17,23-26,28-48,64-67
+src/features/home/index.ts
+  s_476416fbc7fdcb::t_ce31772af2952d 1
+src/features/settings/SettingsScreen.tsx
+  s_476416fbc7fdcb::t_f6d57b78e67fb3 10-14,22-27,35,38,64-73
+src/shared/api/__tests__/appError.test.ts
+  s_476416fbc7fdcb::t_8547a1d332e8bb 1-38
+src/shared/api/__tests__/authApiClient.test.ts
+  s_476416fbc7fdcb::t_a9a7012d0c5575 5,421-555
+src/shared/api/__tests__/httpClient.test.ts
+  s_476416fbc7fdcb::t_8488c9a32e4bc8 1,3-9,13,15-24,26-27,31-38,42-47,53,57-70,78-84,87-94,97-107,110-164,166-237,241-242,246,249-255
+src/shared/api/__tests__/sessionManager.test.ts
+  s_476416fbc7fdcb::t_1c119f5326badc 5-6,36,39,45,47-49,55,84-86,104,127-131,189-191,222
+src/shared/api/authApiClient.ts
+  s_476416fbc7fdcb::t_06073295cdb426 3-4,6,8,11-14,26-27,32,43-67,91-95,99-101,108-109,114-115,223-267,303
+src/shared/api/dto/tokens.ts
+  s_476416fbc7fdcb::t_f1362bbbd0b52b 21-46
+src/shared/api/fixtureTransport.ts
+  s_476416fbc7fdcb::t_adfd9160970935 1-133
+src/shared/api/httpClient.ts
+  s_476416fbc7fdcb::t_92599f00aab53c 1,3-15,18-19,21-34,36-37,41-42,44-52,55-82,85-92,94-95,97-110,114-117,119-120,124-125,127,130-132,134-135,138-186,188-226,228-245
+src/shared/api/refreshCoordinator.ts
+  s_476416fbc7fdcb::t_8be6544c47d65c 1-255
+src/shared/api/sessionManager.ts
+  s_476416fbc7fdcb::t_2d70a66307e8db 5,9,13-19,23-39,41-46,51,60-62,64,67-76,90,94-114,143-144,153,160-163,167-178,191-235,237-238,244-251,259-260,265,271-273,278,281-292,300,325-326,331,336,343,347-391,405,433-449,455-457
+src/shared/i18n/ru.ts
+  s_476416fbc7fdcb::t_8c253475b25e06 86-98,126-130
+src/shared/ui/Button.tsx
+  s_476416fbc7fdcb::t_6c0b02a7c873eb 5,30-31,81,113
+src/shared/ui/StateView.tsx
+  s_476416fbc7fdcb::t_29716e10477509 1,3-4,13-17,57-59
+src/test/fixtures/boosty/e1-user-current.json
+  s_476416fbc7fdcb::t_c1d5cf7594a39c 1-8
+src/test/fixtures/boosty/refresh-invalid-grant.json
+  s_476416fbc7fdcb::t_10733077ff6263 1-8
+src/test/fixtures/boosty/refresh-ok.json
+  s_476416fbc7fdcb::t_27cc32dab49898 1-9
+src/shared/api/appError.ts
+  s_74c49acf72cb12::t_2691cf2e38d42f 1-81
+src/shared/api/index.ts
+  s_74c49acf72cb12::t_8bb5e8bfc87315 5,8,10-15,18,22,25,27
+src/shared/api/transport.ts
+  s_74c49acf72cb12::t_3e9a9bd8225a94 1-39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "9dc16d37ad373d2441cf2b7cd855203908f4bfdc",
+  "prompts": {},
+  "sessions": {
+    "s_476416fbc7fdcb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "08ebeb55-8b1a-43e7-b7ba-11e4b9745838",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_74c49acf72cb12": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ab2cae062a21c81b1",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
