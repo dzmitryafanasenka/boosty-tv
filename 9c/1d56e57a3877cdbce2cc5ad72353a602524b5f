@@ -1,0 +1,73 @@
+__tests__/expiredFlow.test.tsx
+  s_476416fbc7fdcb::t_a29056fbd997e9 1-616
+__tests__/releaseBundle.test.js
+  s_476416fbc7fdcb::t_af78183d0e336f 4-6,27-29,79-80
+__tests__/sessionFlow.test.tsx
+  s_476416fbc7fdcb::t_fa386c84d3b2be 5-6,286,291-292,325,334-339
+__tests__/sessionRefresh.test.ts
+  s_476416fbc7fdcb::t_dd712922df0ca6 329-330,332-334,347,351-356,359,362,366-367
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_476416fbc7fdcb::t_5c1257c8fbf1b7 118,131-137
+_bmad-output/implementation-artifacts/spec-2-6-session-expired-and-quick-re-login.md
+  s_476416fbc7fdcb::t_76e56fcdf879d0 1-168
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_476416fbc7fdcb::t_b1d341c43593e1 32,54-55
+docs/api-contract.md
+  s_476416fbc7fdcb::t_42d6a7ee50b47a 210
+docs/feature-parity.md
+  s_476416fbc7fdcb::t_7d94f3c48cf505 30,32,43
+docs/focus-map.md
+  s_476416fbc7fdcb::t_eb0ed766afc4ee 127-132
+docs/testing.md
+  s_476416fbc7fdcb::t_792cd2788cf4ec 143-163
+src/app/App.tsx
+  s_476416fbc7fdcb::t_60b2be883efc4b 11-18,21-26,30,33-38,79-86,107-110,115,120-131,136,141-157,159-175,184,189,226-233,245,263-265,270-272,274,298,324-328,339,358
+src/app/Shell.tsx
+  s_476416fbc7fdcb::t_724907976e5d30 19-23,29-30,69-75,236,248,254,265
+src/app/routes.ts
+  s_476416fbc7fdcb::t_f13d0a469427ba 9-13,18-19
+src/app/sessionUi.ts
+  s_476416fbc7fdcb::t_7c0290cab557d1 15-16
+src/features/auth/CodeScreen.tsx
+  s_476416fbc7fdcb::t_ada728163c84ee 9,41-42,44,193,199
+src/features/auth/ExpiredScreen.tsx
+  s_476416fbc7fdcb::t_dbf3fd94f7fa62 1-130
+src/features/auth/PhoneScreen.tsx
+  s_476416fbc7fdcb::t_74c41a78f0c646 31,33-37,66-71,73,112-120,170-171,173-177
+src/features/auth/__tests__/phone.test.ts
+  s_476416fbc7fdcb::t_74b3c7eec97c06 1-8,83-120
+src/features/auth/index.ts
+  s_476416fbc7fdcb::t_da4bed47fa7c17 2
+src/features/auth/phone.ts
+  s_476416fbc7fdcb::t_1c3771ed3098ae 79-138
+src/features/settings/SettingsScreen.tsx
+  s_476416fbc7fdcb::t_b7449187c259d9 15-16,30-36,44-48,52,88-97
+src/shared/api/__tests__/sessionManager.test.ts
+  s_476416fbc7fdcb::t_8c05462755b322 280-419
+src/shared/api/index.ts
+  s_476416fbc7fdcb::t_43846d0690f827 25
+src/shared/api/sessionManager.ts
+  s_476416fbc7fdcb::t_835a1112ae1dd7 29-35,59-64,70,72,75-83,110-116,138-144,162-179,181-187,214-218,223,273-277,280-285,301,303-306,308,310-311,331-335,338,372,390-392,403,411,413,415,453,505-516,534-545
+src/shared/focus/ModalHost.tsx
+  s_476416fbc7fdcb::t_70ecba4cd2bab0 34-39,63,67-68,74-76
+src/shared/i18n/ru.ts
+  s_476416fbc7fdcb::t_e070f895787305 67-72,137-140
+src/shared/focus/__tests__/ModalHost.test.tsx
+  s_476416fbc7fdcb::t_69c13250309419 191-196,208-210,227-248
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "9c1d56e57a3877cdbce2cc5ad72353a602524b5f",
+  "prompts": {},
+  "sessions": {
+    "s_476416fbc7fdcb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "08ebeb55-8b1a-43e7-b7ba-11e4b9745838",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
