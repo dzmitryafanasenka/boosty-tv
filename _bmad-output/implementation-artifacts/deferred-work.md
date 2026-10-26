@@ -121,6 +121,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-2-4-the-app-shell-sidebar-back-and-focus.md`
   summary: Modal Back priority relies on its BackHandler listener being the newest (medium, unverified).
   evidence: A screen that registers a Back listener while a dialog is open would handle Back under it. Settle with a documented contract in docs/focus-map.md (screens check `modal.isOpen()` first, or a central host handler) when the first production dialog lands.
+  note: Story 2.7 (2026-10-26): `SignOutDialog` is the first production dialog and relies on this order: its own Back listener (swallows Back while «Выйти» is busy, otherwise returns false) must be newer than the host's. The host now registers its listener in `open()`, before the content mounts, and the contract is one line in docs/focus-map.md §1.4 (host tests; not run on the device).
 - source_spec: `_bmad-output/implementation-artifacts/spec-2-4-the-app-shell-sidebar-back-and-focus.md`
   summary: The owner noticed slower remote response on the 300-card «Проверка фокуса» list (debug build, Metro over the network).
   evidence: Observed with the physical remote on 2026-10-26, only on the debug build (dev-mode JS, no minification, dev checks); the release build has no 300-item list to compare. Measure D-pad latency on the first long production list (Epic 3 feed) in a release build on the pinned device before calling it acceptable.
@@ -139,3 +140,6 @@
   summary: Add a unit test that `getExpiredPhone()` resolves null when the status changes (sign-out/sign-in) while the phone read is pending; fold into Story 2.7.
   evidence: `src/shared/api/sessionManager.ts` `getExpiredPhone` re-checks the status after the read; no test changes it mid-read (verification-gap review).
   note: Resolved in Story 2.7 (2026-10-26): `sessionManager.test.ts` «getExpiredPhone resolves null when the status changes mid-read (sign-out)».
+- source_spec: `_bmad-output/implementation-artifacts/spec-2-7-minimal-settings-and-sign-out.md`
+  summary: A failed `signOut` keeps SessionManager's bumped generation, so a refresh that was in flight is dropped as stale and its already-spent refresh token later yields `invalid_grant`; decide whether a failed sign-out rolls the generation back.
+  evidence: `src/shared/api/sessionManager.ts` `signOut` bumps `generation` before the clears and does not restore it in the failure path (edge-case review, Story 2.7).

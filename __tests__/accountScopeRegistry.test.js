@@ -11,28 +11,42 @@ require('../src/app/bootstrap');
 const { accountScope } = require('../src/shared/account');
 
 const SRC = path.resolve(__dirname, '../src');
-/** The definition itself; its doc comments are not declarations. */
-const DEFINITION_DIR = path.join(SRC, 'shared', 'account');
-const DECLARATION = /defineAccountScoped\(\s*['"`]([^'"`]+)['"`]/g;
+/** The definition itself (`export function defineAccountScoped(`). */
+const DEFINITION = path.join(SRC, 'shared', 'account', 'defineAccountScoped.ts');
+const CALL = /defineAccountScoped\(/g;
+const LITERAL_NAME = /^defineAccountScoped\(\s*(['"])([^'"\n]+)\1/;
 
 function sourceFiles(dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      return entry.name === '__tests__' || full === DEFINITION_DIR ? [] : sourceFiles(full);
+      return entry.name === '__tests__' ? [] : sourceFiles(full);
     }
-    return /\.(ts|tsx|js)$/.test(entry.name) ? [full] : [];
+    if (full === DEFINITION || /\.test\.[jt]sx?$/.test(entry.name)) {
+      return [];
+    }
+    return /\.(ts|tsx|js|jsx)$/.test(entry.name) ? [full] : [];
+  });
+}
+
+/** Every call in `src/`; `name` is null when the first argument is not a string literal. */
+function declarations() {
+  return sourceFiles(SRC).flatMap(file => {
+    const source = fs.readFileSync(file, 'utf8');
+    return [...source.matchAll(CALL)].map(match => {
+      const literal = LITERAL_NAME.exec(source.slice(match.index));
+      return { name: literal ? literal[2] : null, file: path.relative(SRC, file) };
+    });
   });
 }
 
 function declaredNames() {
-  return sourceFiles(SRC).flatMap(file =>
-    [...fs.readFileSync(file, 'utf8').matchAll(DECLARATION)].map(match => ({
-      name: match[1],
-      file: path.relative(SRC, file),
-    })),
-  );
+  return declarations().filter(d => d.name !== null);
 }
+
+test('every declaration names its store with a string literal', () => {
+  expect(declarations().filter(d => d.name === null)).toEqual([]);
+});
 
 test('the scan finds the known declarations', () => {
   expect(declaredNames().map(d => d.name).sort()).toEqual(

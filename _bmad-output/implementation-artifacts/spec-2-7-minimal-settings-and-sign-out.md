@@ -2,10 +2,10 @@
 title: 'Story 2.7: Minimal Settings and sign-out'
 type: 'feature'
 created: '2026-10-26'
-status: 'in-review'
+status: 'done'
 baseline_commit: '9ef168140d8a881fcac5e51425762af416ff7c18'
 route: 'dispatch'
-review_loop_iteration: 0
+review_loop_iteration: 1
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-2-context.md'
   - '{project-root}/docs/focus-map.md'
@@ -118,14 +118,36 @@ context:
 
 - The `session` store is declared in `src/app/session.ts` (not `shared/api`): the app chooses the active SessionManager (real or the debug demo), and the demo must never clear the real keychain. `session.ts` keeps `demo` a local binding and exports only `DEMO_ACTIVE`; an exported `demo` was not folded out of the release bundle (`releaseBundle.test.js` caught `createDemoSessionManager`).
 - `defineAccountScoped` lives in an import-free file (`src/shared/account/defineAccountScoped.ts`) so the logger can declare its store without an import cycle; `bootstrap.ts` seals the scope, so a lazy `register` throws.
-- `reset()` bumps the generation as it starts. Non-gate store failures are logged (`outcome: partial`) and do not stop the others or reject: the session is already gone, so the UI leaves the account.
-- While «Выйти» is busy, `SignOutDialog` swallows Back (its listener is newer than the modal host's) and ignores «Отмена», so the dialog cannot disappear under a running sign-out.
+- `reset()` bumps the generation once the gate succeeded, before the other stores run; a failed gate leaves it unchanged. Non-gate store failures are logged (`outcome: partial`) and do not stop the others or reject: the session is already gone, so the UI leaves the account.
+- `SignOutDialog` registers one Back listener for its lifetime that swallows Back while the sign-out runs (read from the in-flight ref) and otherwise returns false; it also ignores «Отмена» meanwhile. It is newer than the host's because the modal host now adds its listener in `open()`, before the content mounts (child mount effects run before the provider's, so the host's old effect-registered listener would have been newer).
 - The registration test is plain JS (`__tests__/accountScopeRegistry.test.js`), like `boundaries.test.js`, because the repo has no Node type packages.
-- Known edge (unchanged `signOut`): when the session clear succeeds but the phone clear fails, `reset()` rejects and memory keeps `signedIn`, while SecureStore already holds no session; a retry completes the sign-out, and a restart would open A1.
+- `signOut` clears the phone first, then the session entry (review fix): a phone-clear failure now leaves the stored session and memory as they were; a later session-clear failure leaves only the re-login prefill gone.
 
 ## Spec Change Log
 
 ## Review Triage Log
+
+| # | Source | Finding | Verdict | Route / evidence |
+|---|---|---|---|---|
+| 1 | blind+edge | Gate partial failure: the session entry is cleared, then the phone clear fails → `reset()` rejects while memory stays `signedIn` with no stored session and the phone kept | medium | patch: `signOut` clears session then phone (`sessionManager.ts` L447-453); the spec says a gate failure leaves every store as it was. Clearing the phone first makes a phone failure change nothing, and a later session failure leaves only the prefill gone |
+| 2 | blind+edge | `AccountScope` bumps the generation before the gate succeeds; a failed sign-out makes future writers drop valid writes of the still-signed-in account | medium | patch: bump after the gate resolves, before the other stores (writers that started before or during the gate still carry the old value) |
+| 3 | blind+edge | Back between OK on «Выйти» and the busy effect commit reaches the modal host and closes the dialog mid-sign-out | low | patch: one permanent Back listener in `SignOutDialog` that swallows Back while `inFlight.current` |
+| 4 | blind+edge+vg | The registry scan only sees literal names and skips the whole `src/shared/account/` dir | low | patch: fail on any `defineAccountScoped(` call without a literal name; exclude only `defineAccountScoped.ts` |
+| 5 | vg | The `signedOut` → `homeOffline` reset in `App.tsx` is untested | gap | patch: flow test (offline cold start → sign-out → sign-in → no offline view) |
+| 6 | blind | The refresh-race test does not assert that no request with credentials leaves after sign-out | gap | patch: assert no request after `signedOut` (no E1 retry, no `Authorization`) |
+| 7 | blind | `defineAccountScoped.ts` comment names `accountScopeRegistry.test.ts` | low | patch: `.js` |
+| 8 | blind | Deferred "modal Back priority" item not updated though SignOutDialog is the first production dialog | low | patch: note in deferred-work + the contract line in focus-map |
+| 9 | blind | Sign-out keeping `device_id` and device settings is not written down | low | patch: one line in feature-parity AUTH-07 |
+| 10 | edge | `signOut` failure keeps `sessionManager`'s bumped generation, so an in-flight refresh result is dropped and its spent token later yields `invalid_grant` | low | defer: pre-existing 2.5 behaviour; needs a generation rollback design |
+| 11 | blind+edge | `ResetResult.failed` is ignored by App | low | rejected: the non-gate stores are synchronous in-memory clears that cannot fail today; revisit when the query cache lands (2.8 / Epic 3) |
+| 12 | blind | Stores are cleared while the old Shell is mounted and could write again | false | FocusZone writes on item focus, not on unmount (`FocusZone.tsx:133`); and the next sign-in has no previous account id, so `accountChanged` clears FocusRestoration anyway |
+| 13 | edge | `reset()` on an empty or unsealed scope resolves ok | low | rejected: `App.tsx` imports `bootstrap` first, and the registry test proves the gate and the seal; no other entry point exists |
+| 14 | edge | After a successful reset the navigator might not be ready | false | sign-out is only reachable from a mounted Shell |
+| 15 | edge | The registry test matches by name, not by object identity | low | rejected: names are unique per declaration (tested); the extra rigor adds no observed protection |
+| 16 | blind | A double OK on the row can open a second dialog | low | rejected: `ModalHost.open` replaces the content; the modal traps focus at once |
+| 17 | blind | Dialog has no a11y modal role; busy state has no spoken text | low | rejected: TalkBack is an open owner check across epic 2; not regressed here |
+| 18 | blind | `Dialog` prop names `primary`/`secondary` mean order, not style | low | rejected: naming only |
+| 19 | blind | Spec/sprint status mismatch; bootstrap imported only from `App.tsx` | false | statuses are workflow-managed; `index.js` renders `App`, the only entry point |
 
 ## Verification
 

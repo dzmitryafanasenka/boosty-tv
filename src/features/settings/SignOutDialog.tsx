@@ -39,14 +39,15 @@ export function SignOutDialog({ onCancel, onConfirm }: SignOutDialogProps) {
     };
   }, []);
 
-  // Registered after the modal host's listener, so it runs first.
+  // One listener for the dialog's lifetime, registered after the modal
+  // host's (the host adds its own in `open()`), so it sees Back first: it
+  // swallows Back while the sign-out runs (read from the ref, so a Back
+  // right after OK, before any re-render, is caught too) and otherwise lets
+  // the modal host close the dialog.
   useEffect(() => {
-    if (!busy) {
-      return undefined;
-    }
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => true);
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => inFlight.current);
     return () => sub.remove();
-  }, [busy]);
+  }, []);
 
   const confirm = useCallback(() => {
     if (inFlight.current) {

@@ -3,7 +3,7 @@
  * account and must be wiped on sign-out (and, from Story 2.8, on an account
  * switch). The owning module declares it next to the data it owns, and
  * `src/app/bootstrap.ts` registers it with `accountScope` before the app
- * renders. `__tests__/accountScopeRegistry.test.ts` fails when a declared
+ * renders. `__tests__/accountScopeRegistry.test.js` fails when a declared
  * store is not registered.
  *
  * This file imports nothing, so any module (the logger included) can

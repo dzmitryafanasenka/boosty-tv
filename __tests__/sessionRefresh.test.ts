@@ -622,11 +622,11 @@ describe('generation guard', () => {
 });
 
 describe('sign-out', () => {
-  test('SecureStore first (session, phone), then memory; no request', async () => {
+  test('SecureStore first (phone, session), then memory; no request', async () => {
     const t = setup({ route: () => fixtureReply(e1Ok) });
     await t.manager.restore();
     await t.manager.signOut();
-    expect(t.events).toEqual(['session.clear', 'phone.clear']);
+    expect(t.events).toEqual(['phone.clear', 'session.clear']);
     expect(t.manager.getStatus()).toBe('signedOut');
     expect(t.transport.calls).toHaveLength(0);
   });

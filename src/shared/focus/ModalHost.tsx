@@ -25,7 +25,11 @@ import { colors } from '../ui/tokens';
  * `tvFocusable` prop, and turning it back on (or removing it) makes the
  * background container itself focusable (or keeps descendants blocked).
  * Back closes it first (its BackHandler listener is the newest), then focus
- * goes back to the initiator explicitly: before the unmount, right after it
+ * goes back to the initiator explicitly. The host's listener is added in
+ * `open()` itself, before the content mounts, so a listener the content
+ * adds on mount (e.g. the sign-out dialog swallowing Back while busy,
+ * Story 2.7) is newer and sees Back first; it returns false to let the
+ * host close. Focus goes back to the initiator before the unmount, right after it
  * and two frames later (the only request that stuck on the device).
  */
 
@@ -51,12 +55,22 @@ export function ModalHostProvider({ children }: { children?: ReactNode }) {
   const containerRef = useRef<HostView>(null);
   /** The initiator to focus after the overlay is gone. */
   const returnTo = useRef<RefObject<HostView | null> | undefined>(undefined);
+  /** The host's Back listener while an overlay is open. */
+  const backSub = useRef<{ remove(): void } | null>(null);
+  const closeRef = useRef<ModalApi['close']>(() => {});
 
   const open = useCallback<ModalApi['open']>((content, initiatorRef) => {
     returnTo.current = undefined;
     const next = { content, initiator: initiatorRef };
     // Set now, so close() / isOpen() right after open() see it before the commit.
     modalRef.current = next;
+    // Registered now, before the content's mount effects (see above).
+    if (!backSub.current) {
+      backSub.current = BackHandler.addEventListener('hardwareBackPress', () => {
+        closeRef.current();
+        return true;
+      });
+    }
     setModal(next);
   }, []);
 
@@ -68,6 +82,8 @@ export function ModalHostProvider({ children }: { children?: ReactNode }) {
       options?.restoreFocus === false ? undefined : modalRef.current.initiator;
     returnTo.current = initiator;
     modalRef.current = null;
+    backSub.current?.remove();
+    backSub.current = null;
     // Focus the initiator before the dialog is unmounted, so the removed
     // dialog does not hold focus; the effect below repeats the request after
     // the unmount (device: Story 2.4).
@@ -77,7 +93,18 @@ export function ModalHostProvider({ children }: { children?: ReactNode }) {
     setModal(null);
   }, []);
 
+  closeRef.current = close;
+
   const isOpen = useCallback(() => modalRef.current !== null, []);
+
+  // Unmounted while open: drop the listener.
+  useEffect(
+    () => () => {
+      backSub.current?.remove();
+      backSub.current = null;
+    },
+    [],
+  );
 
   const visible = modal !== null;
 
@@ -86,11 +113,7 @@ export function ModalHostProvider({ children }: { children?: ReactNode }) {
       // Move focus into the dialog: the container hands it to its first
       // focusable descendant (or the content's preferred focus).
       requestHostFocus(containerRef.current);
-      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-        close();
-        return true;
-      });
-      return () => sub.remove();
+      return undefined;
     }
     const initiator = returnTo.current;
     returnTo.current = undefined;

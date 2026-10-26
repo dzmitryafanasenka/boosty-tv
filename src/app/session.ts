@@ -25,7 +25,7 @@ export const session: SessionManager = demo
 
 /**
  * The session store (AD-4), the AccountScope gate: SecureStore (the
- * session or expiry marker, then the phone), then memory, including the
+ * phone, then the session or expiry marker), then memory, including the
  * account id and the previous account id. Declared here, not in
  * `shared/api`, because the app chooses which session it runs on (the demo
  * never touches SecureStore). Local only: no server revoke.

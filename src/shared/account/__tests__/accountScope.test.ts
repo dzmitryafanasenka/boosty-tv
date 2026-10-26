@@ -65,7 +65,8 @@ describe('AccountScope', () => {
     fail = false;
     await expect(scope.reset()).resolves.toEqual({ failed: [] });
     expect(calls).toEqual(['session', 'session', 'other']);
-    expect(scope.generation()).toBe(2);
+    // The failed attempt did not bump it.
+    expect(scope.generation()).toBe(1);
   });
 
   test('a failing non-gate store is reported; the rest still reset', async () => {
@@ -98,15 +99,31 @@ describe('AccountScope', () => {
     expect(scope.generation()).toBe(1);
   });
 
-  test('the generation is bumped as the reset starts, so in-flight writers see it', async () => {
-    const { scope, store } = setup();
+  test('the generation is bumped once the gate succeeded, before the other stores run', async () => {
+    const { scope } = setup();
     const gate = deferred();
-    scope.register(store('session', () => gate.promise));
     const captured = scope.generation();
+    const seenByOther: number[] = [];
+    scope.register(
+      defineAccountScoped('session', () => gate.promise),
+      defineAccountScoped('other', () => {
+        seenByOther.push(scope.generation());
+      }),
+    );
     const done = scope.reset();
-    expect(scope.generation()).not.toBe(captured);
+    await Promise.resolve();
+    expect(scope.generation()).toBe(captured);
     gate.resolve();
     await done;
+    expect(seenByOther).toEqual([captured + 1]);
+    expect(scope.generation()).toBe(captured + 1);
+  });
+
+  test('a failed gate leaves the generation unchanged', async () => {
+    const { scope, store } = setup();
+    scope.register(store('session', () => Promise.reject(new Error('keychain'))));
+    await expect(scope.reset()).rejects.toThrow('keychain');
+    expect(scope.generation()).toBe(0);
   });
 
   test('a duplicate name and a registration after seal() throw', () => {
