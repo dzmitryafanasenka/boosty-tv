@@ -1,0 +1,149 @@
+__tests__/accountScopeRegistry.test.js
+  s_8a5132ae1233f2::t_04b7953bb34e88 53
+__tests__/accountSwitchFlow.test.tsx
+  s_8a5132ae1233f2::t_a424dab9ff92ed 16-17,47,163-168,183-185,248-249,259,311-313,320-321,343,353-355,363-370
+__tests__/codeFlow.test.tsx
+  s_8a5132ae1233f2::t_861093a5c07133 13-14,57-58,127,135-136,381-384,386,388,393,642-650
+__tests__/demoFlow.test.tsx
+  s_8a5132ae1233f2::t_ea07fd87f5526e 9,59-60,84-95
+__tests__/demoModeOff.test.js
+  s_8a5132ae1233f2::t_8a079c9787bc54 19
+__tests__/expiredFlow.test.tsx
+  s_8a5132ae1233f2::t_787878170914cb 14,42,136-141,156-157,453-455,497-499,505,513
+__tests__/homeFeedFlow.test.tsx
+  s_8a5132ae1233f2::t_54ed55d99eeafb 1-1066
+__tests__/releaseBundle.test.js
+  s_8a5132ae1233f2::t_b5cf64a3cf549e 30-33,85-87
+__tests__/sessionFlow.test.tsx
+  s_8a5132ae1233f2::t_8c48f2076d11a0 14,38,93-98,113-114,135,138-142,152,172,185,191,203,257,270,290-291,312-315
+__tests__/shellFlow.test.tsx
+  s_8a5132ae1233f2::t_065141c14f5973 13,19,101-102,109-114,118-119,146,152-153,156-157,159,165-166,205,207,262,264-265,269,301,304-307
+__tests__/signOutFlow.test.tsx
+  s_8a5132ae1233f2::t_deca3be10b3ac0 13,44,112-117,120-121,362,400
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_8a5132ae1233f2::t_b1df098a5ad2d2 163-174
+_bmad-output/implementation-artifacts/epic-3-context.md
+  s_8a5132ae1233f2::t_c4817f78de7915 43
+_bmad-output/implementation-artifacts/spec-3-1-subscription-feed-on-the-home-screen.md
+  s_8a5132ae1233f2::t_9f65124e69553d 1-180
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_8a5132ae1233f2::t_163667829ac889 32,60-61
+_bmad-output/planning-artifacts/ux-designs/ux-boosty-tv-2026-10-25/DESIGN.md
+  s_8a5132ae1233f2::t_d46da27b6a7860 232
+docs/adr/0009-session-manager-split.md
+  s_8a5132ae1233f2::t_36317c5fdd22c3 3
+docs/adr/0010-server-state-tanstack-query.md
+  s_8a5132ae1233f2::t_d76f7e129c5049 1-40
+docs/adr/0011-feed-list-flashlist.md
+  s_8a5132ae1233f2::t_07e5396c4777de 1-76
+docs/api-contract.md
+  s_8a5132ae1233f2::t_8ee24261733134 33
+docs/focus-map.md
+  s_8a5132ae1233f2::t_5fad702701d0c6 140,153-169,178
+docs/testing.md
+  s_8a5132ae1233f2::t_fbf6d38c1f5c17 645-674
+jest.config.js
+  s_8a5132ae1233f2::t_7d40cb5a42fa9f 6-7,9-14
+package-lock.json
+  s_8a5132ae1233f2::t_9c8de270a1cd40 13-14,3490-3500,3551-3576
+package.json
+  s_8a5132ae1233f2::t_75104a6dae1d3c 16-17
+src/app/App.tsx
+  s_8a5132ae1233f2::t_c0bb7cad7db7bc 22,41,206,305,364-371,373-403
+src/app/Shell.tsx
+  s_8a5132ae1233f2::t_bdbf0ef247dafa 11,13,33-37,46,86,99-100,198,201,205,208,211-222,246,258-260,267-270,284-287,295-298,307-315
+src/app/__tests__/queryClient.test.ts
+  s_8a5132ae1233f2::t_4fc51349492ed7 1-25
+src/app/bootstrap.ts
+  s_8a5132ae1233f2::t_8edb212031b511 5,37
+src/app/dev/demo.ts
+  s_8a5132ae1233f2::t_22f6caa0e3d97a 17-23,26-75,102-103
+src/features/home/FeedGrid.tsx
+  s_8a5132ae1233f2::t_38bac8ae630c01 1-472
+src/features/home/HomeScreen.tsx
+  s_8a5132ae1233f2::t_4258f84d857286 1-5,7-28,32-53,59,62-68,71-72,74-90,92-93,95-183,185-304,313-314,321,323-394,402-423
+src/features/home/__tests__/feedPaging.test.ts
+  s_8a5132ae1233f2::t_b2e760ebd2d822 1-126
+src/features/home/index.ts
+  s_8a5132ae1233f2::t_15d33744da78b8 1-8
+src/features/home/useSubscriptionFeed.ts
+  s_8a5132ae1233f2::t_e8239ad62256ab 1-155
+src/shared/api/index.ts
+  s_8a5132ae1233f2::t_5162114c078d61 27
+src/shared/entities/post/__tests__/mapPost.test.ts
+  s_8a5132ae1233f2::t_7307022e6472a4 1-227
+src/shared/entities/post/__tests__/postRepository.test.ts
+  s_8a5132ae1233f2::t_bb56df209b02da 1-150
+src/shared/focus/FocusZone.tsx
+  s_8a5132ae1233f2::t_11fb0438afb413 86-87,107-110,113-132,139,149-151,166
+src/shared/focus/__tests__/useFocusRestoration.test.tsx
+  s_8a5132ae1233f2::t_48b213288c6ede 24-25,33,54,258-302
+src/shared/focus/useFocusRestoration.ts
+  s_8a5132ae1233f2::t_97694f0fdf4ef6 37-42,63-68,83,85-87,145-153,163-196,220,222-230,234,236,238-242,245-246
+src/shared/i18n/__tests__/catalog.test.ts
+  s_8a5132ae1233f2::t_0bf7d66d91fc2a 36-37
+src/shared/i18n/ru.ts
+  s_8a5132ae1233f2::t_19f39c72c4d165 87-96,108-147
+src/shared/ui/FocusableSurface.tsx
+  s_8a5132ae1233f2::t_ecbb6f6867fa5a 22,45-50,55-60,89,93-94,109-116,135-139,166-172,175,177,184-192
+src/shared/ui/PostCard.tsx
+  s_8a5132ae1233f2::t_5e064ea23d8ce7 1-367
+src/shared/ui/__tests__/Button.test.tsx
+  s_8a5132ae1233f2::t_d5200f94ac7a9d 44-45
+src/shared/ui/__tests__/PostCard.test.tsx
+  s_8a5132ae1233f2::t_87f69eb7ddf89b 1-296
+src/shared/ui/__tests__/shellPrimitives.test.tsx
+  s_8a5132ae1233f2::t_87a28e979f87a0 31-32
+src/shared/ui/__tests__/surfaceRules.test.tsx
+  s_8a5132ae1233f2::t_fa97cf6de7efdf 1-61
+src/shared/ui/index.ts
+  s_8a5132ae1233f2::t_5d0d79c87f39a3 18-29
+src/shared/ui/useItemState.ts
+  s_8a5132ae1233f2::t_2ef3c19daea59e 1-38
+src/app/queryClient.ts
+  s_5225dc5222aedb::t_d7d3d3f07cedd7 1-51
+src/shared/api/dto/feed.ts
+  s_5225dc5222aedb::t_1b227021e1963e 1-26
+src/shared/api/dto/post.ts
+  s_5225dc5222aedb::t_cc6a6d292d59d6 1-113
+src/shared/api/queryKeys.ts
+  s_5225dc5222aedb::t_dc325df62807f3 1-10
+src/shared/entities/post/index.ts
+  s_5225dc5222aedb::t_5bc3c54daa0bc7 1-17
+src/shared/entities/post/mapPost.ts
+  s_5225dc5222aedb::t_878e97e0be87f2 1-256
+src/shared/entities/post/postRepository.ts
+  s_5225dc5222aedb::t_7ad60ff349f9e0 1-60
+src/shared/entities/post/types.ts
+  s_5225dc5222aedb::t_ea7e5041294082 1-95
+src/shared/i18n/__tests__/format.test.ts
+  s_5225dc5222aedb::t_d911389fb40550 1-54
+src/shared/i18n/format.ts
+  s_5225dc5222aedb::t_a80b19bab3583a 1-68
+src/test/feedFixtures.ts
+  s_5225dc5222aedb::t_9d196b25783674 1-100
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "40f0faba7f2add6d8fa832589b8d9e81a2aa8f2d",
+  "prompts": {},
+  "sessions": {
+    "s_5225dc5222aedb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a16b7a015ce6e5c39",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_8a5132ae1233f2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7bd22f0c-fe48-4fca-bedc-1f4cab1db281",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
