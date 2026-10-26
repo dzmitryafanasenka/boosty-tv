@@ -147,6 +147,7 @@
 - source_spec: none
   summary: Epic 2 retro action item 5 — plan a split of `SessionManager` before it gains Epic 3 concerns (design note/ADR), to run before Story 3.1.
   evidence: Split from the Epic 3 kickoff intent (owner choice 2026-10-26: item 4 first, then item 5, then Story 3.1 as separate runs).
+  note: Planned 2026-10-26 in `docs/adr/0009-session-manager-split.md` (proposed). Owner decision: the split itself runs between Epic 3 and Epic 4, right before Story 4.2 (entry below), not before Story 3.1.
 - source_spec: none
   summary: Story 3.1 (subscription feed on the Home screen), built on the shared flow-test harness from retro item 4; repositories take the HTTP client from `src/app/session.ts`; measure release-build D-pad latency on the 300+ fixture feed.
   evidence: Split from the Epic 3 kickoff intent (owner choice 2026-10-26: retro item 4 runs first).
@@ -156,3 +157,6 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-epic-2-retro-item-4-flow-test-harness.md`
   summary: Exempt `**/__tests__/**` from the `boundaries` "no import of src/test" policy in `.eslintrc.js`, so tests under `src/` can use the shared harness without `eslint-disable` comments.
   evidence: `src/shared/focus/__tests__/ModalHost.test.tsx` needs three `eslint-disable-next-line boundaries/dependencies` lines to import `src/test/flow.tsx` (review of retro item 4).
+- source_spec: `_bmad-output/implementation-artifacts/spec-epic-2-retro-item-5-session-manager-split-plan.md`
+  summary: Split `SessionManager` per ADR 0009 (codec → core → refreshHost → signOut → lifecycle → restore → signIn → debug, facade unchanged) as its own change between Epic 3 and Epic 4, before Story 4.2.
+  evidence: Owner decision 2026-10-26; Story 4.2 is the first story with a session concern (pending progress flushed after re-login only if the account generation is unchanged).
