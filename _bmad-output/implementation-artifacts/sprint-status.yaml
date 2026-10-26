@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 10-25-2026 14:34
-last_updated: 10-26-2026 03:22
+last_updated: 10-26-2026 04:43
 project: Boosty TV
 project_key: NOKEY
 tracking_system: file-system
@@ -49,8 +49,8 @@ development_status:
   epic-2: in-progress
   2-1-welcome-screen-on-the-design-foundation: done
   2-2-request-a-sign-in-code-by-phone: done
-  2-3-confirm-the-code-and-create-the-session: review
-  2-4-the-app-shell-sidebar-back-and-focus: backlog
+  2-3-confirm-the-code-and-create-the-session: done
+  2-4-the-app-shell-sidebar-back-and-focus: review
   2-5-stay-signed-in-across-restarts-and-expiry: backlog
   2-6-session-expired-and-quick-re-login: backlog
   2-7-minimal-settings-and-sign-out: backlog

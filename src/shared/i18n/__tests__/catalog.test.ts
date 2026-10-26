@@ -28,6 +28,17 @@ describe('ru catalog', () => {
     );
   });
 
+  it('has the Shell, Главная and Настройки copy (Story 2.4)', () => {
+    expect(t('shell.wordmark')).toBe('Boosty TV');
+    expect(t('shell.nav.home')).toBe('Главная');
+    expect(t('shell.nav.settings')).toBe('Настройки');
+    expect(Object.keys(ru.shell.nav)).toEqual(['home', 'search', 'subs', 'events', 'settings']);
+    expect(t('home.placeholder.title')).toBe('Лента появится здесь');
+    expect(t('home.placeholder.body').length).toBeGreaterThan(0);
+    expect(t('settings.version')).toBe('Версия');
+    expect(ru.auth).not.toHaveProperty('signedIn');
+  });
+
   it('has copy for every AD-5 error kind and nothing else', () => {
     expect(Object.keys(ru.error).sort()).toEqual([...ERROR_KINDS].sort());
     for (const kind of ERROR_KINDS) {

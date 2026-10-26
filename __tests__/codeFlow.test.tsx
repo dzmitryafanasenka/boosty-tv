@@ -1,7 +1,7 @@
 /**
  * Story 2.3 through the real App (NavigationContainer + JS stack): A5–A8
  * (code field, 60 s resend countdown, resend, A7 wrong code, A8 expired),
- * confirm → E1 → SecureStore → SignedIn, and the startup gate.
+ * confirm → E1 → SecureStore → the Shell, and the startup gate.
  * `fetch`, the InstallId native module, react-native-keychain (root
  * `__mocks__`), BackHandler and the native focus command are faked; native
  * focus and the keychain itself are device checks.
@@ -214,7 +214,7 @@ function lastFocusTarget(): string | undefined {
 }
 
 function topScreen(root: Root): string | undefined {
-  const ids = ['auth/welcome', 'auth/phone', 'auth/code', 'auth/signed-in'];
+  const ids = ['auth/welcome', 'auth/phone', 'auth/code', 'shell'];
   const present = ids.filter(id => visible(root, id));
   return present[present.length - 1];
 }
@@ -426,7 +426,7 @@ describe('A5 form and the countdown', () => {
 });
 
 describe('confirm and session creation', () => {
-  it('success via «Готово»: confirm, E1 with the content profile, saved, then SignedIn; Back exits', async () => {
+  it('success via «Готово»: confirm, E1 with the content profile, saved, then the Shell; Back exits', async () => {
     const root = await openCode();
     await type(root, 'auth/code/field', ` ${SMS_CODE} `);
     await submit(root, 'auth/code/field');
@@ -456,15 +456,22 @@ describe('confirm and session creation', () => {
     expect(keychain.__values.get('boostytv.phone')).toBe(PHONE);
     expect(authFlow.getChallenge()).toBeNull();
 
-    expect(topScreen(root)).toBe('auth/signed-in');
+    expect(topScreen(root)).toBe('shell');
     expect(visible(root, 'auth/code')).toBe(false);
     expect(visible(root, 'auth/phone')).toBe(false);
-    expect(text(root)).toContain(t('auth.signedIn.title'));
-    const signedIn = JSON.stringify(byTestId(root, 'auth/signed-in')[0].toJSON?.() ?? null);
+    expect(visible(root, 'shell/sidebar')).toBe(true);
+    expect(text(root)).toContain(t('home.placeholder.title'));
+    expect(lastFocusTarget()).toBe('nav/home');
+    const shell = JSON.stringify(byTestId(root, 'shell')[0].toJSON?.() ?? null);
     for (const personal of ['291234567', '1001', '•']) {
-      expect(signedIn).not.toContain(personal);
+      expect(shell).not.toContain(personal);
     }
-    expect(root.container.queryAll(node => node.props.focusable === true)).toHaveLength(0);
+    // Only the sidebar is focusable on Главная (the placeholder has no action).
+    expect(
+      root.container
+        .queryAll(node => node.props.focusable === true)
+        .map(node => node.props.testID),
+    ).toEqual(['nav/home', 'nav/settings']);
 
     await back();
     expect(backHandler.exitApp).toHaveBeenCalled();
@@ -493,11 +500,11 @@ describe('confirm and session creation', () => {
     });
     await settle(true);
     expect(requestsTo(CONFIRM_URL)).toHaveLength(1);
-    expect(topScreen(root)).toBe('auth/signed-in');
+    expect(topScreen(root)).toBe('shell');
     await unmount(root);
   });
 
-  it('Back during confirm: the late success still opens SignedIn (the session exists)', async () => {
+  it('Back during confirm: the late success still opens the Shell (the session exists)', async () => {
     let release: () => void = () => {};
     const root = await openCode();
     fetchMock.mockImplementation((url: string) =>
@@ -516,7 +523,7 @@ describe('confirm and session creation', () => {
     });
     await settle(true);
     expect(keychain.__values.has('boostytv.session')).toBe(true);
-    expect(topScreen(root)).toBe('auth/signed-in');
+    expect(topScreen(root)).toBe('shell');
     expect(visible(root, 'auth/phone')).toBe(false);
     await unmount(root);
   });
@@ -542,7 +549,7 @@ describe('confirm and session creation', () => {
     replies[CONFIRM_URL] = [{ status: 200, body: TOKENS }];
     await press(root, 'auth/code/submit');
     await settle(true);
-    expect(topScreen(root)).toBe('auth/signed-in');
+    expect(topScreen(root)).toBe('shell');
     await unmount(root);
   });
 
@@ -707,11 +714,12 @@ describe('startup gate', () => {
     await unmount(root);
   });
 
-  it('a stored session → SignedIn; no request', async () => {
+  it('a stored session → the Shell on Главная, focus nav/home; no request', async () => {
     keychain.__values.set('boostytv.session', STORED);
     const root = await renderApp();
-    expect(topScreen(root)).toBe('auth/signed-in');
+    expect(topScreen(root)).toBe('shell');
     expect(visible(root, 'auth/welcome')).toBe(false);
+    expect(lastFocusTarget()).toBe('nav/home');
     expect(fetchMock).not.toHaveBeenCalled();
     await unmount(root);
   });
@@ -754,11 +762,11 @@ describe('startup gate', () => {
     await unmount(root);
   });
 
-  it('a transient keychain error once → the retry reads the session → SignedIn', async () => {
+  it('a transient keychain error once → the retry reads the session → the Shell', async () => {
     keychain.__values.set('boostytv.session', STORED);
     keychain.__failNext('getGenericPassword', Object.assign(new Error('busy'), { code: 'E_KEYSTORE_ACCESS_ERROR' }));
     const root = await renderApp();
-    expect(topScreen(root)).toBe('auth/signed-in');
+    expect(topScreen(root)).toBe('shell');
     await unmount(root);
   });
 });

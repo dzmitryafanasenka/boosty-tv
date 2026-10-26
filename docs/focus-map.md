@@ -79,7 +79,7 @@ Focus ids follow `<screen>/<zone>/<id>` with stable content ids, never list indi
 - Refetch, pagination, image loading and background updates **never move focus**. Page merges dedupe by id.
 - **Skeletons:** while a screen in Shell shows a skeleton, focus stays on the sidebar's current item. When the first item loads, focus moves to the screen's initial element **only if** the user has not moved focus in the meantime. Screens outside Shell (sign-in, Post, Player) keep focus on the busy control or give none until the first focusable element exists.
 - **Busy buttons:** while an action runs, the button shows a spinner and keeps focus; another OK is ignored.
-- *(device: unverified)* Restoration by id on a long virtualized list is verified on the device in Story 2.4.
+- *(device: Story 2.4, debug build, adb)* Restoration by id on a 300-item virtualized list works (card 150 restored after push/pop; fallback to the neighbor and to the action above). The list needs a bounded viewport height (see `docs/testing.md`, Story 2.4).
 
 ### 1.7 Phase-gated entry points
 
@@ -120,7 +120,7 @@ Implementation notes (Story 2.3, host tests only; A5 is reached only through a r
 - After a resend (success or failure) and after A7, focus goes to the code field; every resend attempt restarts the 60 s countdown. After A8 «Выслать новый код» succeeds, the form comes back with the field cleared and focused; after it fails, the button is locked by the countdown (sub-label «через 1:00») and focus goes to the field.
 - When confirm succeeded but E1 or the session save failed, the challenge is spent: A5 switches to the A8 layout with `error.Unknown` and «Выслать новый код» focused.
 - The inline errors, the resend hint and A1's «Войдите снова» are polite live regions (TalkBack announces them without a focus move). Network and unknown confirm errors leave focus where it is (the busy button keeps it).
-- After a successful sign-in the stack is replaced by the temporary SignedIn screen (no focusable element, Back exits the app). A sign-in that finishes after Back from A5 still opens SignedIn, because the session exists.
+- After a successful sign-in the stack is replaced by the Shell (Story 2.4; it replaced the temporary SignedIn screen of Story 2.3). A sign-in that finishes after Back from A5 still opens the Shell, because the session exists.
 - Startup: a splash with no focusable element until the stored session is read; A1 after a wiped (corrupted) store shows «Войдите снова» above «Войти в Boosty» (focus unchanged).
 - A9 also offers «На первый экран» (`auth/phone/to-welcome`, → A1), as in the mock. A10 hides «Попробовать снова» after its one retry; focus then goes to «Изменить номер» (host tests only).
 
@@ -134,6 +134,12 @@ Implementation notes (Story 2.3, host tests only; A5 is reached only through a r
 | B6 Skeleton | Sidebar current item (§1.6) | — | — | → as sidebar | — |
 | C Подписки (C1–C3) | «Мой блог» tile when its flag is on, otherwise the first author tile | 3-column grid; ← from the first column → sidebar | → D Автор | → sidebar → Главная | After Автор: the same tile by `blogUrl` |
 | C3 No subscriptions | No focusable content; focus stays on the sidebar item | → does nothing | — | → Главная | — |
+
+Implementation notes (Story 2.4, device-verified by adb unless noted):
+- Shell: `src/app/Shell.tsx`. The sidebar is a `TVFocusGuideView` with `trapFocusUp/Down/Left` and the current item as its destination; the content is a `FocusZone` (`src/shared/focus`) with `trapFocusUp/Down` whose destination is the section's remembered element (FocusRestoration under the Shell route key + section id), else the section's initial element. Главная has no focusable content, so → from the sidebar does nothing there.
+- Zone tracking for Back uses the items' focus events; a covered Shell ignores them (Android fallback focus may land on a covered screen).
+- Настройки (Story 2.4 part): `settings/row/version` (info row, OK does nothing) is the initial content focus; debug builds add `settings/row/focus-check` («Проверка фокуса»).
+- Restoration: `useFocusRestoration` restores scroll, then (only when the id's current index differs from the remembered one) `scrollToIndex` by that index, then focuses the item once mounted (the list must provide `getItemLayout`); a user move, blur or unmount cancels the pending focus; fallback neighbor by index → first item → the action above. The modal host focuses the initiator before the unmount, right after it and two frames later (only the last one stuck on the device).
 
 Overrides applied here: **no LIVE card on Главная** (a live stream appears on Главная only if the feed is proven to return stream posts; until then OK on a feed card always opens Post). For more than 30 subscriptions the grid shows «Показаны первые 30» (text only, not focusable) instead of the design's «28 из 55» counter (EXPERIENCE › Visual references › Overrides).
 

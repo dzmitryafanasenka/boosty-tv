@@ -11,3 +11,6 @@ export { Text, type AppTextProps } from './Text';
 export * from './tokens';
 export { useReducedMotion } from './useReducedMotion';
 export { TextField, type TextFieldHandle, type TextFieldProps } from './TextField';
+export { NavItem, type NavItemProps } from './NavItem';
+export { SettingRow, type SettingRowKind, type SettingRowProps } from './SettingRow';
+export { StateView, type StateViewAction, type StateViewProps } from './StateView';

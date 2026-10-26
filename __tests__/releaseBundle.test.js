@@ -1,0 +1,60 @@
+/**
+ * Story 2.4: the debug-only «Проверка фокуса» routes must not be in the
+ * release bundle. Builds the Metro bundle with `--dev false` (and, as a
+ * control that the grep can see them, `--dev true`) and searches it for the
+ * dev route names and focus ids. Plain JS; runs the local react-native CLI.
+ */
+const { execFileSync } = require('node:child_process');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+
+const repoRoot = path.resolve(__dirname, '..');
+const DEV_MARKERS = ['DevFocus', 'dev/list/', 'dev/focus', 'dev/action/', 'dev/dialog'];
+
+jest.setTimeout(240_000);
+
+let dir;
+
+beforeAll(() => {
+  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'boostytv-bundle-'));
+});
+
+afterAll(() => {
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+function bundle(dev) {
+  const out = path.join(dir, `index.${dev ? 'dev' : 'release'}.bundle`);
+  execFileSync(
+    process.execPath,
+    [
+      path.join(repoRoot, 'node_modules/react-native/cli.js'),
+      'bundle',
+      '--platform',
+      'android',
+      '--dev',
+      String(dev),
+      '--entry-file',
+      'index.js',
+      '--bundle-output',
+      out,
+    ],
+    { cwd: repoRoot, stdio: 'pipe' },
+  );
+  return fs.readFileSync(out, 'utf8');
+}
+
+test('the release bundle has the Shell but no dev route or dev focus id', () => {
+  const release = bundle(false);
+  expect(release).toContain('nav/settings');
+  for (const marker of DEV_MARKERS) {
+    expect({ marker, found: release.includes(marker) }).toEqual({ marker, found: false });
+  }
+});
+
+test('control: the debug bundle contains the dev routes', () => {
+  const debug = bundle(true);
+  expect(debug).toContain('DevFocus');
+  expect(debug).toContain('dev/list/');
+});

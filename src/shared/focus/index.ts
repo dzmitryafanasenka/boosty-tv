@@ -1,1 +1,23 @@
+export {
+  MAIN_SECTION,
+  createFocusRestoration,
+  focusRestoration,
+  resolveRestoreTarget,
+  type FocusRestorationStore,
+  type RestorationEntry,
+  type RestoreTarget,
+} from './focusRestoration';
+export {
+  FocusZone,
+  useZoneItem,
+  type FocusZoneHandle,
+  type FocusZoneProps,
+} from './FocusZone';
+export { ModalHostProvider, useModal, type ModalApi } from './ModalHost';
 export { Screen, type ScreenProps } from './Screen';
+export {
+  useFocusRestoration,
+  type FocusRestorationOptions,
+  type ListRestoration,
+  type RestorableList,
+} from './useFocusRestoration';
