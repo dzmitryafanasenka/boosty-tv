@@ -1,0 +1,45 @@
+__tests__/accountSwitchFlow.test.tsx
+  s_8a5132ae1233f2::t_c5c2da3bc7b443 13-14,31-44,51-53,55,59-66,151-156,160,176,184,188
+__tests__/codeFlow.test.tsx
+  s_8a5132ae1233f2::t_5c859cb3dfead1 17-30,39-41,43,65,67,70-84,125-127,131,144,151,157,161,330,333,345,413,436,463,624,650
+__tests__/demoFlow.test.tsx
+  s_8a5132ae1233f2::t_67b340fa3ef000 14-21,29,35-42,53-54,59,66,115,121,123,126,128,130-132,134-135,139
+__tests__/expiredFlow.test.tsx
+  s_8a5132ae1233f2::t_dea528b61e24a8 11-12,27-40,47-49,51,53-60,126-131,134,150,156,160
+__tests__/sessionFlow.test.tsx
+  s_8a5132ae1233f2::t_c482f1cda0a94d 12,25-36,43,45-52,85-89,91,107,112
+__tests__/shellFlow.test.tsx
+  s_8a5132ae1233f2::t_73a5690521a40d 11,17-30,61-63,68-75,96-98,111,117,127
+__tests__/signInFlow.test.tsx
+  s_8a5132ae1233f2::t_0bfe06b6fb2b29 8,13-23,29-31,41-48,70,73,77,82,86,236,300,340,353,359,364,403
+__tests__/signOutFlow.test.tsx
+  s_8a5132ae1233f2::t_5ac203004263cd 11,27-42,49-51,53,55-63,103-108,110,114,120,126,128,321,323,331
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_8a5132ae1233f2::t_fe2f3ea363c5b2 147-158
+_bmad-output/implementation-artifacts/epic-3-context.md
+  s_8a5132ae1233f2::t_09c8505f24bb2e 1-61
+_bmad-output/implementation-artifacts/spec-epic-2-retro-item-4-flow-test-harness.md
+  s_8a5132ae1233f2::t_fb987637f3db3c 1-96
+src/shared/focus/__tests__/ModalHost.test.tsx
+  s_8a5132ae1233f2::t_4f626a070d0a37 3,6-9,14-17,48-55,57-61,67,216
+src/test/backHandlerMock.ts
+  s_8a5132ae1233f2::t_8f8171a69c2e60 1-51
+src/test/flow.tsx
+  s_8a5132ae1233f2::t_abc4eeb5d9a348 1-299
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "d17b68990486069145c35a7a02d5717b903662bd",
+  "prompts": {},
+  "sessions": {
+    "s_8a5132ae1233f2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7bd22f0c-fe48-4fca-bedc-1f4cab1db281",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
