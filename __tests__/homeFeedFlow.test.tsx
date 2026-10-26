@@ -10,6 +10,7 @@
  */
 import { notifyManager } from '@tanstack/react-query';
 import { act } from 'react';
+import { AppState } from 'react-native';
 import App from '../src/app/App';
 import { QUERY_STALE_TIME_MS, queryClient, resetQueryCache } from '../src/app/queryClient';
 import { queryKeys } from '../src/shared/api';
@@ -19,6 +20,7 @@ import {
   type FixtureTransport,
 } from '../src/shared/api/fixtureTransport';
 import { focusRestoration } from '../src/shared/focus';
+import { logger } from '../src/shared/services/logger';
 import { t } from '../src/shared/i18n';
 import { requestHostFocus } from '../src/shared/ui/requestHostFocus';
 import backHandler from '../src/test/backHandlerMock';
@@ -33,6 +35,8 @@ import {
   syntheticFeed,
 } from '../src/test/feedFixtures';
 import e1Ok from '../src/test/fixtures/boosty/e1-user-current.json';
+import e1Unauthorized from '../src/test/fixtures/boosty/e1-no-token.json';
+import refreshRejected from '../src/test/fixtures/boosty/refresh-invalid-grant.json';
 import {
   byTestId,
   clearNativeModules,
@@ -94,7 +98,8 @@ jest.mock('../src/shared/ui/PostCard', () => {
 const mockFlashList: {
   props: Record<string, any> | null;
   scrollToOffset: jest.Mock;
-} = { props: null, scrollToOffset: jest.fn() };
+  scrollToIndex: jest.Mock;
+} = { props: null, scrollToOffset: jest.fn(), scrollToIndex: jest.fn() };
 jest.mock('@shopify/flash-list', () => {
   const actual = jest.requireActual('@shopify/flash-list');
   const React = jest.requireActual('react');
@@ -108,8 +113,10 @@ jest.mock('@shopify/flash-list', () => {
           mockFlashList.scrollToOffset(params);
           return inner.current?.scrollToOffset(params);
         },
-        scrollToIndex: (params: unknown) =>
-          inner.current?.scrollToIndex(params) ?? Promise.resolve(),
+        scrollToIndex: (params: unknown) => {
+          mockFlashList.scrollToIndex(params);
+          return inner.current?.scrollToIndex(params) ?? Promise.resolve();
+        },
       }),
       [],
     );
@@ -1061,6 +1068,290 @@ describe('account scope', () => {
     await press(root, 'dialog/signout/confirm');
     expect(visible(root, 'auth/welcome')).toBe(true);
     expect(queryClient.getQueryCache().getAll()).toHaveLength(0);
+    await unmount(root);
+  });
+});
+
+describe('refresh on resume (spec-feed-refresh-on-resume, AD-7)', () => {
+  let appStateHandlers: Array<(state: string) => void> = [];
+
+  beforeEach(() => {
+    appStateHandlers = [];
+    jest.spyOn(AppState, 'addEventListener').mockImplementation(((
+      _type: string,
+      listener: (state: string) => void,
+    ) => {
+      appStateHandlers.push(listener);
+      return {
+        remove: () => {
+          appStateHandlers = appStateHandlers.filter(h => h !== listener);
+        },
+      };
+    }) as unknown as typeof AppState.addEventListener);
+  });
+
+  async function changeAppState(state: string) {
+    await act(async () => {
+      for (const h of [...appStateHandlers]) {
+        h(state);
+      }
+    });
+    await settle();
+  }
+
+  /** HOME, `ms` later back: the clock moves without firing timers. */
+  async function backgroundFor(ms: number) {
+    await changeAppState('background');
+    jest.setSystemTime(Date.now() + ms);
+    await changeAppState('active');
+  }
+
+  /** 30 synthetic posts; page 1 answered by `head` once set. */
+  let head: ((req: FixtureRequest) => FixtureReply) | null;
+  function feedWithHead() {
+    const pages = syntheticFeed({ total: 30 });
+    head = null;
+    return (req: FixtureRequest): FixtureReply =>
+      cursorOf(req.url) === null && head ? head(req) : pages(req);
+  }
+  /** A page-1 reply with these posts and the next cursor `cursor:<next>`. */
+  const headPage = (posts: Record<string, unknown>[], next: number): FixtureReply => ({
+    status: 200,
+    body: { data: { posts, blogs: [], counters: {} }, extra: { offset: cursorFor(next), isLast: false } },
+  });
+  const newPost = (n: number) => feedPost(1000 + n, { id: `new-${n}`, title: `New ${n}` });
+
+  /** Two pages loaded (20 posts), focus deep on post 13. */
+  async function deepInTheFeed() {
+    feed = feedWithHead();
+    const root = await renderApp();
+    await focusOn(root, 'home/feed/feed-post-8');
+    await focusOn(root, 'home/feed/feed-post-13');
+    expect(feedCalls()).toHaveLength(2);
+    focusMock.mockClear();
+    mockFlashList.scrollToIndex.mockClear();
+    return root;
+  }
+
+  it('quick return (< 60 s since the feed loaded): no E5 request', async () => {
+    const root = await deepInTheFeed();
+    await backgroundFor(QUERY_STALE_TIME_MS - 5_000);
+    expect(transport.callsTo(E1)).toHaveLength(2);
+    expect(feedCalls()).toHaveLength(2);
+    expect(focusMock).not.toHaveBeenCalled();
+    await unmount(root);
+  });
+
+  it('stale return, 2 new posts: on top, loaded pages kept, the focused card keeps focus at its new row', async () => {
+    const root = await deepInTheFeed();
+    head = () => headPage([newPost(0), newPost(1), ...Array.from({ length: 8 }, (_, i) => feedPost(i))], 8);
+    await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+    // One E5 request: page 1, no cursor.
+    expect(feedCalls()).toHaveLength(3);
+    expect(cursorOf(feedCalls()[2].url)).toBeNull();
+    const ids = gridPosts(root).map(p => p.id);
+    expect(ids.slice(0, 3)).toEqual(['new-0', 'new-1', 'feed-post-0']);
+    // 22 posts, the trailing partial row held: 21 shown; both pages kept.
+    expect(ids).toHaveLength(21);
+    expect(new Set(ids).size).toBe(21);
+    expect(ids).toContain('feed-post-18');
+    // The rows regrouped (post 13 moved from row 4 to row 5): it is
+    // scrolled into view and focused again.
+    expect(ids.indexOf('feed-post-13')).toBe(15);
+    expect(mockFlashList.scrollToIndex).toHaveBeenCalledWith(
+      expect.objectContaining({ index: 5, animated: false }),
+    );
+    expect(focusTargets()).toEqual(['home/feed/feed-post-13']);
+    // The next page still continues from the last loaded page.
+    await focusOn(root, 'home/feed/feed-post-18');
+    expect(cursorOf(feedCalls()[feedCalls().length - 1].url)).toBe(20);
+    await unmount(root);
+  });
+
+  it('stale return, nothing new: no visible change, focus unchanged', async () => {
+    const root = await deepInTheFeed();
+    const before = gridPosts(root).map(p => p.id);
+    await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+    expect(feedCalls()).toHaveLength(3);
+    expect(gridPosts(root).map(p => p.id)).toEqual(before);
+    expect(focusMock).not.toHaveBeenCalled();
+    expect(mockFlashList.scrollToIndex).not.toHaveBeenCalled();
+    await unmount(root);
+  });
+
+  it('a gap (page 1 shares no post): the feed is page 1 alone; focus follows the fallback chain', async () => {
+    const root = await deepInTheFeed();
+    head = () => headPage(Array.from({ length: 10 }, (_, i) => newPost(i)), 10);
+    await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+    expect(feedCalls()).toHaveLength(3);
+    const ids = gridPosts(root).map(p => p.id);
+    // 10 posts, more pages: 9 shown.
+    expect(ids).toEqual(Array.from({ length: 9 }, (_, i) => `new-${i}`));
+    // Post 13 (index 13) is gone: its neighbor by index, the last shown card.
+    expect(lastFocusTarget()).toBe('home/feed/new-8');
+    await unmount(root);
+  });
+
+  it('the refresh fails: nothing changes; logged without content', async () => {
+    const root = await deepInTheFeed();
+    const before = gridPosts(root).map(p => p.id);
+    logger.clear();
+    head = () => ({ status: 400, body: { error: 'bad_request' } });
+    await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+    expect(feedCalls()).toHaveLength(3);
+    expect(gridPosts(root).map(p => p.id)).toEqual(before);
+    expect(focusMock).not.toHaveBeenCalled();
+    expect(logger.entries()).toContainEqual(
+      expect.objectContaining({ scope: 'feed', message: 'resume refresh failed', fields: { kind: 'Client' } }),
+    );
+    await unmount(root);
+  });
+
+  it('the resume E1 fails: no E5 request', async () => {
+    const root = await deepInTheFeed();
+    transport = installFixtureTransport(req =>
+      req.path === E1 ? { status: 400, body: { error: 'bad_request' } } : feed(req),
+    );
+    head = () => headPage([newPost(0), ...Array.from({ length: 9 }, (_, i) => feedPost(i))], 9);
+    await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+    expect(transport.callsTo(E1)).toHaveLength(1);
+    expect(transport.callsTo(E5_PATH)).toHaveLength(0);
+    expect(gridPosts(root)[0].id).toBe('feed-post-0');
+    await unmount(root);
+  });
+
+  it('a 1-post prepend that adds no shown row sends no further E5 (only an append auto-fetches)', async () => {
+    feed = feedWithHead();
+    const root = await renderApp();
+    // 10 posts, more pages: 9 shown, post 9 held.
+    expect(gridPosts(root)).toHaveLength(9);
+    head = () => headPage([newPost(0), ...Array.from({ length: 9 }, (_, i) => feedPost(i))], 9);
+    await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+    // 11 posts: still 9 shown (2 held).
+    expect(gridPosts(root)[0].id).toBe('new-0');
+    expect(gridPosts(root)).toHaveLength(9);
+    expect(feedCalls()).toHaveLength(2);
+    await unmount(root);
+  });
+
+  it('a post inserted below an unchanged first post: the rows regroup, the focused card keeps focus', async () => {
+    const root = await deepInTheFeed();
+    head = () => headPage([feedPost(0), newPost(0), ...Array.from({ length: 8 }, (_, i) => feedPost(i + 1))], 9);
+    await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+    const ids = gridPosts(root).map(p => p.id);
+    expect(ids.slice(0, 3)).toEqual(['feed-post-0', 'new-0', 'feed-post-1']);
+    expect(ids.indexOf('feed-post-13')).toBe(14);
+    expect(mockFlashList.scrollToIndex).toHaveBeenCalledWith(
+      expect.objectContaining({ index: 4, animated: false }),
+    );
+    expect(focusTargets()).toEqual(['home/feed/feed-post-13']);
+    await unmount(root);
+  });
+
+  it('a 1-post prepend moves the focused last-row card into the held partial row: it stays shown and focused', async () => {
+    // Page 1: posts 0–8 (a multiple of 3). Later pages only repeat them with
+    // fresh cursors, so the auto-paging stops with more pages still "possible".
+    head = null;
+    feed = req => {
+      const n = cursorOf(req.url);
+      if (n === null && head) {
+        return head(req);
+      }
+      const posts = Array.from({ length: 9 }, (_, i) => feedPost(i));
+      return headPage(posts, n === null ? 9 : n + 1);
+    };
+    const root = await renderApp();
+    await focusOn(root, 'home/feed/feed-post-8');
+    await settle();
+    expect(gridPosts(root)).toHaveLength(9);
+    const calls = feedCalls().length;
+    focusMock.mockClear();
+    mockFlashList.scrollToIndex.mockClear();
+    head = () => headPage([newPost(0), ...Array.from({ length: 9 }, (_, i) => feedPost(i))], 9);
+    await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+    expect(feedCalls()).toHaveLength(calls + 1);
+    // 10 posts with more pages: post 8 is alone in the held row, but shown.
+    const ids = gridPosts(root).map(p => p.id);
+    expect(ids).toHaveLength(10);
+    expect(ids[9]).toBe('feed-post-8');
+    expect(mockFlashList.scrollToIndex).toHaveBeenCalledWith(
+      expect.objectContaining({ index: 3, animated: false }),
+    );
+    expect(focusTargets()).toEqual(['home/feed/feed-post-8']);
+    await unmount(root);
+  });
+
+  it('«Повторить» focused during a resume prepend: focus stays on it, no scroll', async () => {
+    const pages = syntheticFeed({ total: 30 });
+    head = null;
+    let failNext = true;
+    feed = req => {
+      const n = cursorOf(req.url);
+      if (n === null && head) {
+        return head(req);
+      }
+      return n !== null && failNext ? { status: 400, body: { error: 'bad_request' } } : pages(req);
+    };
+    const root = await renderApp();
+    await focusOn(root, 'home/feed/feed-post-8');
+    expect(visible(root, 'home/feed/retry')).toBe(true);
+    await focusOn(root, 'home/feed/retry');
+    failNext = false;
+    focusMock.mockClear();
+    mockFlashList.scrollToIndex.mockClear();
+    head = () => headPage([newPost(0), newPost(1), ...Array.from({ length: 8 }, (_, i) => feedPost(i))], 8);
+    await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+    expect(gridPosts(root)[0].id).toBe('new-0');
+    expect(focusMock).not.toHaveBeenCalled();
+    expect(mockFlashList.scrollToIndex).not.toHaveBeenCalled();
+    await unmount(root);
+  });
+
+  it('the resume E1 ends in expired (invalid_grant → A11): no E5 request', async () => {
+    installNativeModules({ InstallId: { getOrCreate: jest.fn().mockResolvedValue('0f8fad5b-d9cb-469f-a165-70867728950e') } });
+    const root = await deepInTheFeed();
+    transport = installFixtureTransport(req =>
+      req.path === E1
+        ? { status: e1Unauthorized.status, body: e1Unauthorized.body }
+        : req.path === '/oauth/token/'
+          ? { status: refreshRejected.status, body: refreshRejected.body }
+          : feed(req),
+    );
+    head = () => headPage([newPost(0), ...Array.from({ length: 9 }, (_, i) => feedPost(i))], 9);
+    await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+    await settle(WITH_TIMERS);
+    expect(transport.callsTo('/oauth/token/')).toHaveLength(1);
+    expect(visible(root, 'auth/expired')).toBe(true);
+    expect(transport.callsTo(E5_PATH)).toHaveLength(0);
+    await unmount(root);
+  });
+
+  it.each([
+    ['a network failure', (): FixtureReply => ({ network: true })],
+    ['a 5xx', (): FixtureReply => ({ status: 503, body: { error: 'unavailable' } })],
+  ])('the refresh E5 ends in %s (through the HttpClient retries): nothing changes', async (_name, reply) => {
+    const root = await deepInTheFeed();
+    const before = gridPosts(root).map(p => p.id);
+    head = reply;
+    await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+    await settle(WITH_TIMERS);
+    expect(feedCalls().length).toBeGreaterThan(3);
+    expect(feedCalls().slice(2).every(c => cursorOf(c.url) === null)).toBe(true);
+    expect(gridPosts(root).map(p => p.id)).toEqual(before);
+    expect(focusMock).not.toHaveBeenCalled();
+    await unmount(root);
+  });
+
+  it('focus on the sidebar: the data is merged, focus stays on nav/home', async () => {
+    const root = await deepInTheFeed();
+    await back(); // → nav/home
+    await focusOn(root, 'nav/home'); // the native focus event of that move
+    focusMock.mockClear();
+    head = () => headPage([newPost(0), newPost(1), ...Array.from({ length: 8 }, (_, i) => feedPost(i))], 8);
+    await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+    expect(feedCalls()).toHaveLength(3);
+    expect(gridPosts(root)[0].id).toBe('new-0');
+    expect(focusTargets()).toEqual([]);
     await unmount(root);
   });
 });

@@ -27,6 +27,7 @@ import {
   PhoneScreen,
   WelcomeScreen,
 } from '../features/auth';
+import { refreshFeedHead } from '../features/home';
 import { SignOutDialog } from '../features/settings';
 import { accountScope } from '../shared/account';
 import type { SignInResult, ValidateResult } from '../shared/api';
@@ -38,7 +39,7 @@ import {
 import { t } from '../shared/i18n';
 import { Text, colors, components, spacing, type HostView } from '../shared/ui';
 import type * as DevFocusModule from './dev/devFocus';
-import { queryClient } from './queryClient';
+import { queryClient, resetQueryCache } from './queryClient';
 import type { RootStackParamList } from './routes';
 import { DEMO_ACTIVE, session } from './session';
 import { SessionUiContext, useSessionUi, type SessionUi } from './sessionUi';
@@ -112,7 +113,11 @@ function Phone({
  * and session were stored; the same account keeps its FocusRestoration.
  */
 function onSignedIn(_result: SignInResult) {
-  openShell();
+  // Every sign-in starts with an empty query cache, also a re-login to the
+  // same account after A11 (owner decision 2026-10-26): a feed fetched with
+  // the dead token (all locked) must not survive. Cancel, then clear; the
+  // Shell opens after it, so its first E5 is never cancelled.
+  resetQueryCache().then(openShell, openShell);
 }
 
 function Code({ navigation }: StackScreenProps<RootStackParamList, 'Code'>) {
@@ -302,10 +307,13 @@ function App() {
       }
     });
     const appState = AppState.addEventListener('change', state => {
-      // Resume: E1 again; only a success changes anything (offline → the feed).
+      // Resume: E1 again; only a success changes anything (offline → the
+      // feed, and a stale cached feed gets its head refreshed: one E5 page 1,
+      // AD-7). Failures send nothing more.
       session.onAppStateChange(state)?.then(result => {
         if (alive.current && result.kind === 'ok') {
           setHomeOffline(false);
+          refreshFeedHead(queryClient, session.http, Date.now()).catch(() => {});
         }
       });
     });

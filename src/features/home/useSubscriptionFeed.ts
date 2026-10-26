@@ -65,8 +65,8 @@ export function useSubscriptionFeed(http: HttpClient, enabled: boolean): Subscri
     initialPageParam: null as string | null,
     getNextPageParam: (last, _all, _lastParam, allParams) => nextFeedCursor(last, allParams),
     // A remount after `staleTime` would refetch every loaded page in a row
-    // (31 requests for a 300-post feed). The feed refreshes only by explicit
-    // action (ADR 0010).
+    // (31 requests for a 300-post feed). Besides explicit actions, only the
+    // resume refresh of page 1 (`feedRefresh.ts`, ADR 0010) updates it.
     refetchOnMount: false,
     enabled,
   });
