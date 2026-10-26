@@ -108,6 +108,20 @@ export const ru = {
     version: 'Версия',
     /** Shown when the native versionName cannot be read. */
     versionUnknown: 'неизвестна',
+    signOut: {
+      row: 'Выйти из аккаунта',
+    },
+  },
+  // The sign-out confirmation (Story 2.7, docs/focus-map.md K4); copy from
+  // the approved Settings mock.
+  dialog: {
+    signOut: {
+      title: 'Выйти из аккаунта?',
+      body: 'Чтобы снова войти, понадобятся номер телефона и код из сообщения. Это коснётся всех, кто смотрит на этом телевизоре.',
+      cancel: 'Отмена',
+      confirm: 'Выйти',
+      error: 'Не удалось выйти из аккаунта. Попробуйте ещё раз.',
+    },
   },
   // Debug-only «Проверка фокуса» (Story 2.4, __DEV__ builds). Not product
   // copy; the screens that use it are not in the release bundle.

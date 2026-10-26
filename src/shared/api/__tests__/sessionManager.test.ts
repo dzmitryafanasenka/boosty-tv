@@ -403,6 +403,66 @@ describe('expiry marker, re-login and the phone accessor (Story 2.6)', () => {
     await expect(manager.signIn(ARGS)).resolves.toEqual({ accountChanged: true });
   });
 
+  test('signOut from expired (Story 2.7): the marker, then the phone, cleared; then signedOut, nothing sent', async () => {
+    const { manager, sessionStore, phoneStore, http } = setup();
+    sessionStore.value = marker('1001');
+    phoneStore.value = PHONE;
+    await manager.restore();
+    expect(manager.getStatus()).toBe('expired');
+    const order: string[] = [];
+    sessionStore.clear.mockImplementationOnce(async () => {
+      order.push('session');
+      sessionStore.value = null;
+    });
+    phoneStore.clear.mockImplementationOnce(async () => {
+      order.push('phone');
+      phoneStore.value = null;
+    });
+    const statuses: string[] = [];
+    manager.subscribe(s => statuses.push(s));
+    await manager.signOut();
+    expect(order).toEqual(['session', 'phone']);
+    expect(sessionStore.value).toBeNull();
+    expect(phoneStore.value).toBeNull();
+    expect(statuses).toEqual(['signedOut']);
+    expect(http.calls).toHaveLength(0);
+    await expect(manager.getExpiredPhone()).resolves.toBeNull();
+    // The previous account id is gone too.
+    await expect(manager.signIn(ARGS)).resolves.toEqual({ accountChanged: true });
+  });
+
+  test('signOut from expired: a failed clear rejects and keeps expired, the marker and the phone', async () => {
+    const { manager, sessionStore, phoneStore } = setup();
+    sessionStore.value = marker('1001');
+    phoneStore.value = PHONE;
+    await manager.restore();
+    sessionStore.clear.mockRejectedValueOnce(new Error('keychain'));
+    await expect(manager.signOut()).rejects.toThrow('keychain');
+    expect(manager.getStatus()).toBe('expired');
+    expect(sessionStore.value).toBe(marker('1001'));
+    expect(phoneStore.value).toBe(PHONE);
+    await expect(manager.getExpiredPhone()).resolves.toBe(PHONE);
+  });
+
+  test('getExpiredPhone resolves null when the status changes mid-read (sign-out)', async () => {
+    const { manager, sessionStore, phoneStore } = setup();
+    sessionStore.value = marker('1001');
+    phoneStore.value = PHONE;
+    await manager.restore();
+    let release!: () => void;
+    phoneStore.read.mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          release = () => resolve({ kind: 'value', value: PHONE });
+        }),
+    );
+    const pending = manager.getExpiredPhone();
+    await manager.signOut();
+    expect(manager.getStatus()).toBe('signedOut');
+    release();
+    await expect(pending).resolves.toBeNull();
+  });
+
   test('logs never contain the phone or the account id', async () => {
     const { manager, sessionStore, phoneStore, logger } = setup();
     sessionStore.value = marker('1001');

@@ -117,7 +117,10 @@ export type SessionManager = {
   /**
    * Local sign-out (no server call): clears SecureStore first (session, then
    * phone), then memory. Rejects with the store's error when a clear fails;
-   * the in-memory session is then kept. The UI is Story 2.7.
+   * the in-memory session and status are then kept. Works from `signedIn`
+   * and `expired` (the marker and the phone); drops the account id and the
+   * previous account id. The app calls it only through `AccountScope.reset()`
+   * (the `session` store, Story 2.7).
    */
   signOut(): Promise<void>;
   /** E1 session check, single-flight. Never rejects; never moves focus. */

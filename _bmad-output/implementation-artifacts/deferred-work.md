@@ -112,10 +112,12 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-2-4-the-app-shell-sidebar-back-and-focus.md`
   summary: `focusRestoration.forget` is never called and sign-out must call `focusRestoration.clear()` (Story 2.7, account isolation).
   evidence: Entries under removed route keys stay in memory for the app's lifetime; in-memory only, no persistence.
+  note: Sign-out part resolved in Story 2.7 (2026-10-26): `focusRestoration` is an account-scoped store, cleared by `AccountScope.reset()` on sign-out (`__tests__/signOutFlow.test.tsx`, host test). `forget` for removed route keys stays open.
 - source_spec: `_bmad-output/implementation-artifacts/spec-2-4-the-app-shell-sidebar-back-and-focus.md`
   summary: Modal host behavior when the initiator unmounts, when the stack is reset, or when a second dialog opens while one is open (medium, unverified).
   evidence: Not reachable in 2.4. Settle when session-expiry/sign-out resets (Stories 2.5–2.7) or the first production dialog can run with a dialog open; add a fallback focus and close-on-reset.
   note: Partly resolved in Story 2.6 (2026-10-26): on `expired` the app closes the modal with `close({ restoreFocus: false })` before the reset to A11, so no focus request goes to the departing initiator (host test with the debug dialog; not run on the device). Sign-out (2.7) and a second dialog while one is open remain open.
+  note: Sign-out reset part resolved in Story 2.7 (2026-10-26): after a successful sign-out the app closes the dialog with `close({ restoreFocus: false })`, then resets the stack to `[Welcome]` (host test; the device check covered only the dialog, not a real sign-out). A second dialog while one is open remains open.
 - source_spec: `_bmad-output/implementation-artifacts/spec-2-4-the-app-shell-sidebar-back-and-focus.md`
   summary: Modal Back priority relies on its BackHandler listener being the newest (medium, unverified).
   evidence: A screen that registers a Back listener while a dialog is open would handle Back under it. Settle with a documented contract in docs/focus-map.md (screens check `modal.isOpen()` first, or a central host handler) when the first production dialog lands.
@@ -132,6 +134,8 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-2-6-session-expired-and-quick-re-login.md`
   summary: A11 offers no way to remove the stored phone and the expiry marker's account id from a shared TV; Story 2.7 sign-out must decide whether A11 (or A1) gets a «Выйти»/forget path.
   evidence: After `expired` the phone and `{expired, accountId}` stay in SecureStore until a re-login or a sign-out, and sign-out is only reachable from the Shell.
+  note: Closed as won't do in Story 2.7 (owner decision 2026-10-26): A11 keeps its one-button design; the phone and the expiry marker stay until the next sign-in or sign-out (sign-out works from `expired` too).
 - source_spec: `_bmad-output/implementation-artifacts/spec-2-6-session-expired-and-quick-re-login.md`
   summary: Add a unit test that `getExpiredPhone()` resolves null when the status changes (sign-out/sign-in) while the phone read is pending; fold into Story 2.7.
   evidence: `src/shared/api/sessionManager.ts` `getExpiredPhone` re-checks the status after the read; no test changes it mid-read (verification-gap review).
+  note: Resolved in Story 2.7 (2026-10-26): `sessionManager.test.ts` «getExpiredPhone resolves null when the status changes mid-read (sign-out)».

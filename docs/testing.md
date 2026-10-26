@@ -161,6 +161,26 @@ Changes: A11 «Сессия истекла» (`src/features/auth/ExpiredScreen.t
 | Modal open during expiry | Host test only (the debug dialog) | host |
 | Physical remote, TalkBack | **Not verified** | — |
 
+### Story 2.7 — Minimal Settings and sign-out, 2026-10-26
+
+**Status: implemented and host-tested; the Настройки rows and the sign-out dialog (open, focus, ← →, «Отмена», Back) verified on the pinned device by adb on a release-like build. The sign-out itself is host-tested only (owner decision: the owner stays signed in on the device).**
+
+Changes: `AccountScope` (`src/shared/account/`: `defineAccountScoped`, `register`, `seal`, single-flight `reset()` with the session as the gate, `generation()`); `src/app/bootstrap.ts` registers `session` (`src/app/session.ts`, the active SessionManager's local `signOut()`), `focusRestoration`, `authFlow` and `logger`, then seals, imported first by `App.tsx`; the shared `Dialog` primitive (`src/shared/ui/Dialog.tsx`); Настройки row «Выйти из аккаунта» (`settings/row/signout`) and `SignOutDialog` (`src/features/settings/`); App: confirm → `accountScope.reset()` → modal closed without a focus return → `[Welcome]`; a failure keeps the dialog with the error line. No network request on sign-out.
+
+**Host checks:** `npm run lint -- --max-warnings 0`, `npm run typecheck`, `npm test` (41 suites, 622 tests), `npm run check:fixtures` (17 clean) pass. New tests: `__tests__/signOutFlow.test.tsx` (the spec matrix through the real App over FixtureTransport: the rows and the version focus, the dialog's focus, copy and hidden background, «Отмена» and Back → the row, confirm clears the keychain session and phone, FocusRestoration, the sign-in draft and the log ring, generation +1, no request, A1 with focus «Войти в Boosty» and no «Войдите снова», a repeated OK / «Отмена» / Back during the reset → one reset, a failed keychain clear keeps the dialog, the error line, the session and every store and moves no focus, a refresh in flight at confirm is dropped and storage stays clear), `__tests__/accountScopeRegistry.test.js` (scans `src/` for declared stores; fails on an unregistered or duplicate one; checked by removing a registration), `src/shared/account/__tests__/accountScope.test.ts` (order, gate failure, partial failure, single flight, generation, seal, logs), `src/shared/ui/__tests__/Dialog.test.tsx`, `sessionManager.test.ts` (sign-out from `expired`, its failure, `getExpiredPhone()` → null when sign-out lands mid-read).
+
+**Build:** `./gradlew assembleRelease -PreactNativeArchitectures=armeabi-v7a` BUILD SUCCESSFUL. The shipped Hermes bundle: `settings/row/signout` 1, `dialog/signout/confirm` 1, `createDemoSessionManager` 0, `settings/row/expired-check` 0, `settings/row/session-check` 0. Release-like (`zipalign -p 4` + `apksigner`, SDK debug key outside the repo), installed with `adb install -r`; nothing uninstalled or cleared, no sign-in, no sign-out.
+
+| Row | Result | Who |
+|---|---|---|
+| Настройки rows | Launcher start → Shell (still signed in), ↓ OK on Настройки: focus `settings/row/version`; rows `version`, `signout` only (release-like: no debug rows); ↓ → `settings/row/signout`, ↓ again stays | agent via adb (uiautomator) |
+| Dialog open | OK on the row → `dialog/signout` with focus `dialog/signout/cancel`; copy as approved (screenshot) | agent via adb (uiautomator, screenshot) |
+| ← → and the trap | → `confirm`, → stays, ↑ stays, ← `cancel`, ← stays | agent via adb |
+| «Отмена» | OK on «Отмена» → dialog closed, focus `settings/row/signout` | agent via adb |
+| Back | Dialog opened again, Back → dialog closed, focus `settings/row/signout`; ↑ → `settings/row/version`; the Shell and the session kept | agent via adb |
+| Confirm, failure, double OK, refresh race | Host tests only (`signOutFlow.test.tsx`); not run on the device (owner decision) | host |
+| Physical remote, TalkBack | **Not verified** | — |
+
 ### Verification commands
 
 ```sh

@@ -1,5 +1,12 @@
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from 'react';
 import { BackHandler, StyleSheet, TVFocusGuideView, View } from 'react-native';
 import { HomeScreen, type HomeScreenProps } from '../features/home';
 import { SETTINGS_VERSION_ID, SettingsScreen } from '../features/settings';
@@ -22,6 +29,8 @@ export type ShellProps = {
    * the Shell route a new key while the same account keeps its memory.
    */
   routeKey: string;
+  /** Настройки «Выйти из аккаунта»: open the sign-out dialog (Story 2.7). */
+  onOpenSignOut: (initiator: RefObject<HostView | null>) => void;
   /** Debug builds only: open «Проверка фокуса» from Настройки. */
   onOpenFocusCheck?: () => void;
   /** Debug builds only: the live refresh check row in Настройки. */
@@ -68,6 +77,7 @@ type View_ = { section: SectionId; focusContent: boolean };
  */
 export function Shell({
   routeKey,
+  onOpenSignOut,
   onOpenFocusCheck,
   onCheckSession,
   onExpireSession,
@@ -231,6 +241,7 @@ export function Shell({
       >
         <SectionContent
           section={view.section}
+          onOpenSignOut={onOpenSignOut}
           onOpenFocusCheck={onOpenFocusCheck}
           onCheckSession={onCheckSession}
           onExpireSession={onExpireSession}
@@ -243,12 +254,14 @@ export function Shell({
 
 function SectionContent({
   section,
+  onOpenSignOut,
   onOpenFocusCheck,
   onCheckSession,
   onExpireSession,
   homeOffline,
 }: {
   section: SectionId;
+  onOpenSignOut: (initiator: RefObject<HostView | null>) => void;
   onOpenFocusCheck?: () => void;
   onCheckSession?: () => void;
   onExpireSession?: () => void;
@@ -260,6 +273,7 @@ function SectionContent({
     case 'settings':
       return (
         <SettingsScreen
+          onOpenSignOut={onOpenSignOut}
           onOpenFocusCheck={onOpenFocusCheck}
           onCheckSession={onCheckSession}
           onExpireSession={onExpireSession}

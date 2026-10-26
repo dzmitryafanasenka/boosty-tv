@@ -1,3 +1,5 @@
+import { defineAccountScoped } from '../account/defineAccountScoped';
+
 /**
  * App logger (epic 2 "Logger"). Every message and field value passes
  * `redact()` before it is stored or printed, so the in-memory ring never
@@ -148,3 +150,10 @@ export function createLogger({
 export const logger: Logger = createLogger({
   console: typeof __DEV__ !== 'undefined' && __DEV__,
 });
+
+/**
+ * The in-memory ring is account-scoped (it may hold account activity):
+ * wiped by `AccountScope.reset()`. Imported from the import-free file, not
+ * the account index, which itself imports this logger.
+ */
+export const loggerAccountStore = defineAccountScoped('logger', () => logger.clear());

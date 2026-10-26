@@ -1,3 +1,5 @@
+import { defineAccountScoped } from '../account';
+
 /**
  * FocusRestoration (AD-12, docs/focus-map.md §1.6): the single store of the
  * return target `{focusId, scrollOffset}` per route key + section id, so each
@@ -101,6 +103,11 @@ export function createFocusRestoration(): FocusRestorationStore {
 
 /** The app-wide store. */
 export const focusRestoration = createFocusRestoration();
+
+/** Every entry belongs to the signed-in account (AD-4). */
+export const focusRestorationAccountStore = defineAccountScoped('focusRestoration', () =>
+  focusRestoration.clear(),
+);
 
 /**
  * Where focus goes on return, after the fallback chain (§1.6):
