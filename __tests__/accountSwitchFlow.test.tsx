@@ -15,7 +15,7 @@ import { createRoot, type Root } from 'test-renderer';
 import App, { SHELL_RESTORATION_KEY } from '../src/app/App';
 import { authFlow } from '../src/features/auth/authFlow';
 import { accountScope } from '../src/shared/account';
-import { sessionManager } from '../src/shared/api';
+import { session } from '../src/app/session';
 import {
   createFixtureTransport,
   type FixtureReply,
@@ -429,7 +429,7 @@ describe('a different account', () => {
       accessToken: NEW_ACCESS,
       accountId: String(ACCOUNT_B),
     });
-    expect(sessionManager.getStatus()).toBe('signedIn');
+    expect(session.getStatus()).toBe('signedIn');
     expect(topScreen(root)).toBe('shell');
     expect(visible(root, 'auth/welcome')).toBe(false);
     expect(visible(root, 'home/placeholder')).toBe(true);
@@ -540,7 +540,7 @@ describe('the reset fails', () => {
     expect(keychain.setGenericPassword).not.toHaveBeenCalled();
     expect(keychain.__values.get(SESSION_KEY)).toBe(MARKER_A);
     expect(keychain.__values.get(PHONE_KEY)).toBe(PHONE_A);
-    expect(sessionManager.getStatus()).toBe('expired');
+    expect(session.getStatus()).toBe('expired');
     expect(resetLogged()).toBe(false);
     // The gate failed first, so no other store was touched.
     expect(focusRestoration.peek(SHELL_RESTORATION_KEY, 'settings')?.focusId).toBe('settings/row/version');
@@ -572,7 +572,7 @@ describe('a partial reset', () => {
     expect(keychain.setGenericPassword).not.toHaveBeenCalled();
     expect(keychain.__values.has(SESSION_KEY)).toBe(false);
     expect(keychain.__values.has(PHONE_KEY)).toBe(false);
-    expect(sessionManager.getStatus()).toBe('signedOut');
+    expect(session.getStatus()).toBe('signedOut');
     expect(JSON.stringify(logger.entries())).not.toContain('accountChanged');
     await unmount(root);
   });
@@ -588,7 +588,7 @@ describe('guarded writes (AccountScope.guard)', () => {
     await press(root, 'auth/expired/relogin');
     await signInOnA2(root, PHONE_B);
     expect(topScreen(root)).toBe('shell');
-    expect(sessionManager.getStatus()).toBe('signedIn');
+    expect(session.getStatus()).toBe('signedIn');
 
     await act(async () => {
       releaseSlow?.({ status: 200, body: { position: 'account-A-secret' } });

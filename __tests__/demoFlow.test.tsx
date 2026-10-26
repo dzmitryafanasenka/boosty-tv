@@ -184,10 +184,9 @@ test('Story 2.8: demo expiry → A11 → A2 → A5 → sign-in with another id: 
   expect(keychain.setGenericPassword).not.toHaveBeenCalled();
   expect(keychain.resetGenericPassword).not.toHaveBeenCalled();
   expect(keychain.__values.get('boostytv.session')).toBe(STORED);
-  // Only the send reached the global fetch.
-  expect(fetchMock.mock.calls.map(call => call[0])).toEqual([
-    expect.stringContaining(SEND),
-  ]);
+  // Nothing reached the global fetch: the send went through the demo
+  // session's fixture transport (Epic 2 retro, item 1).
+  expect(fetchMock).not.toHaveBeenCalled();
   await act(async () => {
     root.unmount();
   });

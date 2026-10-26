@@ -2,8 +2,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, TVFocusGuideView, View } from 'react-native';
 import {
-  authApiClient,
   isAuthError,
+  type AuthApiClient,
   type AuthErrorKind,
   type SessionManager,
   type SignInResult,
@@ -47,6 +47,11 @@ export type CodeScreenProps = {
    * the demo's), so a demo sign-in never touches the keychain (Story 2.8).
    */
   signIn: SessionManager['signIn'];
+  /**
+   * The active session's resend (`src/app/session.ts`: the real one, or the
+   * demo's), so a demo run sends nothing to Boosty (Epic 2 retro).
+   */
+  resendCode: AuthApiClient['resendCode'];
 };
 
 /** A5–A7 (form) or A8 (expired). */
@@ -92,7 +97,12 @@ function errorKind(error: unknown): AuthErrorKind {
  * - Back (stack pop) or «Изменить номер» → A2 with the number kept. The
  *   challenge lives in `authFlow` and is cleared when A5 is left.
  */
-export function CodeScreen({ onChangeNumber, onSignedIn, signIn }: CodeScreenProps) {
+export function CodeScreen({
+  onChangeNumber,
+  onSignedIn,
+  signIn,
+  resendCode,
+}: CodeScreenProps) {
   const [pending, setPending] = useState(() => authFlow.getChallenge());
   const [countryCode] = useState(() => authFlow.getDraft().countryCode);
   const [code, setCode] = useState('');
@@ -244,7 +254,7 @@ export function CodeScreen({ onChangeNumber, onSignedIn, signIn }: CodeScreenPro
     setBusy('resend');
     setError(null);
     try {
-      const result = await authApiClient.resendCode(phone);
+      const result = await resendCode(phone);
       if (!mounted.current) {
         return;
       }
@@ -280,7 +290,7 @@ export function CodeScreen({ onChangeNumber, onSignedIn, signIn }: CodeScreenPro
         setAfterResend(true);
       }
     }
-  }, []);
+  }, [resendCode]);
 
   const onCodeChange = (text: string) => {
     setCode(text);

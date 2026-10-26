@@ -60,7 +60,7 @@ const theme: Theme = {
   colors: { ...DarkTheme.colors, background: colors.bg, card: colors.bg },
 };
 
-/** The first route, decided by `sessionManager.restore()`. */
+/** The first route, decided by `session.restore()`. */
 type Boot = { initial: 'Welcome' | 'Shell' | 'Expired'; signInAgain: boolean };
 
 /**
@@ -98,6 +98,7 @@ function Phone({
       onCodeSent={() => navigation.navigate('Code')}
       onExit={() => navigation.goBack()}
       fromExpired={route.params?.fromExpired === true}
+      sendCode={session.authApi.sendCode}
     />
   );
 }
@@ -118,6 +119,7 @@ function Code({ navigation }: StackScreenProps<RootStackParamList, 'Code'>) {
       onChangeNumber={() => navigation.goBack()}
       onSignedIn={onSignedIn}
       signIn={session.signIn}
+      resendCode={session.authApi.resendCode}
     />
   );
 }
@@ -233,7 +235,7 @@ function DemoBadge() {
 
 /**
  * App root. Startup gate: a neutral splash (`colors.bg`, nothing focusable)
- * until `sessionManager.restore()` resolves; then a stored session opens
+ * until `session.restore()` resolves; then a stored session opens
  * the Shell, nothing (or a transient storage error) opens Welcome, and a
  * wiped store opens Welcome with «Войдите снова».
  *

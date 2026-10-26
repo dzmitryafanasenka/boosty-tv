@@ -13,7 +13,7 @@ import { createRoot, type Root } from 'test-renderer';
 import App, { SHELL_RESTORATION_KEY } from '../src/app/App';
 import { authFlow } from '../src/features/auth/authFlow';
 import { accountScope } from '../src/shared/account';
-import { sessionManager } from '../src/shared/api';
+import { session } from '../src/app/session';
 import {
   createFixtureTransport,
   type FixtureReply,
@@ -284,7 +284,7 @@ describe('sign-out dialog', () => {
     expect(lastFocusTarget()).toBe(ROW);
     expect(keychain.__values.get(SESSION)).toBe(STORED);
     expect(keychain.__values.get(PHONE_SERVICE)).toBe(PHONE);
-    expect(sessionManager.getStatus()).toBe('signedIn');
+    expect(session.getStatus()).toBe('signedIn');
     expect(accountScope.generation()).toBe(generation);
     await unmount(root);
   });
@@ -315,7 +315,7 @@ describe('confirm', () => {
 
     expect(keychain.__values.has(SESSION)).toBe(false);
     expect(keychain.__values.has(PHONE_SERVICE)).toBe(false);
-    expect(sessionManager.getStatus()).toBe('signedOut');
+    expect(session.getStatus()).toBe('signedOut');
     expect(focusRestoration.peek(SHELL_RESTORATION_KEY, 'settings')).toBeUndefined();
     expect(focusRestoration.peek(SHELL_RESTORATION_KEY, 'home')).toBeUndefined();
     expect(authFlow.getDraft()).toEqual({ countryCode: '+7', number: '' });
@@ -402,7 +402,7 @@ describe('confirm', () => {
     // Focus is not moved: it stays on «Выйти».
     expect(focusMock).not.toHaveBeenCalled();
     expect(one(root, CONFIRM).props.accessibilityState).toMatchObject({ busy: false });
-    expect(sessionManager.getStatus()).toBe('signedIn');
+    expect(session.getStatus()).toBe('signedIn');
     expect(keychain.__values.get(SESSION)).toBe(STORED);
     expect(keychain.__values.get(PHONE_SERVICE)).toBe(PHONE);
     expect(focusRestoration.peek(SHELL_RESTORATION_KEY, 'settings')).toEqual(remembered);
@@ -434,14 +434,14 @@ describe('confirm', () => {
     await openDialog(root, false);
     // The request count when the status became signedOut.
     let sentAtSignOut: number | null = null;
-    const unsubscribe = sessionManager.subscribe(status => {
+    const unsubscribe = session.subscribe(status => {
       if (status === 'signedOut' && sentAtSignOut === null) {
         sentAtSignOut = transport.calls.length;
       }
     });
     await press(root, CONFIRM, false);
     unsubscribe();
-    expect(sessionManager.getStatus()).toBe('signedOut');
+    expect(session.getStatus()).toBe('signedOut');
     expect(sentAtSignOut).not.toBeNull();
     expect(visible(root, 'auth/welcome')).toBe(true);
 
@@ -450,7 +450,7 @@ describe('confirm', () => {
       body: { access_token: 'n'.repeat(64), refresh_token: 'm'.repeat(64), expires_in: 2592000 },
     });
     await settle();
-    expect(sessionManager.getStatus()).toBe('signedOut');
+    expect(session.getStatus()).toBe('signedOut');
     expect(keychain.__values.has(SESSION)).toBe(false);
     expect(keychain.__values.has(PHONE_SERVICE)).toBe(false);
     // Nothing at all after the sign-out: no E1 retry, nothing with Authorization.
@@ -499,7 +499,7 @@ describe('confirm', () => {
     await submit(root, 'auth/code/field');
 
     expect(visible(root, 'shell')).toBe(true);
-    expect(sessionManager.getStatus()).toBe('signedIn');
+    expect(session.getStatus()).toBe('signedIn');
     expect(visible(root, 'home/placeholder')).toBe(true);
     expect(visible(root, 'home/offline')).toBe(false);
     await unmount(root);

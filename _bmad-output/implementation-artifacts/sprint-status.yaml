@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 10-25-2026 14:34
-last_updated: 10-26-2026 14:25
+last_updated: 10-26-2026 14:37
 project: Boosty TV
 project_key: NOKEY
 tracking_system: file-system
@@ -46,7 +46,7 @@ development_status:
   1-8-focus-map-and-spike-decision: done
   epic-1-retrospective: optional
 
-  epic-2: in-progress
+  epic-2: done
   2-1-welcome-screen-on-the-design-foundation: done
   2-2-request-a-sign-in-code-by-phone: done
   2-3-confirm-the-code-and-create-the-session: done
@@ -123,20 +123,20 @@ action_items:
     action: "Route the A2/A5 auth API calls (send, resend) through the active session
       so demo mode sends nothing to Boosty"
     owner: "dev"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-10-26.md"
   - id: "epic-2-retro-item-2-remove-or-repoint-the-shared-api-session"
     epic: 2
     action: "Remove or repoint the shared/api sessionManager/httpClient app singletons
       before Epic 3s first content request"
     owner: "dev"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-10-26.md"
   - id: "epic-2-retro-item-3-delete-the-unreachable-modal-isopen-bran"
     epic: 2
     action: "Delete the unreachable modal.isOpen() branch in the Shell Back handler"
     owner: "dev"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-10-26.md"
   - id: "epic-2-retro-item-4-extract-a-shared-flow-test-harness-and-m"
     epic: 2

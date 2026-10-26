@@ -12,7 +12,7 @@ import { AppState, NativeModules } from 'react-native';
 import { createRoot, type Root } from 'test-renderer';
 import App, { SHELL_RESTORATION_KEY } from '../src/app/App';
 import { authFlow } from '../src/features/auth/authFlow';
-import { sessionManager } from '../src/shared/api';
+import { session } from '../src/app/session';
 import {
   createFixtureTransport,
   type FixtureReply,
@@ -318,7 +318,7 @@ describe('A11 from any screen', () => {
     await press(root, 'nav/settings');
     focusMock.mockClear();
     await expireOnResume();
-    expect(sessionManager.getStatus()).toBe('expired');
+    expect(session.getStatus()).toBe('expired');
     expect(visible(root, 'auth/expired')).toBe(true);
     expect(visible(root, 'shell')).toBe(false);
     expect(lastFocusTarget()).toBe('auth/expired/relogin');
@@ -357,15 +357,15 @@ describe('A11 from any screen', () => {
   it('expired before the navigator is ready → A11 once ready; the cold-start E1 is not sent', async () => {
     // Expire the moment the stored session is read: before restore() resolves,
     // so before the navigator is mounted.
-    const stop = sessionManager.subscribe(status => {
+    const stop = session.subscribe(status => {
       if (status === 'signedIn') {
         stop();
-        sessionManager.debugExpireInMemory?.();
+        session.debugExpireInMemory?.();
       }
     });
     const root = await renderApp();
     stop();
-    expect(sessionManager.getStatus()).toBe('expired');
+    expect(session.getStatus()).toBe('expired');
     expect(topScreen(root)).toBe('auth/expired');
     expect(visible(root, 'shell')).toBe(false);
     expect(lastFocusTarget()).toBe('auth/expired/relogin');
@@ -414,7 +414,7 @@ describe('A11 → A2', () => {
     keychain.__values.set('boostytv.session', MARKER);
     const root = await renderApp();
     let release: (phone: string | null) => void = () => {};
-    const read = jest.spyOn(sessionManager, 'getExpiredPhone').mockImplementation(
+    const read = jest.spyOn(session, 'getExpiredPhone').mockImplementation(
       () =>
         new Promise<string | null>(resolve => {
           release = resolve;
@@ -549,7 +549,7 @@ describe('re-login', () => {
     await relogin(root);
     // Story 2.8: the same account wipes nothing, so no keychain clear.
     expect(keychainOrder()).toEqual(['set:boostytv.phone', 'set:boostytv.session']);
-    expect(sessionManager.getStatus()).toBe('signedIn');
+    expect(session.getStatus()).toBe('signedIn');
     expect(topScreen(root)).toBe('shell');
     expect(visible(root, 'auth/expired')).toBe(false);
     expect(visible(root, 'home/placeholder')).toBe(true);

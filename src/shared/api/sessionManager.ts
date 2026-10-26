@@ -152,6 +152,13 @@ export type SessionManager = {
   /** The content `HttpClient`, with this manager as its token source. */
   readonly http: HttpClient;
   /**
+   * This manager's phone send/resend for A2/A5, and nothing else: confirm and
+   * refresh stay behind `signIn` and the refresh coordinator. Screens take it
+   * from the active session (`src/app/session.ts`), so a demo run sends
+   * nothing to Boosty.
+   */
+  readonly authApi: Pick<AuthApiClient, 'sendCode' | 'resendCode'>;
+  /**
    * Debug builds only (undefined in release): replaces the in-memory access
    * token with a corrupted one of the same length, then runs `validate()`,
    * so E1 → 401 → one real refresh → retry. Storage is not touched.
@@ -576,6 +583,7 @@ export function createSessionManager({
       return next === 'active' && previous !== 'active' ? validate() : null;
     },
     http,
+    authApi: { sendCode: authApi.sendCode, resendCode: authApi.resendCode },
     debugCorruptAccessToken: __DEV__
       ? () => {
           if (status === 'signedIn' && session) {
@@ -599,9 +607,3 @@ export function createSessionManager({
       : undefined,
   };
 }
-
-/** The app's SessionManager over the real clients and the keychain. */
-export const sessionManager: SessionManager = createSessionManager();
-
-/** The app's content client: token from `sessionManager` (AD-3). */
-export const httpClient: HttpClient = sessionManager.http;

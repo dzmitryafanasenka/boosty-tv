@@ -1,7 +1,7 @@
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BackHandler, StyleSheet, TVFocusGuideView, View } from 'react-native';
-import { authApiClient, isAuthError, type AuthErrorKind } from '../../shared/api';
+import { isAuthError, type AuthApiClient, type AuthErrorKind } from '../../shared/api';
 import { Screen } from '../../shared/focus';
 import { t } from '../../shared/i18n';
 import {
@@ -35,6 +35,11 @@ export type PhoneScreenProps = {
    * a valid prefilled draft the initial focus is «Получить код».
    */
   fromExpired?: boolean;
+  /**
+   * The active session's send-code (`src/app/session.ts`: the real one, or
+   * the demo's), so a demo run sends nothing to Boosty (Epic 2 retro).
+   */
+  sendCode: AuthApiClient['sendCode'];
 };
 
 /** A2 form (with A4 and the inline send errors), A9 or A10. */
@@ -70,7 +75,12 @@ const COUNTRY_WIDTH = 96;
  * «Получить код» (focus-map §2 «A2 after A11»); every later return to A2
  * focuses the number field as usual.
  */
-export function PhoneScreen({ onCodeSent, onExit, fromExpired = false }: PhoneScreenProps) {
+export function PhoneScreen({
+  onCodeSent,
+  onExit,
+  fromExpired = false,
+  sendCode,
+}: PhoneScreenProps) {
   const [countryCode, setCountryCode] = useState(
     () => authFlow.getDraft().countryCode,
   );
@@ -224,7 +234,7 @@ export function PhoneScreen({ onCodeSent, onExit, fromExpired = false }: PhoneSc
     setBusy(true);
     setFormError(null);
     try {
-      const result = await authApiClient.sendCode(phone);
+      const result = await sendCode(phone);
       // Back was pressed while sending: drop the result, open nothing.
       if (!mounted.current || !isFocusedRef.current) {
         return;
@@ -258,7 +268,7 @@ export function PhoneScreen({ onCodeSent, onExit, fromExpired = false }: PhoneSc
         setBusy(false);
       }
     }
-  }, [countryCode, number, onCodeSent, showForm]);
+  }, [countryCode, number, onCodeSent, sendCode, showForm]);
 
   const retry = useCallback(() => {
     if (retryUsed || inFlight.current) {
