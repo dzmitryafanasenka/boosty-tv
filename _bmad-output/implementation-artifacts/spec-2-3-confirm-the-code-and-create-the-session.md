@@ -2,7 +2,7 @@
 title: 'Story 2.3: Confirm the code and create the session'
 type: 'feature'
 created: '2026-10-26'
-status: 'in-review'
+status: 'done'
 baseline_commit: '55addc67a525645725f4db37aa9f327d9824029a'
 route: 'dispatch'
 review_loop_iteration: 0
@@ -134,6 +134,8 @@ context:
 - `npm run lint -- --max-warnings 0 && npm run typecheck && npm test && npm run check:fixtures` -- expected: exit 0.
 - `npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output /tmp/rn-check.bundle` -- expected: exit 0.
 - `cd android && ./gradlew assembleRelease -PreactNativeArchitectures=armeabi-v7a` -- expected: BUILD SUCCESSFUL.
+
+- Coordinator live run (2026-10-26): the owner signed in once with the physical remote (code via Telegram); E1 with the content profile succeeded; SignedIn survived force-stop + cold start; logcat clean and cleared. Review patches re-verified: lint, typecheck, 363 tests, fixtures, release bundle and build pass.
 
 ## Review Triage Log
 
