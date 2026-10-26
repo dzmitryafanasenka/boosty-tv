@@ -1,0 +1,49 @@
+__tests__/accountSwitchFlow.test.tsx
+  s_476416fbc7fdcb::t_a2ec1c4ad7b54d 18,432,543,575,591
+__tests__/codeFlow.test.tsx
+  s_476416fbc7fdcb::t_2735e999b4aad7 387,636-637
+__tests__/demoFlow.test.tsx
+  s_476416fbc7fdcb::t_801f66c9a1fa7a 187-189
+__tests__/expiredFlow.test.tsx
+  s_476416fbc7fdcb::t_9206d821eb385f 15,321,360,363,368,417,552
+__tests__/signInFlow.test.tsx
+  s_476416fbc7fdcb::t_3adb3756974455 508-509
+__tests__/signOutFlow.test.tsx
+  s_476416fbc7fdcb::t_58cf9b11be3028 16,287,318,405,437,444,453,502
+_bmad-output/implementation-artifacts/epic-2-retro-2026-10-26.md
+  s_476416fbc7fdcb::t_2c9af386daf35e 4,108,119,121-122
+_bmad-output/implementation-artifacts/spec-epic-2-retro-items-1-3.md
+  s_476416fbc7fdcb::t_2aeec66f217e0d 1-51
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_476416fbc7fdcb::t_ef8f025d54ff12 32,49,126,133,139
+src/app/App.tsx
+  s_476416fbc7fdcb::t_9911365ec28c06 63,101,122,238
+src/app/Shell.tsx
+  s_476416fbc7fdcb::t_f3b8385e83d18e 13,150-152,169
+src/app/dev/demo.ts
+  s_476416fbc7fdcb::t_7655807a30b0cf 14-17,49-57
+src/app/session.ts
+  s_476416fbc7fdcb::t_6c66c273007556 1,21-26,29
+src/features/auth/CodeScreen.tsx
+  s_476416fbc7fdcb::t_4de28f3b9b29c2 6,50-54,100-105,257,293
+src/features/auth/PhoneScreen.tsx
+  s_476416fbc7fdcb::t_d245afaa85e659 4,38-42,78-83,237,271
+src/shared/api/sessionManager.ts
+  s_476416fbc7fdcb::t_4f0d8548254961 154-160,586
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "e907eddad1d0b870cc35b0838bd68f0d124197f7",
+  "prompts": {},
+  "sessions": {
+    "s_476416fbc7fdcb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "08ebeb55-8b1a-43e7-b7ba-11e4b9745838",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
