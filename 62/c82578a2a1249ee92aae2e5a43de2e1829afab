@@ -1,0 +1,47 @@
+__tests__/expiredFlow.test.tsx
+  s_8a5132ae1233f2::t_ee710c9bebf265 14-15,506-540
+__tests__/homeFeedFlow.test.tsx
+  s_8a5132ae1233f2::t_a26fe66ba0f675 13,23,38-39,101-102,116-119,1074-1357
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_8a5132ae1233f2::t_b65edab070973b 167
+_bmad-output/implementation-artifacts/spec-feed-refresh-on-resume.md
+  s_8a5132ae1233f2::t_5d3d5d371b0301 1-117
+docs/adr/0010-server-state-tanstack-query.md
+  s_8a5132ae1233f2::t_01a450d64ec348 37-39
+docs/focus-map.md
+  s_8a5132ae1233f2::t_be514217526cd7 169
+src/app/App.tsx
+  s_8a5132ae1233f2::t_27161414ac7cdb 30,42,116-120,310-312,316
+src/app/queryClient.ts
+  s_8a5132ae1233f2::t_a193e4c3255e12 3,21
+src/features/home/HomeScreen.tsx
+  s_8a5132ae1233f2::t_2d4669d8324805 1,115-122,125-131,146-150,157,160,167,289-339
+src/features/home/__tests__/feedRefresh.test.ts
+  s_8a5132ae1233f2::t_a94aecc425e97f 1-199
+src/features/home/feedRefresh.ts
+  s_8a5132ae1233f2::t_48ebdc590e137f 1-113
+src/features/home/index.ts
+  s_8a5132ae1233f2::t_679c87c864b398 9
+src/features/home/useSubscriptionFeed.ts
+  s_8a5132ae1233f2::t_c1e9d63fa667b0 68-69
+src/shared/api/index.ts
+  s_8a5132ae1233f2::t_36d93a48bc3e74 27
+src/shared/api/queryKeys.ts
+  s_8a5132ae1233f2::t_12a1e67387015b 11-17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "62c82578a2a1249ee92aae2e5a43de2e1829afab",
+  "prompts": {},
+  "sessions": {
+    "s_8a5132ae1233f2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7bd22f0c-fe48-4fca-bedc-1f4cab1db281",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
