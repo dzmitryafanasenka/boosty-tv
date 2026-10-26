@@ -1,0 +1,101 @@
+__tests__/codeFlow.test.tsx
+  s_fce05da352b4dc::t_d789e774dd5f2b 4,217,429,459,462-465,467,469-474,503,507,526,552,717,720,722,765,769
+__tests__/releaseBundle.test.js
+  s_fce05da352b4dc::t_1469a4fd6a703a 1-60
+__tests__/shellFlow.test.tsx
+  s_fce05da352b4dc::t_7c58e8e03cf989 1-512
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_fce05da352b4dc::t_1e61df0b48b985 109-123
+_bmad-output/implementation-artifacts/spec-2-4-the-app-shell-sidebar-back-and-focus.md
+  s_fce05da352b4dc::t_2702c4a7cc58b9 1-153
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_fce05da352b4dc::t_749996db420ace 32,52-53
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/AppInfoModule.kt
+  s_fce05da352b4dc::t_db166084125192 1-31
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/BoostyNativePackage.kt
+  s_fce05da352b4dc::t_c2f0b217e62552 11-15
+docs/focus-map.md
+  s_fce05da352b4dc::t_aa8c02f9789675 82,123,138-143
+docs/testing.md
+  s_fce05da352b4dc::t_228f8e293c57c2 84-116
+jest.config.js
+  s_fce05da352b4dc::t_a3e26b3c6df5c1 5-6,8
+src/app/App.tsx
+  s_fce05da352b4dc::t_87ad9893354fa5 14,16,18,20-29,41,43-44,46,50-53,75-89,97,102-103,114,128-154
+src/app/Shell.tsx
+  s_fce05da352b4dc::t_f6d92c5b14a842 1-249
+src/app/__tests__/phaseFlags.test.ts
+  s_fce05da352b4dc::t_8264ff96ccb296 1-19
+src/app/dev/devFocus.tsx
+  s_fce05da352b4dc::t_31537078f3d2b0 1-347
+src/app/routes.ts
+  s_fce05da352b4dc::t_e606c1ab33eb25 13-18
+src/features/home/HomeScreen.tsx
+  s_fce05da352b4dc::t_dc4b1393def03a 3,6-8,10,12-17,22-24
+src/features/home/index.ts
+  s_fce05da352b4dc::t_9ef52e800c50f5 1
+src/features/settings/SettingsScreen.tsx
+  s_fce05da352b4dc::t_b6a6727830544d 1-68
+src/features/settings/index.ts
+  s_fce05da352b4dc::t_dbaea0643ab8c0 1-6
+src/shared/focus/FocusZone.tsx
+  s_fce05da352b4dc::t_a63b596f88b179 1-197
+src/shared/focus/ModalHost.tsx
+  s_fce05da352b4dc::t_63b4fa69989f9b 1-163
+src/shared/focus/__tests__/ModalHost.test.tsx
+  s_fce05da352b4dc::t_3e74d46f159146 1-268
+src/shared/focus/__tests__/focusRestoration.test.ts
+  s_fce05da352b4dc::t_ca205dc9d4e5f1 1-137
+src/shared/focus/__tests__/useFocusRestoration.test.tsx
+  s_fce05da352b4dc::t_dd9aa73d97429a 1-253
+src/shared/focus/focusRestoration.ts
+  s_fce05da352b4dc::t_410ab0b9cc46ab 1-137
+src/shared/focus/index.ts
+  s_fce05da352b4dc::t_e148c9ef108e36 1-16,18-23
+src/shared/focus/useFocusRestoration.ts
+  s_fce05da352b4dc::t_57feee0f4843b1 1-200
+src/shared/i18n/__tests__/catalog.test.ts
+  s_fce05da352b4dc::t_2c5cf4181266b0 31-41
+src/shared/i18n/ru.ts
+  s_fce05da352b4dc::t_fe7fe5ffbcee8c 68-113
+src/shared/platform/__tests__/appInfo.test.ts
+  s_fce05da352b4dc::t_a3c0d9221e390b 1-23
+src/shared/platform/appInfo.ts
+  s_fce05da352b4dc::t_4d2941faa4b647 1-15
+src/shared/ui/NavItem.tsx
+  s_fce05da352b4dc::t_781e8ec68f7ccb 1-104
+src/shared/ui/SettingRow.tsx
+  s_fce05da352b4dc::t_6a952b3c9ab1e8 1-101
+src/shared/ui/StateView.tsx
+  s_fce05da352b4dc::t_4bed1198c968b3 1-86
+src/shared/ui/__tests__/shellPrimitives.test.tsx
+  s_fce05da352b4dc::t_456b659eb239f8 1-142
+src/shared/ui/index.ts
+  s_fce05da352b4dc::t_0f07a165bae6ab 14-16
+src/app/phaseFlags.ts
+  s_0111ec1876026f::t_b86ebba27dd486 1-26
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "45b92de3bf431c8e10feaed7179f5526e5553bf2",
+  "prompts": {},
+  "sessions": {
+    "s_0111ec1876026f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-aa64d5aaa7bedcb1f",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_fce05da352b4dc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1d96fc39-0a81-40cc-a1ff-5557f210c17b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
