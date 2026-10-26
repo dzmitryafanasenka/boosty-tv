@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 10-25-2026 14:34
-last_updated: 10-26-2026 14:01
+last_updated: 10-26-2026 14:25
 project: Boosty TV
 project_key: NOKEY
 tracking_system: file-system
@@ -54,8 +54,8 @@ development_status:
   2-5-stay-signed-in-across-restarts-and-expiry: done
   2-6-session-expired-and-quick-re-login: done
   2-7-minimal-settings-and-sign-out: done
-  2-8-account-switch-never-leaks-data: review
-  epic-2-retrospective: optional
+  2-8-account-switch-never-leaks-data: done
+  epic-2-retrospective: done
 
   epic-3: backlog
   3-1-subscription-feed-on-the-home-screen: backlog
@@ -117,3 +117,58 @@ development_status:
   9-4-visual-fidelity-and-accessibility-pass: backlog
   9-5-full-device-regression-and-owner-acceptance: backlog
   epic-9-retrospective: optional
+action_items:
+  - id: "epic-2-retro-item-1-route-the-a2-a5-auth-api-calls-send-rese"
+    epic: 2
+    action: "Route the A2/A5 auth API calls (send, resend) through the active session
+      so demo mode sends nothing to Boosty"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-10-26.md"
+  - id: "epic-2-retro-item-2-remove-or-repoint-the-shared-api-session"
+    epic: 2
+    action: "Remove or repoint the shared/api sessionManager/httpClient app singletons
+      before Epic 3s first content request"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-10-26.md"
+  - id: "epic-2-retro-item-3-delete-the-unreachable-modal-isopen-bran"
+    epic: 2
+    action: "Delete the unreachable modal.isOpen() branch in the Shell Back handler"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-10-26.md"
+  - id: "epic-2-retro-item-4-extract-a-shared-flow-test-harness-and-m"
+    epic: 2
+    action: "Extract a shared flow-test harness and move the 7 flow-test files onto
+      it"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-10-26.md"
+  - id: "epic-2-retro-item-5-plan-a-split-of-sessionmanager-before-ep"
+    epic: 2
+    action: "Plan a split of SessionManager before Epic 3 adds session concerns"
+    owner: "architect"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-10-26.md"
+  - id: "epic-2-retro-item-6-open-prs-only-after-review-fixes-when-as"
+    epic: 2
+    action: "Open PRs only after review fixes; when asked earlier, open a draft marked
+      do not merge"
+    owner: "agent"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-10-26.md"
+  - id: "epic-2-retro-item-7-run-the-full-suite-3-times-and-new-focus"
+    epic: 2
+    action: "Run the full suite 3+ times and new focus/timer test files 30+ times
+      before review"
+    owner: "agent"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-10-26.md"
+  - id: "epic-2-retro-item-8-device-pass-with-a-second-boosty-account"
+    epic: 2
+    action: "Device pass with a second Boosty account: expiry or sign-out then re-login,
+      account switch (S10), TalkBack, physical remote"
+    owner: "owner"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-10-26.md"
