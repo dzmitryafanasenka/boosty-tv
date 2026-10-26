@@ -7,14 +7,27 @@
  * command are faked: these tests prove which element the app asks to focus,
  * not native focus movement (a device check, docs/testing.md).
  */
-import { act } from 'react';
 import { NativeModules } from 'react-native';
-import { createRoot, type Root } from 'test-renderer';
+import { type Root } from 'test-renderer';
 import App from '../src/app/App';
 import { devListStore } from '../src/app/dev/devFocus';
 import { focusRestoration } from '../src/shared/focus';
 import { t } from '../src/shared/i18n';
 import { requestHostFocus } from '../src/shared/ui/requestHostFocus';
+import backHandler from '../src/test/backHandlerMock';
+import {
+  byTestId,
+  clearNativeModules,
+  createFlow,
+  focusableIds,
+  installNativeModules,
+  lastFocusTarget,
+  resetKeychain,
+  text,
+  topScreen as topScreenOf,
+  unmount,
+  visible,
+} from '../src/test/flow';
 
 jest.mock('react-native-keychain');
 
@@ -45,46 +58,20 @@ jest.mock('../src/shared/ui/requestHostFocus', () => ({
   requestHostFocus: jest.fn(),
 }));
 
-jest.mock('react-native/Libraries/Utilities/BackHandler', () => {
-  const handlers: Array<() => boolean | null | undefined> = [];
-  const backHandler = {
-    exitApp: jest.fn(),
-    addEventListener: (
-      _name: string,
-      handler: () => boolean | null | undefined,
-    ) => {
-      handlers.push(handler);
-      return {
-        remove: () => {
-          const index = handlers.lastIndexOf(handler);
-          if (index >= 0) {
-            handlers.splice(index, 1);
-          }
-        },
-      };
-    },
-    pressBack: () => {
-      for (let i = handlers.length - 1; i >= 0; i -= 1) {
-        if (handlers[i]()) {
-          return true;
-        }
-      }
-      backHandler.exitApp();
-      return false;
-    },
-  };
-  return { __esModule: true, default: backHandler };
-});
+jest.mock('react-native/Libraries/Utilities/BackHandler', () =>
+  require('../src/test/backHandlerMock'),
+);
 
-type KeychainMock = { __values: Map<string, string>; __reset(): void };
-type Node = ReturnType<Root['container']['queryAll']>[number];
-
-const keychain = jest.requireMock('react-native-keychain') as KeychainMock;
-const backHandler = jest.requireMock(
-  'react-native/Libraries/Utilities/BackHandler',
-).default as { pressBack: () => boolean; exitApp: jest.Mock };
 const focusMock = requestHostFocus as jest.Mock;
 const native = NativeModules as { AppInfo?: { versionName?: string } };
+
+/** 20 rounds; timers run in the first 2. */
+const { settle, render, one, focusOn, press, back } = createFlow({
+  settle: { rounds: 20, timerRounds: 2 },
+  one: 'focusable',
+  pressFocuses: true,
+  submitSettles: false,
+});
 
 const STORED = JSON.stringify({
   v: 1,
@@ -106,10 +93,9 @@ beforeEach(() => {
   jest.spyOn(console, 'log').mockImplementation(() => {});
   jest.spyOn(console, 'warn').mockImplementation(() => {});
   focusMock.mockClear();
-  backHandler.exitApp.mockClear();
-  keychain.__reset();
-  keychain.__values.set('boostytv.session', STORED);
-  native.AppInfo = { versionName: '1.0' };
+  backHandler.reset();
+  resetKeychain({ 'boostytv.session': STORED });
+  installNativeModules({ AppInfo: { versionName: '1.0' } });
   // Story 2.5: the background E1 after the boot succeeds; nothing else is sent.
   (globalThis as { fetch: unknown }).fetch = jest.fn((url: string) =>
     url === 'https://api.boosty.to/v1/user/current'
@@ -122,93 +108,13 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  delete native.AppInfo;
+  clearNativeModules();
   devListStore.refill();
   focusRestoration.clear();
   jest.restoreAllMocks();
 });
 
-async function settle() {
-  for (let i = 0; i < 20; i += 1) {
-    await act(async () => {
-      if (i < 2) {
-        jest.runOnlyPendingTimers();
-      }
-      await Promise.resolve();
-    });
-  }
-}
-
-async function renderApp() {
-  const root = createRoot();
-  await act(async () => {
-    root.render(<App />);
-  });
-  await settle();
-  return root;
-}
-
-async function unmount(root: Root) {
-  await act(async () => {
-    root.unmount();
-  });
-}
-
-function byTestId(root: Root, testID: string): Node[] {
-  return root.container.queryAll(node => node.props.testID === testID);
-}
-
-function visible(root: Root, testID: string): boolean {
-  return byTestId(root, testID).length > 0;
-}
-
-/** The focusable host view with this testID. */
-function one(root: Root, testID: string): Node {
-  const nodes = byTestId(root, testID).filter(
-    node => node.props.focusable === true,
-  );
-  expect(nodes).toHaveLength(1);
-  return nodes[0];
-}
-
-function focusableIds(root: Root, within?: Node): string[] {
-  return (within ?? root.container)
-    .queryAll(node => node.props.focusable === true)
-    .map(node => node.props.testID as string);
-}
-
-/** Native focus arrived on an element (what Android does on a D-pad move). */
-async function focusOn(root: Root, testID: string) {
-  const node = one(root, testID);
-  await act(async () => {
-    node.props.onFocus({ nativeEvent: {} });
-  });
-}
-
-/** OK on an element: the same click path the TV press uses. */
-async function press(root: Root, testID: string) {
-  await focusOn(root, testID);
-  const node = one(root, testID);
-  await act(async () => {
-    node.props.onClick({ nativeEvent: {} });
-  });
-  await settle();
-}
-
-async function back() {
-  await act(async () => {
-    backHandler.pressBack();
-  });
-  await settle();
-}
-
-function lastFocusTarget(): string | undefined {
-  const calls = focusMock.mock.calls;
-  const view = calls[calls.length - 1]?.[0] as
-    | { props?: { testID?: string } }
-    | undefined;
-  return view?.props?.testID;
-}
+const renderApp = () => render(<App />);
 
 /** testIDs of the host views a guide currently routes to. */
 function destinationIds(guide: string): string[] {
@@ -218,20 +124,13 @@ function destinationIds(guide: string): string[] {
 }
 
 function topScreen(root: Root): string | undefined {
-  const ids = ['shell', 'dev/focus', 'dev/focus/detail'];
-  const present = ids.filter(id => visible(root, id));
-  return present[present.length - 1];
+  return topScreenOf(root, ['shell', 'dev/focus', 'dev/focus/detail']);
 }
 
 function currentSection(root: Root): string[] {
   return ['nav/home', 'nav/settings'].filter(id =>
     visible(root, `${id}/current`),
   );
-}
-
-function text(node: Node | Root): string {
-  const json = 'container' in node ? node.container.toJSON() : node.toJSON?.();
-  return JSON.stringify(json ?? null);
 }
 
 describe('Shell', () => {

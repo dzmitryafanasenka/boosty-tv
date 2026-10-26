@@ -9,11 +9,9 @@
  * real network behavior.
  */
 import { act } from 'react';
-import { AppState, NativeModules } from 'react-native';
-import { createRoot, type Root } from 'test-renderer';
+import { AppState } from 'react-native';
 import App from '../src/app/App';
 import {
-  createFixtureTransport,
   type FixtureReply,
   type FixtureRequest,
   type FixtureTransport,
@@ -24,27 +22,34 @@ import { requestHostFocus } from '../src/shared/ui/requestHostFocus';
 import e1Ok from '../src/test/fixtures/boosty/e1-user-current.json';
 import e1Unauthorized from '../src/test/fixtures/boosty/e1-no-token.json';
 import refreshRejected from '../src/test/fixtures/boosty/refresh-invalid-grant.json';
+import {
+  clearNativeModules,
+  createFlow,
+  installFixtureTransport,
+  installNativeModules,
+  keychain as keychainMock,
+  lastFocusTarget,
+  resetKeychain,
+  text,
+  unmount,
+  visible,
+} from '../src/test/flow';
 
 jest.mock('react-native-keychain');
 jest.mock('../src/shared/ui/requestHostFocus', () => ({
   requestHostFocus: jest.fn(),
 }));
 
-type KeychainMock = {
-  __values: Map<string, string>;
-  __reset(): void;
-  getGenericPassword: jest.Mock;
-  setGenericPassword: jest.Mock;
-  resetGenericPassword: jest.Mock;
-};
-type Node = ReturnType<Root['container']['queryAll']>[number];
-
-const keychain = jest.requireMock('react-native-keychain') as KeychainMock;
+const keychain = keychainMock();
 const focusMock = requestHostFocus as jest.Mock;
-const native = NativeModules as {
-  AppInfo?: { versionName?: string };
-  InstallId?: { getOrCreate: jest.Mock };
-};
+
+/** Lets promises, the AD-6 backoff timers and renders run: 30 rounds, timers in each. */
+const { settle, render, one, press } = createFlow({
+  settle: { rounds: 30, timerRounds: 30 },
+  one: 'focusable',
+  pressFocuses: true,
+  submitSettles: false,
+});
 
 const OLD_ACCESS = 'a'.repeat(64);
 const OLD_REFRESH = 'r'.repeat(64);
@@ -77,16 +82,13 @@ beforeEach(() => {
   jest.spyOn(console, 'warn').mockImplementation(() => {});
   jest.spyOn(console, 'error').mockImplementation(() => {});
   focusMock.mockClear();
-  keychain.__reset();
-  keychain.getGenericPassword.mockClear();
-  keychain.setGenericPassword.mockClear();
-  keychain.resetGenericPassword.mockClear();
-  keychain.__values.set('boostytv.session', STORED);
-  native.AppInfo = { versionName: '1.0' };
-  native.InstallId = { getOrCreate: jest.fn().mockResolvedValue('0f8fad5b-d9cb-469f-a165-70867728950e') };
+  resetKeychain({ 'boostytv.session': STORED });
+  installNativeModules({
+    AppInfo: { versionName: '1.0' },
+    InstallId: { getOrCreate: jest.fn().mockResolvedValue('0f8fad5b-d9cb-469f-a165-70867728950e') },
+  });
   handler = req => (req.path === E1 ? { status: 200, body: e1Ok.body } : undefined);
-  transport = createFixtureTransport(req => handler(req));
-  (globalThis as { fetch: unknown }).fetch = transport;
+  transport = installFixtureTransport(req => handler(req));
   appStateHandlers = [];
   jest.spyOn(AppState, 'addEventListener').mockImplementation(((
     _type: string,
@@ -102,76 +104,12 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  delete native.AppInfo;
-  delete native.InstallId;
+  clearNativeModules();
   focusRestoration.clear();
   jest.restoreAllMocks();
 });
 
-/** Lets promises, the AD-6 backoff timers and renders run. */
-async function settle() {
-  for (let i = 0; i < 30; i += 1) {
-    await act(async () => {
-      jest.runOnlyPendingTimers();
-      await Promise.resolve();
-    });
-  }
-}
-
-async function renderApp() {
-  const root = createRoot();
-  await act(async () => {
-    root.render(<App />);
-  });
-  await settle();
-  return root;
-}
-
-async function unmount(root: Root) {
-  await act(async () => {
-    root.unmount();
-  });
-}
-
-function byTestId(root: Root, testID: string): Node[] {
-  return root.container.queryAll(node => node.props.testID === testID);
-}
-
-function visible(root: Root, testID: string): boolean {
-  return byTestId(root, testID).length > 0;
-}
-
-function one(root: Root, testID: string): Node {
-  const nodes = byTestId(root, testID).filter(node => node.props.focusable === true);
-  expect(nodes).toHaveLength(1);
-  return nodes[0];
-}
-
-async function focusOn(root: Root, testID: string) {
-  const node = one(root, testID);
-  await act(async () => {
-    node.props.onFocus({ nativeEvent: {} });
-  });
-}
-
-async function press(root: Root, testID: string) {
-  await focusOn(root, testID);
-  const node = one(root, testID);
-  await act(async () => {
-    node.props.onClick({ nativeEvent: {} });
-  });
-  await settle();
-}
-
-function lastFocusTarget(): string | undefined {
-  const calls = focusMock.mock.calls;
-  const view = calls[calls.length - 1]?.[0] as { props?: { testID?: string } } | undefined;
-  return view?.props?.testID;
-}
-
-function text(root: Root): string {
-  return JSON.stringify(root.container.toJSON());
-}
+const renderApp = () => render(<App />);
 
 async function changeAppState(state: string) {
   await act(async () => {

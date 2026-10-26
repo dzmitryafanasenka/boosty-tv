@@ -144,3 +144,15 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-2-7-minimal-settings-and-sign-out.md`
   summary: A failed `signOut` keeps SessionManager's bumped generation, so a refresh that was in flight is dropped as stale and its already-spent refresh token later yields `invalid_grant`; decide whether a failed sign-out rolls the generation back.
   evidence: `src/shared/api/sessionManager.ts` `signOut` bumps `generation` before the clears and does not restore it in the failure path (edge-case review, Story 2.7).
+- source_spec: none
+  summary: Epic 2 retro action item 5 — plan a split of `SessionManager` before it gains Epic 3 concerns (design note/ADR), to run before Story 3.1.
+  evidence: Split from the Epic 3 kickoff intent (owner choice 2026-10-26: item 4 first, then item 5, then Story 3.1 as separate runs).
+- source_spec: none
+  summary: Story 3.1 (subscription feed on the Home screen), built on the shared flow-test harness from retro item 4; repositories take the HTTP client from `src/app/session.ts`; measure release-build D-pad latency on the 300+ fixture feed.
+  evidence: Split from the Epic 3 kickoff intent (owner choice 2026-10-26: retro item 4 runs first).
+- source_spec: `_bmad-output/implementation-artifacts/spec-epic-2-retro-item-4-flow-test-harness.md`
+  summary: `npx jest src/shared/focus/__tests__/ModalHost.test.tsx` run alone exits 1 although all 9 tests pass — a real-timer frame callback (`@react-native/jest-preset/jest/setup.js:51`, the "two frames later" focus restore) fires after the environment is torn down; fix the timer handling in the test.
+  evidence: Reproduced on the untouched file at `fd09dbe` (exit 1) and after the harness refactor (exit 1); the full suite exits 0, so CI does not see it.
+- source_spec: `_bmad-output/implementation-artifacts/spec-epic-2-retro-item-4-flow-test-harness.md`
+  summary: Exempt `**/__tests__/**` from the `boundaries` "no import of src/test" policy in `.eslintrc.js`, so tests under `src/` can use the shared harness without `eslint-disable` comments.
+  evidence: `src/shared/focus/__tests__/ModalHost.test.tsx` needs three `eslint-disable-next-line boundaries/dependencies` lines to import `src/test/flow.tsx` (review of retro item 4).
