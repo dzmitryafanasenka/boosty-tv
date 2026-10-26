@@ -2,6 +2,7 @@ import type { Ref } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import {
   FocusableSurface,
+  type FocusableSurfaceProps,
   type HostView,
   type SurfaceState,
 } from './FocusableSurface';
@@ -26,6 +27,8 @@ export type ButtonProps = {
   style?: StyleProp<ViewStyle>;
   /** The focusable host view (for `requestTVFocus()` and focus guides). */
   ref?: Ref<HostView>;
+  /** Native focus arrived (e.g. `useZoneItem`'s `onFocus`). */
+  onFocus?: FocusableSurfaceProps['onFocus'];
 };
 
 const KIND = {
@@ -75,6 +78,7 @@ export function Button({
   testID,
   style,
   ref,
+  onFocus,
 }: ButtonProps) {
   const k = KIND[kind];
   const s = SIZE[size];
@@ -106,6 +110,7 @@ export function Button({
       accessibilityLabel={label}
       accessibilityState={{ busy, disabled }}
       onPress={busy || disabled ? undefined : onPress}
+      onFocus={onFocus}
       surfaceStyle={surfaceStyle}
     >
       {/* The label always keeps its place, so busy never changes the width. */}

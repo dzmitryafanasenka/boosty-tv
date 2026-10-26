@@ -1,0 +1,8 @@
+{
+  "case": "e1-user-current",
+  "status": 200,
+  "body": {
+    "id": 1001,
+    "blogUrl": "synthetic-blog-1"
+  }
+}

@@ -199,6 +199,37 @@ Production refresh-coordinator requirements (from the Story 1.4 review; binding 
 - **`expires_in` validation:** accept only finite numbers above the 300 s proactive window. Otherwise keep the previous expiry, so that a refresh storm cannot occur.
 - **Reuse detection (closed, not tested):** whether reusing a rotated-out refresh token revokes the whole token family is unknown. Owner decision 2026-10-25 (Story 1.5): not re-tested, because the client never reuses a refresh token on purpose and the burned-token case is already handled as "sign in again". The `device_id` question is closed the same way.
 
+#### Production client (Story 2.5)
+
+`src/shared/api/authApiClient.ts` (`refresh`), `refreshCoordinator.ts`, `sessionManager.ts`, `httpClient.ts`, `appError.ts`. Host-tested over `FixtureTransport` (`__tests__/sessionRefresh.test.ts`, `__tests__/sessionFlow.test.tsx`).
+
+| Item | Behavior |
+|---|---|
+| Request | `AuthApiClient` / `auth` profile, `POST /oauth/token/`, form `grant_type=refresh_token`, `refresh_token`, `device_id` (the install id), `device_os=web`; 30 s timeout; never retried |
+| Parsed as | `access_token` required (non-empty string). `refresh_token` optional: missing or empty keeps the old one. `expires_in` adopted only when finite, > 300 and ≤ 315 360 000 s; otherwise the previous `expiresAt` is kept |
+| Expired | Only HTTP 400 with `error: "invalid_grant"` → status `expired`; nothing further is sent with these tokens; the stored session entry is cleared through the store queue (the phone is kept for re-login; a failed clear is logged and does not change the status). Until A11 exists the app resets to A1 «Войдите снова», and a later cold start (no session, phone kept: restore reason `expired`) opens A1 «Войдите снова» too (owner decisions 2026-10-26) |
+| Kept (still `signedIn`) | Any other status (400 other `error`, 401, 403 → `Client`; 429 → `RateLimited`; 5xx → `Server`), a transport failure or timeout (`Network`) and a 200 that fails the schema (`Parse`). The triggering request fails with that kind |
+| Order | The new pair is written to SecureStore before it replaces the in-memory session. A failed write keeps the old pair in memory and storage (logged as an error; the request fails with `Client`) |
+| Single flight | One refresh per session generation; proactive when `expiresAt − now < 300 s` (also for a past `expiresAt` after a restore); after a 401 only when the failed request used the still-current token, otherwise the request is retried with the current token. One retry of a GET after a 401; mutations are never re-sent |
+| Cooldown | After a `failed` refresh no new refresh starts for 30 s in the same session generation (owner decision: no sequential refresh storm); requests that need one fail at once with the same kind, 401 renewals included. A proactive refresh that failed while the access token is not past `expiresAt` sends the request with the current token. Sign-in, restore and sign-out reset the cooldown |
+| Sign-out | While the clears run, the coordinator sees no session: no refresh starts and no refreshed pair is written or adopted |
+| Races | Sign-in, restore and sign-out bump a generation; every session write and clear runs in one queue. A late refresh result of an older generation is dropped and logged; a late rejection never turns `signedOut` into `expired` |
+| E1 validation | `GET /v1/user/current` (content profile) in the background after the boot and on every `AppState` change to `active`, single-flight, with the AD-6 GET retries. A cold-start `Network` result shows Главная's offline StateView; the session is kept |
+| Logs | Operation, outcome, status, path, booleans (`rotated`, `expiresIn` accepted). Never tokens, `Bearer`, the device id or a body |
+
+#### Live evidence (Story 2.5)
+
+Recorded 2026-10-26 on the pinned Chromecast with Google TV 4K, **debug build** (Metro), with the owner's stored session; one run, triggered by the agent through the debug-only Настройки row «Проверка обновления сессии» (key injected via adb). The row replaced the access token **in memory only** with a corrupted value of the same length; nothing else was altered. Paths and statuses from the app's sanitized log:
+
+| Case | Request | Status | Notes | Level |
+|---|---|---|---|---|
+| E1 at cold start and on resume, content profile | `GET /v1/user/current` | **200** | One request each time, attempt 1 | `LIVE` |
+| E1 with the corrupted access token, content profile | `GET /v1/user/current` | **401** | As in Story 1.4 (web profile) | `LIVE` |
+| Refresh with the stored refresh token | `POST /oauth/token/` | **200** | `refresh_token` present (rotated), `expires_in` accepted by the > 300 s rule; the new pair was saved before use | `LIVE` |
+| Retry of E1 with the new token | `GET /v1/user/current` | **200** | Then a cold start of the release-like build opened the Shell with the rotated session | `LIVE` |
+
+Nothing new about the server was observed: the shapes match Story 1.4.
+
 ### 2.4 Logout
 
 The reference makes **no server call**; it only clears local data. `DELETE /oauth/token` exists only at `RE-SPEC` level and is unverified. Do not depend on it until it is verified live.

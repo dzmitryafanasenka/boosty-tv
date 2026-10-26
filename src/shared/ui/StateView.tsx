@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import { Button } from './Button';
+import { Button, type ButtonProps } from './Button';
+import type { HostView } from './FocusableSurface';
 import { Text } from './Text';
 import { colors, components, rounded, spacing } from './tokens';
 
@@ -9,6 +10,11 @@ export type StateViewAction = {
   label: string;
   onPress: () => void;
   testID?: string;
+  /** In progress: spinner, focus kept, OK ignored. */
+  busy?: boolean;
+  /** The button's host view (a FocusZone item's `ref`). */
+  ref?: Ref<HostView>;
+  onFocus?: ButtonProps['onFocus'];
 };
 
 export type StateViewProps = {
@@ -48,6 +54,9 @@ export function StateView({ title, body, icon, action, testID, style }: StateVie
           label={action.label}
           onPress={action.onPress}
           testID={action.testID}
+          busy={action.busy}
+          ref={action.ref}
+          onFocus={action.onFocus}
           style={styles.action}
         />
       ) : null}

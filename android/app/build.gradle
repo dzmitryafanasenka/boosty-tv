@@ -96,6 +96,30 @@ android {
     }
 }
 
+/**
+ * Story 2.5: the debug-only demo mode (src/app/appConfig.ts `DEMO_MODE`) must
+ * be off in every release build. Runs before the release JS bundle, so
+ * assembleRelease fails while the flag is on. The same rule is checked in CI
+ * by __tests__/demoModeOff.test.js; keep both in sync.
+ */
+def demoConfigFile = file("../../src/app/appConfig.ts")
+tasks.register("checkDemoModeOff") {
+    def configFile = demoConfigFile
+    inputs.file(configFile)
+    doLast {
+        def source = configFile.text
+        def declarations = (source =~ /(?m)^export const DEMO_MODE\b/).size()
+        def off = (source =~ /(?m)^export const DEMO_MODE = false;$/).find()
+        if (declarations != 1 || !off) {
+            throw new GradleException(
+                "Release build blocked: DEMO_MODE must be false in src/app/appConfig.ts")
+        }
+    }
+}
+tasks.matching { it.name == "createBundleReleaseJsAndAssets" }.configureEach {
+    dependsOn "checkDemoModeOff"
+}
+
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")

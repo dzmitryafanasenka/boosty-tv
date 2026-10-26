@@ -2,7 +2,8 @@ import { createSecureStore, type ReadResult, type SecureStore } from '../../plat
 import { createLogger } from '../../services/logger';
 import type { AuthApiClient, ConfirmCodeResult } from '../authApiClient';
 import { AuthError } from '../authError';
-import { HttpTransportError, type HttpClient } from '../httpClient';
+import { createFixtureTransport, type FixtureReply } from '../fixtureTransport';
+import { createHttpClient } from '../httpClient';
 import { createSessionManager } from '../sessionManager';
 
 const PHONE = '+375291234567';
@@ -32,23 +33,26 @@ function memoryStore(): SecureStore & { value: string | null; write: jest.Mock; 
 
 function setup({
   confirm = () => Promise.resolve(TOKENS),
-  e1 = () => Promise.resolve({ status: 200, body: { id: 1001, flags: {} } }),
+  e1 = () => ({ status: 200, body: { id: 1001, flags: {} } }),
 }: {
   confirm?: () => Promise<ConfirmCodeResult>;
-  e1?: HttpClient['get'];
+  e1?: () => FixtureReply;
 } = {}) {
   const authApi = {
     sendCode: jest.fn(),
     resendCode: jest.fn(),
     confirmCode: jest.fn(confirm),
+    refresh: jest.fn(),
   } as unknown as AuthApiClient & { confirmCode: jest.Mock };
-  const http = { get: jest.fn(e1) };
+  const e1Mock = jest.fn(e1);
+  const transport = createFixtureTransport(req => (req.path === '/v1/user/current' ? e1Mock() : undefined));
+  const http = { get: e1Mock, calls: transport.calls };
   const sessionStore = memoryStore();
   const phoneStore = memoryStore();
   const logger = createLogger();
   const manager = createSessionManager({
     authApi,
-    http,
+    createHttp: tokens => createHttpClient({ transport, tokens, logger, sleep: () => Promise.resolve() }),
     sessionStore,
     phoneStore,
     now: () => NOW,
@@ -77,7 +81,9 @@ describe('signIn', () => {
     await manager.signIn(ARGS);
 
     expect(authApi.confirmCode).toHaveBeenCalledWith(PHONE, CHALLENGE, SMS_CODE);
-    expect(http.get).toHaveBeenCalledWith('/v1/user/current', ACCESS);
+    expect(http.calls).toHaveLength(1);
+    expect(http.calls[0].path).toBe('/v1/user/current');
+    expect(http.calls[0].headers.Authorization).toBe(`Bearer ${ACCESS}`);
     expect(JSON.parse(sessionStore.value ?? '')).toEqual({
       v: 1,
       accessToken: ACCESS,
@@ -95,7 +101,7 @@ describe('signIn', () => {
 
   test('a string E1 id is kept as is', async () => {
     const { manager, sessionStore } = setup({
-      e1: () => Promise.resolve({ status: 200, body: { id: 'u-1001' } }),
+      e1: () => ({ status: 200, body: { id: 'u-1001' } }),
     });
     await manager.signIn(ARGS);
     expect(JSON.parse(sessionStore.value ?? '').accountId).toBe('u-1001');
@@ -118,11 +124,11 @@ describe('signIn', () => {
   });
 
   test.each([
-    ['E1 401', () => Promise.resolve({ status: 401, body: { error: 'unauthorized' } })],
-    ['E1 500', () => Promise.resolve({ status: 500, body: undefined })],
-    ['E1 network', () => Promise.reject(new HttpTransportError())],
-    ['E1 200 without id', () => Promise.resolve({ status: 200, body: { flags: {} } })],
-    ['E1 200 not JSON', () => Promise.resolve({ status: 200, body: undefined })],
+    ['E1 401', (): FixtureReply => ({ status: 401, body: { error: 'unauthorized' } })],
+    ['E1 500', (): FixtureReply => ({ status: 500 })],
+    ['E1 network', (): FixtureReply => ({ network: true })],
+    ['E1 200 without id', (): FixtureReply => ({ status: 200, body: { flags: {} } })],
+    ['E1 200 not JSON', (): FixtureReply => ({ status: 200 })],
   ])('%s: Unknown (challenge spent), nothing saved, tokens dropped, still signedOut', async (_name, e1) => {
     const { manager, sessionStore, phoneStore } = setup({ e1 });
     await expect(manager.signIn(ARGS)).rejects.toMatchObject({ kind: 'Unknown', challengeSpent: true });
@@ -180,8 +186,9 @@ describe('signIn', () => {
     };
     const logger = createLogger();
     const manager = createSessionManager({
-      authApi: { sendCode: jest.fn(), resendCode: jest.fn(), confirmCode: jest.fn(async () => TOKENS) },
-      http: { get: jest.fn(async () => ({ status: 200, body: { id: 1001 } })) },
+      authApi: { sendCode: jest.fn(), resendCode: jest.fn(), confirmCode: jest.fn(async () => TOKENS), refresh: jest.fn() },
+      createHttp: tokens =>
+        createHttpClient({ transport: createFixtureTransport(() => ({ status: 200, body: { id: 1001 } })), tokens, logger }),
       sessionStore: createSecureStore({ service: 'boostytv.session', keychain, helper, logger }),
       phoneStore: createSecureStore({ service: 'boostytv.phone', keychain, helper, logger }),
       now: () => NOW,
@@ -212,7 +219,7 @@ describe('signIn', () => {
 
   test('logs never contain the phone, challenge, code, tokens or the E1 body', async () => {
     const { manager, logger } = setup({
-      e1: () => Promise.resolve({ status: 200, body: { id: 1001, email: 'owner@example.invalid' } }),
+      e1: () => ({ status: 200, body: { id: 1001, email: 'owner@example.invalid' } }),
     });
     await manager.signIn(ARGS);
     const dump = JSON.stringify(logger.entries());

@@ -714,13 +714,15 @@ describe('startup gate', () => {
     await unmount(root);
   });
 
-  it('a stored session → the Shell on Главная, focus nav/home; no request', async () => {
+  it('a stored session → the Shell on Главная, focus nav/home; then one background E1 (Story 2.5)', async () => {
     keychain.__values.set('boostytv.session', STORED);
     const root = await renderApp();
     expect(topScreen(root)).toBe('shell');
     expect(visible(root, 'auth/welcome')).toBe(false);
     expect(lastFocusTarget()).toBe('nav/home');
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe(E1_URL);
+    expect(fetchMock.mock.calls[0][1].method).toBe('GET');
     await unmount(root);
   });
 

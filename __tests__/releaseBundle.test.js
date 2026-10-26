@@ -1,6 +1,7 @@
 /**
  * Story 2.4: the debug-only «Проверка фокуса» routes must not be in the
- * release bundle. Builds the Metro bundle with `--dev false` (and, as a
+ * release bundle; Story 2.5: neither the live refresh trigger nor the demo
+ * mode (FixtureTransport). Builds the Metro bundle with `--dev false` (and, as a
  * control that the grep can see them, `--dev true`) and searches it for the
  * dev route names and focus ids. Plain JS; runs the local react-native CLI.
  */
@@ -10,7 +11,19 @@ const os = require('node:os');
 const path = require('node:path');
 
 const repoRoot = path.resolve(__dirname, '..');
-const DEV_MARKERS = ['DevFocus', 'dev/list/', 'dev/focus', 'dev/action/', 'dev/dialog'];
+const DEV_MARKERS = [
+  'DevFocus',
+  'dev/list/',
+  'dev/focus',
+  'dev/action/',
+  'dev/dialog',
+  // Story 2.5: the debug-only live refresh trigger and the demo mode.
+  'settings/row/session-check',
+  'access token corrupted',
+  'createDemoSessionManager',
+  'demo-access-token',
+  'createFixtureTransport',
+];
 
 jest.setTimeout(240_000);
 
@@ -57,4 +70,6 @@ test('control: the debug bundle contains the dev routes', () => {
   const debug = bundle(true);
   expect(debug).toContain('DevFocus');
   expect(debug).toContain('dev/list/');
+  expect(debug).toContain('settings/row/session-check');
+  expect(debug).toContain('access token corrupted');
 });
