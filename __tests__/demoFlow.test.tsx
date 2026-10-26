@@ -6,6 +6,7 @@
  */
 import { act } from 'react';
 import App from '../src/app/App';
+import { resetQueryCache } from '../src/app/queryClient';
 import { session } from '../src/app/session';
 import { focusRestoration } from '../src/shared/focus';
 import { t } from '../src/shared/i18n';
@@ -55,7 +56,8 @@ beforeEach(() => {
   (globalThis as { fetch: unknown }).fetch = fetchMock;
 });
 
-afterEach(() => {
+afterEach(async () => {
+  await resetQueryCache();
   clearNativeModules();
   focusRestoration.clear();
   logger.clear();
@@ -79,11 +81,18 @@ test('fixture-backed Shell with the «ДЕМО» badge; SecureStore and the netw
     height: components.badge.height,
     backgroundColor: components.badge.bg,
   });
-  // The badge adds nothing focusable.
-  expect(root.container.queryAll(n => n.props.focusable === true).map(n => n.props.testID)).toEqual([
-    'nav/home',
-    'nav/settings',
-  ]);
+  // The badge adds nothing focusable; Главная shows the demo feed (Story
+  // 3.1), served by the demo's FixtureTransport.
+  const focusable = root.container
+    .queryAll(n => n.props.focusable === true)
+    .map(n => n.props.testID as string);
+  expect(focusable.slice(0, 2)).toEqual(['nav/home', 'nav/settings']);
+  // Demo posts in order. (FlashList's Jest measurements report the list
+  // end at once, so further demo pages may already be loaded.)
+  expect(focusable.slice(2, 11)).toEqual(
+    Array.from({ length: 9 }, (_, i) => `home/feed/demo-post-${i}`),
+  );
+  expect(focusable.slice(2).every(id => id.startsWith('home/feed/demo-post-'))).toBe(true);
   // The demo's E1 is answered by FixtureTransport: no real request, no keychain.
   expect(fetchMock).not.toHaveBeenCalled();
   expect(keychain.getGenericPassword).not.toHaveBeenCalled();

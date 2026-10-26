@@ -8,8 +8,9 @@ import {
   type RefObject,
 } from 'react';
 import { BackHandler, StyleSheet, TVFocusGuideView, View } from 'react-native';
-import { HomeScreen, type HomeScreenProps } from '../features/home';
+import { HomeScreen, type HomeFocusInfo, type HomeScreenProps } from '../features/home';
 import { SETTINGS_VERSION_ID, SettingsScreen } from '../features/settings';
+import type { HttpClient } from '../shared/api';
 import { FocusZone, Screen, type FocusZoneHandle } from '../shared/focus';
 import { t } from '../shared/i18n';
 import {
@@ -29,6 +30,11 @@ export type ShellProps = {
    * the Shell route a new key while the same account keeps its memory.
    */
   routeKey: string;
+  /**
+   * The active session's content client (`session.http`), for the feed.
+   * Passed down, never imported: demo mode must not reach the real API.
+   */
+  http: HttpClient;
   /** Настройки «Выйти из аккаунта»: open the sign-out dialog (Story 2.7). */
   onOpenSignOut: (initiator: RefObject<HostView | null>) => void;
   /** Debug builds only: open «Проверка фокуса» from Настройки. */
@@ -37,7 +43,7 @@ export type ShellProps = {
   onCheckSession?: () => void;
   /** Debug builds only: the in-memory A11 trigger row in Настройки. */
   onExpireSession?: () => void;
-  /** Главная's offline StateView (Story 2.5); absent: the placeholder. */
+  /** Главная's offline StateView (Story 2.5); absent: the feed. */
   homeOffline?: HomeScreenProps['offline'];
 };
 
@@ -77,6 +83,7 @@ type View_ = { section: SectionId; focusContent: boolean };
  */
 export function Shell({
   routeKey,
+  http,
   onOpenSignOut,
   onOpenFocusCheck,
   onCheckSession,
@@ -89,6 +96,8 @@ export function Shell({
   sectionRef.current = view.section;
   /** Where focus is: the sidebar or the content zone. */
   const zone = useRef<'sidebar' | 'content'>('sidebar');
+  /** The last focused element (a nav id or a content item id); null: none yet. */
+  const lastFocusId = useRef<string | null>(null);
   const navViews = useRef(new Map<SectionId, HostView>());
   const navRefCallbacks = useRef(new Map<SectionId, (v: HostView | null) => void>());
   const contentRef = useRef<FocusZoneHandle>(null);
@@ -186,17 +195,31 @@ export function Shell({
     wasOffline.current = offline;
   }, [offline, focusNav]);
 
-  const onSidebarFocus = useCallback(() => {
+  const onSidebarFocus = useCallback((section: SectionId) => {
     if (routeFocused.current) {
       zone.current = 'sidebar';
+      lastFocusId.current = NAV_ID[section];
     }
   }, []);
   const isShellActive = useCallback(() => routeFocused.current, []);
-  const onContentFocus = useCallback(() => {
+  const onContentFocus = useCallback((focusId: string) => {
     if (routeFocused.current) {
       zone.current = 'content';
+      lastFocusId.current = focusId;
     }
   }, []);
+  // Главная moves focus into its content only while the user has not moved
+  // (docs/focus-map.md §1.6 skeleton rule), and never while the Shell is
+  // covered or closing.
+  const homeFocus = useMemo<HomeFocusInfo>(
+    () => ({
+      isActive: () => routeFocused.current,
+      current: () => lastFocusId.current,
+      sectionItemId: NAV_ID[HOME],
+      focusSidebar: () => focusNav(HOME),
+    }),
+    [focusNav],
+  );
 
   return (
     <Screen testID="shell">
@@ -220,7 +243,7 @@ export function Shell({
               current={section === view.section}
               hasTVPreferredFocus={section === HOME}
               onPress={() => openSection(section)}
-              onFocus={onSidebarFocus}
+              onFocus={() => onSidebarFocus(section)}
             />
           </View>
         ))}
@@ -232,13 +255,19 @@ export function Shell({
         routeKey={routeKey}
         sectionId={view.section}
         initialFocusId={INITIAL_CONTENT_ID[view.section]}
-        focusOnMount={view.focusContent}
+        // Главная takes its content focus itself (restoration in a
+        // virtualized grid, or after the first page arrives).
+        focusOnMount={view.focusContent && view.section !== HOME}
         onItemFocus={onContentFocus}
         isActive={isShellActive}
         style={styles.content}
       >
         <SectionContent
           section={view.section}
+          routeKey={routeKey}
+          http={http}
+          focusContent={view.focusContent}
+          homeFocus={homeFocus}
           onOpenSignOut={onOpenSignOut}
           onOpenFocusCheck={onOpenFocusCheck}
           onCheckSession={onCheckSession}
@@ -252,6 +281,10 @@ export function Shell({
 
 function SectionContent({
   section,
+  routeKey,
+  http,
+  focusContent,
+  homeFocus,
   onOpenSignOut,
   onOpenFocusCheck,
   onCheckSession,
@@ -259,6 +292,10 @@ function SectionContent({
   homeOffline,
 }: {
   section: SectionId;
+  routeKey: string;
+  http: HttpClient;
+  focusContent: boolean;
+  homeFocus: HomeFocusInfo;
   onOpenSignOut: (initiator: RefObject<HostView | null>) => void;
   onOpenFocusCheck?: () => void;
   onCheckSession?: () => void;
@@ -267,7 +304,15 @@ function SectionContent({
 }) {
   switch (section) {
     case 'home':
-      return <HomeScreen offline={homeOffline} />;
+      return (
+        <HomeScreen
+          offline={homeOffline}
+          http={http}
+          routeKey={routeKey}
+          focusOnMount={focusContent}
+          focus={homeFocus}
+        />
+      );
     case 'settings':
       return (
         <SettingsScreen

@@ -10,6 +10,7 @@
 import { act } from 'react';
 import { type Root } from 'test-renderer';
 import App, { SHELL_RESTORATION_KEY } from '../src/app/App';
+import { resetQueryCache } from '../src/app/queryClient';
 import { authFlow } from '../src/features/auth/authFlow';
 import { accountScope } from '../src/shared/account';
 import { session } from '../src/app/session';
@@ -40,6 +41,7 @@ import {
   visible,
   type SettleOptions,
 } from '../src/test/flow';
+import { E5_PATH, e5Page } from '../src/test/feedFixtures';
 
 jest.mock('react-native-keychain');
 jest.mock('../src/shared/ui/requestHostFocus', () => ({
@@ -107,10 +109,16 @@ beforeEach(async () => {
     InstallId: { getOrCreate: jest.fn().mockResolvedValue('0f8fad5b-d9cb-469f-a165-70867728950e') },
   });
   handler = okRoute;
-  transport = installFixtureTransport(req => handler(req));
+  // Story 3.1: Главная sends E5; a handler that does not answer it gets the
+  // live feed page.
+  transport = installFixtureTransport(async req => {
+    const reply = await handler(req);
+    return reply ?? (req.path === E5_PATH ? { status: 200, body: e5Page() } : undefined);
+  });
 });
 
-afterEach(() => {
+afterEach(async () => {
+  await resetQueryCache();
   clearNativeModules();
   focusRestoration.clear();
   authFlow.reset();
@@ -351,7 +359,7 @@ describe('confirm', () => {
     await unmount(root);
   });
 
-  it('offline cold start → sign out → sign in again: Главная shows the placeholder, not the offline view', async () => {
+  it('offline cold start → sign out → sign in again: Главная shows the feed, not the offline view', async () => {
     handler = () => ({ network: true });
     const root = await renderApp();
     expect(visible(root, 'home/offline')).toBe(true);
@@ -389,7 +397,7 @@ describe('confirm', () => {
 
     expect(visible(root, 'shell')).toBe(true);
     expect(session.getStatus()).toBe('signedIn');
-    expect(visible(root, 'home/placeholder')).toBe(true);
+    expect(visible(root, 'home/feed')).toBe(true);
     expect(visible(root, 'home/offline')).toBe(false);
     await unmount(root);
   });

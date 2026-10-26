@@ -10,11 +10,13 @@
 import { NativeModules } from 'react-native';
 import { type Root } from 'test-renderer';
 import App from '../src/app/App';
+import { resetQueryCache } from '../src/app/queryClient';
 import { devListStore } from '../src/app/dev/devFocus';
 import { focusRestoration } from '../src/shared/focus';
 import { t } from '../src/shared/i18n';
 import { requestHostFocus } from '../src/shared/ui/requestHostFocus';
 import backHandler from '../src/test/backHandlerMock';
+import { e5Page, e5Posts } from '../src/test/feedFixtures';
 import {
   byTestId,
   clearNativeModules,
@@ -96,18 +98,25 @@ beforeEach(() => {
   backHandler.reset();
   resetKeychain({ 'boostytv.session': STORED });
   installNativeModules({ AppInfo: { versionName: '1.0' } });
-  // Story 2.5: the background E1 after the boot succeeds; nothing else is sent.
+  // Story 2.5: the background E1 after the boot succeeds; Story 3.1: E5
+  // answers the live feed page (the last one); nothing else is sent.
   (globalThis as { fetch: unknown }).fetch = jest.fn((url: string) =>
     url === 'https://api.boosty.to/v1/user/current'
       ? Promise.resolve({
           status: 200,
           text: () => Promise.resolve('{"id":1001}'),
         })
-      : Promise.reject(new Error('no request expected')),
+      : url.startsWith('https://api.boosty.to/v1/feed/post/?')
+        ? Promise.resolve({
+            status: 200,
+            text: () => Promise.resolve(JSON.stringify(e5Page())),
+          })
+        : Promise.reject(new Error('no request expected')),
   );
 });
 
-afterEach(() => {
+afterEach(async () => {
+  await resetQueryCache();
   clearNativeModules();
   devListStore.refill();
   focusRestoration.clear();
@@ -134,25 +143,27 @@ function currentSection(root: Root): string[] {
 }
 
 describe('Shell', () => {
-  it('opens on Главная with focus on nav/home and the placeholder StateView, without signing in', async () => {
+  it('opens on Главная with focus on nav/home, then the feed (Story 3.1) takes it, without signing in', async () => {
     const root = await renderApp();
     expect(topScreen(root)).toBe('shell');
     expect(visible(root, 'auth/welcome')).toBe(false);
-    expect(lastFocusTarget()).toBe('nav/home');
     expect(one(root, 'nav/home').props.hasTVPreferredFocus).toBe(true);
     expect(currentSection(root)).toEqual(['nav/home']);
+    const first = `home/feed/${e5Posts()[0].id}`;
+    expect(focusMock.mock.calls.map(c => c[0]?.props?.testID)).toEqual(['nav/home', first]);
 
     const content = byTestId(root, 'shell/content/home')[0];
-    expect(text(content)).toContain(t('home.placeholder.title'));
-    expect(text(content)).toContain(t('home.placeholder.body'));
-    expect(focusableIds(root, content)).toEqual([]);
+    expect(visible(root, 'home/feed')).toBe(true);
+    expect(focusableIds(root, content)).toEqual(e5Posts().map(p => `home/feed/${p.id}`));
     expect(text(root)).toContain(t('shell.wordmark'));
+    expect(text(root)).toContain(t('home.feed.title'));
     await unmount(root);
   });
 
   it('renders only the phase-enabled sections (Главная, Настройки)', async () => {
     const root = await renderApp();
-    expect(focusableIds(root)).toEqual(['nav/home', 'nav/settings']);
+    const sidebar = byTestId(root, 'shell/sidebar')[0];
+    expect(focusableIds(root, sidebar)).toEqual(['nav/home', 'nav/settings']);
     for (const hidden of ['nav/search', 'nav/subs', 'nav/events']) {
       expect(visible(root, hidden)).toBe(false);
     }
@@ -191,9 +202,9 @@ describe('Shell', () => {
 
   it('zone destinations: the current item for ←, the remembered content element for →', async () => {
     const root = await renderApp();
-    // Главная: sidebar → nav/home; the content has no focusable, so no destination.
+    // Главная: sidebar → nav/home; content → the first feed card (Story 3.1).
     expect(destinationIds('shell/sidebar')).toEqual(['nav/home']);
-    expect(destinationIds('shell/content/home')).toEqual([]);
+    expect(destinationIds('shell/content/home')).toEqual([`home/feed/${e5Posts()[0].id}`]);
 
     await press(root, 'nav/settings');
     expect(destinationIds('shell/sidebar')).toEqual(['nav/settings']);
@@ -248,12 +259,14 @@ describe('Shell', () => {
     await unmount(root);
   });
 
-  it('OK on Главная while it is current keeps focus on the sidebar (no content focus)', async () => {
+  it('OK on Главная while it is current moves focus into the feed (Story 3.1)', async () => {
     const root = await renderApp();
+    await focusOn(root, `home/feed/${e5Posts()[2].id}`);
+    await back();
     focusMock.mockClear();
     await press(root, 'nav/home');
     expect(currentSection(root)).toEqual(['nav/home']);
-    expect(focusMock).not.toHaveBeenCalled();
+    expect(lastFocusTarget()).toBe(`home/feed/${e5Posts()[2].id}`);
     await unmount(root);
   });
 
@@ -285,9 +298,13 @@ describe('Shell', () => {
     const root = await renderApp();
     await press(root, 'nav/settings');
     await focusOn(root, 'nav/home');
+    focusMock.mockClear();
     await back();
     expect(currentSection(root)).toEqual(['nav/home']);
-    expect(lastFocusTarget()).toBe('nav/home');
+    // Back focuses nav/home. (The fake timers run the query's gc timer, so
+    // the feed loads again; its arrival then moves focus to the first card,
+    // the skeleton rule of focus-map §1.6.)
+    expect(focusMock.mock.calls[0][0]?.props?.testID).toBe('nav/home');
     expect(backHandler.exitApp).not.toHaveBeenCalled();
     await unmount(root);
   });

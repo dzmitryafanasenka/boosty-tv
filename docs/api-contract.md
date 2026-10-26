@@ -30,7 +30,7 @@ Rules:
 | Timeouts (reference) | connect 15 s, request 30 s, socket 30 s | `REF` |
 | `device_id` | A client-generated UUIDv4, persisted once per install and sent with refresh and phone auth | `REF` `SettingsRepository.getOrCreateDeviceId` |
 
-Boosty TV decision: two request profiles, `auth` (phone auth, refresh: the web-style set) and `content` (every other call: mobile Android Chrome UA, `Accept`, Bearer), as in the reference. See [ADR 0008](adr/0008-api-request-profiles.md). The content profile is `LIVE` only for E8 so far; the other content endpoints are checked by the first production story that sends them.
+Boosty TV decision: two request profiles, `auth` (phone auth, refresh: the web-style set) and `content` (every other call: mobile Android Chrome UA, `Accept`, Bearer), as in the reference. See [ADR 0008](adr/0008-api-request-profiles.md). The content profile is `LIVE` for E8 (Story 1.6) and E5 (Story 3.1: production release-like build on the pinned device, owner's session, 2026-10-26: HTTP 200 with the owner's subscribed posts, accessible posts with video previews and durations, several pages via `extra.offset`); the other content endpoints are checked by the first production story that sends them.
 
 ## 2. Authentication
 

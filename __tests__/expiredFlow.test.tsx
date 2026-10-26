@@ -11,6 +11,7 @@ import { act } from 'react';
 import { AppState } from 'react-native';
 import { type Root } from 'test-renderer';
 import App, { SHELL_RESTORATION_KEY } from '../src/app/App';
+import { resetQueryCache } from '../src/app/queryClient';
 import { authFlow } from '../src/features/auth/authFlow';
 import { session } from '../src/app/session';
 import {
@@ -38,6 +39,7 @@ import {
   unmount,
   visible,
 } from '../src/test/flow';
+import { E5_PATH, e5Page, e5Posts } from '../src/test/feedFixtures';
 
 jest.mock('react-native-keychain');
 jest.mock('../src/shared/ui/requestHostFocus', () => ({
@@ -131,7 +133,12 @@ beforeEach(() => {
   });
   newAccountId = e1Ok.body.id;
   handler = okRoute;
-  transport = installFixtureTransport(req => handler(req));
+  // Story 3.1: Главная sends E5; a handler that does not answer it gets the
+  // live feed page.
+  transport = installFixtureTransport(async req => {
+    const reply = await handler(req);
+    return reply ?? (req.path === E5_PATH ? { status: 200, body: e5Page() } : undefined);
+  });
   appStateHandlers = [];
   jest.spyOn(AppState, 'addEventListener').mockImplementation(((
     _type: string,
@@ -146,7 +153,8 @@ beforeEach(() => {
   }) as unknown as typeof AppState.addEventListener);
 });
 
-afterEach(() => {
+afterEach(async () => {
+  await resetQueryCache();
   clearNativeModules();
   focusRestoration.clear();
   authFlow.reset();
@@ -442,8 +450,9 @@ describe('re-login', () => {
     expect(session.getStatus()).toBe('signedIn');
     expect(topScreen(root)).toBe('shell');
     expect(visible(root, 'auth/expired')).toBe(false);
-    expect(visible(root, 'home/placeholder')).toBe(true);
-    expect(lastFocusTarget()).toBe('nav/home');
+    expect(visible(root, 'home/feed')).toBe(true);
+    // Главная's initial focus: the first feed card (Story 3.1).
+    expect(lastFocusTarget()).toBe(`home/feed/${e5Posts()[0].id}`);
     expect(focusRestoration.peek(SHELL_RESTORATION_KEY, 'settings')).toEqual(remembered);
     expect(JSON.parse(keychain.__values.get('boostytv.session') ?? '{}')).toMatchObject({
       accessToken: NEW_ACCESS,
@@ -485,14 +494,15 @@ describe('re-login', () => {
       'set:boostytv.session',
     ]);
     expect(topScreen(root)).toBe('shell');
-    expect(visible(root, 'home/placeholder')).toBe(true);
-    expect(lastFocusTarget()).toBe('nav/home');
+    expect(visible(root, 'home/feed')).toBe(true);
+    // Главная's initial focus: the first feed card (Story 3.1).
+    expect(lastFocusTarget()).toBe(`home/feed/${e5Posts()[0].id}`);
     expect(focusRestoration.peek(SHELL_RESTORATION_KEY, 'settings')).toBeUndefined();
     expect(JSON.parse(keychain.__values.get('boostytv.session') ?? '{}').accountId).toBe('2002');
     await unmount(root);
   });
 
-  it('offline cold start → resume → invalid_grant → re-login: the placeholder, no offline view', async () => {
+  it('offline cold start → resume → invalid_grant → re-login: Главная (the feed), no offline view', async () => {
     handler = () => ({ network: true });
     const root = await renderApp();
     expect(visible(root, 'home/offline')).toBe(true);
@@ -500,7 +510,7 @@ describe('re-login', () => {
     expect(topScreen(root)).toBe('auth/expired');
     await relogin(root);
     expect(topScreen(root)).toBe('shell');
-    expect(visible(root, 'home/placeholder')).toBe(true);
+    expect(visible(root, 'home/feed')).toBe(true);
     expect(visible(root, 'home/offline')).toBe(false);
     await unmount(root);
   });

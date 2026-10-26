@@ -13,6 +13,8 @@ import { act } from 'react';
 import { AppState } from 'react-native';
 import { type Root } from 'test-renderer';
 import App, { SHELL_RESTORATION_KEY } from '../src/app/App';
+import { QUERY_GC_TIME_MS, queryClient, resetQueryCache } from '../src/app/queryClient';
+import { queryKeys } from '../src/shared/api';
 import { authFlow } from '../src/features/auth/authFlow';
 import { accountScope } from '../src/shared/account';
 import { session } from '../src/app/session';
@@ -42,6 +44,7 @@ import {
   unmount,
   visible,
 } from '../src/test/flow';
+import { E5_PATH, e5Page, e5Posts } from '../src/test/feedFixtures';
 
 jest.mock('react-native-keychain');
 jest.mock('../src/shared/ui/requestHostFocus', () => ({
@@ -157,7 +160,12 @@ beforeEach(() => {
   newAccountId = ACCOUNT_B;
   releaseSlow = null;
   handler = okRoute;
-  transport = installFixtureTransport(req => handler(req));
+  // Story 3.1: Главная sends E5; a handler that does not answer it gets the
+  // live feed page.
+  transport = installFixtureTransport(async req => {
+    const reply = await handler(req);
+    return reply ?? (req.path === E5_PATH ? { status: 200, body: e5Page() } : undefined);
+  });
   appStateHandlers = [];
   jest.spyOn(AppState, 'addEventListener').mockImplementation(((
     _type: string,
@@ -172,7 +180,9 @@ beforeEach(() => {
   }) as unknown as typeof AppState.addEventListener);
 });
 
-afterEach(() => {
+afterEach(async () => {
+  queryClient.setQueryDefaults(queryKeys.subscriptionFeed(), { gcTime: QUERY_GC_TIME_MS });
+  await resetQueryCache();
   clearNativeModules();
   focusRestoration.clear();
   authFlow.reset();
@@ -235,6 +245,8 @@ function track() {
     challenge?: unknown;
     oldLog?: boolean;
     session?: string;
+    /** Queries in the TanStack cache (Story 3.1: A's feed must be gone). */
+    queries?: number;
   } = {};
   keychain.setGenericPassword.mockImplementation(
     async (username: string, password: string, options: { service: string }) => {
@@ -244,6 +256,7 @@ function track() {
         atPhoneWrite.challenge = authFlow.getChallenge();
         atPhoneWrite.oldLog = JSON.stringify(logger.entries()).includes(OLD_LOG_LINE);
         atPhoneWrite.session = keychain.__values.get(SESSION_KEY) ?? 'none';
+        atPhoneWrite.queries = queryClient.getQueryCache().getAll().length;
       }
       return keychainSet?.(username, password, options);
     },
@@ -295,12 +308,17 @@ function startSlowWrite() {
 
 describe('a different account', () => {
   it('from A11 mid-session: E1 → reset → phone write → session write; every store empty; fresh Главная', async () => {
+    // The fake timers would run the 10 min gc of A's inactive feed query
+    // at once; keep it so the switch itself must clear it.
+    queryClient.setQueryDefaults(queryKeys.subscriptionFeed(), { gcTime: Infinity });
     const root = await renderApp();
     await rememberSettingsFocus(root);
     logger.info('test', OLD_LOG_LINE);
     await expireOnResume();
     expect(topScreen(root)).toBe('auth/expired');
     expect(keychain.__values.get(SESSION_KEY)).toBe(MARKER_A);
+    // A's feed is in the query cache before the switch.
+    expect(queryClient.getQueryCache().getAll().length).toBeGreaterThan(0);
     const sentBefore = transport.calls.length;
     const { atPhoneWrite, order } = track();
     await press(root, 'auth/expired/relogin');
@@ -322,6 +340,7 @@ describe('a different account', () => {
     expect(atPhoneWrite.draft).toEqual({ countryCode: '+7', number: '' });
     expect(atPhoneWrite.challenge).toBeNull();
     expect(atPhoneWrite.oldLog).toBe(false);
+    expect(atPhoneWrite.queries).toBe(0);
 
     expect(keychain.__values.get(PHONE_KEY)).toBe(PHONE_B);
     expect(JSON.parse(keychain.__values.get(SESSION_KEY) ?? '{}')).toMatchObject({
@@ -331,8 +350,9 @@ describe('a different account', () => {
     expect(session.getStatus()).toBe('signedIn');
     expect(topScreen(root)).toBe('shell');
     expect(visible(root, 'auth/welcome')).toBe(false);
-    expect(visible(root, 'home/placeholder')).toBe(true);
-    expect(lastFocusTarget()).toBe('nav/home');
+    expect(visible(root, 'home/feed')).toBe(true);
+    // Главная's initial focus: the first feed card (Story 3.1).
+    expect(lastFocusTarget()).toBe(`home/feed/${e5Posts()[0].id}`);
     expect(focusRestoration.peek(SHELL_RESTORATION_KEY, 'settings')).toBeUndefined();
     expect(resetLogged()).toBe(true);
     // Logs: `accountChanged` and store names only; never a phone or account id.
@@ -340,8 +360,14 @@ describe('a different account', () => {
     for (const secret of [PHONE_A, PHONE_B, ACCOUNT_A, String(ACCOUNT_B), SMS_CODE, CHALLENGE]) {
       expect(dump).not.toContain(secret);
     }
-    // No server call on switch: after A11 only send, confirm and B's E1.
-    expect(transport.calls.slice(sentBefore).map(call => call.path)).toEqual([SEND, CONFIRM, E1]);
+    // No server call on switch: after A11 only send, confirm and B's E1,
+    // then B's own feed (A's cache is gone, so Главная fetches it fresh).
+    expect(transport.calls.slice(sentBefore).map(call => call.path)).toEqual([
+      SEND,
+      CONFIRM,
+      E1,
+      E5_PATH,
+    ]);
     await unmount(root);
   });
 

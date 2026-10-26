@@ -16,3 +16,4 @@ test('DEMO_MODE is false and declared exactly once', () => {
   expect(source.match(ANY)).toHaveLength(1);
   expect(OFF.test(source)).toBe(true);
 });
+

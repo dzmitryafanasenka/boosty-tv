@@ -1,7 +1,6 @@
 import {
   useEffect,
   useRef,
-  useState,
   type ComponentRef,
   type ReactNode,
   type Ref,
@@ -20,6 +19,7 @@ import {
 } from 'react-native';
 import { toEasing } from './motion';
 import { colors, focus, motion } from './tokens';
+import { useItemState } from './useItemState';
 import { useReducedMotion } from './useReducedMotion';
 
 /** Instance of a host `View` (has `requestTVFocus()` on TV). */
@@ -42,11 +42,22 @@ export type FocusableSurfaceProps = Omit<
   disabled?: boolean;
   /** Outer layout style (margins, alignment). Never scaled. */
   style?: StyleProp<ViewStyle>;
-  /** Surface style per state: size, padding, background (the focus lift). */
+  /**
+   * Surface style per state: size, padding, background (the focus lift). It
+   * is the same native view as the scale and holds the ring, so it must not
+   * set `overflow` (clips the ring) or `opacity` (dims the ring);
+   * `__tests__/surfaceRules.test.tsx` checks the consumers.
+   */
   surfaceStyle?: (state: SurfaceState) => StyleProp<ViewStyle>;
   children?: ReactNode | ((state: SurfaceState) => ReactNode);
   /** The focusable host view (for `requestTVFocus()` and focus guides). */
   ref?: Ref<HostView>;
+  /**
+   * The item this surface shows, in a recycling list: when it changes, the
+   * focus and pressed state and the scale start over, so they never leak
+   * to the next item (ADR 0011). Absent: plain state (buttons, rows).
+   */
+  resetKey?: string;
 };
 
 const RING_WIDTH = focus['ring-width'];
@@ -75,11 +86,12 @@ export function FocusableSurface({
   onPressIn,
   onPressOut,
   ref,
+  resetKey,
   ...pressableProps
 }: FocusableSurfaceProps) {
   const reducedMotion = useReducedMotion();
-  const [focused, setFocused] = useState(false);
-  const [pressed, setPressed] = useState(false);
+  const [focused, setFocused] = useItemState(false, resetKey);
+  const [pressed, setPressed] = useItemState(false, resetKey);
   const scale = useRef(new Animated.Value(1)).current;
   const wasPressed = useRef(false);
 
@@ -93,6 +105,14 @@ export function FocusableSurface({
     : state.focused
       ? scaleFocus
       : 1;
+
+  // A recycled item: no animation from the previous item's scale.
+  const shownKey = useRef(resetKey);
+  if (shownKey.current !== resetKey) {
+    shownKey.current = resetKey;
+    scale.stopAnimation();
+    scale.setValue(target);
+  }
 
   useEffect(() => {
     const token = state.pressed || wasPressed.current ? motion.press : motion.focus;
@@ -111,6 +131,11 @@ export function FocusableSurface({
     animation.start();
     return () => animation.stop();
   }, [scale, target, reducedMotion, state.pressed]);
+
+  const surfaceStyles = surfaceStyle?.(state);
+  const border = StyleSheet.flatten(surfaceStyles)?.borderWidth ?? 0;
+  /** Inset from the padding box: the ring stays `RING_INSET` off the outer edge. */
+  const ringInset = RING_INSET - border;
 
   return (
     <Pressable
@@ -138,20 +163,33 @@ export function FocusableSurface({
         onPressOut?.(event);
       }}
     >
+      {/*
+        One native view for the scale and the surface (Story 3.1 device
+        profiling: every card's native view count is mount time). The ring
+        is its absolutely positioned child: it scales with the surface, and
+        its inset adds the surface's own border, so the gap stays the same.
+        Surface styles must not clip (`overflow: 'hidden'`) or the ring is cut.
+      */}
       <Animated.View
         testID={testID ? `${testID}/scale` : undefined}
-        style={{ transform: [{ scale }] }}
+        style={[{ borderRadius: radius }, surfaceStyles, { transform: [{ scale }] }]}
       >
-        <View style={[{ borderRadius: radius }, surfaceStyle?.(state)]}>
-          {typeof children === 'function' ? children(state) : children}
-        </View>
+        {typeof children === 'function' ? children(state) : children}
         {state.focused ? (
           <View
             testID={testID ? `${testID}/ring` : undefined}
             pointerEvents="none"
             style={[
               styles.ring,
-              { borderRadius: radius - RING_INSET },
+              {
+                top: ringInset,
+                right: ringInset,
+                bottom: ringInset,
+                left: ringInset,
+                // The ring is placed in the surface's padding box (inside its
+                // border, whose inner radius is `radius - border`).
+                borderRadius: radius - border - ringInset,
+              },
             ]}
           />
         ) : null}
@@ -163,10 +201,6 @@ export function FocusableSurface({
 const styles = StyleSheet.create({
   ring: {
     position: 'absolute',
-    top: RING_INSET,
-    right: RING_INSET,
-    bottom: RING_INSET,
-    left: RING_INSET,
     borderWidth: RING_WIDTH,
     borderColor: colors['focus-ring'],
   },

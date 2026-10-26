@@ -19,6 +19,7 @@ import {
   type RefObject,
 } from 'react';
 import { AppState, StatusBar, StyleSheet, View } from 'react-native';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import {
   CodeScreen,
@@ -37,6 +38,7 @@ import {
 import { t } from '../shared/i18n';
 import { Text, colors, components, spacing, type HostView } from '../shared/ui';
 import type * as DevFocusModule from './dev/devFocus';
+import { queryClient } from './queryClient';
 import type { RootStackParamList } from './routes';
 import { DEMO_ACTIVE, session } from './session';
 import { SessionUiContext, useSessionUi, type SessionUi } from './sessionUi';
@@ -201,6 +203,7 @@ function ShellRoute({
   return (
     <Shell
       routeKey={SHELL_RESTORATION_KEY}
+      http={session.http}
       onOpenSignOut={onOpenSignOut}
       onOpenFocusCheck={
         __DEV__ ? () => navigation.navigate('DevFocus') : undefined
@@ -299,7 +302,7 @@ function App() {
       }
     });
     const appState = AppState.addEventListener('change', state => {
-      // Resume: E1 again; only a success changes anything (offline → placeholder).
+      // Resume: E1 again; only a success changes anything (offline → the feed).
       session.onAppStateChange(state)?.then(result => {
         if (alive.current && result.kind === 'ok') {
           setHomeOffline(false);
@@ -358,44 +361,46 @@ function App() {
     <GestureHandlerRootView style={styles.root}>
       <StatusBar hidden />
       {boot ? (
-        <SessionUiContext.Provider value={ui}>
-          <ModalHostProvider>
-            <ModalBridge apiRef={modalApi} />
-            <NavigationContainer
-              ref={navigationRef}
-              theme={theme}
-              onReady={onNavigationReady}
-            >
-              <Stack.Navigator
-                initialRouteName={boot.initial}
-                detachInactiveScreens={false}
-                screenOptions={{ headerShown: false, gestureEnabled: false }}
+        <QueryClientProvider client={queryClient}>
+          <SessionUiContext.Provider value={ui}>
+            <ModalHostProvider>
+              <ModalBridge apiRef={modalApi} />
+              <NavigationContainer
+                ref={navigationRef}
+                theme={theme}
+                onReady={onNavigationReady}
               >
-                <Stack.Screen
-                  name="Welcome"
-                  component={Welcome}
-                  initialParams={{ signInAgain: boot.signInAgain }}
-                />
-                <Stack.Screen name="Phone" component={Phone} />
-                <Stack.Screen name="Code" component={Code} />
-                <Stack.Screen name="Shell" component={ShellRoute} />
-                <Stack.Screen name="Expired" component={Expired} />
-                {__DEV__ && dev ? (
-                  <>
-                    <Stack.Screen
-                      name="DevFocus"
-                      component={dev.DevFocusRoute}
-                    />
-                    <Stack.Screen
-                      name="DevFocusDetail"
-                      component={dev.DevFocusDetailRoute}
-                    />
-                  </>
-                ) : null}
-              </Stack.Navigator>
-            </NavigationContainer>
-          </ModalHostProvider>
-        </SessionUiContext.Provider>
+                <Stack.Navigator
+                  initialRouteName={boot.initial}
+                  detachInactiveScreens={false}
+                  screenOptions={{ headerShown: false, gestureEnabled: false }}
+                >
+                  <Stack.Screen
+                    name="Welcome"
+                    component={Welcome}
+                    initialParams={{ signInAgain: boot.signInAgain }}
+                  />
+                  <Stack.Screen name="Phone" component={Phone} />
+                  <Stack.Screen name="Code" component={Code} />
+                  <Stack.Screen name="Shell" component={ShellRoute} />
+                  <Stack.Screen name="Expired" component={Expired} />
+                  {__DEV__ && dev ? (
+                    <>
+                      <Stack.Screen
+                        name="DevFocus"
+                        component={dev.DevFocusRoute}
+                      />
+                      <Stack.Screen
+                        name="DevFocusDetail"
+                        component={dev.DevFocusDetailRoute}
+                      />
+                    </>
+                  ) : null}
+                </Stack.Navigator>
+              </NavigationContainer>
+            </ModalHostProvider>
+          </SessionUiContext.Provider>
+        </QueryClientProvider>
       ) : (
         <View testID="app/splash" style={styles.root} />
       )}

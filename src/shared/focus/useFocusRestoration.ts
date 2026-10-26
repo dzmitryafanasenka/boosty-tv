@@ -34,6 +34,12 @@ export type FocusRestorationOptions = {
   focusAbove: () => void;
   /** Frames to wait for a scrolled-to item to mount (default 30). */
   maxFrames?: number;
+  /**
+   * Whether a pending focus may still land when its item mounts or a frame
+   * check finds it (default: always). False (the screen is covered, the user
+   * moved away) drops the pending focus instead.
+   */
+  canFocus?: () => boolean;
 };
 
 export type ListRestoration = {
@@ -54,6 +60,12 @@ export type ListRestoration = {
   cancel(): void;
   /** Initial focus: the first item, or the action above when the list is empty. */
   focusInitial(): void;
+  /**
+   * Focus the item with this id once it is mounted (e.g. the first new card
+   * after a load-more retry). A user move, `cancel` or `restore` stops it;
+   * after the frame budget it gives up and leaves focus where it is.
+   */
+  focusItem(id: string): void;
 };
 
 /**
@@ -68,7 +80,11 @@ export function useFocusRestoration({
   listRef,
   focusAbove,
   maxFrames = 30,
+  canFocus,
 }: FocusRestorationOptions): ListRestoration {
+  const canFocusRef = useRef(canFocus);
+  canFocusRef.current = canFocus;
+  const allowed = () => canFocusRef.current?.() ?? true;
   const views = useRef(new Map<string, HostView>());
   const refCallbacks = useRef(
     new Map<string, (view: HostView | null) => void>(),
@@ -126,6 +142,15 @@ export function useFocusRestoration({
       callback = (view: HostView | null) => {
         if (view) {
           views.current.set(id, view);
+          // A pending focus target that mounts now (a list that renders its
+          // items after a layout pass, e.g. FlashList) is focused at once.
+          if (pending.current === id) {
+            pending.current = null;
+            attempt.current += 1;
+            if (allowed()) {
+              requestHostFocus(view);
+            }
+          }
         } else if (views.current.has(id)) {
           views.current.delete(id);
         }
@@ -134,6 +159,40 @@ export function useFocusRestoration({
     }
     return callback;
   }, []);
+
+  /** Focus `id` once mounted, within the frame budget; `onGiveUp` otherwise. */
+  const focusWhenMounted = useCallback(
+    (id: string, onGiveUp: () => void) => {
+      pending.current = id;
+      const mine = attempt.current;
+      let frames = 0;
+      const tryFocus = () => {
+        if (mine !== attempt.current) {
+          return;
+        }
+        if (!allowed()) {
+          // Covered, or the user moved away: drop it (no give-up action).
+          pending.current = null;
+          return;
+        }
+        const view = views.current.get(id);
+        if (view) {
+          pending.current = null;
+          requestHostFocus(view);
+          return;
+        }
+        frames += 1;
+        if (frames < maxFrames) {
+          requestAnimationFrame(tryFocus);
+        } else {
+          pending.current = null;
+          onGiveUp();
+        }
+      };
+      tryFocus();
+    },
+    [maxFrames],
+  );
 
   const restore = useCallback((): RestoreTarget => {
     const entry = focusRestoration.restore(routeKey, sectionId);
@@ -158,43 +217,32 @@ export function useFocusRestoration({
       });
     }
 
-    pending.current = target.id;
-    const mine = attempt.current;
-    let frames = 0;
-    const tryFocus = () => {
-      if (mine !== attempt.current) {
-        return;
-      }
-      const view = views.current.get(target.id);
-      if (view) {
-        pending.current = null;
-        requestHostFocus(view);
-        return;
-      }
-      frames += 1;
-      if (frames < maxFrames) {
-        requestAnimationFrame(tryFocus);
-      } else {
-        pending.current = null;
-        focusAboveRef.current();
-      }
-    };
-    tryFocus();
+    focusWhenMounted(target.id, () => focusAboveRef.current());
     return target;
-  }, [routeKey, sectionId, listRef, maxFrames, cancel]);
+  }, [routeKey, sectionId, listRef, cancel, focusWhenMounted]);
+
+  const focusItem = useCallback(
+    (id: string) => {
+      cancel();
+      focusWhenMounted(id, () => {});
+    },
+    [cancel, focusWhenMounted],
+  );
 
   const focusInitial = useCallback(() => {
     const first = idsRef.current[0];
-    const view = first === undefined ? undefined : views.current.get(first);
-    if (view) {
-      requestHostFocus(view);
-    } else {
+    if (first === undefined) {
       focusAboveRef.current();
+      return;
     }
-  }, []);
+    cancel();
+    // Not mounted yet (the list renders items after a layout pass): focus
+    // it when it mounts, else the action above after the frame budget.
+    focusWhenMounted(first, () => focusAboveRef.current());
+  }, [cancel, focusWhenMounted]);
 
   return useMemo(
-    () => ({ onItemFocus, onScroll, itemRef, restore, cancel, focusInitial }),
-    [onItemFocus, onScroll, itemRef, restore, cancel, focusInitial],
+    () => ({ onItemFocus, onScroll, itemRef, restore, cancel, focusInitial, focusItem }),
+    [onItemFocus, onScroll, itemRef, restore, cancel, focusInitial, focusItem],
   );
 }

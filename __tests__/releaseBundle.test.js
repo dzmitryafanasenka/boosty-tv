@@ -27,6 +27,10 @@ const DEV_MARKERS = [
   // Story 2.6: the debug-only in-memory A11 trigger.
   'settings/row/expired-check',
   'debug: expired in memory',
+  // Story 3.1: the demo E5 generator.
+  'demo-post-',
+  'demo-blog-',
+  'demo-video-',
 ];
 
 jest.setTimeout(240_000);
@@ -78,4 +82,7 @@ test('control: the debug bundle contains the dev routes', () => {
   expect(debug).toContain('access token corrupted');
   expect(debug).toContain('settings/row/expired-check');
   expect(debug).toContain('debug: expired in memory');
+  expect(debug).toContain('demo-post-');
+  expect(debug).toContain('demo-blog-');
+  expect(debug).toContain('demo-video-');
 });

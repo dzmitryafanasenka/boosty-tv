@@ -1,0 +1,113 @@
+import { z } from 'zod';
+
+/**
+ * Lenient Zod schemas for the Boosty `Post` object and its content blocks
+ * (docs/api-contract.md §4, §4.1). One schema per DTO (AD-8); only
+ * `shared/entities/post` maps them.
+ *
+ * - A post is parsed on its own (`postDtoSchema.safeParse`), so one bad post
+ *   never fails its page. Required, as in the reference: `id`, `createdAt`,
+ *   `int_id` and `user.name`; also `user.blogUrl`, because a post is routed
+ *   and keyed by `{blogUrl, postId}` (AD-9).
+ * - Every other field is optional, and a wrong type falls back (`catch`)
+ *   instead of dropping the post.
+ * - Blocks stay `unknown` here: each block is parsed by its own schema in
+ *   the mapper, and an unknown `type` becomes `Block.Unknown`.
+ * - Never parsed: `signedQuery`, `playerUrls`, `timeCode`, `comments`,
+ *   `count`, prices. They are not part of the domain (AD-9; comments are
+ *   excluded).
+ */
+
+const optionalString = z.string().nullish().catch(undefined);
+const optionalNumber = z.number().nullish().catch(undefined);
+
+export const postUserDtoSchema = z.object({
+  name: z.string().min(1),
+  blogUrl: z.string().min(1),
+  avatarUrl: optionalString,
+});
+
+export const postDtoSchema = z.object({
+  id: z.string().min(1),
+  int_id: z.number().int(),
+  createdAt: z.number(),
+  publishTime: optionalNumber,
+  title: optionalString,
+  /** Missing: true (reference default). */
+  hasAccess: z.boolean().nullish().catch(undefined),
+  user: postUserDtoSchema,
+  data: z.array(z.unknown()).nullish().catch(undefined),
+  teaser: z.array(z.unknown()).nullish().catch(undefined),
+  /** Present only as a key in live posts; only `name` is read. */
+  subscriptionLevel: z
+    .object({ name: optionalString })
+    .nullish()
+    .catch(undefined),
+});
+
+export type PostDto = z.infer<typeof postDtoSchema>;
+
+/** Any block: only the `type` discriminator is required. */
+export const blockTypeDtoSchema = z.object({ type: z.string() });
+
+/** `text`: `content` is a JSON string `[text, style, ranges]` or raw text. */
+export const textBlockDtoSchema = z.object({
+  type: z.literal('text'),
+  content: optionalString,
+  modificator: optionalString,
+});
+
+export const linkBlockDtoSchema = z.object({
+  type: z.literal('link'),
+  content: optionalString,
+  url: optionalString,
+});
+
+export const imageBlockDtoSchema = z.object({
+  type: z.literal('image'),
+  id: optionalString,
+  url: optionalString,
+  width: optionalNumber,
+  height: optionalNumber,
+});
+
+/** `ok_video`: `id` is the media identity (AD-9). No URLs, no `timeCode`. */
+export const okVideoBlockDtoSchema = z.object({
+  type: z.literal('ok_video'),
+  id: z.string().min(1),
+  title: optionalString,
+  /** Seconds (api-contract §3 «Live evidence (Story 1.5)»). */
+  duration: optionalNumber,
+  preview: optionalString,
+  defaultPreview: optionalString,
+});
+
+export const audioBlockDtoSchema = z.object({
+  type: z.literal('audio_file'),
+  id: optionalString,
+  title: optionalString,
+  duration: optionalNumber,
+});
+
+export const fileBlockDtoSchema = z.object({
+  type: z.literal('file'),
+  id: optionalString,
+  title: optionalString,
+  size: optionalNumber,
+});
+
+export const pollBlockDtoSchema = z.object({
+  type: z.literal('poll'),
+  id: z.union([z.number(), z.string()]).nullish().catch(undefined),
+});
+
+/** `list` (`LIVE`, Story 1.5): `items[]{data: ContentBlock[], items[]}`. */
+export const listBlockDtoSchema = z.object({
+  type: z.literal('list'),
+  items: z.array(z.unknown()).nullish().catch(undefined),
+});
+
+export const listItemDtoSchema = z.object({
+  data: z.array(z.unknown()).nullish().catch(undefined),
+  items: z.array(z.unknown()).nullish().catch(undefined),
+});

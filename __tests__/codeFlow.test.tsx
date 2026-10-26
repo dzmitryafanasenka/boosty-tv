@@ -10,6 +10,8 @@ import { act } from 'react';
 import { NativeModules } from 'react-native';
 import { createRoot, type Root } from 'test-renderer';
 import App from '../src/app/App';
+import { resetQueryCache } from '../src/app/queryClient';
+import { e5Page, e5Posts } from '../src/test/feedFixtures';
 import { authFlow } from '../src/features/auth/authFlow';
 import { t } from '../src/shared/i18n';
 import { CONTENT_USER_AGENT } from '../src/shared/api/profiles';
@@ -52,6 +54,8 @@ const REFRESH = 'r'.repeat(64);
 const SEND_URL = 'https://api.boosty.to/auth/phone/verification_code/send';
 const CONFIRM_URL = 'https://api.boosty.to/auth/phone/verification_code/confirm';
 const E1_URL = 'https://api.boosty.to/v1/user/current';
+/** Story 3.1: Главная's first feed page. */
+const E5_URL = 'https://api.boosty.to/v1/feed/post/?limit=10&comments_limit=0&reply_limit=0';
 
 const sendBody = (code: string) => ({
   data: { phoneCode: { code, expiresIn: 604800, phone: PHONE, sentTransport: 'gate' } },
@@ -120,6 +124,7 @@ beforeEach(() => {
     [SEND_URL]: [{ status: 200, body: sendBody(CHALLENGE) }],
     [CONFIRM_URL]: [{ status: 200, body: TOKENS }],
     [E1_URL]: [{ status: 200, body: { id: 1001, flags: {} } }],
+    [E5_URL]: [{ status: 200, body: e5Page() }],
   };
   (globalThis as { fetch: unknown }).fetch = fetchMock;
   installNativeModules({ InstallId: { getOrCreate: jest.fn().mockResolvedValue(DEVICE_ID) } });
@@ -127,7 +132,8 @@ beforeEach(() => {
   backHandler.reset();
 });
 
-afterEach(() => {
+afterEach(async () => {
+  await resetQueryCache();
   clearNativeModules();
   authFlow.reset();
   jest.restoreAllMocks();
@@ -372,18 +378,19 @@ describe('confirm and session creation', () => {
     expect(visible(root, 'auth/code')).toBe(false);
     expect(visible(root, 'auth/phone')).toBe(false);
     expect(visible(root, 'shell/sidebar')).toBe(true);
-    expect(text(root)).toContain(t('home.placeholder.title'));
-    expect(lastFocusTarget()).toBe('nav/home');
-    const shell = JSON.stringify(byTestId(root, 'shell')[0].toJSON?.() ?? null);
+    expect(text(root)).toContain(t('home.feed.title'));
+    // Главная's initial focus: the first feed card (Story 3.1).
+    expect(lastFocusTarget()).toBe(`home/feed/${e5Posts()[0].id}`);
+    const sidebar = JSON.stringify(byTestId(root, 'shell/sidebar')[0].toJSON?.() ?? null);
     for (const personal of ['291234567', '1001', '•']) {
-      expect(shell).not.toContain(personal);
+      expect(sidebar).not.toContain(personal);
     }
-    // Only the sidebar is focusable on Главная (the placeholder has no action).
+    // The sidebar, then the feed cards.
     expect(
       root.container
         .queryAll(node => node.props.focusable === true)
         .map(node => node.props.testID),
-    ).toEqual(['nav/home', 'nav/settings']);
+    ).toEqual(['nav/home', 'nav/settings', ...e5Posts().map(p => `home/feed/${p.id}`)]);
 
     await back();
     expect(backHandler.exitApp).toHaveBeenCalled();
@@ -632,10 +639,15 @@ describe('startup gate', () => {
     const root = await renderApp();
     expect(topScreen(root)).toBe('shell');
     expect(visible(root, 'auth/welcome')).toBe(false);
-    expect(lastFocusTarget()).toBe('nav/home');
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0][0]).toBe(E1_URL);
-    expect(fetchMock.mock.calls[0][1].method).toBe('GET');
+    // nav/home first; the first feed page then takes focus (Story 3.1).
+    expect(focusMock.mock.calls.map(c => c[0]?.props?.testID)).toEqual([
+      'nav/home',
+      `home/feed/${e5Posts()[0].id}`,
+    ]);
+    // One E1, and Главная's E5; nothing else.
+    expect(requestsTo(E1_URL)).toHaveLength(1);
+    expect(requestsTo(E1_URL)[0][1].method).toBe('GET');
+    expect(fetchMock.mock.calls.map(c => c[0]).sort()).toEqual([E1_URL, E5_URL].sort());
     await unmount(root);
   });
 

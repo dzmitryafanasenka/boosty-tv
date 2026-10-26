@@ -160,3 +160,15 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-epic-2-retro-item-5-session-manager-split-plan.md`
   summary: Split `SessionManager` per ADR 0009 (codec → core → refreshHost → signOut → lifecycle → restore → signIn → debug, facade unchanged) as its own change between Epic 3 and Epic 4, before Story 4.2.
   evidence: Owner decision 2026-10-26; Story 4.2 is the first story with a session concern (pending progress flushed after re-login only if the account generation is unchanged).
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-1-subscription-feed-on-the-home-screen.md`
+  summary: Feed freshness (AD-7) — the feed refreshes only by explicit action (refetchOnMount off to avoid refetching every loaded page); add silent first-page invalidation on resume after staleTime, and invalidate the feed after a token refresh/re-login so an anonymous (all-locked) E5 page fetched before E1 validation does not linger. Decide the policy with the owner (what happens to deep scroll/focus when page 1 is replaced).
+  evidence: Story 3.1 review: E5 starts in parallel with the cold-start E1 (a server-invalidated token yields a 200 anonymous page); a same-account re-login after A11 does not reset the query cache (AccountScope resets only on switch/sign-out); no resume invalidation exists.
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-1-subscription-feed-on-the-home-screen.md`
+  summary: Before Story 3.4 relies on Shell refocus: `FocusZone.focusTarget` for Главная uses zone order (an arbitrary mounted card, no scroll restore) and the FocusZone remembers the retry/state-action id over the card entry; route Главная's refocus through `useFocusRestoration.restore()` and keep card-only memory.
+  evidence: Edge-case review of Story 3.1 (`src/shared/focus/FocusZone.tsx:91-99`, `FeedGrid` retry row `onFocus`); harmless until a Post/Player return exists (3.4).
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-1-subscription-feed-on-the-home-screen.md`
+  summary: Test that the demo transport pages through all 30 posts (320 with `longFeed`) and then stops, so the release latency check cannot silently run on one page.
+  evidence: Verification-gap review: `demoFeedPage` cursor parsing is only exercised on page 1 (`__tests__/demoFlow.test.tsx:91`); the owner sees the card count during the device run.
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-1-subscription-feed-on-the-home-screen.md`
+  summary: PostCard for posts without a preview (polls, files) should show the author avatar on a plate (DESIGN.md PostCard anatomy); today it shows a plain placeholder plate.
+  evidence: Review pass 2 of Story 3.1; no poll/file posts were seen in the owner's feed, so the gap is not visible yet — fold into the story that renders polls/files (Epic 6) or the 3.6 locked-card work.

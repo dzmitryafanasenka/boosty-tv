@@ -21,6 +21,8 @@ let hook: ListRestoration;
 let calls: string[];
 let list: RestorableList;
 const focusAbove = jest.fn(() => calls.push('above'));
+/** The screen's gate (covered Shell, user moved away); default open. */
+let gate = true;
 
 function Probe({ data }: { data: readonly string[] }) {
   hook = useFocusRestoration({
@@ -28,6 +30,7 @@ function Probe({ data }: { data: readonly string[] }) {
     ids: data,
     listRef: { current: list },
     focusAbove,
+    canFocus: () => gate,
   });
   return null;
 }
@@ -48,6 +51,7 @@ beforeAll(() => jest.useFakeTimers());
 afterAll(() => jest.useRealTimers());
 
 beforeEach(() => {
+  gate = true;
   focusRestoration.clear();
   focusMock.mockClear();
   focusAbove.mockClear();
@@ -250,4 +254,49 @@ test('unmount stops the pending focus', async () => {
   });
   expect(calls).toEqual(['offset 0']);
   expect(focusAbove).not.toHaveBeenCalled();
+});
+
+describe('late mounts (a list that renders items after a layout pass, e.g. FlashList)', () => {
+  test('focusInitial before the item mounts: focused when it mounts', async () => {
+    const root = await render(ids(3));
+    hook.focusInitial();
+    expect(calls).toEqual([]);
+    hook.itemRef('dev/list/1')(view('dev/list/1'));
+    expect(calls).toEqual(['focus dev/list/1']);
+    await act(async () => root.unmount());
+  });
+
+  test('focusInitial, the first item never mounts: gives up to the action above (the sidebar) after the frame budget', async () => {
+    const root = await render(ids(3));
+    hook.focusInitial();
+    await act(async () => {
+      jest.advanceTimersByTime(2000);
+    });
+    expect(calls).toEqual(['above']);
+    await act(async () => root.unmount());
+  });
+
+  test('the screen got covered before the item mounts: the late mount does not focus, nothing gives up', async () => {
+    const root = await render(ids(3));
+    hook.focusInitial();
+    gate = false; // e.g. A11 or a dialog on top
+    hook.itemRef('dev/list/1')(view('dev/list/1'));
+    await act(async () => {
+      jest.advanceTimersByTime(2000);
+    });
+    expect(calls).toEqual([]);
+    await act(async () => root.unmount());
+  });
+
+  test('the user moved to another sidebar item while waiting: the frame check drops the pending focus', async () => {
+    const root = await render(ids(3));
+    hook.focusInitial();
+    gate = false; // e.g. focus on nav/settings
+    await act(async () => {
+      jest.advanceTimersByTime(2000);
+    });
+    hook.itemRef('dev/list/1')(view('dev/list/1'));
+    expect(calls).toEqual([]);
+    await act(async () => root.unmount());
+  });
 });

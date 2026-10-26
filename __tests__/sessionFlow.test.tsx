@@ -11,6 +11,7 @@
 import { act } from 'react';
 import { AppState } from 'react-native';
 import App from '../src/app/App';
+import { resetQueryCache } from '../src/app/queryClient';
 import {
   type FixtureReply,
   type FixtureRequest,
@@ -34,6 +35,7 @@ import {
   unmount,
   visible,
 } from '../src/test/flow';
+import { E5_PATH, e5Page, e5Posts } from '../src/test/feedFixtures';
 
 jest.mock('react-native-keychain');
 jest.mock('../src/shared/ui/requestHostFocus', () => ({
@@ -88,7 +90,12 @@ beforeEach(() => {
     InstallId: { getOrCreate: jest.fn().mockResolvedValue('0f8fad5b-d9cb-469f-a165-70867728950e') },
   });
   handler = req => (req.path === E1 ? { status: 200, body: e1Ok.body } : undefined);
-  transport = installFixtureTransport(req => handler(req));
+  // Story 3.1: Главная sends E5; a handler that does not answer it gets the
+  // live feed page.
+  transport = installFixtureTransport(async req => {
+    const reply = await handler(req);
+    return reply ?? (req.path === E5_PATH ? { status: 200, body: e5Page() } : undefined);
+  });
   appStateHandlers = [];
   jest.spyOn(AppState, 'addEventListener').mockImplementation(((
     _type: string,
@@ -103,7 +110,8 @@ beforeEach(() => {
   }) as unknown as typeof AppState.addEventListener);
 });
 
-afterEach(() => {
+afterEach(async () => {
+  await resetQueryCache();
   clearNativeModules();
   focusRestoration.clear();
   jest.restoreAllMocks();
@@ -124,10 +132,14 @@ describe('cold start with a stored session', () => {
   it('opens the Shell at once and runs one E1 in the background; nothing visible changes, focus stays', async () => {
     const root = await renderApp();
     expect(visible(root, 'shell')).toBe(true);
-    expect(visible(root, 'home/placeholder')).toBe(true);
+    expect(visible(root, 'home/feed')).toBe(true);
     expect(transport.callsTo(E1)).toHaveLength(1);
     expect(transport.calls[0].headers.Authorization).toBe(`Bearer ${OLD_ACCESS}`);
-    expect(focusMock.mock.calls.map(c => c[0]?.props?.testID)).toEqual(['nav/home']);
+    // E1 never moves focus; the first feed page does (Story 3.1).
+    expect(focusMock.mock.calls.map(c => c[0]?.props?.testID)).toEqual([
+      'nav/home',
+      `home/feed/${e5Posts()[0].id}`,
+    ]);
     expect(visible(root, 'demo/badge')).toBe(false);
     await unmount(root);
   });
@@ -137,7 +149,7 @@ describe('cold start with a stored session', () => {
     const root = await renderApp();
     expect(transport.callsTo(E1)).toHaveLength(3);
     expect(visible(root, 'home/offline')).toBe(true);
-    expect(visible(root, 'home/placeholder')).toBe(false);
+    expect(visible(root, 'home/feed')).toBe(false);
     expect(text(root)).toContain(t('home.offline.title'));
     expect(text(root)).toContain(t('home.offline.body'));
     expect(text(root)).not.toContain(t('error.SessionExpired'));
@@ -157,7 +169,7 @@ describe('cold start with a stored session', () => {
     await unmount(root);
   });
 
-  it('«Повторить» runs E1 again; still offline → stays; success → the placeholder, focus to nav/home', async () => {
+  it('«Повторить» runs E1 again; still offline → stays; success → Главная (the feed), focus to nav/home', async () => {
     handler = () => ({ network: true });
     const root = await renderApp();
     await press(root, 'nav/home');
@@ -170,13 +182,13 @@ describe('cold start with a stored session', () => {
     await press(root, 'home/offline/retry');
     expect(transport.callsTo(E1)).toHaveLength(7);
     expect(visible(root, 'home/offline')).toBe(false);
-    expect(visible(root, 'home/placeholder')).toBe(true);
+    expect(visible(root, 'home/feed')).toBe(true);
     expect(lastFocusTarget()).toBe('nav/home');
     await unmount(root);
   });
 });
 
-describe('cold start E1 failures other than Network keep the placeholder', () => {
+describe('cold start E1 failures other than Network keep Главная (the feed)', () => {
   it.each<[string, (req: FixtureRequest) => FixtureReply | undefined]>([
     ['Server (503 ×2)', req => (req.path === E1 ? { status: 503 } : undefined)],
     ['Parse (bad 200 shape)', req => (req.path === E1 ? { status: 200, body: { name: 'x' } } : undefined)],
@@ -188,7 +200,7 @@ describe('cold start E1 failures other than Network keep the placeholder', () =>
     handler = reply;
     const root = await renderApp();
     expect(transport.callsTo(E1).length).toBeGreaterThan(0);
-    expect(visible(root, 'home/placeholder')).toBe(true);
+    expect(visible(root, 'home/feed')).toBe(true);
     expect(visible(root, 'home/offline')).toBe(false);
     expect(visible(root, 'shell')).toBe(true);
     await unmount(root);
@@ -242,7 +254,7 @@ describe('resume', () => {
     handler = () => ({ network: true });
     await changeAppState('active');
     expect(transport.callsTo(E1)).toHaveLength(4);
-    expect(visible(root, 'home/placeholder')).toBe(true);
+    expect(visible(root, 'home/feed')).toBe(true);
     expect(visible(root, 'home/offline')).toBe(false);
     expect(focusMock).not.toHaveBeenCalled();
     await unmount(root);
@@ -255,7 +267,7 @@ describe('resume', () => {
     handler = req => (req.path === E1 ? { status: 200, body: e1Ok.body } : undefined);
     await changeAppState('background');
     await changeAppState('active');
-    expect(visible(root, 'home/placeholder')).toBe(true);
+    expect(visible(root, 'home/feed')).toBe(true);
     await unmount(root);
   });
 });
@@ -275,8 +287,8 @@ it('expired (refresh 400 invalid_grant): the stack resets to A11 «Сессия 
   expect(visible(root, 'auth/welcome')).toBe(false);
   expect(text(root)).toContain(t('auth.expired.title'));
   expect(lastFocusTarget()).toBe('auth/expired/relogin');
-  // Nothing further is sent; no loop.
-  expect(transport.calls).toHaveLength(2);
+  // Nothing further is sent; no loop. (E5 went out at Shell mount.)
+  expect(transport.calls.filter(c => c.path !== E5_PATH)).toHaveLength(2);
   await unmount(root);
 });
 
@@ -297,10 +309,10 @@ it('debug row «Проверка обновления сессии»: corrupted 
   await press(root, 'nav/settings');
   expect(one(root, 'settings/row/session-check').props.accessibilityLabel).toBe(t('dev.sessionCheck.row'));
   await press(root, 'settings/row/session-check');
-  const paths = transport.calls.map(c => c.path);
-  expect(paths).toEqual([E1, E1, TOKEN, E1]);
-  expect(transport.calls[1].headers.Authorization).not.toBe(`Bearer ${OLD_ACCESS}`);
-  expect(transport.calls[3].headers.Authorization).toBe(`Bearer ${NEW_ACCESS}`);
+  const calls = transport.calls.filter(c => c.path !== E5_PATH);
+  expect(calls.map(c => c.path)).toEqual([E1, E1, TOKEN, E1]);
+  expect(calls[1].headers.Authorization).not.toBe(`Bearer ${OLD_ACCESS}`);
+  expect(calls[3].headers.Authorization).toBe(`Bearer ${NEW_ACCESS}`);
   const saved = JSON.parse(keychain.__values.get('boostytv.session') ?? '{}');
   expect(saved).toMatchObject({ accessToken: NEW_ACCESS, refreshToken: NEW_REFRESH });
   expect(visible(root, 'shell')).toBe(true);
