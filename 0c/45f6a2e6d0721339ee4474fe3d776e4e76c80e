@@ -1,0 +1,99 @@
+__mocks__/react-native-keychain.js
+  s_fce05da352b4dc::t_866340a5153d20 1-51
+__tests__/codeFlow.test.tsx
+  s_fce05da352b4dc::t_86dad77a730289 1-764
+__tests__/signInFlow.test.tsx
+  s_fce05da352b4dc::t_b37c78b5739efc 342-343
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_fce05da352b4dc::t_7d7f65ea38b811 106-108
+_bmad-output/implementation-artifacts/spec-2-3-confirm-the-code-and-create-the-session.md
+  s_fce05da352b4dc::t_5dcbeecf7593ec 1-161
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_fce05da352b4dc::t_0c05b4b0e1aaac 32,51-52
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/BoostyNativePackage.kt
+  s_fce05da352b4dc::t_d48c200dfb8d3a 11
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/KeychainStorageResetModule.kt
+  s_fce05da352b4dc::t_64d4164d484c74 1-58
+docs/api-contract.md
+  s_fce05da352b4dc::t_12735447d09cda 130-148
+docs/focus-map.md
+  s_fce05da352b4dc::t_c6c4b76430a139 114-124
+docs/testing.md
+  s_fce05da352b4dc::t_ff27068b70dd38 507-528
+package-lock.json
+  s_fce05da352b4dc::t_62a051985893ab 16,10555-10567
+package.json
+  s_fce05da352b4dc::t_9a1052afa70793 19
+src/app/App.tsx
+  s_fce05da352b4dc::t_ec7e0d5ff4ca45 1-6,11-12,14-20,25,33-49,62-67,71-79,82-99,103-122
+src/app/routes.ts
+  s_fce05da352b4dc::t_25419c642f2354 2-4,7-8,11,13-14
+src/features/auth/CodeScreen.tsx
+  s_fce05da352b4dc::t_6dc940c67ca48c 1-9,11-20,22,24-27,29-32,37-42,45-52,56-65,67-86,88-314,326-332,334-414,438-450,453-456
+src/features/auth/SignedInScreen.tsx
+  s_fce05da352b4dc::t_52d15393702a0e 1-45
+src/features/auth/WelcomeScreen.tsx
+  s_fce05da352b4dc::t_a33e2a38ca21d5 23-24,32-33,35,57-67,99-101
+src/features/auth/__tests__/phone.test.ts
+  s_fce05da352b4dc::t_8f552a1ff392d7 1,51-75
+src/features/auth/index.ts
+  s_fce05da352b4dc::t_f9cda92568b9f0 3
+src/features/auth/phone.ts
+  s_fce05da352b4dc::t_4b9de6cd28f026 45-78
+src/shared/api/__tests__/authApiClient.test.ts
+  s_fce05da352b4dc::t_35c59f2dec1010 2-7,246-419
+src/shared/api/__tests__/httpClient.test.ts
+  s_fce05da352b4dc::t_7217d8fbefeb6f 1-95
+src/shared/api/__tests__/sessionManager.test.ts
+  s_fce05da352b4dc::t_5fa4cf086b832c 1-272
+src/shared/api/authApiClient.ts
+  s_fce05da352b4dc::t_7614f48c8ce1b1 3,5,10,13-21,25,47-54,56,58-68,92,94-95,99-109,114,127,133-136,145,149-150,152-158,160,164,167-169,172-206,208,211-212,214,216-233
+src/shared/api/authError.ts
+  s_fce05da352b4dc::t_7ec79073b3ae46 19-23,25,30,58-70
+src/shared/api/dto/tokens.ts
+  s_fce05da352b4dc::t_8a05e5a9dc9878 1-20
+src/shared/api/dto/userCurrent.ts
+  s_fce05da352b4dc::t_a96e7256444a6e 1-12
+src/shared/api/index.ts
+  s_fce05da352b4dc::t_eed134ee33de54 8-15
+src/shared/api/sessionManager.ts
+  s_fce05da352b4dc::t_92b100c44979a0 1-260
+src/shared/i18n/__tests__/catalog.test.ts
+  s_fce05da352b4dc::t_29b9408516ee6c 1,44-51
+src/shared/i18n/index.ts
+  s_fce05da352b4dc::t_266305512199e9 33-42
+src/shared/i18n/ru.ts
+  s_fce05da352b4dc::t_edda6e96b8472a 43-46,49-52,54-60,63-72
+src/shared/platform/__tests__/secureStore.test.ts
+  s_fce05da352b4dc::t_c710ce94190f2e 1-293
+src/shared/platform/secureStore.ts
+  s_fce05da352b4dc::t_833f06395274b9 1-302
+src/shared/ui/TextField.tsx
+  s_fce05da352b4dc::t_12a3e9b4197510 132
+src/shared/api/httpClient.ts
+  s_e1566cde338a86::t_c25b221543105b 1-105
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "0c45f6a2e6d0721339ee4474fe3d776e4e76c80e",
+  "prompts": {},
+  "sessions": {
+    "s_e1566cde338a86": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a1e500b6758ba0495",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_fce05da352b4dc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1d96fc39-0a81-40cc-a1ff-5557f210c17b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
