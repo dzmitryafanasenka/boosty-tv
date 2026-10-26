@@ -384,7 +384,7 @@ describe('A5 form and the countdown', () => {
     await act(async () => {
       second.render(
         <NavigationContainer>
-          <CodeScreen onChangeNumber={() => {}} onSignedIn={() => {}} />
+          <CodeScreen onChangeNumber={() => {}} onSignedIn={() => {}} signIn={() => Promise.reject(new Error("unused"))} />
         </NavigationContainer>,
       );
     });

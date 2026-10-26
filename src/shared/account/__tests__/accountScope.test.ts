@@ -148,3 +148,60 @@ describe('AccountScope', () => {
     });
   });
 });
+
+describe('AccountScope.guard (Story 2.8)', () => {
+  test('no reset since guard(): the value is committed', async () => {
+    const { scope, store } = setup();
+    scope.register(store('session'));
+    const written: string[] = [];
+    const write = scope.guard<string>('progress', value => {
+      written.push(value);
+    });
+    expect(write.isCurrent()).toBe(true);
+    await expect(write.commit('A')).resolves.toBe(true);
+    expect(written).toEqual(['A']);
+  });
+
+  test('a reset in between: the value is dropped, logged with the store name and no data', async () => {
+    const { scope, store, logger } = setup();
+    scope.register(store('session'));
+    const written: string[] = [];
+    const write = scope.guard<string>('progress', value => {
+      written.push(value);
+    });
+    await scope.reset();
+    expect(write.isCurrent()).toBe(false);
+    await expect(write.commit('secret-value')).resolves.toBe(false);
+    expect(written).toEqual([]);
+    const dropped = logger.entries().filter(e => e.message === 'stale write dropped');
+    expect(dropped).toHaveLength(1);
+    expect(dropped[0]).toMatchObject({ scope: 'account', fields: { store: 'progress' } });
+    expect(JSON.stringify(logger.entries())).not.toContain('secret-value');
+  });
+
+  test('a guard taken after the reset commits', async () => {
+    const { scope, store } = setup();
+    scope.register(store('session'));
+    await scope.reset();
+    const written: number[] = [];
+    const write = scope.guard<number>('progress', v => {
+      written.push(v);
+    });
+    await expect(write.commit(7)).resolves.toBe(true);
+    expect(written).toEqual([7]);
+  });
+
+  test('a failed gate does not invalidate the guard', async () => {
+    const { scope, store } = setup();
+    scope.register(store('session', () => Promise.reject(new Error('keychain'))));
+    const write = scope.guard<string>('progress', () => {});
+    await expect(scope.reset()).rejects.toThrow('keychain');
+    await expect(write.commit('A')).resolves.toBe(true);
+  });
+
+  test("the writer's rejection propagates", async () => {
+    const { scope } = setup();
+    const write = scope.guard<string>('progress', () => Promise.reject(new Error('disk')));
+    await expect(write.commit('A')).rejects.toThrow('disk');
+  });
+});

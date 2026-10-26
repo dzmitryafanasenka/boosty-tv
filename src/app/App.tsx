@@ -31,7 +31,6 @@ import { accountScope } from '../shared/account';
 import type { SignInResult, ValidateResult } from '../shared/api';
 import {
   ModalHostProvider,
-  focusRestoration,
   useModal,
   type ModalApi,
 } from '../shared/focus';
@@ -104,14 +103,12 @@ function Phone({
 }
 
 /**
- * After a sign-in: a different account (or none before) drops the previous
- * account's FocusRestoration; the same account keeps it. Then the Shell on
- * Главная. The account-switch wipe through AccountScope is Story 2.8.
+ * After a sign-in: the Shell on Главная. A different account (or none
+ * before) was already wiped by `SessionManager.signIn` through the
+ * account-switch hook (`AccountScope.reset()`, Story 2.8) before its phone
+ * and session were stored; the same account keeps its FocusRestoration.
  */
-function onSignedIn({ accountChanged }: SignInResult) {
-  if (accountChanged) {
-    focusRestoration.clear();
-  }
+function onSignedIn(_result: SignInResult) {
   openShell();
 }
 
@@ -120,6 +117,7 @@ function Code({ navigation }: StackScreenProps<RootStackParamList, 'Code'>) {
     <CodeScreen
       onChangeNumber={() => navigation.goBack()}
       onSignedIn={onSignedIn}
+      signIn={session.signIn}
     />
   );
 }
