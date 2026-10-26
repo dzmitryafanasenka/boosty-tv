@@ -1,4 +1,4 @@
-import { sessionManager, type SessionManager } from '../shared/api';
+import { createSessionManager, type SessionManager } from '../shared/api';
 import { defineAccountScoped } from '../shared/account';
 import { DEMO_MODE } from './appConfig';
 import type * as DemoModule from './dev/demo';
@@ -18,10 +18,15 @@ const demo: typeof DemoModule | null =
  */
 export const DEMO_ACTIVE = demo !== null;
 
-/** The session the app runs on: the real one, or the demo's in-memory one. */
+/**
+ * The session the app runs on, and its only owner: the real one (the
+ * keychain and the real clients), or the demo's in-memory one. Features and
+ * shared code never import a session singleton; they get what they need
+ * from this one through props (Epic 2 retro, items 1–2).
+ */
 export const session: SessionManager = demo
   ? demo.createDemoSessionManager()
-  : sessionManager;
+  : createSessionManager();
 
 /**
  * The session store (AD-4), the AccountScope gate: SecureStore (the

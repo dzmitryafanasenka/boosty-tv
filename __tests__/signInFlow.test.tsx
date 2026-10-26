@@ -505,7 +505,8 @@ describe('A10 (VerificationRequired)', () => {
   // the kind directly to render the state.
   async function openA10(results: Array<'VerificationRequired' | 'ok'>) {
     const api = jest.requireActual('../src/shared/api') as typeof import('../src/shared/api');
-    const spy = jest.spyOn(api.authApiClient, 'sendCode');
+    const { session } = jest.requireActual('../src/app/session') as typeof import('../src/app/session');
+    const spy = jest.spyOn(session.authApi, 'sendCode');
     for (const result of results) {
       if (result === 'ok') {
         spy.mockResolvedValueOnce({ challenge: CHALLENGE });

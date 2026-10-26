@@ -10,7 +10,7 @@ import {
 import { BackHandler, StyleSheet, TVFocusGuideView, View } from 'react-native';
 import { HomeScreen, type HomeScreenProps } from '../features/home';
 import { SETTINGS_VERSION_ID, SettingsScreen } from '../features/settings';
-import { FocusZone, Screen, useModal, type FocusZoneHandle } from '../shared/focus';
+import { FocusZone, Screen, type FocusZoneHandle } from '../shared/focus';
 import { t } from '../shared/i18n';
 import {
   NavItem,
@@ -100,7 +100,6 @@ export function Shell({
    */
   const routeFocused = useRef(false);
   const [sidebarDestination, setSidebarDestination] = useState<HostView | null>(null);
-  const modal = useModal();
 
   const navRef = useCallback((section: SectionId) => {
     let callback = navRefCallbacks.current.get(section);
@@ -148,11 +147,10 @@ export function Shell({
       if (!(zone.current === 'content' && contentRef.current?.focusTarget())) {
         focusNav(sectionRef.current);
       }
+      // An open modal never reaches this listener: the modal host adds its
+      // own in `open()`, after this one, so it sees Back first
+      // (docs/focus-map.md §1.4).
       const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-        if (modal.isOpen()) {
-          modal.close();
-          return true;
-        }
         if (zone.current === 'content') {
           focusNav(sectionRef.current);
           return true;
@@ -168,7 +166,7 @@ export function Shell({
         routeFocused.current = false;
         sub.remove();
       };
-    }, [focusNav, modal]),
+    }, [focusNav]),
   );
 
   // The offline view went away (E1 succeeded) while «Повторить» had focus:

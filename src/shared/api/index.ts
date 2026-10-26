@@ -1,5 +1,4 @@
 export {
-  authApiClient,
   createAuthApiClient,
   type AuthApiClient,
   type RefreshResult,
@@ -15,8 +14,6 @@ export {
 } from './httpClient';
 export {
   createSessionManager,
-  httpClient,
-  sessionManager,
   type AccountSwitchHook,
   type RestoreResult,
   type SessionManager,

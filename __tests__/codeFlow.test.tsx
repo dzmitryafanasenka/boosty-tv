@@ -384,7 +384,7 @@ describe('A5 form and the countdown', () => {
     await act(async () => {
       second.render(
         <NavigationContainer>
-          <CodeScreen onChangeNumber={() => {}} onSignedIn={() => {}} signIn={() => Promise.reject(new Error("unused"))} />
+          <CodeScreen onChangeNumber={() => {}} onSignedIn={() => {}} signIn={() => Promise.reject(new Error("unused"))} resendCode={() => Promise.reject(new Error("unused"))} />
         </NavigationContainer>,
       );
     });
@@ -633,7 +633,8 @@ describe('A8 (CodeExpired)', () => {
   // return the kind directly to render the state.
   it('«Выслать новый код» focused, «Войти» hidden; OK → new code, form back, field cleared and focused', async () => {
     const api = jest.requireActual('../src/shared/api') as typeof import('../src/shared/api');
-    jest.spyOn(api.sessionManager, 'signIn').mockRejectedValueOnce(new api.AuthError('CodeExpired'));
+    const { session } = jest.requireActual('../src/app/session') as typeof import('../src/app/session');
+    jest.spyOn(session, 'signIn').mockRejectedValueOnce(new api.AuthError('CodeExpired'));
     replies[SEND_URL] = [
       { status: 200, body: sendBody(CHALLENGE) },
       { status: 200, body: sendBody(CHALLENGE_2) },

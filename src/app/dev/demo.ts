@@ -11,9 +11,10 @@ import type { ReadResult, SecureStore } from '../../shared/platform/secureStore'
  * Debug builds only (Story 2.5 demo mode; required under `__DEV__ &&
  * DEMO_MODE`, so release bundles never contain it). A SessionManager over
  * `FixtureTransport` and in-memory stores: a synthetic session, E1 answers
- * 200 with a synthetic id, confirm answers synthetic tokens (so a demo
- * sign-in on A5 lands; the id differs from the stored `demo`, so it runs the
- * account-switch hook, Story 2.8), every other request a 404. The keychain
+ * 200 with a synthetic id, send-code answers a synthetic challenge and
+ * confirm synthetic tokens (so a demo sign-in on A5 lands; the id differs
+ * from the stored `demo`, so it runs the account-switch hook, Story 2.8),
+ * every other request a 404. The keychain
  * is never touched, so the owner's stored session survives a demo run.
  */
 
@@ -45,6 +46,15 @@ export function createDemoSessionManager(): SessionManager {
     switch (request.path) {
       case '/v1/user/current':
         return { status: 200, body: { id: 1001 }, delayMs: 300 };
+      case '/auth/phone/verification_code/send':
+        return {
+          status: 200,
+          body: {
+            data: {
+              phoneCode: { code: 'demo-challenge', sentTransport: 'gate', expiresIn: 604800 },
+            },
+          },
+        };
       case '/auth/phone/verification_code/confirm':
         return {
           status: 200,
