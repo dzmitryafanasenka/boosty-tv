@@ -11,8 +11,10 @@ import type { ReadResult, SecureStore } from '../../shared/platform/secureStore'
  * Debug builds only (Story 2.5 demo mode; required under `__DEV__ &&
  * DEMO_MODE`, so release bundles never contain it). A SessionManager over
  * `FixtureTransport` and in-memory stores: a synthetic session, E1 answers
- * 200 with a synthetic id, every other request a 404. The keychain is never
- * touched, so the owner's stored session survives a demo run.
+ * 200 with a synthetic id, confirm answers synthetic tokens (so a demo
+ * sign-in on A5 lands; the id differs from the stored `demo`, so it runs the
+ * account-switch hook, Story 2.8), every other request a 404. The keychain
+ * is never touched, so the owner's stored session survives a demo run.
  */
 
 const DEMO_SESSION = JSON.stringify({
@@ -39,11 +41,23 @@ function memoryStore(initial: string | null): SecureStore {
 }
 
 export function createDemoSessionManager(): SessionManager {
-  const transport = createFixtureTransport(request =>
-    request.path === '/v1/user/current'
-      ? { status: 200, body: { id: 1001 }, delayMs: 300 }
-      : { status: 404, body: { error: 'not_found' } },
-  );
+  const transport = createFixtureTransport(request => {
+    switch (request.path) {
+      case '/v1/user/current':
+        return { status: 200, body: { id: 1001 }, delayMs: 300 };
+      case '/auth/phone/verification_code/confirm':
+        return {
+          status: 200,
+          body: {
+            access_token: 'demo-access-token-2',
+            refresh_token: 'demo-refresh-token-2',
+            expires_in: 2592000,
+          },
+        };
+      default:
+        return { status: 404, body: { error: 'not_found' } };
+    }
+  });
   return createSessionManager({
     authApi: createAuthApiClient({ transport, getDeviceId: async () => 'demo-device' }),
     createHttp: tokens => createHttpClient({ transport, tokens }),

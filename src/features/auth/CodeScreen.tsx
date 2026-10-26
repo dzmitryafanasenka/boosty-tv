@@ -4,8 +4,8 @@ import { StyleSheet, TVFocusGuideView, View } from 'react-native';
 import {
   authApiClient,
   isAuthError,
-  sessionManager,
   type AuthErrorKind,
+  type SessionManager,
   type SignInResult,
 } from '../../shared/api';
 import { Screen } from '../../shared/focus';
@@ -42,6 +42,11 @@ export type CodeScreenProps = {
    * previous account (Story 2.6), so the previous account's UI state goes.
    */
   onSignedIn: (result: SignInResult) => void;
+  /**
+   * The active session's `signIn` (`src/app/session.ts`: the real one, or
+   * the demo's), so a demo sign-in never touches the keychain (Story 2.8).
+   */
+  signIn: SessionManager['signIn'];
 };
 
 /** A5–A7 (form) or A8 (expired). */
@@ -74,7 +79,7 @@ function errorKind(error: unknown): AuthErrorKind {
  * (not focusable) during the 60 s countdown and shows «через 0:42».
  * IME «Готово» with a non-empty code submits. Busy keeps focus.
  *
- * - «Войти» → `sessionManager.signIn` (confirm → E1 → SecureStore). One
+ * - «Войти» → `signIn` (the active session: confirm → E1 → SecureStore). One
  *   request per attempt (in-flight ref); never retried.
  * - A7 (`WrongCode`): inline error, the field cleared and focused.
  * - Resend (`transport=gate`): every attempt, success or failure, restarts
@@ -87,7 +92,7 @@ function errorKind(error: unknown): AuthErrorKind {
  * - Back (stack pop) or «Изменить номер» → A2 with the number kept. The
  *   challenge lives in `authFlow` and is cleared when A5 is left.
  */
-export function CodeScreen({ onChangeNumber, onSignedIn }: CodeScreenProps) {
+export function CodeScreen({ onChangeNumber, onSignedIn, signIn }: CodeScreenProps) {
   const [pending, setPending] = useState(() => authFlow.getChallenge());
   const [countryCode] = useState(() => authFlow.getDraft().countryCode);
   const [code, setCode] = useState('');
@@ -190,7 +195,7 @@ export function CodeScreen({ onChangeNumber, onSignedIn }: CodeScreenProps) {
     setBusy('submit');
     setError(null);
     try {
-      const result = await sessionManager.signIn({
+      const result = await signIn({
         phone: challenge.phone,
         challenge: challenge.challenge,
         smsCode,
@@ -224,7 +229,7 @@ export function CodeScreen({ onChangeNumber, onSignedIn }: CodeScreenProps) {
         setBusy(null);
       }
     }
-  }, [code, onSignedIn]);
+  }, [code, onSignedIn, signIn]);
 
   const resend = useCallback(async () => {
     if (inFlight.current) {

@@ -34,6 +34,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-4-spike-refresh-and-logout-behavior.md`
   summary: Second-account isolation check for S10 (sign in as a different Boosty account after logout and confirm that no data from the first account is visible).
   evidence: No second account was available; required by CLAUDE.md (no cross-account leakage). Story 2.8 covers it in production.
+  note: Still open. Story 2.8 (2026-10-26) implemented the production account-switch path (AccountScope.reset() before the new phone and session are written, guarded late writes) and host-tested it over FixtureTransport only; the owner decided against a device run and a spent sign-in, so S10 "second account" stays not verified on the device.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-4-spike-refresh-and-logout-behavior.md`
   summary: Production refresh-coordinator tests: a late 401 after another caller's completed refresh (staggered timing), signOut/reload during an in-flight refresh, save failure on adopt, and expires_in edge values.
   evidence: The spike tests use uniform delays and sequential calls; requirements are listed in api-contract §2.3.

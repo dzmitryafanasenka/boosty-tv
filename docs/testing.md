@@ -181,6 +181,22 @@ Changes: `AccountScope` (`src/shared/account/`: `defineAccountScoped`, `register
 | Confirm, failure, double OK, refresh race | Host tests only (`signOutFlow.test.tsx`); not run on the device (owner decision) | host |
 | Physical remote, TalkBack | **Not verified** | — |
 
+### Story 2.8 — Account switch never leaks data, 2026-10-26
+
+**Status: implemented and host-tested only.** Owner decision (2026-10-26): no device run and no sign-in spent; the owner's session on the TV stays untouched. S10 "second account" stays **not verified on the device**.
+
+Changes: `SessionManager` gets an account-switch hook (`SessionManagerDeps.onAccountSwitch` / `setAccountSwitchHook`); `signIn` order is confirm → E1 → account-id compare (in-memory session, else the expiry marker) → on a change or no previous id `await hook()` → phone write → session write → `signedIn`. A hook rejection, or no hook set, fails the sign-in with the spent-challenge error and stores nothing of the new account. The bootstrap hook throws when `reset()` reports a failed store (a partial reset fails the switch; sign-out still leaves the account anyway). `CodeScreen` takes `signIn` as a prop from the active session, so a demo sign-in runs on the demo stores. The hook's gate is the manager's own `signOut()`, so the status may pass `signedOut` on the way to `signedIn` (no navigation is tied to it). `src/app/bootstrap.ts` sets the hook on the active session (real or demo) to `accountScope.reset()`; `App.onSignedIn` no longer clears FocusRestoration itself. `AccountScope.guard(store, write)` captures the generation; `commit(value)` writes only if no reset happened since, otherwise drops the value and logs `stale write dropped` with the store name only. Logs on switch: `accountChanged` and store names; never a phone or an account id.
+
+**Host checks:** `npm run lint -- --max-warnings 0`, `npm run typecheck`, `npm test` (42 suites, 646 tests), `npm run check:fixtures` (17 clean) pass. New or extended tests: `__tests__/accountSwitchFlow.test.tsx` (the spec matrix through the real App over FixtureTransport: switch from A11 mid-session and after a restart, and from A1 with nothing stored — the requests after A11 are exactly send, confirm, E1; the keychain order is `reset:phone`, `reset:session`, `set:phone`, `set:session`, and at B's phone write the marker, FocusRestoration, the draft, the challenge and A's log lines are gone; same account → no keychain clear, FocusRestoration and the log ring kept; a failing gate clear → A8 with `error.Unknown`, no keychain write, A's marker and phone kept; a failing non-gate store → the sign-in fails as spent, nothing of B stored; a guarded write held on a delayed fixture response is dropped after B signs in and committed after a same-account re-login), `expiredFlow.test.tsx` (same/different account assert the keychain order), `demoFlow.test.tsx` (demo expiry → A11 → A2 → A5 → sign-in with another id through the UI: the demo hook wiped FocusRestoration and the log ring, the keychain mock was never called; the demo transport now answers confirm with synthetic tokens), `sessionManager.test.ts` (hook order, no hook for the same account, the gate inside sign-in, hook failure → spent), `accountScope.test.ts` (`guard`). A mutation check (the bootstrap hook body removed) fails 6 of these tests.
+
+**Build:** `./gradlew assembleRelease -PreactNativeArchitectures=armeabi-v7a` BUILD SUCCESSFUL. The shipped Hermes bundle: `stale write dropped` 1, `accountChanged` 1, `createDemoSessionManager` 0.
+
+| Row | Result | Who |
+|---|---|---|
+| Different account from A11 / A1, same account, reset failure, late guarded write, demo | Host tests only (FixtureTransport); not run on the device (owner decision) | host |
+| S10 second account on the device | **Not verified** (owner decision 2026-10-26; no second account used) | — |
+| Physical remote, TalkBack | **Not verified** | — |
+
 ### Verification commands
 
 ```sh
@@ -228,7 +244,7 @@ Verdicts: **passed**, **failed**, **not verified** (the scenario ran but a requi
 | S7 media URL expiry | 1.6 | **Not verified** | `expires` = 24 h after E8 (measured); probe at 15 min → 200; the E8 re-resolve by `ok_video.id` resumed at the same position after other player errors | The CDN response to a really expired URL and recovery from it (owner skipped the long pauses; needs a pause over 24 h) |
 | S8 progress | 1.6 | **Passed** (adb, owner) | E9 every ~10 s of movement, on pause, exit and background; exit `t=1743` → next E8 `timeCode=1743`; the website offered the same position | — |
 | S9 audio and files | 1.7 | **Not verified** | No accessible `audio_file` or `file` in the 60 newest posts of each of the 3 subscribed blogs. `Post.signedQuery` measured on 131 posts: `user_id`, `content_id`, `expire_time` (24 h), `sign` | Audio play/pause/seek/sleep, file QR on a phone, enforcement of `expire_time` by audio/file hosts |
-| S10 logout | 1.4 | **Passed** (adb) | Store cleared and read back empty, also after cold start; `device_id` kept; no request after logout | Second-account isolation (no second account) |
+| S10 logout | 1.4 | **Passed** (adb) | Store cleared and read back empty, also after cold start; `device_id` kept; no request after logout | Second-account isolation: not verified on the device (owner decision 2026-10-26); the production path is host-tested in Story 2.8 |
 | S11 events | 1.5 | **Passed** (adb) | E18 → 200, `count{total, unread, byEventType}`, `updateTime`; EVT-01 endpoint reachable | Paging (1 event, no cursor); event types other than `target_new` |
 | Library compatibility | 1.2 | **Passed with fallbacks** (adb, owner) | JS stack navigation 50/50 push/pop in debug and release-like; keychain survives reboot; react-native-video HLS/DASH/MP4; Zod 4 in Hermes release bytecode; QR scanned by a phone | — |
 

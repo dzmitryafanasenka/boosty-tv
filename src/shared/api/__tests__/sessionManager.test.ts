@@ -34,9 +34,12 @@ function memoryStore(): SecureStore & { value: string | null; write: jest.Mock; 
 function setup({
   confirm = () => Promise.resolve(TOKENS),
   e1 = () => ({ status: 200, body: { id: 1001, flags: {} } }),
+  onAccountSwitch = () => Promise.resolve(),
 }: {
   confirm?: () => Promise<ConfirmCodeResult>;
   e1?: () => FixtureReply;
+  /** null: no hook set (a wiring bug). */
+  onAccountSwitch?: (() => Promise<void>) | null;
 } = {}) {
   const authApi = {
     sendCode: jest.fn(),
@@ -57,6 +60,7 @@ function setup({
     phoneStore,
     now: () => NOW,
     logger,
+    onAccountSwitch: onAccountSwitch ?? undefined,
   });
   return { manager, authApi, http, sessionStore, phoneStore, logger };
 }
@@ -193,6 +197,7 @@ describe('signIn', () => {
       phoneStore: createSecureStore({ service: 'boostytv.phone', keychain, helper, logger }),
       now: () => NOW,
       logger,
+      onAccountSwitch: () => Promise.resolve(),
     });
     await manager.signIn(ARGS);
     expect(helper.deleteKeychainStorage).toHaveBeenCalledTimes(1);
@@ -489,6 +494,143 @@ describe('expiry marker, re-login and the phone accessor (Story 2.6)', () => {
     manager.debugExpireInMemory?.();
     const dump = JSON.stringify(logger.entries());
     for (const secret of [PHONE, '1001', ACCESS, REFRESH, CHALLENGE, SMS_CODE]) {
+      expect(dump).not.toContain(secret);
+    }
+  });
+});
+
+describe('account-switch hook (Story 2.8)', () => {
+  const marker = (accountId: string) => JSON.stringify({ v: 1, expired: true, accountId });
+
+  function withHook(impl?: (manager: ReturnType<typeof setup>['manager']) => Promise<void>) {
+    const order: string[] = [];
+    const hook = jest.fn(async () => {
+      order.push('hook');
+      await impl?.(ctx.manager);
+    });
+    const ctx = setup({ onAccountSwitch: hook });
+    ctx.phoneStore.write.mockImplementation(async (value: string) => {
+      order.push('phone');
+      ctx.phoneStore.value = value;
+    });
+    ctx.sessionStore.write.mockImplementation(async (value: string) => {
+      order.push('session');
+      ctx.sessionStore.value = value;
+    });
+    return { ...ctx, hook, order };
+  }
+
+  test('another account id: E1 → hook → phone write → session write → signedIn', async () => {
+    const { manager, sessionStore, hook, order, http } = withHook();
+    sessionStore.value = marker('2002');
+    await manager.restore();
+    await expect(manager.signIn(ARGS)).resolves.toEqual({ accountChanged: true });
+    expect(hook).toHaveBeenCalledTimes(1);
+    expect(http.get.mock.invocationCallOrder[0]).toBeLessThan(hook.mock.invocationCallOrder[0]);
+    expect(order).toEqual(['hook', 'phone', 'session']);
+    expect(manager.getStatus()).toBe('signedIn');
+  });
+
+  test('no previous account id: the hook runs too', async () => {
+    const { manager, hook, order } = withHook();
+    await manager.restore();
+    await manager.signIn(ARGS);
+    expect(hook).toHaveBeenCalledTimes(1);
+    expect(order).toEqual(['hook', 'phone', 'session']);
+  });
+
+  test('the same account id: no hook', async () => {
+    const { manager, sessionStore, hook, order } = withHook();
+    sessionStore.value = marker('1001');
+    await manager.restore();
+    await expect(manager.signIn(ARGS)).resolves.toEqual({ accountChanged: false });
+    expect(hook).not.toHaveBeenCalled();
+    expect(order).toEqual(['phone', 'session']);
+  });
+
+  test('the gate (signOut) inside the hook: old phone and marker cleared, then the new ones written; signedOut → signedIn', async () => {
+    const { manager, sessionStore, phoneStore, order } = withHook(m => m.signOut());
+    sessionStore.value = marker('2002');
+    phoneStore.value = '+79990000000';
+    await manager.restore();
+    const statuses: string[] = [];
+    manager.subscribe(s => statuses.push(s));
+    await expect(manager.signIn(ARGS)).resolves.toEqual({ accountChanged: true });
+    expect(order).toEqual(['hook', 'phone', 'session']);
+    expect(phoneStore.clear).toHaveBeenCalledTimes(1);
+    expect(sessionStore.clear).toHaveBeenCalledTimes(1);
+    expect(phoneStore.clear.mock.invocationCallOrder[0]).toBeLessThan(phoneStore.write.mock.invocationCallOrder[0]);
+    expect(sessionStore.clear.mock.invocationCallOrder[0]).toBeLessThan(sessionStore.write.mock.invocationCallOrder[0]);
+    expect(phoneStore.value).toBe(PHONE);
+    expect(JSON.parse(sessionStore.value ?? '')).toMatchObject({ accessToken: ACCESS, accountId: '1001' });
+    expect(statuses).toEqual(['signedOut', 'signedIn']);
+    expect(manager.getStatus()).toBe('signedIn');
+    // The new session is the live one: E1 goes out with the new token.
+    await expect(manager.validate()).resolves.toEqual({ kind: 'ok' });
+  });
+
+  test('the hook rejects: spent, nothing of the new account written, the old data kept', async () => {
+    const { manager, sessionStore, phoneStore, order } = withHook(() => Promise.reject(new Error('keychain')));
+    sessionStore.value = marker('2002');
+    phoneStore.value = '+79990000000';
+    await manager.restore();
+    let failure: unknown;
+    try {
+      await manager.signIn(ARGS);
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure).toBeInstanceOf(AuthError);
+    expect(failure).toMatchObject({ kind: 'Unknown', challengeSpent: true });
+    expect(order).toEqual(['hook']);
+    expect(phoneStore.write).not.toHaveBeenCalled();
+    expect(sessionStore.write).not.toHaveBeenCalled();
+    expect(sessionStore.value).toBe(marker('2002'));
+    expect(phoneStore.value).toBe('+79990000000');
+    expect(manager.getStatus()).toBe('expired');
+  });
+
+  test('no hook set and the account changed: spent, nothing written (fail closed)', async () => {
+    const { manager, sessionStore, phoneStore } = setup({ onAccountSwitch: null });
+    sessionStore.value = marker('2002');
+    phoneStore.value = '+79990000000';
+    await manager.restore();
+    await expect(manager.signIn(ARGS)).rejects.toMatchObject({ kind: 'Unknown', challengeSpent: true });
+    expect(phoneStore.write).not.toHaveBeenCalled();
+    expect(sessionStore.write).not.toHaveBeenCalled();
+    expect(sessionStore.value).toBe(marker('2002'));
+    expect(manager.getStatus()).toBe('expired');
+  });
+
+  test('no hook set and the same account: signs in (nothing to wipe)', async () => {
+    const { manager, sessionStore } = setup({ onAccountSwitch: null });
+    sessionStore.value = marker('1001');
+    await manager.restore();
+    await expect(manager.signIn(ARGS)).resolves.toEqual({ accountChanged: false });
+  });
+
+  test('setAccountSwitchHook replaces the hook', async () => {
+    const { manager } = setup({ onAccountSwitch: null });
+    const hook = jest.fn(() => Promise.resolve());
+    manager.setAccountSwitchHook(hook);
+    await manager.signIn(ARGS);
+    expect(hook).toHaveBeenCalledTimes(1);
+  });
+
+  test('logs the accountChanged line after the hook (which clears the ring); never the phone or an account id', async () => {
+    let logger!: ReturnType<typeof setup>['logger'];
+    const ctx = withHook(async m => {
+      await m.signOut();
+      // As the app's reset: the log ring is cleared by the hook.
+      logger.clear();
+    });
+    logger = ctx.logger;
+    ctx.sessionStore.value = marker('2002');
+    await ctx.manager.restore();
+    await ctx.manager.signIn(ARGS);
+    expect(logger.entries().filter(e => e.scope === 'session' && e.message === 'accountChanged')).toHaveLength(1);
+    const dump = JSON.stringify(logger.entries());
+    for (const secret of [PHONE, '1001', '2002', ACCESS, REFRESH, CHALLENGE, SMS_CODE]) {
       expect(dump).not.toContain(secret);
     }
   });

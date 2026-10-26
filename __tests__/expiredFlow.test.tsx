@@ -286,6 +286,22 @@ async function expireOnResume() {
   await changeAppState('active');
 }
 
+/** `reset:<service>` / `set:<service>` keychain calls since the last mockClear, in order. */
+function keychainOrder(): string[] {
+  return [
+    ...keychain.resetGenericPassword.mock.calls.map((call, i) => ({
+      at: keychain.resetGenericPassword.mock.invocationCallOrder[i],
+      op: `reset:${(call[0] as { service: string }).service}`,
+    })),
+    ...keychain.setGenericPassword.mock.calls.map((call, i) => ({
+      at: keychain.setGenericPassword.mock.invocationCallOrder[i],
+      op: `set:${(call[2] as { service: string }).service}`,
+    })),
+  ]
+    .sort((a, b) => a.at - b.at)
+    .map(entry => entry.op);
+}
+
 /** A11 → A2 (prefilled) → send → A5 → code → the Shell. */
 async function relogin(root: Root) {
   await press(root, 'auth/expired/relogin');
@@ -528,7 +544,11 @@ describe('re-login', () => {
     expect(remembered?.focusId).toBe('settings/row/version');
     await expireOnResume();
     expect(topScreen(root)).toBe('auth/expired');
+    keychain.setGenericPassword.mockClear();
+    keychain.resetGenericPassword.mockClear();
     await relogin(root);
+    // Story 2.8: the same account wipes nothing, so no keychain clear.
+    expect(keychainOrder()).toEqual(['set:boostytv.phone', 'set:boostytv.session']);
     expect(sessionManager.getStatus()).toBe('signedIn');
     expect(topScreen(root)).toBe('shell');
     expect(visible(root, 'auth/expired')).toBe(false);
@@ -563,7 +583,17 @@ describe('re-login', () => {
     expect(focusRestoration.peek(SHELL_RESTORATION_KEY, 'settings')).toBeDefined();
     newAccountId = 2002;
     await expireOnResume();
+    keychain.setGenericPassword.mockClear();
+    keychain.resetGenericPassword.mockClear();
     await relogin(root);
+    // Story 2.8: AccountScope.reset() (its gate clears the phone, then the
+    // marker) runs before the new phone and session are written.
+    expect(keychainOrder()).toEqual([
+      'reset:boostytv.phone',
+      'reset:boostytv.session',
+      'set:boostytv.phone',
+      'set:boostytv.session',
+    ]);
     expect(topScreen(root)).toBe('shell');
     expect(visible(root, 'home/placeholder')).toBe(true);
     expect(lastFocusTarget()).toBe('nav/home');

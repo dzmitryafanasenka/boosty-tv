@@ -33,6 +33,9 @@ import { createRefreshCoordinator, type RefreshHost } from './refreshCoordinator
  *   (`getExpiredPhone`, the A11 → A2 prefill); nothing else hands it out.
  * - `signIn` reports whether the E1 id differs from the previous account
  *   id (the in-memory session or the expiry marker; none counts as changed).
+ *   On a change it awaits the injected account-switch hook (Story 2.8, the
+ *   app's `AccountScope.reset()`) before anything of the new account is
+ *   written; the same account runs no hook.
  * - `validate()` runs E1 `GET /v1/user/current` (single-flight): at cold
  *   start and on every return to the foreground (`onAppStateChange`),
  *   because content endpoints answer 200 as anonymous for a bad token
@@ -43,9 +46,13 @@ import { createRefreshCoordinator, type RefreshHost } from './refreshCoordinator
  *   refresh result of an older generation is dropped.
  *
  * Sign-in order: confirm (AuthApiClient) → E1 (content profile, with the new
- * token) → save the phone, then the session, to SecureStore → `signedIn`.
- * The phone is written first and its failure is not fatal; if E1 or the
- * session save fails, the tokens are dropped, nothing is kept and the call
+ * token) → compare the account id → on a change (or no previous id) await
+ * the account-switch hook → save the phone, then the session, to
+ * SecureStore → `signedIn`. The hook's session gate is this manager's own
+ * `signOut()`: it clears the old phone, marker and memory, so the status may
+ * pass `signedOut` on the way to `signedIn`. The phone is written first and
+ * its failure is not fatal; if E1, the hook or the session save fails, the
+ * tokens are dropped, nothing of the new account is kept and the call
  * rejects with `AuthError('Unknown')` marked `challengeSpent` (confirm
  * succeeded, so the code cannot be reused).
  *
@@ -75,8 +82,9 @@ export type RestoreResult =
 /** The outcome of a successful sign-in. */
 export type SignInResult = {
   /**
-   * The E1 id differs from the previous account id (or there was none):
-   * the caller drops the previous account's UI state (FocusRestoration).
+   * The E1 id differs from the previous account id (or there was none). The
+   * account-switch hook already wiped the previous account's data (Story
+   * 2.8); callers only read it.
    */
   accountChanged: boolean;
 };
@@ -126,6 +134,14 @@ export type SessionManager = {
    * (the `session` store, Story 2.7).
    */
   signOut(): Promise<void>;
+  /**
+   * Sets the account-switch hook (Story 2.8), once, from `app/bootstrap.ts`:
+   * the app's `AccountScope.reset()`. `signIn` awaits it when the E1 id
+   * differs from the previous account id (or there is none), before the new
+   * phone and session are written. A rejection, or no hook set, fails the
+   * sign-in as spent and stores nothing.
+   */
+  setAccountSwitchHook(hook: AccountSwitchHook): void;
   /** E1 session check, single-flight. Never rejects; never moves focus. */
   validate(): Promise<ValidateResult>;
   /**
@@ -196,6 +212,9 @@ function decodeSession(raw: string): Decoded | null {
   }
 }
 
+/** Wipes every account-scoped store (the app's `AccountScope.reset()`). */
+export type AccountSwitchHook = () => Promise<void>;
+
 export type SessionManagerDeps = {
   authApi?: AuthApiClient;
   /** Builds the content client over a token source (tests pass a fixture transport). */
@@ -204,6 +223,8 @@ export type SessionManagerDeps = {
   phoneStore?: SecureStore;
   now?: () => number;
   logger?: Logger;
+  /** The account-switch hook; also settable with `setAccountSwitchHook`. */
+  onAccountSwitch?: AccountSwitchHook;
 };
 
 export function createSessionManager({
@@ -213,7 +234,9 @@ export function createSessionManager({
   phoneStore = phoneSecureStore,
   now = Date.now,
   logger = appLogger,
+  onAccountSwitch,
 }: SessionManagerDeps = {}): SessionManager {
+  let accountSwitchHook: AccountSwitchHook | null = onAccountSwitch ?? null;
   let status: SessionStatus = 'signedOut';
   /** The signed-in session; memory only besides SecureStore. */
   let session: StoredSession | null = null;
@@ -396,6 +419,26 @@ export function createSessionManager({
     // The previous account: the in-memory session, else the expiry marker.
     const previous = session?.accountId ?? previousAccountId;
     const accountChanged = previous === null || previous !== accountId;
+    if (accountChanged) {
+      // Story 2.8: wipe the previous account before anything of this one is
+      // written. The hook's gate is `signOut()` (old phone, marker, memory);
+      // it bumps the generation and emits `signedOut`, which navigates
+      // nowhere. A failed gate keeps the old data; nothing of this account is
+      // stored and the tokens are dropped with this frame. No hook set is
+      // a wiring bug: fail closed rather than store B next to A's data.
+      if (!accountSwitchHook) {
+        logger.error('session', 'no account-switch hook set; nothing kept');
+        throw spent();
+      }
+      try {
+        await accountSwitchHook();
+      } catch {
+        logger.error('session', 'account switch failed; nothing kept');
+        throw spent();
+      }
+      // After the hook: its reset cleared the log ring.
+      logger.info('session', 'accountChanged');
+    }
     // A new session: any refresh still running for an older one is dropped.
     generation += 1;
     // The phone first and non-fatal (it only prefills re-login): its ADR
@@ -523,6 +566,9 @@ export function createSessionManager({
       }
     },
     signOut,
+    setAccountSwitchHook(hook) {
+      accountSwitchHook = hook;
+    },
     validate,
     onAppStateChange(next) {
       const previous = appState;

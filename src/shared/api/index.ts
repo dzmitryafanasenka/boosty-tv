@@ -17,6 +17,7 @@ export {
   createSessionManager,
   httpClient,
   sessionManager,
+  type AccountSwitchHook,
   type RestoreResult,
   type SessionManager,
   type SessionManagerDeps,

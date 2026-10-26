@@ -18,12 +18,36 @@ import type { AccountScopedStore } from './defineAccountScoped';
  *   `generation()` are dropped by their writer; a failed gate leaves it
  *   unchanged. It is single-flight: a call while one runs gets the same
  *   promise.
+ * - `guard(store, write)` (Story 2.8) is the write helper for async writers
+ *   (E9 progress, history, caches): call it when the async work starts; it
+ *   captures `generation()`. `commit(value)` writes only if no reset
+ *   happened since; otherwise the value is dropped and a log line names the
+ *   store, with no data. A commit that lands while a reset's gate is still
+ *   running is written and then wiped by that store's own reset, which runs
+ *   after the bump.
+ *   Contract: the generation is checked once, before `await write(value)`.
+ *   So `write` must apply synchronously to the same store a reset clears;
+ *   an async writer (disk, keychain) must re-check `isCurrent()` after its
+ *   write and undo it when a reset happened meanwhile. No async writer
+ *   exists yet (Story 2.8).
  * - Logs only store names and the outcome.
  */
 
 export type ResetResult = {
   /** Stores (besides the gate) whose reset failed; normally empty. */
   failed: string[];
+};
+
+/** One async write that started under the current account. */
+export type GuardedWrite<T> = {
+  /**
+   * Writes `value` if no `reset()` bumped the generation since `guard()`;
+   * resolves true when written, false when dropped. A writer's rejection
+   * propagates.
+   */
+  commit(value: T): Promise<boolean>;
+  /** No reset since `guard()`. */
+  isCurrent(): boolean;
 };
 
 export type AccountScope = {
@@ -33,6 +57,11 @@ export type AccountScope = {
   reset(): Promise<ResetResult>;
   /** Bumped by every `reset()`; async writers capture it and compare. */
   generation(): number;
+  /**
+   * Captures the generation now; `commit` later writes through `write` only
+   * if it is unchanged. `store` is a log-safe name (it is logged).
+   */
+  guard<T>(store: string, write: (value: T) => void | Promise<void>): GuardedWrite<T>;
   /** Test-only: the registered names, in registration (= reset) order. */
   registeredNames(): string[];
 };
@@ -108,6 +137,20 @@ export function createAccountScope({
       return running;
     },
     generation: () => gen,
+    guard(store, write) {
+      const captured = gen;
+      return {
+        isCurrent: () => captured === gen,
+        async commit(value) {
+          if (captured !== gen) {
+            logger().info('account', 'stale write dropped', { store });
+            return false;
+          }
+          await write(value);
+          return true;
+        },
+      };
+    },
     registeredNames: () => stores.map(s => s.name),
   };
 }
