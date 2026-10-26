@@ -6,12 +6,17 @@
 export type RootStackParamList = {
   /** A1. `signInAgain`: the stored session was corrupted and wiped. */
   Welcome: { signInAgain?: boolean } | undefined;
-  /** A2–A4, A9, A10 */
-  Phone: undefined;
+  /**
+   * A2–A4, A9, A10. `fromExpired`: opened from A11 (a flag only; the
+   * prefilled phone travels in `authFlow`'s in-memory draft).
+   */
+  Phone: { fromExpired?: boolean } | undefined;
   /** A5–A8 */
   Code: undefined;
   /** The signed-in Shell: sidebar + sections swapped in place (Story 2.4). */
   Shell: undefined;
+  /** A11 Session expired (Story 2.6): the stack root after an expiry. */
+  Expired: undefined;
   /** Debug builds only: «Проверка фокуса» (registered under `__DEV__`). */
   DevFocus: undefined;
   /** Debug builds only: the card detail pushed from «Проверка фокуса». */

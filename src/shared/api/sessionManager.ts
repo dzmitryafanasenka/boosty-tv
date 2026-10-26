@@ -2,7 +2,6 @@ import { z } from 'zod';
 import {
   phoneSecureStore,
   sessionSecureStore,
-  type ReadResult,
   type SecureStore,
 } from '../platform/secureStore';
 import { logger as appLogger, type Logger } from '../services/logger';
@@ -27,8 +26,13 @@ import { createRefreshCoordinator, type RefreshHost } from './refreshCoordinator
  * - Requests refresh through the single-flight coordinator
  *   (`refreshCoordinator.ts`, api-contract §2.3): proactively when < 300 s
  *   remain, once after a 401. Only refresh 400 `invalid_grant` sets
- *   `expired` and clears the stored session entry (the phone is kept for
- *   re-login), so the next start opens A1 «Войдите снова».
+ *   `expired` and replaces the stored session with an expiry marker that
+ *   holds no token (`{v:1, expired:true, accountId}`); the phone is kept
+ *   for re-login, so the next start opens A11 «Сессия истекла» (Story 2.6).
+ * - The stored phone is readable only while the status is `expired`
+ *   (`getExpiredPhone`, the A11 → A2 prefill); nothing else hands it out.
+ * - `signIn` reports whether the E1 id differs from the previous account
+ *   id (the in-memory session or the expiry marker; none counts as changed).
  * - `validate()` runs E1 `GET /v1/user/current` (single-flight): at cold
  *   start and on every return to the foreground (`onAppStateChange`),
  *   because content endpoints answer 200 as anonymous for a bad token
@@ -52,17 +56,30 @@ export type SessionStatus = 'signedOut' | 'signedIn' | 'expired';
 
 export type RestoreResult =
   | { status: 'signedIn' }
+  /**
+   * The last session was rejected (refresh 400 `invalid_grant`): only the
+   * stored expiry marker means this. The status is `expired`, so the A11
+   * prefill can read the phone; the app opens A11.
+   */
+  | { status: 'expired'; reason: 'expired' }
   | {
       status: 'signedOut';
       /**
        * `none`: nothing stored. `wiped`: the store was corrupted and reset
        * («Войдите снова»). `unavailable`: a transient storage error; the
-       * data is kept and the next start reads it again. `expired`: no
-       * session but the phone is kept, i.e. the last session was rejected
-       * (refresh 400 `invalid_grant`) — «Войдите снова».
+       * data is kept and the next start reads it again.
        */
-      reason: 'none' | 'wiped' | 'unavailable' | 'expired';
+      reason: 'none' | 'wiped' | 'unavailable';
     };
+
+/** The outcome of a successful sign-in. */
+export type SignInResult = {
+  /**
+   * The E1 id differs from the previous account id (or there was none):
+   * the caller drops the previous account's UI state (FocusRestoration).
+   */
+  accountChanged: boolean;
+};
 
 /** The outcome of one E1 session check. */
 export type ValidateResult =
@@ -90,7 +107,13 @@ export type SessionManager = {
   /** Reads the stored session (again) and keeps it in memory. Never rejects. */
   restore(): Promise<RestoreResult>;
   /** Rejects with `AuthError` only. */
-  signIn(args: SignInArgs): Promise<void>;
+  signIn(args: SignInArgs): Promise<SignInResult>;
+  /**
+   * The stored phone (E.164) for the A11 → A2 prefill, or null. Readable
+   * only while the status is `expired`; null in any other status, when
+   * nothing is stored or the store fails. Never rejects.
+   */
+  getExpiredPhone(): Promise<string | null>;
   /**
    * Local sign-out (no server call): clears SecureStore first (session, then
    * phone), then memory. Rejects with the store's error when a clear fails;
@@ -112,6 +135,13 @@ export type SessionManager = {
    * so E1 → 401 → one real refresh → retry. Storage is not touched.
    */
   readonly debugCorruptAccessToken?: () => Promise<ValidateResult>;
+  /**
+   * Debug builds only (undefined in release, Story 2.6): sets the status to
+   * `expired` in memory only, as a real expiry would, but writes nothing to
+   * SecureStore and sends nothing. The next cold start reads the stored
+   * session again.
+   */
+  readonly debugExpireInMemory?: () => void;
 };
 
 export const CURRENT_USER_PATH = '/v1/user/current';
@@ -129,10 +159,32 @@ const storedSessionSchema = z.object({
 
 type StoredSession = z.infer<typeof storedSessionSchema>;
 
-function decodeSession(raw: string): StoredSession | null {
+/**
+ * The expiry marker that replaces the session on refresh 400
+ * `invalid_grant` (Story 2.6): no token, only the account id for the
+ * same-account check after a restart.
+ */
+const expiryMarkerSchema = z.object({
+  v: z.literal(1),
+  expired: z.literal(true),
+  accountId: z.string().min(1),
+});
+
+type ExpiryMarker = z.infer<typeof expiryMarkerSchema>;
+
+type Decoded =
+  | { kind: 'session'; session: StoredSession }
+  | { kind: 'expired'; accountId: string };
+
+function decodeSession(raw: string): Decoded | null {
   try {
-    const parsed = storedSessionSchema.safeParse(JSON.parse(raw));
-    return parsed.success ? parsed.data : null;
+    const value: unknown = JSON.parse(raw);
+    const session = storedSessionSchema.safeParse(value);
+    if (session.success) {
+      return { kind: 'session', session: session.data };
+    }
+    const marker = expiryMarkerSchema.safeParse(value);
+    return marker.success ? { kind: 'expired', accountId: marker.data.accountId } : null;
   } catch {
     return null;
   }
@@ -159,11 +211,16 @@ export function createSessionManager({
   let status: SessionStatus = 'signedOut';
   /** The signed-in session; memory only besides SecureStore. */
   let session: StoredSession | null = null;
+  /**
+   * The account id of the session that expired (memory, or the stored
+   * marker); null when there is none. Compared with E1 on the next sign-in.
+   */
+  let previousAccountId: string | null = null;
   /** Bumped by restore, sign-in and sign-out. */
   let generation = 0;
   const listeners = new Set<(next: SessionStatus) => void>();
   let restoring: Promise<RestoreResult> | null = null;
-  let signingIn: { key: string; promise: Promise<void> } | null = null;
+  let signingIn: { key: string; promise: Promise<SignInResult> } | null = null;
   let validating: Promise<ValidateResult> | null = null;
   let appState = 'active';
   /** Sign-out has started: the coordinator sees no session. */
@@ -213,14 +270,19 @@ export function createSessionManager({
         logger.info('session', 'late rejection dropped');
         return false;
       }
-      // Nothing further is sent with these tokens; the stored session entry
-      // is cleared (the phone stays for re-login). A failed clear is logged
-      // and does not change the status.
+      // Nothing further is sent with these tokens; the stored session is
+      // replaced by the expiry marker (the phone stays for re-login). A
+      // failed write is logged and does not change the status.
+      const accountId = session?.accountId ?? null;
+      previousAccountId = accountId;
       session = null;
       setStatus('expired');
-      enqueue(() => sessionStore.clear()).catch(() => {
-        logger.error('session', 'expired session not cleared');
-      });
+      if (accountId) {
+        const marker: ExpiryMarker = { v: 1, expired: true, accountId };
+        enqueue(() => sessionStore.write(JSON.stringify(marker))).catch(() => {
+          logger.error('session', 'expiry marker not saved');
+        });
+      }
       return true;
     },
   };
@@ -236,19 +298,17 @@ export function createSessionManager({
   async function readSession(): Promise<RestoreResult> {
     generation += 1;
     session = null;
+    previousAccountId = null;
     const result = await sessionStore.read();
+    if (result.kind === 'empty') {
+      // No session, whatever the phone store holds: a kept phone alone may
+      // come from a sign-in interrupted between the phone and session writes,
+      // so only the expiry marker means `expired`.
+      setStatus('signedOut');
+      return { status: 'signedOut', reason: 'none' };
+    }
     if (result.kind !== 'value') {
       setStatus('signedOut');
-    }
-    if (result.kind === 'empty') {
-      // A kept phone without a session: the last session expired.
-      let phone: ReadResult = { kind: 'empty' };
-      try {
-        phone = await phoneStore.read();
-      } catch {
-        // Treated as nothing stored.
-      }
-      return { status: 'signedOut', reason: phone.kind === 'value' ? 'expired' : 'none' };
     }
     if (result.kind === 'wiped') {
       return { status: 'signedOut', reason: 'wiped' };
@@ -268,9 +328,14 @@ export function createSessionManager({
       }
       return { status: 'signedOut', reason: 'wiped' };
     }
+    if (decoded.kind === 'expired') {
+      previousAccountId = decoded.accountId;
+      setStatus('expired');
+      return { status: 'expired', reason: 'expired' };
+    }
     // A past `expiresAt` is kept as is: the first request refreshes
     // proactively (and E1 runs right after the boot).
-    session = decoded;
+    session = decoded.session;
     setStatus('signedIn');
     return { status: 'signedIn' };
   }
@@ -304,7 +369,7 @@ export function createSessionManager({
     }
   }
 
-  async function doSignIn({ phone, challenge, smsCode }: SignInArgs) {
+  async function doSignIn({ phone, challenge, smsCode }: SignInArgs): Promise<SignInResult> {
     const tokens = await authApi.confirmCode(phone, challenge, smsCode);
     // From here on the challenge is spent: any failure says so.
     const spent = () => new AuthError('Unknown', { challengeSpent: true });
@@ -322,6 +387,9 @@ export function createSessionManager({
       expiresAt: confirmedAt + tokens.expiresIn * 1000,
       accountId,
     };
+    // The previous account: the in-memory session, else the expiry marker.
+    const previous = session?.accountId ?? previousAccountId;
+    const accountChanged = previous === null || previous !== accountId;
     // A new session: any refresh still running for an older one is dropped.
     generation += 1;
     // The phone first and non-fatal (it only prefills re-login): its ADR
@@ -332,6 +400,7 @@ export function createSessionManager({
     } catch {
       logger.warn('session', 'phone not saved');
     }
+    // Overwrites the expiry marker, if any.
     try {
       await enqueue(() => sessionStore.write(JSON.stringify(next)));
     } catch {
@@ -339,9 +408,11 @@ export function createSessionManager({
       await discardSaved();
       throw spent();
     }
-    logger.info('session', 'signed in');
+    logger.info('session', 'signed in', { accountChanged });
     session = next;
+    previousAccountId = null;
     setStatus('signedIn');
+    return { accountChanged };
   }
 
   async function doValidate(): Promise<ValidateResult> {
@@ -379,6 +450,7 @@ export function createSessionManager({
       signingOut = false;
     }
     session = null;
+    previousAccountId = null;
     logger.info('session', 'signed out');
     setStatus('signedOut');
   }
@@ -430,6 +502,18 @@ export function createSessionManager({
       signingIn = { key, promise };
       return promise;
     },
+    async getExpiredPhone() {
+      if (status !== 'expired') {
+        return null;
+      }
+      try {
+        const phone = await phoneStore.read();
+        // The status may have changed while reading.
+        return status === 'expired' && phone.kind === 'value' ? phone.value : null;
+      } catch {
+        return null;
+      }
+    },
     signOut,
     validate,
     onAppStateChange(next) {
@@ -445,6 +529,18 @@ export function createSessionManager({
             logger.info('session', 'debug: access token corrupted in memory');
           }
           return validate();
+        }
+      : undefined,
+    debugExpireInMemory: __DEV__
+      ? () => {
+          if (status === 'signedIn' && session) {
+            // As `host.expire`, minus the marker write: storage is untouched.
+            generation += 1;
+            previousAccountId = session.accountId;
+            session = null;
+            logger.info('session', 'debug: expired in memory');
+            setStatus('expired');
+          }
         }
       : undefined,
   };

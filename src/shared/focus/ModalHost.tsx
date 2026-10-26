@@ -31,7 +31,12 @@ import { colors } from '../ui/tokens';
 
 export type ModalApi = {
   open(content: ReactNode, initiatorRef?: RefObject<HostView | null>): void;
-  close(): void;
+  /**
+   * Close the overlay. Focus returns to the initiator, unless
+   * `restoreFocus: false` (the screen behind is going away, e.g. the
+   * session expired and the stack is reset to A11, Story 2.6).
+   */
+  close(options?: { restoreFocus?: boolean }): void;
   isOpen(): boolean;
 };
 
@@ -55,17 +60,20 @@ export function ModalHostProvider({ children }: { children?: ReactNode }) {
     setModal(next);
   }, []);
 
-  const close = useCallback(() => {
+  const close = useCallback<ModalApi['close']>(options => {
     if (!modalRef.current) {
       return;
     }
-    const initiator = modalRef.current.initiator;
+    const initiator =
+      options?.restoreFocus === false ? undefined : modalRef.current.initiator;
     returnTo.current = initiator;
     modalRef.current = null;
     // Focus the initiator before the dialog is unmounted, so the removed
     // dialog does not hold focus; the effect below repeats the request after
     // the unmount (device: Story 2.4).
-    requestHostFocus(initiator?.current);
+    if (initiator) {
+      requestHostFocus(initiator.current);
+    }
     setModal(null);
   }, []);
 

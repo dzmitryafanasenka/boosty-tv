@@ -326,9 +326,12 @@ describe('rejected refresh', () => {
     expect(await kindOf(t.manager.http.get(E1))).toBe('SessionExpired');
     await expect(t.manager.validate()).resolves.toEqual({ kind: 'skipped' });
     expect(t.transport.calls).toHaveLength(2);
-    // The stored session entry is cleared; the phone stays for re-login.
+    // The stored session is replaced by the token-free expiry marker
+    // (Story 2.6); the phone stays for re-login.
     await flush();
-    expect(t.sessionStore.value).toBeNull();
+    expect(JSON.parse(t.sessionStore.value ?? '')).toEqual({ v: 1, expired: true, accountId: '1001' });
+    expect(t.sessionStore.value).not.toContain(OLD_ACCESS);
+    expect(t.sessionStore.value).not.toContain(OLD_REFRESH);
     expect(t.phoneStore.value).toBe('+375291234567');
     expectNoSecrets(t.logger);
   });
@@ -341,22 +344,27 @@ describe('rejected refresh', () => {
     expect(t.manager.getStatus()).toBe('expired');
   });
 
-  test('restore after expiry: no session, the phone kept → signedOut (expired)', async () => {
+  test('restore after expiry: the marker → expired (reason expired), nothing sent', async () => {
     const t = setup({ route: req => (req.path === TOKEN ? refreshRejected : fixtureReply(e1Unauthorized)) });
     await t.manager.restore();
     await t.manager.validate();
-    await expect(t.manager.restore()).resolves.toEqual({ status: 'signedOut', reason: 'expired' });
-    expect(t.manager.getStatus()).toBe('signedOut');
+    await flush();
+    const sent = t.transport.calls.length;
+    await expect(t.manager.restore()).resolves.toEqual({ status: 'expired', reason: 'expired' });
+    expect(t.manager.getStatus()).toBe('expired');
+    await expect(t.manager.validate()).resolves.toEqual({ kind: 'skipped' });
+    expect(t.transport.calls).toHaveLength(sent);
   });
 
-  test('a failed clear on expiry is logged; the status stays expired', async () => {
+  test('a failed marker write on expiry is logged; the status stays expired', async () => {
     const t = setup({ route: req => (req.path === TOKEN ? refreshRejected : fixtureReply(e1Unauthorized)) });
     await t.manager.restore();
-    t.sessionStore.clear.mockRejectedValueOnce(new Error('keychain'));
+    t.sessionStore.write.mockRejectedValueOnce(new Error('keychain'));
     await t.manager.validate();
     await flush();
     expect(t.manager.getStatus()).toBe('expired');
-    expect(JSON.stringify(t.logger.entries())).toContain('expired session not cleared');
+    expect(JSON.stringify(t.logger.entries())).toContain('expiry marker not saved');
+    expectNoSecrets(t.logger);
   });
 });
 

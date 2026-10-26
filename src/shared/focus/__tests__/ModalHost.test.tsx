@@ -188,8 +188,12 @@ test('focus is sent to the initiator before the unmount, after it, and two frame
   await press(root, 'probe/open');
   const scrimAtCall: boolean[] = [];
   focusMock.mockClear();
-  focusMock.mockImplementation(() => {
-    scrimAtCall.push(byId(root, 'modal/scrim').length > 0);
+  focusMock.mockImplementation(target => {
+    // The open's passive effect can be flushed late, after the close has
+    // detached the dialog container: its `requestHostFocus(null)` is a no-op.
+    if (target != null) {
+      scrimAtCall.push(byId(root, 'modal/scrim').length > 0);
+    }
   });
   jest.useFakeTimers();
   await act(async () => {
@@ -201,9 +205,9 @@ test('focus is sent to the initiator before the unmount, after it, and two frame
   });
   jest.useRealTimers();
   expect(
-    focusMock.mock.calls.map(
-      c => (c[0] as { props: { testID: string } }).props.testID,
-    ),
+    focusMock.mock.calls
+      .filter(([target]) => target != null)
+      .map(c => (c[0] as { props: { testID: string } }).props.testID),
   ).toEqual(['probe/open', 'probe/open', 'probe/open']);
   expect(scrimAtCall).toEqual([true, false, false]);
   focusMock.mockImplementation(() => {});
@@ -217,6 +221,28 @@ test('closing from inside (OK on a dialog button) also returns focus to the init
   await press(root, 'probe/dialog/ok');
   expect(api.isOpen()).toBe(false);
   expect(lastFocusTarget()).toBe('probe/open');
+  await act(async () => root.unmount());
+});
+
+test('close({ restoreFocus: false }) closes without any focus request (Story 2.6: the screen behind goes away)', async () => {
+  const root = await render();
+  await press(root, 'probe/open');
+  focusMock.mockClear();
+  jest.useFakeTimers();
+  await act(async () => {
+    api.close({ restoreFocus: false });
+  });
+  await act(async () => {
+    jest.advanceTimersByTime(100);
+  });
+  jest.useRealTimers();
+  expect(api.isOpen()).toBe(false);
+  expect(byId(root, 'modal/scrim')).toHaveLength(0);
+  // No focus request reaches a view. The open's passive effect can be
+  // flushed late, after this close has detached the dialog container; its
+  // `requestHostFocus(null)` is a no-op, so only non-null targets count.
+  expect(focusMock.mock.calls.filter(([target]) => target != null)).toEqual([]);
+  expect(backHandler.count()).toBe(0);
   await act(async () => root.unmount());
 });
 

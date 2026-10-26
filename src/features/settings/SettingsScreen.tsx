@@ -12,6 +12,8 @@ export const SETTINGS_FOCUS_CHECK_ID = 'settings/row/focus-check';
  * constant), so the id is not shipped (__tests__/releaseBundle.test.js).
  */
 export const SETTINGS_SESSION_CHECK_ID = __DEV__ ? 'settings/row/session-check' : '';
+/** Debug builds only (Story 2.6), folded to '' in release like the one above. */
+export const SETTINGS_EXPIRED_CHECK_ID = __DEV__ ? 'settings/row/expired-check' : '';
 
 export type SettingsScreenProps = {
   /**
@@ -25,6 +27,13 @@ export type SettingsScreenProps = {
    * when given; the app passes it under `__DEV__`.
    */
   onCheckSession?: () => void;
+  /**
+   * Debug builds only (Story 2.6): sets the session status to `expired` in
+   * memory only (no storage write, no network), so A11 can be checked on
+   * the device without dropping the stored session. Rendered only when
+   * given; the app passes it under `__DEV__`.
+   */
+  onExpireSession?: () => void;
 };
 
 /**
@@ -32,10 +41,15 @@ export type SettingsScreenProps = {
  * (OK does nothing), the initial focus of the section. Sign-out arrives in
  * Story 2.7. Rendered inside the Shell's content FocusZone.
  */
-export function SettingsScreen({ onOpenFocusCheck, onCheckSession }: SettingsScreenProps) {
+export function SettingsScreen({
+  onOpenFocusCheck,
+  onCheckSession,
+  onExpireSession,
+}: SettingsScreenProps) {
   const version = useZoneItem(SETTINGS_VERSION_ID);
   const focusCheck = useZoneItem(SETTINGS_FOCUS_CHECK_ID);
   const sessionCheck = useZoneItem(SETTINGS_SESSION_CHECK_ID);
+  const expiredCheck = useZoneItem(SETTINGS_EXPIRED_CHECK_ID);
 
   return (
     <View testID="settings" style={styles.root}>
@@ -69,6 +83,16 @@ export function SettingsScreen({ onOpenFocusCheck, onCheckSession }: SettingsScr
             label={t('dev.sessionCheck.row')}
             onPress={onCheckSession}
             onFocus={sessionCheck.onFocus}
+          />
+        ) : null}
+        {__DEV__ && onExpireSession ? (
+          <SettingRow
+            ref={expiredCheck.ref}
+            testID={SETTINGS_EXPIRED_CHECK_ID}
+            kind="nav"
+            label={t('dev.expiredCheck.row')}
+            onPress={onExpireSession}
+            onFocus={expiredCheck.onFocus}
           />
         ) : null}
       </View>

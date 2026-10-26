@@ -124,6 +124,12 @@ Implementation notes (Story 2.3, host tests only; A5 is reached only through a r
 - Startup: a splash with no focusable element until the stored session is read; A1 after a wiped (corrupted) store shows «Войдите снова» above «Войти в Boosty» (focus unchanged).
 - A9 also offers «На первый экран» (`auth/phone/to-welcome`, → A1), as in the mock. A10 hides «Попробовать снова» after its one retry; focus then goes to «Изменить номер» (host tests only).
 
+Implementation notes (Story 2.6, host tests; the device rows are in `docs/testing.md`):
+- A11 is the `Expired` route (`src/features/auth/ExpiredScreen.tsx`) in the shared screen wrapper. Its only focusable element is «Войти снова» (`auth/expired/relogin`), focused initially and explicitly whenever A11 is the focused route again (Back from A2). Back is not intercepted: A11 is the stack root, so the app exits.
+- `expired` from any screen: the app first closes an open modal **without** a focus return to its initiator (the screen behind is going away), clears Главная's offline view, then resets the stack to `[Expired]`. Before the navigator is ready, the reset happens on `onReady`. An existing `[Expired]` stack is not reset again.
+- OK on A11 reads the stored phone (status-gated), splits it into the country code and number by the ITU-T calling code list, and opens A2 with the flag `fromExpired` (the phone travels only in `authFlow`'s in-memory draft). The button is busy while the phone is read. With a valid prefilled draft, A2's initial focus is «Получить код»; with no phone or an unknown code, A2 opens empty (`+7`) with focus on the number field. Later returns to A2 (Back from A5) focus the number field as before. «Назад» and Back on A2 pop to A11; A9's «На первый экран» also pops to A11 in this flow.
+- After the re-login the stack is replaced by the Shell on Главная. FocusRestoration uses the constant Shell key `shell` (not the route key, which a reset changes): the same account id keeps every entry; a different id (or no previous id) clears FocusRestoration first.
+
 ## 3. Shell: sidebar and sections
 
 | Screen | Initial focus | Arrows | OK | Back | Restoration |

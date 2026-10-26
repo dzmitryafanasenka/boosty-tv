@@ -28,8 +28,13 @@ export const PHONE_RETRY_ID = 'auth/phone/retry';
 export type PhoneScreenProps = {
   /** A code was sent; the challenge is in `authFlow`. Open A5. */
   onCodeSent: () => void;
-  /** «Назад» or «На первый экран»: back to A1. */
+  /** «Назад» or «На первый экран»: back to the previous screen (A1, or A11). */
   onExit: () => void;
+  /**
+   * Opened from A11 (Story 2.6): the draft may hold the stored phone. With
+   * a valid prefilled draft the initial focus is «Получить код».
+   */
+  fromExpired?: boolean;
 };
 
 /** A2 form (with A4 and the inline send errors), A9 or A10. */
@@ -58,9 +63,14 @@ const COUNTRY_WIDTH = 96;
  * after a failed retry «Изменить номер». Nothing maps to A10 yet, because no
  * captcha shape is verified (docs/api-contract.md §2.2).
  * Every state switch focuses its target explicitly (`requestHostFocus`).
- * Back: A9/A10 → the form; the form → A1 (stack pop).
+ * Back: A9/A10 → the form; the form → A1 (stack pop), or A11 when opened
+ * from it.
+ *
+ * Opened from A11 with a valid prefilled draft, the initial focus is
+ * «Получить код» (focus-map §2 «A2 after A11»); every later return to A2
+ * focuses the number field as usual.
  */
-export function PhoneScreen({ onCodeSent, onExit }: PhoneScreenProps) {
+export function PhoneScreen({ onCodeSent, onExit, fromExpired = false }: PhoneScreenProps) {
   const [countryCode, setCountryCode] = useState(
     () => authFlow.getDraft().countryCode,
   );
@@ -99,7 +109,15 @@ export function PhoneScreen({ onCodeSent, onExit }: PhoneScreenProps) {
    * Where focus goes when the form (re)appears. `none`: the form comes back
    * under A5 (after a successful A10 retry) and must not take focus from it.
    */
-  const formFocus = useRef<'number' | 'send' | 'none'>('number');
+  const initialTarget = useRef<'number' | 'send'>(
+    fromExpired &&
+      toE164(authFlow.getDraft().countryCode, authFlow.getDraft().number)
+      ? 'send'
+      : 'number',
+  );
+  const formFocus = useRef<'number' | 'send' | 'none'>(initialTarget.current);
+  /** The first route focus applies `initialTarget`; later ones the number. */
+  const firstRouteFocus = useRef(true);
 
   useEffect(() => {
     mounted.current = true;
@@ -149,8 +167,14 @@ export function PhoneScreen({ onCodeSent, onExit }: PhoneScreenProps) {
   // again (Back from A5): never Android's fallback focus (ADR 0007).
   useFocusEffect(
     useCallback(() => {
+      const first = firstRouteFocus.current;
+      firstRouteFocus.current = false;
       if (modeRef.current === 'form') {
-        numberRef.current?.focus();
+        if (first && initialTarget.current === 'send') {
+          requestHostFocus(sendRef.current);
+        } else {
+          numberRef.current?.focus();
+        }
       } else {
         focusStateTarget();
       }

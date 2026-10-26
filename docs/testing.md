@@ -140,6 +140,27 @@ Review fixes (refresh cooldown, `expired` wipes the stored session, sign-out rac
 | Demo mode on the device | **Not run** (host tests only) | — |
 | Physical remote / TalkBack | **Not verified** | — |
 
+### Story 2.6 — Session expired and quick re-login, 2026-10-26
+
+**Status: implemented and host-tested; the debug in-memory A11 path and the release-like cold start verified on the pinned device by adb (rows below). The re-login itself is host-tested only (owner decision: no code is sent on the device).**
+
+Changes: A11 «Сессия истекла» (`src/features/auth/ExpiredScreen.tsx`, route `Expired`); `SessionManager` replaces the stored session with a token-free expiry marker `{v:1, expired:true, accountId}` on refresh 400 `invalid_grant`, `restore()` maps only the marker to status `expired` (an empty session store is `signedOut`, reason `none`, even with a kept phone), the status-gated `getExpiredPhone()`, `signIn` → `{ accountChanged }`, the `__DEV__`-only `debugExpireInMemory`; `splitE164` over the ITU-T calling code list (`src/features/auth/phone.ts`); A2 opened from A11 focuses «Получить код» when the prefill is valid; App: `expired` closes an open modal without a focus return (`ModalApi.close({ restoreFocus: false })`), clears the offline view and resets to `[Expired]` (also on `onReady`), boots into A11 after an expiry, a different account clears FocusRestoration, the Shell uses the constant restoration key `shell`; the debug-only Настройки row «Проверка: сессия истекла» (`settings/row/expired-check`).
+
+**Host checks:** `npm run lint -- --max-warnings 0`, `npm run typecheck`, `npm test` (37 suites, 595 tests after the review fixes), `npm run check:fixtures` (17 clean) pass. New or extended tests: `__tests__/expiredFlow.test.tsx` (every spec matrix row through the real App over FixtureTransport: mid-session expiry, expiry from a pushed screen with an open dialog, expiry before the navigator is ready, cold start with the marker, wiped store → A1, prefill `+375` / `291234567` with focus «Получить код», no phone and an unassigned code → empty A2 with focus on the number, Back A2 → A11 → exit, A5 Back and «Изменить номер» → A2 with focus on the number, A9 «На первый экран» → A11, a double OK during the phone read opens A2 once (busy meanwhile), same account (also after a restart) keeps FocusRestoration, a different account clears it, offline cold start → expiry → re-login shows the placeholder, the debug row leaves SecureStore untouched and sends nothing), `sessionManager.test.ts` (marker restore, invalid markers → wiped, the phone accessor gating and failures, `accountChanged` for same/other/none, marker overwritten by sign-in, the debug hook, sign-out forgets the previous id, no phone or account id in logs), `sessionRefresh.test.ts` (marker written instead of a clear, marker write failure logged), `phone.test.ts` (`splitE164`, a prefix-free calling code list), `ModalHost.test.tsx` (`restoreFocus: false`; the flaky Story 2.4 close test — 8/40 failures on baseline `d9879b3`, a late-flushed open effect calling the no-op `requestHostFocus(null)` — now counts non-null focus targets only: 0/60 failures), `sessionFlow.test.tsx` (the expiry rows now expect A11), `releaseBundle.test.js` (`settings/row/expired-check` and the debug log line absent from the `--dev false` bundle).
+
+**Build:** `./gradlew assembleRelease -PreactNativeArchitectures=armeabi-v7a` BUILD SUCCESSFUL. The shipped Hermes bundle: `settings/row/expired-check` 0, `debug: expired in memory` 0, `settings/row/session-check` 0, `auth/expired/relogin` 1. Debug APK (`assembleDebug`, native unchanged) with Metro on port 8097 via `adb reverse tcp:8081 tcp:8097` (the other Metro on host 8081 was not touched; the reverse mapping was restored to `tcp:8081 tcp:8081` afterwards); release-like (`zipalign -p 4` + `apksigner`, SDK debug key outside the repo); both installed with `adb install -r`. The release-like build is installed now. Nothing uninstalled or cleared; no sign-in, no code sent.
+
+| Row | Result | Who |
+|---|---|---|
+| Debug row → A11 | Shell → Настройки → `settings/row/expired-check` → OK: A11 with the catalog copy, focus `auth/expired/relogin`; logcat `[session] debug: expired in memory`, `status expired`; no request | agent via adb (uiautomator, logcat, screenshot) |
+| A11 OK → A2 prefilled | One OK: A2 with the stored phone split into a 3-digit country code and a 9-digit number (digits masked in the capture), focus `auth/phone/send`; one keychain read of `boostytv.phone`, no request | agent via adb |
+| Back A2 → A11 → exit | Back → A11, focus «Войти снова»; Back → Google TV Home | agent via adb |
+| Cold start after the debug trigger (debug) | Force-stop + launcher start → Shell, focus `nav/home`, `E1 200` (the stored session was untouched) | agent via adb (logcat, uiautomator) |
+| Cold start, release-like | Launcher start → Shell, focus `nav/home`; Настройки has only «Версия» (no debug rows) | agent via adb (uiautomator) |
+| Real `invalid_grant` expiry, re-login, same/different account | Host tests only (FixtureTransport); not run on the device (owner decision) | host |
+| Modal open during expiry | Host test only (the debug dialog) | host |
+| Physical remote, TalkBack | **Not verified** | — |
+
 ### Verification commands
 
 ```sh

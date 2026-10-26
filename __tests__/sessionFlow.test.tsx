@@ -2,7 +2,8 @@
  * Story 2.5 through the real App with a stored session, over FixtureTransport
  * as the global `fetch`: E1 in the background at cold start (focus never
  * moves), the offline StateView and «Повторить», E1 on resume, the `expired`
- * route to A1 «Войдите снова», the debug live-refresh row, and the demo mode
+ * route to A11 (Story 2.6; the full A11 matrix is in expiredFlow.test.tsx),
+ * the debug live-refresh row, and the demo mode
  * (badge, SecureStore untouched). The keychain and the native focus command
  * are faked: these tests prove what the app asks for, not native focus or
  * real network behavior.
@@ -282,12 +283,13 @@ it('«Повторить» is busy while E1 is pending and not busy after', asyn
   await unmount(root);
 });
 
-it('next cold start after expiry (phone kept, no session) → Welcome with «Войдите снова»', async () => {
+it('a kept phone without a session (no expiry marker) → A1 without «Войдите снова», not A11', async () => {
   keychain.__values.delete('boostytv.session');
   keychain.__values.set('boostytv.phone', '+375291234567');
   const root = await renderApp();
   expect(visible(root, 'auth/welcome')).toBe(true);
-  expect(visible(root, 'auth/welcome/sign-in-again')).toBe(true);
+  expect(visible(root, 'auth/welcome/sign-in-again')).toBe(false);
+  expect(visible(root, 'auth/expired')).toBe(false);
   expect(transport.calls).toHaveLength(0);
   await unmount(root);
 });
@@ -320,7 +322,7 @@ describe('resume', () => {
   });
 });
 
-it('expired (refresh 400 invalid_grant): the stack resets to A1 with «Войдите снова»', async () => {
+it('expired (refresh 400 invalid_grant): the stack resets to A11 «Сессия истекла»', async () => {
   handler = req =>
     req.path === E1
       ? { status: e1Unauthorized.status, body: e1Unauthorized.body }
@@ -329,11 +331,12 @@ it('expired (refresh 400 invalid_grant): the stack resets to A1 with «Войд�
         : undefined;
   const root = await renderApp();
   expect(transport.callsTo(TOKEN)).toHaveLength(1);
-  // The reset leaves Welcome as the only route (the Shell may still be
-  // unmounting in the same frame).
-  expect(visible(root, 'auth/welcome')).toBe(true);
-  expect(visible(root, 'auth/welcome/sign-in-again')).toBe(true);
-  expect(text(root)).toContain(t('auth.welcome.signInAgain'));
+  // The reset leaves A11 as the only route.
+  expect(visible(root, 'auth/expired')).toBe(true);
+  expect(visible(root, 'shell')).toBe(false);
+  expect(visible(root, 'auth/welcome')).toBe(false);
+  expect(text(root)).toContain(t('auth.expired.title'));
+  expect(lastFocusTarget()).toBe('auth/expired/relogin');
   // Nothing further is sent; no loop.
   expect(transport.calls).toHaveLength(2);
   await unmount(root);

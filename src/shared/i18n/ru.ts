@@ -64,6 +64,12 @@ export const ru = {
       /** A1 after the stored session was unreadable and wiped. */
       signInAgain: 'Войдите снова',
     },
+    // A11 Session expired (Story 2.6). Copy from the approved A11 mock.
+    expired: {
+      title: 'Сессия истекла',
+      body: 'Boosty завершил вход на этом телевизоре. Войдите снова — позиции просмотра хранятся в Boosty и не потеряются.',
+      relogin: 'Войти снова',
+    },
   },
   // The signed-in Shell (Story 2.4): wordmark and sidebar sections. Labels
   // exist for every section; app/phaseFlags.ts decides which are rendered.
@@ -127,6 +133,10 @@ export const ru = {
     // access token, then E1 → 401 → refresh → retry.
     sessionCheck: {
       row: 'Проверка обновления сессии',
+    },
+    // Debug-only A11 trigger (Story 2.6): `expired` in memory only.
+    expiredCheck: {
+      row: 'Проверка: сессия истекла',
     },
   },
   error: {
