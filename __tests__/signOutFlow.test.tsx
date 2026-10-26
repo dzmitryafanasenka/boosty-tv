@@ -171,7 +171,9 @@ function visible(root: Root, testID: string): boolean {
 }
 
 function one(root: Root, testID: string): Node {
-  const nodes = byTestId(root, testID).filter(node => node.props.focusable === true);
+  const nodes = byTestId(root, testID).filter(
+    node => node.props.focusable === true || node.props.onChangeText,
+  );
   expect(nodes).toHaveLength(1);
   return nodes[0];
 }
@@ -190,6 +192,21 @@ async function press(root: Root, testID: string, timers = true) {
     node.props.onClick({ nativeEvent: {} });
   });
   await settle(timers);
+}
+
+async function type(root: Root, testID: string, value: string) {
+  const node = one(root, testID);
+  await act(async () => {
+    node.props.onChangeText(value);
+  });
+}
+
+async function submit(root: Root, testID: string) {
+  const node = one(root, testID);
+  await act(async () => {
+    node.props.onSubmitEditing({ nativeEvent: { text: node.props.value } });
+  });
+  await settle();
 }
 
 async function back() {
@@ -339,7 +356,10 @@ describe('confirm', () => {
     await act(async () => {
       confirm.props.onClick({ nativeEvent: {} });
       confirm.props.onClick({ nativeEvent: {} });
+      // Back right after OK, before the busy state is rendered.
+      backHandler.pressBack();
     });
+    expect(visible(root, 'dialog/signout')).toBe(true);
     await settle();
     // Still running: busy; OK, «Отмена» and Back do nothing.
     const busy = one(root, CONFIRM);
@@ -412,9 +432,17 @@ describe('confirm', () => {
     const root = await renderApp(false);
     expect(transport.callsTo(TOKEN)).toHaveLength(1);
     await openDialog(root, false);
-    const sent = transport.calls.length;
+    // The request count when the status became signedOut.
+    let sentAtSignOut: number | null = null;
+    const unsubscribe = sessionManager.subscribe(status => {
+      if (status === 'signedOut' && sentAtSignOut === null) {
+        sentAtSignOut = transport.calls.length;
+      }
+    });
     await press(root, CONFIRM, false);
+    unsubscribe();
     expect(sessionManager.getStatus()).toBe('signedOut');
+    expect(sentAtSignOut).not.toBeNull();
     expect(visible(root, 'auth/welcome')).toBe(true);
 
     answerRefresh({
@@ -425,9 +453,55 @@ describe('confirm', () => {
     expect(sessionManager.getStatus()).toBe('signedOut');
     expect(keychain.__values.has(SESSION)).toBe(false);
     expect(keychain.__values.has(PHONE_SERVICE)).toBe(false);
-    // Only the original request's retry may follow the refresh; nothing for sign-out.
-    expect(transport.calls.slice(sent).map(c => c.path)).not.toContain(TOKEN);
+    // Nothing at all after the sign-out: no E1 retry, nothing with Authorization.
+    expect(transport.calls.slice(sentAtSignOut ?? 0)).toEqual([]);
+    expect(
+      transport.calls.slice(sentAtSignOut ?? 0).filter(c => c.headers.Authorization),
+    ).toEqual([]);
     expect(visible(root, 'auth/welcome')).toBe(true);
+    await unmount(root);
+  });
+
+  it('offline cold start → sign out → sign in again: Главная shows the placeholder, not the offline view', async () => {
+    handler = () => ({ network: true });
+    const root = await renderApp();
+    expect(visible(root, 'home/offline')).toBe(true);
+    await openDialog(root);
+    await press(root, CONFIRM);
+    expect(visible(root, 'auth/welcome')).toBe(true);
+
+    const challenge = 'c'.repeat(64);
+    const access = 'n'.repeat(64);
+    handler = req => {
+      switch (req.path) {
+        case '/auth/phone/verification_code/send':
+          return {
+            status: 200,
+            body: { data: { phoneCode: { code: challenge, expiresIn: 604800, phone: PHONE, sentTransport: 'gate' } } },
+          };
+        case '/auth/phone/verification_code/confirm':
+          return { status: 200, body: { access_token: access, refresh_token: 'm'.repeat(64), expires_in: 2592000 } };
+        case E1:
+          return req.headers.Authorization === `Bearer ${access}`
+            ? { status: 200, body: e1Ok.body }
+            : { status: e1Unauthorized.status, body: e1Unauthorized.body };
+        default:
+          return undefined;
+      }
+    };
+    await press(root, 'auth/welcome/signin');
+    expect(visible(root, 'auth/phone')).toBe(true);
+    await type(root, 'auth/phone/country', '+375');
+    await type(root, 'auth/phone/number', '291234567');
+    await press(root, 'auth/phone/send');
+    expect(visible(root, 'auth/code')).toBe(true);
+    await type(root, 'auth/code/field', '482193');
+    await submit(root, 'auth/code/field');
+
+    expect(visible(root, 'shell')).toBe(true);
+    expect(sessionManager.getStatus()).toBe('signedIn');
+    expect(visible(root, 'home/placeholder')).toBe(true);
+    expect(visible(root, 'home/offline')).toBe(false);
     await unmount(root);
   });
 });

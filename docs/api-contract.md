@@ -195,7 +195,7 @@ Production refresh-coordinator requirements (from the Story 1.4 review; binding 
 - **Persist before adopt:** refresh tokens are single-use, so the new pair is written to `SecureStore` before it replaces the in-memory session. A failed or throwing save is surfaced as a distinct result, not only a log line.
 - **Burned-token risk:** a 200 that cannot be parsed, or a lost response after the server processed the refresh, has probably consumed the refresh token. Treat these as "session may be lost": keep the current state, but expect `invalid_grant` on the next refresh and show «Войдите снова» calmly, without a loop.
 - **Races:** a session generation guards `signOut`/`reload` against an in-flight refresh. A late rejection never turns «signed-out» into «expired»; a late success after `reload` is persisted or explicitly discarded with a log entry. No null dereference.
-- **Logout order:** clear `SecureStore` first, then the in-memory session. A failed clear is surfaced.
+- **Logout order:** clear `SecureStore` first (the stored phone, then the session entry, so a phone failure leaves the session untouched), then the in-memory session. A failed clear is surfaced.
 - **`expires_in` validation:** accept only finite numbers above the 300 s proactive window. Otherwise keep the previous expiry, so that a refresh storm cannot occur.
 - **Reuse detection (closed, not tested):** whether reusing a rotated-out refresh token revokes the whole token family is unknown. Owner decision 2026-10-25 (Story 1.5): not re-tested, because the client never reuses a refresh token on purpose and the burned-token case is already handled as "sign in again". The `device_id` question is closed the same way.
 

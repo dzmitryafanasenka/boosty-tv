@@ -403,7 +403,7 @@ describe('expiry marker, re-login and the phone accessor (Story 2.6)', () => {
     await expect(manager.signIn(ARGS)).resolves.toEqual({ accountChanged: true });
   });
 
-  test('signOut from expired (Story 2.7): the marker, then the phone, cleared; then signedOut, nothing sent', async () => {
+  test('signOut from expired (Story 2.7): the phone, then the marker, cleared; then signedOut, nothing sent', async () => {
     const { manager, sessionStore, phoneStore, http } = setup();
     sessionStore.value = marker('1001');
     phoneStore.value = PHONE;
@@ -421,7 +421,7 @@ describe('expiry marker, re-login and the phone accessor (Story 2.6)', () => {
     const statuses: string[] = [];
     manager.subscribe(s => statuses.push(s));
     await manager.signOut();
-    expect(order).toEqual(['session', 'phone']);
+    expect(order).toEqual(['phone', 'session']);
     expect(sessionStore.value).toBeNull();
     expect(phoneStore.value).toBeNull();
     expect(statuses).toEqual(['signedOut']);
@@ -431,17 +431,33 @@ describe('expiry marker, re-login and the phone accessor (Story 2.6)', () => {
     await expect(manager.signIn(ARGS)).resolves.toEqual({ accountChanged: true });
   });
 
-  test('signOut from expired: a failed clear rejects and keeps expired, the marker and the phone', async () => {
+  test('signOut from expired: a failed phone clear rejects and keeps expired, the marker and the phone', async () => {
     const { manager, sessionStore, phoneStore } = setup();
     sessionStore.value = marker('1001');
     phoneStore.value = PHONE;
     await manager.restore();
-    sessionStore.clear.mockRejectedValueOnce(new Error('keychain'));
+    phoneStore.clear.mockRejectedValueOnce(new Error('keychain'));
     await expect(manager.signOut()).rejects.toThrow('keychain');
     expect(manager.getStatus()).toBe('expired');
     expect(sessionStore.value).toBe(marker('1001'));
     expect(phoneStore.value).toBe(PHONE);
     await expect(manager.getExpiredPhone()).resolves.toBe(PHONE);
+  });
+
+  test('signOut while signedIn: a failed phone clear rejects; the session entry and memory are kept, signedIn', async () => {
+    const { manager, sessionStore, phoneStore } = setup();
+    sessionStore.value = session;
+    phoneStore.value = PHONE;
+    await manager.restore();
+    expect(manager.getStatus()).toBe('signedIn');
+    phoneStore.clear.mockRejectedValueOnce(new Error('keychain'));
+    await expect(manager.signOut()).rejects.toThrow('keychain');
+    expect(sessionStore.clear).not.toHaveBeenCalled();
+    expect(sessionStore.value).toBe(session);
+    expect(phoneStore.value).toBe(PHONE);
+    expect(manager.getStatus()).toBe('signedIn');
+    // Memory kept: a second sign-in compares with the same account.
+    await expect(manager.signIn(ARGS)).resolves.toEqual({ accountChanged: false });
   });
 
   test('getExpiredPhone resolves null when the status changes mid-read (sign-out)', async () => {

@@ -45,6 +45,8 @@ Back always closes the topmost layer first (AD-13):
 
 At the root (A1 Welcome, A11 Session expired, or the sidebar on Главная), Back exits the app to the system.
 
+Modal Back contract (Story 2.7): the modal host adds its BackHandler listener in `open()`, before the content mounts, so it is newer than every screen listener and wins over them; a listener the dialog content adds on mount is newer still and sees Back first, returning true only to swallow Back (the sign-out dialog while «Выйти» is busy) and false to let the host close. Screens never add a Back listener while a dialog is open.
+
 *(device: Story 1.3)* With the system keyboard open, Back closes the keyboard first and focus stays on the text field.
 
 ### 1.5 Focus identity
@@ -223,7 +225,7 @@ Raw keys (`useTVEventHandler`, key up, §1.1). Seek steps: overlay hidden or tim
 | K Diagnostics (SET-05, revealed) | The log-capture toggle | ↑ ↓; ← → sidebar | Toggle; the info rows (how to fetch logs via adb) are not activatable | → Настройки, focus on «Версия» | — |
 | K «Системный видеоплеер» handoff (PLAY-13, Android only) | — | — | With the toggle on, OK on a media row opens the quality list (as G Quality before playback), then the Android chooser | The external app owns Back; on return to Boosty TV, focus is on the initiator (no progress is tracked) | «Внешний плеер не найден» → the built-in player opens instead |
 | Update notice (FR-56, Story 9.2; non-blocking) | None: the notice never takes or traps focus when it appears on its own | — | Shows the version, changelog and a QR to the release page; nothing is installed | Does not consume Back | Story 9.2 decides where the notice is focusable and records the row here |
-| K Sign-out dialog (K4) | «Отмена» | ← → «Отмена» / «Выйти» | «Выйти»: `AccountScope.reset()` — secure storage first (the session or expiry marker, then the stored phone), then every other account-scoped store (FocusRestoration, the sign-in draft, the log ring; later the query cache, the continue-watching history and filters) → A1. «Отмена»: close | Close (same as «Отмена»); ignored while «Выйти» is busy | Cancel → «Выйти из аккаунта» |
+| K Sign-out dialog (K4) | «Отмена» | ← → «Отмена» / «Выйти» | «Выйти»: `AccountScope.reset()` — secure storage first (the stored phone, then the session or expiry marker), then every other account-scoped store (FocusRestoration, the sign-in draft, the log ring; later the query cache, the continue-watching history and filters) → A1. «Отмена»: close | Close (same as «Отмена»); ignored while «Выйти» is busy | Cancel → «Выйти из аккаунта» |
 | L StateView (loading error, empty, offline, unavailable) | Its single action («Повторить», «Обновить», «Назад»; none for C3) | ← → sidebar (inside Shell) | The action | As the screen | After success: the first element of the loaded list |
 | Cold start offline | Главная StateView «Повторить» | ← → sidebar | Retry | → sidebar | The session is kept; this is not A11 |
 | Content unavailable (404) | «Назад» | — | Pop | Pop | No «Повторить» |

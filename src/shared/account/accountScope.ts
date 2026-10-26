@@ -13,9 +13,11 @@ import type { AccountScopedStore } from './defineAccountScoped';
  *   succeeded are the other stores reset, in registration order. A failure
  *   of one of them is logged and does not stop the rest (the session is
  *   already gone, so the UI must still leave the account).
- * - `reset()` bumps the generation as it starts, so async writes that
- *   captured an older `generation()` are dropped by their writer, and it is
- *   single-flight: a call while one runs gets the same promise.
+ * - `reset()` bumps the generation once the gate succeeded, before the
+ *   other stores run, so async writes that captured an older
+ *   `generation()` are dropped by their writer; a failed gate leaves it
+ *   unchanged. It is single-flight: a call while one runs gets the same
+ *   promise.
  * - Logs only store names and the outcome.
  */
 
@@ -49,7 +51,6 @@ export function createAccountScope({
   let running: Promise<ResetResult> | null = null;
 
   async function doReset(): Promise<ResetResult> {
-    gen += 1;
     const [gate, ...rest] = stores;
     if (gate) {
       try {
@@ -62,6 +63,9 @@ export function createAccountScope({
         throw error;
       }
     }
+    // The account is gone: async writes captured before this are dropped.
+    // Not before the gate, so a failed gate leaves the generation as it was.
+    gen += 1;
     const failed: string[] = [];
     for (const store of rest) {
       try {

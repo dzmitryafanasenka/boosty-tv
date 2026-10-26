@@ -115,9 +115,12 @@ export type SessionManager = {
    */
   getExpiredPhone(): Promise<string | null>;
   /**
-   * Local sign-out (no server call): clears SecureStore first (session, then
-   * phone), then memory. Rejects with the store's error when a clear fails;
-   * the in-memory session and status are then kept. Works from `signedIn`
+   * Local sign-out (no server call): clears SecureStore first (the phone,
+   * then the session or expiry marker), then memory. Rejects with the
+   * store's error when a clear fails; the in-memory session and status are
+   * then kept, and so is the stored session entry (the phone goes first, so
+   * a phone failure changes nothing; a later session failure leaves only the
+   * re-login prefill gone). Works from `signedIn`
    * and `expired` (the marker and the phone); drops the account id and the
    * previous account id. The app calls it only through `AccountScope.reset()`
    * (the `session` store, Story 2.7).
@@ -446,9 +449,11 @@ export function createSessionManager({
     generation += 1;
     signingOut = true;
     // SecureStore first, then memory (api-contract §2.3 «Logout order»).
+    // The phone before the session entry: a phone failure then leaves the
+    // stored session and memory exactly as they were.
     try {
-      await enqueue(() => sessionStore.clear());
       await enqueue(() => phoneStore.clear());
+      await enqueue(() => sessionStore.clear());
     } finally {
       signingOut = false;
     }
