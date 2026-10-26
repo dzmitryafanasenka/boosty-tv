@@ -1,0 +1,25 @@
+_bmad-output/implementation-artifacts/spec-2-3-confirm-the-code-and-create-the-session.md
+  s_fce05da352b4dc::t_070f450ab125ad 5,138-139
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_fce05da352b4dc::t_899952d086fe54 32,52
+docs/api-contract.md
+  s_fce05da352b4dc::t_98698eab72cba0 136-139
+docs/testing.md
+  s_fce05da352b4dc::t_d4c2b4004680a9 509,523-526
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "9348ec5f7e740719b383a12944c77637d146e894",
+  "prompts": {},
+  "sessions": {
+    "s_fce05da352b4dc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1d96fc39-0a81-40cc-a1ff-5557f210c17b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
