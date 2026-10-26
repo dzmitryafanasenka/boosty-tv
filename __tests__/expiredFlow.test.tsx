@@ -8,13 +8,12 @@
  * prove what the app asks for, not native focus or real network behavior.
  */
 import { act } from 'react';
-import { AppState, NativeModules } from 'react-native';
-import { createRoot, type Root } from 'test-renderer';
+import { AppState } from 'react-native';
+import { type Root } from 'test-renderer';
 import App, { SHELL_RESTORATION_KEY } from '../src/app/App';
 import { authFlow } from '../src/features/auth/authFlow';
 import { session } from '../src/app/session';
 import {
-  createFixtureTransport,
   type FixtureReply,
   type FixtureRequest,
   type FixtureTransport,
@@ -25,56 +24,40 @@ import { requestHostFocus } from '../src/shared/ui/requestHostFocus';
 import e1Ok from '../src/test/fixtures/boosty/e1-user-current.json';
 import e1Unauthorized from '../src/test/fixtures/boosty/e1-no-token.json';
 import refreshRejected from '../src/test/fixtures/boosty/refresh-invalid-grant.json';
+import backHandler from '../src/test/backHandlerMock';
+import {
+  clearNativeModules,
+  createFlow,
+  installFixtureTransport,
+  installNativeModules,
+  keychain as keychainMock,
+  lastFocusTarget,
+  resetKeychain,
+  text,
+  topScreen as topScreenOf,
+  unmount,
+  visible,
+} from '../src/test/flow';
 
 jest.mock('react-native-keychain');
 jest.mock('../src/shared/ui/requestHostFocus', () => ({
   requestHostFocus: jest.fn(),
 }));
 
-jest.mock('react-native/Libraries/Utilities/BackHandler', () => {
-  const handlers: Array<() => boolean | null | undefined> = [];
-  const backHandler = {
-    exitApp: jest.fn(),
-    addEventListener: (_name: string, handler: () => boolean | null | undefined) => {
-      handlers.push(handler);
-      return {
-        remove: () => {
-          const index = handlers.lastIndexOf(handler);
-          if (index >= 0) {
-            handlers.splice(index, 1);
-          }
-        },
-      };
-    },
-    pressBack: () => {
-      for (let i = handlers.length - 1; i >= 0; i -= 1) {
-        if (handlers[i]()) {
-          return true;
-        }
-      }
-      backHandler.exitApp();
-      return false;
-    },
-  };
-  return { __esModule: true, default: backHandler };
-});
+jest.mock('react-native/Libraries/Utilities/BackHandler', () =>
+  require('../src/test/backHandlerMock'),
+);
 
-type KeychainMock = {
-  __values: Map<string, string>;
-  __reset(): void;
-  setGenericPassword: jest.Mock;
-  resetGenericPassword: jest.Mock;
-};
-type Node = ReturnType<Root['container']['queryAll']>[number];
-
-const keychain = jest.requireMock('react-native-keychain') as KeychainMock;
-const backHandler = jest.requireMock('react-native/Libraries/Utilities/BackHandler')
-  .default as { pressBack: () => boolean; exitApp: jest.Mock };
+const keychain = keychainMock();
 const focusMock = requestHostFocus as jest.Mock;
-const native = NativeModules as {
-  AppInfo?: { versionName?: string };
-  InstallId?: { getOrCreate: jest.Mock };
-};
+
+/** Lets promises, the AD-6 backoff timers and renders run: 30 rounds, timers in each. */
+const { settle, render, one, focusOn, press, type, submit, back } = createFlow({
+  settle: { rounds: 30, timerRounds: 30 },
+  one: 'focusableOrInput',
+  pressFocuses: true,
+  submitSettles: true,
+});
 
 const PHONE = '+375291234567';
 const OLD_ACCESS = 'a'.repeat(64);
@@ -140,18 +123,15 @@ beforeEach(() => {
   jest.spyOn(console, 'warn').mockImplementation(() => {});
   jest.spyOn(console, 'error').mockImplementation(() => {});
   focusMock.mockClear();
-  backHandler.exitApp.mockClear();
-  keychain.__reset();
-  keychain.setGenericPassword.mockClear();
-  keychain.resetGenericPassword.mockClear();
-  keychain.__values.set('boostytv.session', STORED);
-  keychain.__values.set('boostytv.phone', PHONE);
-  native.AppInfo = { versionName: '1.0' };
-  native.InstallId = { getOrCreate: jest.fn().mockResolvedValue('0f8fad5b-d9cb-469f-a165-70867728950e') };
+  backHandler.reset();
+  resetKeychain({ 'boostytv.session': STORED, 'boostytv.phone': PHONE });
+  installNativeModules({
+    AppInfo: { versionName: '1.0' },
+    InstallId: { getOrCreate: jest.fn().mockResolvedValue('0f8fad5b-d9cb-469f-a165-70867728950e') },
+  });
   newAccountId = e1Ok.body.id;
   handler = okRoute;
-  transport = createFixtureTransport(req => handler(req));
-  (globalThis as { fetch: unknown }).fetch = transport;
+  transport = installFixtureTransport(req => handler(req));
   appStateHandlers = [];
   jest.spyOn(AppState, 'addEventListener').mockImplementation(((
     _type: string,
@@ -167,107 +147,17 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  delete native.AppInfo;
-  delete native.InstallId;
+  clearNativeModules();
   focusRestoration.clear();
   authFlow.reset();
   jest.restoreAllMocks();
 });
 
-/** Lets promises, the AD-6 backoff timers and renders run. */
-async function settle() {
-  for (let i = 0; i < 30; i += 1) {
-    await act(async () => {
-      jest.runOnlyPendingTimers();
-      await Promise.resolve();
-    });
-  }
-}
-
-async function renderApp() {
-  const root = createRoot();
-  await act(async () => {
-    root.render(<App />);
-  });
-  await settle();
-  return root;
-}
-
-async function unmount(root: Root) {
-  await act(async () => {
-    root.unmount();
-  });
-}
-
-function byTestId(root: Root, testID: string): Node[] {
-  return root.container.queryAll(node => node.props.testID === testID);
-}
-
-function visible(root: Root, testID: string): boolean {
-  return byTestId(root, testID).length > 0;
-}
-
-function one(root: Root, testID: string): Node {
-  const nodes = byTestId(root, testID).filter(
-    node => node.props.focusable === true || node.props.onChangeText,
-  );
-  expect(nodes).toHaveLength(1);
-  return nodes[0];
-}
-
-async function focusOn(root: Root, testID: string) {
-  const node = one(root, testID);
-  await act(async () => {
-    node.props.onFocus?.({ nativeEvent: {} });
-  });
-}
-
-async function press(root: Root, testID: string) {
-  await focusOn(root, testID);
-  const node = one(root, testID);
-  await act(async () => {
-    node.props.onClick({ nativeEvent: {} });
-  });
-  await settle();
-}
-
-async function type(root: Root, testID: string, value: string) {
-  const node = one(root, testID);
-  await act(async () => {
-    node.props.onChangeText(value);
-  });
-}
-
-async function submit(root: Root, testID: string) {
-  const node = one(root, testID);
-  await act(async () => {
-    node.props.onSubmitEditing({ nativeEvent: { text: node.props.value } });
-  });
-  await settle();
-}
-
-async function back() {
-  await act(async () => {
-    backHandler.pressBack();
-  });
-  await settle();
-}
-
-function lastFocusTarget(): string | undefined {
-  const calls = focusMock.mock.calls;
-  const view = calls[calls.length - 1]?.[0] as { props?: { testID?: string } } | undefined;
-  return view?.props?.testID;
-}
-
-function text(root: Root): string {
-  return JSON.stringify(root.container.toJSON());
-}
+const renderApp = () => render(<App />);
 
 /** The topmost stack screen (the JS stack keeps covered screens mounted). */
 function topScreen(root: Root): string | undefined {
-  const ids = ['auth/expired', 'auth/welcome', 'auth/phone', 'auth/code', 'shell', 'dev/focus'];
-  const present = ids.filter(id => visible(root, id));
-  return present[present.length - 1];
+  return topScreenOf(root, ['auth/expired', 'auth/welcome', 'auth/phone', 'auth/code', 'shell', 'dev/focus']);
 }
 
 async function changeAppState(state: string) {

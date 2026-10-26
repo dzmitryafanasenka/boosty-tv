@@ -1,51 +1,21 @@
 import { act, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { createRoot, type Root } from 'test-renderer';
+import { createRoot } from 'test-renderer';
 import { Button, colors, type HostView } from '../../ui';
 import { requestHostFocus } from '../../ui/requestHostFocus';
+// eslint-disable-next-line boundaries/dependencies -- a test under src/shared may use the src/test harness
+import backHandler from '../../../test/backHandlerMock';
+// eslint-disable-next-line boundaries/dependencies -- a test under src/shared may use the src/test harness
+import { byTestId as byId, createFlow, lastFocusTarget } from '../../../test/flow';
 import { ModalHostProvider, useModal, type ModalApi } from '../ModalHost';
 
 jest.mock('../../ui/requestHostFocus', () => ({ requestHostFocus: jest.fn() }));
 
-jest.mock('react-native/Libraries/Utilities/BackHandler', () => {
-  const handlers: Array<() => boolean | null | undefined> = [];
-  const backHandler = {
-    exitApp: jest.fn(),
-    addEventListener: (
-      _name: string,
-      handler: () => boolean | null | undefined,
-    ) => {
-      handlers.push(handler);
-      return {
-        remove: () => {
-          const index = handlers.lastIndexOf(handler);
-          if (index >= 0) {
-            handlers.splice(index, 1);
-          }
-        },
-      };
-    },
-    count: () => handlers.length,
-    pressBack: () => {
-      for (let i = handlers.length - 1; i >= 0; i -= 1) {
-        if (handlers[i]()) {
-          return true;
-        }
-      }
-      backHandler.exitApp();
-      return false;
-    },
-  };
-  return { __esModule: true, default: backHandler };
-});
+jest.mock('react-native/Libraries/Utilities/BackHandler', () =>
+  // eslint-disable-next-line boundaries/dependencies -- as above
+  require('../../../test/backHandlerMock'),
+);
 
-const backHandler = jest.requireMock(
-  'react-native/Libraries/Utilities/BackHandler',
-).default as {
-  pressBack: () => boolean;
-  exitApp: jest.Mock;
-  count: () => number;
-};
 const focusMock = requestHostFocus as jest.Mock;
 
 let api: ModalApi;
@@ -75,47 +45,26 @@ function Probe() {
   );
 }
 
-function byId(root: Root, testID: string) {
-  return root.container.queryAll(node => node.props.testID === testID);
-}
+/** No settling: every step here is synchronous inside `act()`. */
+const flow = createFlow({
+  settle: { rounds: 0, timerRounds: 0 },
+  one: 'focusable',
+  pressFocuses: false,
+  submitSettles: false,
+});
+const { press } = flow;
 
-function focusable(root: Root, testID: string) {
-  const nodes = byId(root, testID).filter(
-    node => node.props.focusable === true,
+function render() {
+  return flow.render(
+    <ModalHostProvider>
+      <Probe />
+    </ModalHostProvider>,
   );
-  expect(nodes).toHaveLength(1);
-  return nodes[0];
-}
-
-function lastFocusTarget(): string | undefined {
-  const calls = focusMock.mock.calls;
-  return (
-    calls[calls.length - 1]?.[0] as { props?: { testID?: string } } | undefined
-  )?.props?.testID;
-}
-
-async function render() {
-  const root = createRoot();
-  await act(async () => {
-    root.render(
-      <ModalHostProvider>
-        <Probe />
-      </ModalHostProvider>,
-    );
-  });
-  return root;
-}
-
-async function press(root: Root, testID: string) {
-  const node = focusable(root, testID);
-  await act(async () => {
-    node.props.onClick({ nativeEvent: {} });
-  });
 }
 
 beforeEach(() => {
   focusMock.mockClear();
-  backHandler.exitApp.mockClear();
+  backHandler.reset();
 });
 
 test('closed: no overlay, no Back listener, background visible to accessibility', async () => {
@@ -263,11 +212,8 @@ test('close() and isOpen() right after open(), before the commit, see the modal'
 
 test('the modal listener is the newest, so it wins over listeners added before it', async () => {
   const root = await render();
-  const BackHandler = jest.requireMock(
-    'react-native/Libraries/Utilities/BackHandler',
-  ).default;
   const screenHandler = jest.fn(() => true);
-  const sub = BackHandler.addEventListener('hardwareBackPress', screenHandler);
+  const sub = backHandler.addEventListener('hardwareBackPress', screenHandler);
   await press(root, 'probe/open');
   await act(async () => {
     backHandler.pressBack();

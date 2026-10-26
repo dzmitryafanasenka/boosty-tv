@@ -14,6 +14,20 @@ import { authFlow } from '../src/features/auth/authFlow';
 import { t } from '../src/shared/i18n';
 import { CONTENT_USER_AGENT } from '../src/shared/api/profiles';
 import { requestHostFocus } from '../src/shared/ui/requestHostFocus';
+import backHandler from '../src/test/backHandlerMock';
+import {
+  byTestId,
+  clearNativeModules,
+  createFlow,
+  installNativeModules,
+  keychain as keychainMock,
+  lastFocusTarget,
+  resetKeychain,
+  text,
+  topScreen as topScreenOf,
+  unmount,
+  visible,
+} from '../src/test/flow';
 
 // The root `__mocks__/react-native-keychain.js` (in-memory, per service).
 jest.mock('react-native-keychain');
@@ -22,44 +36,11 @@ jest.mock('../src/shared/ui/requestHostFocus', () => ({
   requestHostFocus: jest.fn(),
 }));
 
-jest.mock('react-native/Libraries/Utilities/BackHandler', () => {
-  const handlers: Array<() => boolean | null | undefined> = [];
-  const backHandler = {
-    exitApp: jest.fn(),
-    addEventListener: (_name: string, handler: () => boolean | null | undefined) => {
-      handlers.push(handler);
-      return {
-        remove: () => {
-          const index = handlers.lastIndexOf(handler);
-          if (index >= 0) {
-            handlers.splice(index, 1);
-          }
-        },
-      };
-    },
-    pressBack: () => {
-      for (let i = handlers.length - 1; i >= 0; i -= 1) {
-        if (handlers[i]()) {
-          return true;
-        }
-      }
-      backHandler.exitApp();
-      return false;
-    },
-  };
-  return { __esModule: true, default: backHandler };
-});
+jest.mock('react-native/Libraries/Utilities/BackHandler', () =>
+  require('../src/test/backHandlerMock'),
+);
 
-type KeychainMock = {
-  __values: Map<string, string>;
-  __failNext(method: string, error: unknown): void;
-  __reset(): void;
-  getGenericPassword: jest.Mock;
-};
-
-const keychain = jest.requireMock('react-native-keychain') as KeychainMock;
-const backHandler = jest.requireMock('react-native/Libraries/Utilities/BackHandler')
-  .default as { pressBack: () => boolean; exitApp: jest.Mock };
+const keychain = keychainMock();
 
 const DEVICE_ID = '3f0c2a8e-1b7d-4c3a-9e2f-5a6b7c8d9e0f';
 const PHONE = '+375291234567';
@@ -77,15 +58,29 @@ const sendBody = (code: string) => ({
 });
 const TOKENS = { access_token: ACCESS, refresh_token: REFRESH, expires_in: 2592000 };
 
-type Node = ReturnType<Root['container']['queryAll']>[number];
 type Reply = { status: number; body: unknown } | Error;
 
 const focusMock = requestHostFocus as jest.Mock;
 const fetchMock = jest.fn();
+/** Read-only view for assertions; fakes go in through `installNativeModules`. */
 const native = NativeModules as {
-  InstallId?: { getOrCreate: jest.Mock };
-  KeychainStorageReset?: { deleteKeychainStorage: jest.Mock };
+  KeychainStorageReset: { deleteKeychainStorage: jest.Mock };
 };
+
+/**
+ * 20 rounds; timers stay off by default so the resend countdown never runs
+ * down by accident. `settle(TIMERS)` runs them in the first 2 rounds, as
+ * render and Back always do.
+ */
+const TIMERS = { timerRounds: 2 };
+const { settle, render, one, press, type, submit, back } = createFlow({
+  settle: { rounds: 20, timerRounds: 0 },
+  renderSettle: TIMERS,
+  backSettle: TIMERS,
+  one: 'declaredOrInput',
+  pressFocuses: false,
+  submitSettles: false,
+});
 
 /** Replies per URL, in order; the last one repeats. */
 let replies: Record<string, Reply[]> = {};
@@ -127,29 +122,16 @@ beforeEach(() => {
     [E1_URL]: [{ status: 200, body: { id: 1001, flags: {} } }],
   };
   (globalThis as { fetch: unknown }).fetch = fetchMock;
-  native.InstallId = { getOrCreate: jest.fn().mockResolvedValue(DEVICE_ID) };
-  keychain.__reset();
-  backHandler.exitApp.mockClear();
+  installNativeModules({ InstallId: { getOrCreate: jest.fn().mockResolvedValue(DEVICE_ID) } });
+  resetKeychain();
+  backHandler.reset();
 });
 
 afterEach(() => {
-  delete native.InstallId;
-  delete native.KeychainStorageReset;
+  clearNativeModules();
   authFlow.reset();
   jest.restoreAllMocks();
 });
-
-/** Settles promises; runs pending timers only when asked. */
-async function settle(timers = false) {
-  for (let i = 0; i < 20; i += 1) {
-    await act(async () => {
-      if (timers && i < 2) {
-        jest.runOnlyPendingTimers();
-      }
-      await Promise.resolve();
-    });
-  }
-}
 
 async function advance(ms: number) {
   await act(async () => {
@@ -158,95 +140,25 @@ async function advance(ms: number) {
   await settle();
 }
 
-function byTestId(root: Root, testID: string): Node[] {
-  return root.container.queryAll(node => node.props.testID === testID);
-}
-
-function one(root: Root, testID: string): Node {
-  const nodes = byTestId(root, testID).filter(
-    node => node.props.focusable !== undefined || node.props.onChangeText,
-  );
-  expect(nodes).toHaveLength(1);
-  return nodes[0];
-}
-
-function visible(root: Root, testID: string): boolean {
-  return byTestId(root, testID).length > 0;
-}
-
-function text(root: Root): string {
-  return JSON.stringify(root.container.toJSON());
-}
-
-async function press(root: Root, testID: string) {
-  const node = one(root, testID);
-  await act(async () => {
-    node.props.onClick({ nativeEvent: {} });
-  });
-  await settle();
-}
-
-async function type(root: Root, testID: string, value: string) {
-  const node = one(root, testID);
-  await act(async () => {
-    node.props.onChangeText(value);
-  });
-}
-
-async function submit(root: Root, testID: string) {
-  const node = one(root, testID);
-  await act(async () => {
-    node.props.onSubmitEditing({ nativeEvent: { text: node.props.value } });
-  });
-}
-
-async function back() {
-  await act(async () => {
-    backHandler.pressBack();
-  });
-  await settle(true);
-}
-
-function lastFocusTarget(): string | undefined {
-  const calls = focusMock.mock.calls;
-  const view = calls[calls.length - 1]?.[0] as { props?: { testID?: string } } | undefined;
-  return view?.props?.testID;
-}
-
 function topScreen(root: Root): string | undefined {
-  const ids = ['auth/welcome', 'auth/phone', 'auth/code', 'shell'];
-  const present = ids.filter(id => visible(root, id));
-  return present[present.length - 1];
+  return topScreenOf(root, ['auth/welcome', 'auth/phone', 'auth/code', 'shell']);
 }
 
 function requestsTo(url: string) {
   return fetchMock.mock.calls.filter(([u]) => u === url);
 }
 
-async function renderApp() {
-  const root = createRoot();
-  await act(async () => {
-    root.render(<App />);
-  });
-  await settle(true);
-  return root;
-}
-
-async function unmount(root: Root) {
-  await act(async () => {
-    root.unmount();
-  });
-}
+const renderApp = () => render(<App />);
 
 /** A1 → A2 → valid number → send → A5 (the countdown starts at 1:00). */
 async function openCode() {
   const root = await renderApp();
   await press(root, 'auth/welcome/signin');
-  await settle(true);
+  await settle(TIMERS);
   await type(root, 'auth/phone/country', '+375');
   await type(root, 'auth/phone/number', '291234567');
   await press(root, 'auth/phone/send');
-  await settle(true);
+  await settle(TIMERS);
   expect(topScreen(root)).toBe('auth/code');
   return root;
 }
@@ -415,10 +327,10 @@ describe('A5 form and the countdown', () => {
     expect(authFlow.getChallenge()).toBeNull();
 
     await press(root, 'auth/phone/send');
-    await settle(true);
+    await settle(TIMERS);
     expect(topScreen(root)).toBe('auth/code');
     await press(root, 'auth/code/change-number');
-    await settle(true);
+    await settle(TIMERS);
     expect(topScreen(root)).toBe('auth/phone');
     expect(one(root, 'auth/phone/number').props.value).toBe('291234567');
     await unmount(root);
@@ -430,7 +342,7 @@ describe('confirm and session creation', () => {
     const root = await openCode();
     await type(root, 'auth/code/field', ` ${SMS_CODE} `);
     await submit(root, 'auth/code/field');
-    await settle(true);
+    await settle(TIMERS);
 
     const [confirm] = requestsTo(CONFIRM_URL);
     expect(confirm[1].method).toBe('PUT');
@@ -498,7 +410,7 @@ describe('confirm and session creation', () => {
     await act(async () => {
       release();
     });
-    await settle(true);
+    await settle(TIMERS);
     expect(requestsTo(CONFIRM_URL)).toHaveLength(1);
     expect(topScreen(root)).toBe('shell');
     await unmount(root);
@@ -521,7 +433,7 @@ describe('confirm and session creation', () => {
     await act(async () => {
       release();
     });
-    await settle(true);
+    await settle(TIMERS);
     expect(keychain.__values.has('boostytv.session')).toBe(true);
     expect(topScreen(root)).toBe('shell');
     expect(visible(root, 'auth/phone')).toBe(false);
@@ -548,7 +460,7 @@ describe('confirm and session creation', () => {
     expect(text(root)).not.toContain(t('error.WrongCode'));
     replies[CONFIRM_URL] = [{ status: 200, body: TOKENS }];
     await press(root, 'auth/code/submit');
-    await settle(true);
+    await settle(TIMERS);
     expect(topScreen(root)).toBe('shell');
     await unmount(root);
   });
@@ -709,7 +621,7 @@ describe('startup gate', () => {
     await act(async () => {
       release();
     });
-    await settle(true);
+    await settle(TIMERS);
     expect(visible(root, 'app/splash')).toBe(false);
     expect(topScreen(root)).toBe('auth/welcome');
     await unmount(root);
@@ -735,7 +647,7 @@ describe('startup gate', () => {
   });
 
   it('CorruptionException → the native helper deletes the file, wiped, Welcome with «Войдите снова», no crash', async () => {
-    native.KeychainStorageReset = { deleteKeychainStorage: jest.fn().mockResolvedValue(true) };
+    installNativeModules({ KeychainStorageReset: { deleteKeychainStorage: jest.fn().mockResolvedValue(true) } });
     keychain.__values.set('boostytv.session', STORED);
     keychain.__failNext(
       'getGenericPassword',

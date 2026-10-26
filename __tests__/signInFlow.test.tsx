@@ -5,48 +5,30 @@
  * focus command are faked; native focus itself is a device check.
  */
 import { act } from 'react';
-import { NativeModules } from 'react-native';
-import { createRoot, type Root } from 'test-renderer';
+import { type Root } from 'test-renderer';
 import App from '../src/app/App';
 import { authFlow } from '../src/features/auth/authFlow';
 import { t } from '../src/shared/i18n';
 import { requestHostFocus } from '../src/shared/ui/requestHostFocus';
+import backHandler from '../src/test/backHandlerMock';
+import {
+  byTestId,
+  clearNativeModules,
+  createFlow,
+  installNativeModules,
+  lastFocusTarget,
+  topScreen as topScreenOf,
+  unmount,
+  visible,
+} from '../src/test/flow';
 
 jest.mock('../src/shared/ui/requestHostFocus', () => ({
   requestHostFocus: jest.fn(),
 }));
 
-jest.mock('react-native/Libraries/Utilities/BackHandler', () => {
-  const handlers: Array<() => boolean | null | undefined> = [];
-  const backHandler = {
-    exitApp: jest.fn(),
-    addEventListener: (_name: string, handler: () => boolean | null | undefined) => {
-      handlers.push(handler);
-      return {
-        remove: () => {
-          const index = handlers.lastIndexOf(handler);
-          if (index >= 0) {
-            handlers.splice(index, 1);
-          }
-        },
-      };
-    },
-    /** Test-only: like Android, the newest handler first. */
-    pressBack: () => {
-      for (let i = handlers.length - 1; i >= 0; i -= 1) {
-        if (handlers[i]()) {
-          return true;
-        }
-      }
-      backHandler.exitApp();
-      return false;
-    },
-  };
-  return { __esModule: true, default: backHandler };
-});
-
-const backHandler = jest.requireMock('react-native/Libraries/Utilities/BackHandler')
-  .default as { pressBack: () => boolean; exitApp: jest.Mock };
+jest.mock('react-native/Libraries/Utilities/BackHandler', () =>
+  require('../src/test/backHandlerMock'),
+);
 
 const DEVICE_ID = '3f0c2a8e-1b7d-4c3a-9e2f-5a6b7c8d9e0f';
 const CHALLENGE = 'c'.repeat(64);
@@ -54,11 +36,16 @@ const OK_BODY = {
   data: { phoneCode: { code: CHALLENGE, expiresIn: 604800, phone: '+375291234567', sentTransport: 'gate' } },
 };
 
-type Node = ReturnType<Root['container']['queryAll']>[number];
-
 const focusMock = requestHostFocus as jest.Mock;
 const fetchMock = jest.fn();
-const native = NativeModules as { InstallId?: { getOrCreate: jest.Mock } };
+
+/** Two rounds; timers run in both unless a call turns them off. */
+const { settle, render, one, press, type, submit, back } = createFlow({
+  settle: { rounds: 2, timerRounds: 2 },
+  one: 'focusableOrInput',
+  pressFocuses: false,
+  submitSettles: false,
+});
 
 function respond(status: number, body: unknown) {
   return Promise.resolve({
@@ -80,109 +67,29 @@ beforeEach(() => {
   jest.spyOn(console, 'log').mockImplementation(() => {});
   jest.spyOn(console, 'warn').mockImplementation(() => {});
   focusMock.mockClear();
+  backHandler.reset();
   fetchMock.mockReset();
   (globalThis as { fetch: unknown }).fetch = fetchMock;
-  native.InstallId = { getOrCreate: jest.fn().mockResolvedValue(DEVICE_ID) };
+  installNativeModules({ InstallId: { getOrCreate: jest.fn().mockResolvedValue(DEVICE_ID) } });
 });
 
 afterEach(() => {
-  delete native.InstallId;
+  clearNativeModules();
   authFlow.reset();
   jest.restoreAllMocks();
 });
 
-/** Settles promises and (unless `timers` is false) runs pending timers. */
-async function flush(timers = true) {
-  for (let i = 0; i < 2; i += 1) {
-    await act(async () => {
-      if (timers) {
-        jest.runOnlyPendingTimers();
-      }
-      await Promise.resolve();
-    });
-  }
-}
-
-async function renderApp() {
-  const root = createRoot();
-  await act(async () => {
-    root.render(<App />);
-  });
-  await flush();
-  return root;
-}
-
-function byTestId(root: Root, testID: string): Node[] {
-  return root.container.queryAll(node => node.props.testID === testID);
-}
-
-/** The single host node with this testID (the focusable Pressable view). */
-function one(root: Root, testID: string): Node {
-  const nodes = byTestId(root, testID).filter(
-    node => node.props.focusable === true || node.props.onChangeText,
-  );
-  expect(nodes).toHaveLength(1);
-  return nodes[0];
-}
-
-function visible(root: Root, testID: string): boolean {
-  return byTestId(root, testID).length > 0;
-}
-
-/** OK on a button: the same click path the TV press uses. */
-async function press(root: Root, testID: string, timers = true) {
-  const node = one(root, testID);
-  await act(async () => {
-    node.props.onClick({ nativeEvent: {} });
-  });
-  await flush(timers);
-}
-
-async function type(root: Root, testID: string, text: string) {
-  const node = one(root, testID);
-  await act(async () => {
-    node.props.onChangeText(text);
-  });
-}
-
-async function submit(root: Root, testID: string) {
-  const node = one(root, testID);
-  await act(async () => {
-    node.props.onSubmitEditing({ nativeEvent: { text: node.props.value } });
-  });
-}
-
-async function back() {
-  await act(async () => {
-    backHandler.pressBack();
-  });
-  await flush();
-}
-
-/** testID of the last view that `requestHostFocus` targeted. */
-function lastFocusTarget(): string | undefined {
-  const calls = focusMock.mock.calls;
-  const view = calls[calls.length - 1]?.[0] as { props?: { testID?: string } } | undefined;
-  return view?.props?.testID;
-}
+const renderApp = () => render(<App />);
 
 /** Topmost stack screen (the JS stack keeps covered screens mounted). */
 function topScreen(root: Root): string | undefined {
-  const ids = ['auth/welcome', 'auth/phone', 'auth/phone/too-many-attempts', 'auth/phone/verification-required', 'auth/code'];
-  const present = ids.filter(id => visible(root, id));
-  return present[present.length - 1];
+  return topScreenOf(root, ['auth/welcome', 'auth/phone', 'auth/phone/too-many-attempts', 'auth/phone/verification-required', 'auth/code']);
 }
 
 async function openPhone() {
   const root = await renderApp();
   await press(root, 'auth/welcome/signin');
   return root;
-}
-
-async function unmount(root: Root) {
-  await act(async () => {
-    root.unmount();
-  });
 }
 
 describe('A1 → A2', () => {
@@ -326,7 +233,7 @@ describe('send', () => {
     await act(async () => {
       release(await respond(200, OK_BODY));
     });
-    await flush();
+    await settle();
 
     expect(topScreen(root)).toBe('auth/code');
     expect(authFlow.getChallenge()).toEqual({
@@ -390,7 +297,7 @@ describe('send', () => {
     expect(lastFocusTarget()).toBe('auth/phone/change-number');
     expect(one(root, 'auth/phone/to-welcome').props.hasTVPreferredFocus).toBeFalsy();
 
-    await flush();
+    await settle();
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     focusMock.mockClear();
@@ -430,7 +337,7 @@ describe('send', () => {
       t('error.Network'),
     );
     expect(lastFocusTarget()).toBe('auth/phone/send');
-    await flush();
+    await settle();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     await unmount(root);
   });
@@ -443,18 +350,18 @@ describe('send', () => {
         }),
     );
     const root = await phoneWithValidNumber();
-    await press(root, 'auth/phone/send', false);
+    await press(root, 'auth/phone/send', { settle: { timerRounds: 0 } });
     expect(one(root, 'auth/phone/send').props.accessibilityState).toMatchObject({ busy: true });
 
     await act(async () => {
       jest.advanceTimersByTime(29_999);
     });
-    await flush(false);
+    await settle({ timerRounds: 0 });
     expect(one(root, 'auth/phone/send').props.accessibilityState).toMatchObject({ busy: true });
     await act(async () => {
       jest.advanceTimersByTime(1);
     });
-    await flush();
+    await settle();
     expect(JSON.stringify(root.container.toJSON())).toContain(t('error.Network'));
     expect(one(root, 'auth/phone/send').props.accessibilityState).toMatchObject({ busy: false });
     await unmount(root);
@@ -493,7 +400,7 @@ describe('send', () => {
     await act(async () => {
       release(await respond(200, OK_BODY));
     });
-    await flush();
+    await settle();
     expect(topScreen(root)).toBe('auth/welcome');
     expect(authFlow.getChallenge()).toBeNull();
     await unmount(root);

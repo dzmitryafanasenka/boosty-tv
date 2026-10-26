@@ -8,14 +8,12 @@
  * faked: these tests prove what the app asks for, not native focus.
  */
 import { act } from 'react';
-import { NativeModules } from 'react-native';
-import { createRoot, type Root } from 'test-renderer';
+import { type Root } from 'test-renderer';
 import App, { SHELL_RESTORATION_KEY } from '../src/app/App';
 import { authFlow } from '../src/features/auth/authFlow';
 import { accountScope } from '../src/shared/account';
 import { session } from '../src/app/session';
 import {
-  createFixtureTransport,
   type FixtureReply,
   type FixtureRequest,
   type FixtureTransport,
@@ -26,56 +24,43 @@ import { logger } from '../src/shared/services/logger';
 import { requestHostFocus } from '../src/shared/ui/requestHostFocus';
 import e1Ok from '../src/test/fixtures/boosty/e1-user-current.json';
 import e1Unauthorized from '../src/test/fixtures/boosty/e1-no-token.json';
+import backHandler from '../src/test/backHandlerMock';
+import {
+  byTestId,
+  clearNativeModules,
+  createFlow,
+  focusableIds,
+  installFixtureTransport,
+  installNativeModules,
+  keychain as keychainMock,
+  lastFocusTarget,
+  resetKeychain,
+  text,
+  unmount,
+  visible,
+  type SettleOptions,
+} from '../src/test/flow';
 
 jest.mock('react-native-keychain');
 jest.mock('../src/shared/ui/requestHostFocus', () => ({
   requestHostFocus: jest.fn(),
 }));
 
-jest.mock('react-native/Libraries/Utilities/BackHandler', () => {
-  const handlers: Array<() => boolean | null | undefined> = [];
-  const backHandler = {
-    exitApp: jest.fn(),
-    addEventListener: (_name: string, handler: () => boolean | null | undefined) => {
-      handlers.push(handler);
-      return {
-        remove: () => {
-          const index = handlers.lastIndexOf(handler);
-          if (index >= 0) {
-            handlers.splice(index, 1);
-          }
-        },
-      };
-    },
-    pressBack: () => {
-      for (let i = handlers.length - 1; i >= 0; i -= 1) {
-        if (handlers[i]()) {
-          return true;
-        }
-      }
-      backHandler.exitApp();
-      return false;
-    },
-  };
-  return { __esModule: true, default: backHandler };
-});
+jest.mock('react-native/Libraries/Utilities/BackHandler', () =>
+  require('../src/test/backHandlerMock'),
+);
 
-type KeychainMock = {
-  __values: Map<string, string>;
-  __reset(): void;
-  __failNext(method: string, error: Error): void;
-  resetGenericPassword: jest.Mock;
-};
-type Node = ReturnType<Root['container']['queryAll']>[number];
-
-const keychain = jest.requireMock('react-native-keychain') as KeychainMock;
-const backHandler = jest.requireMock('react-native/Libraries/Utilities/BackHandler')
-  .default as { pressBack: () => boolean; exitApp: jest.Mock };
+const keychain = keychainMock();
 const focusMock = requestHostFocus as jest.Mock;
-const native = NativeModules as {
-  AppInfo?: { versionName?: string };
-  InstallId?: { getOrCreate: jest.Mock };
-};
+
+/** Lets promises, timers and renders run: 30 rounds, timers in each unless `NO_TIMERS`. */
+const NO_TIMERS = { timerRounds: 0 };
+const { settle, render, one, focusOn, press, type, submit, back } = createFlow({
+  settle: { rounds: 30, timerRounds: 30 },
+  one: 'focusableOrInput',
+  pressFocuses: true,
+  submitSettles: true,
+});
 
 const PHONE = '+375291234567';
 const ACCOUNT = String(e1Ok.body.id);
@@ -115,128 +100,32 @@ beforeEach(async () => {
   jest.spyOn(console, 'warn').mockImplementation(() => {});
   jest.spyOn(console, 'error').mockImplementation(() => {});
   focusMock.mockClear();
-  backHandler.exitApp.mockClear();
-  keychain.__reset();
-  keychain.resetGenericPassword.mockClear();
-  keychain.__values.set(SESSION, STORED);
-  keychain.__values.set(PHONE_SERVICE, PHONE);
-  native.AppInfo = { versionName: '1.0' };
-  native.InstallId = { getOrCreate: jest.fn().mockResolvedValue('0f8fad5b-d9cb-469f-a165-70867728950e') };
+  backHandler.reset();
+  resetKeychain({ [SESSION]: STORED, [PHONE_SERVICE]: PHONE });
+  installNativeModules({
+    AppInfo: { versionName: '1.0' },
+    InstallId: { getOrCreate: jest.fn().mockResolvedValue('0f8fad5b-d9cb-469f-a165-70867728950e') },
+  });
   handler = okRoute;
-  transport = createFixtureTransport(req => handler(req));
-  (globalThis as { fetch: unknown }).fetch = transport;
+  transport = installFixtureTransport(req => handler(req));
 });
 
 afterEach(() => {
-  delete native.AppInfo;
-  delete native.InstallId;
+  clearNativeModules();
   focusRestoration.clear();
   authFlow.reset();
   jest.restoreAllMocks();
 });
 
-/** Lets promises, timers and renders run. */
-async function settle(timers = true) {
-  for (let i = 0; i < 30; i += 1) {
-    await act(async () => {
-      if (timers) {
-        jest.runOnlyPendingTimers();
-      }
-      await Promise.resolve();
-    });
-  }
-}
-
-async function renderApp(timers = true) {
-  const root = createRoot();
-  await act(async () => {
-    root.render(<App />);
-  });
-  await settle(timers);
-  return root;
-}
-
-async function unmount(root: Root) {
-  await act(async () => {
-    root.unmount();
-  });
-}
-
-function byTestId(root: Root, testID: string): Node[] {
-  return root.container.queryAll(node => node.props.testID === testID);
-}
-
-function visible(root: Root, testID: string): boolean {
-  return byTestId(root, testID).length > 0;
-}
-
-function one(root: Root, testID: string): Node {
-  const nodes = byTestId(root, testID).filter(
-    node => node.props.focusable === true || node.props.onChangeText,
-  );
-  expect(nodes).toHaveLength(1);
-  return nodes[0];
-}
-
-async function focusOn(root: Root, testID: string) {
-  const node = one(root, testID);
-  await act(async () => {
-    node.props.onFocus?.({ nativeEvent: {} });
-  });
-}
-
-async function press(root: Root, testID: string, timers = true) {
-  await focusOn(root, testID);
-  const node = one(root, testID);
-  await act(async () => {
-    node.props.onClick({ nativeEvent: {} });
-  });
-  await settle(timers);
-}
-
-async function type(root: Root, testID: string, value: string) {
-  const node = one(root, testID);
-  await act(async () => {
-    node.props.onChangeText(value);
-  });
-}
-
-async function submit(root: Root, testID: string) {
-  const node = one(root, testID);
-  await act(async () => {
-    node.props.onSubmitEditing({ nativeEvent: { text: node.props.value } });
-  });
-  await settle();
-}
-
-async function back() {
-  await act(async () => {
-    backHandler.pressBack();
-  });
-  await settle();
-}
-
-function lastFocusTarget(): string | undefined {
-  const calls = focusMock.mock.calls;
-  const view = calls[calls.length - 1]?.[0] as { props?: { testID?: string } } | undefined;
-  return view?.props?.testID;
-}
-
-function text(root: Root): string {
-  return JSON.stringify(root.container.toJSON());
-}
-
-function focusableIds(within: Node): string[] {
-  return within.queryAll(node => node.props.focusable === true).map(node => node.props.testID as string);
-}
+const renderApp = (settleOptions?: Partial<SettleOptions>) => render(<App />, settleOptions);
 
 async function openSettings(root: Root) {
   await press(root, 'nav/settings');
 }
 
-async function openDialog(root: Root, timers = true) {
+async function openDialog(root: Root, settleOptions?: Partial<SettleOptions>) {
   await openSettings(root);
-  await press(root, ROW, timers);
+  await press(root, ROW, { settle: settleOptions });
 }
 
 describe('Настройки', () => {
@@ -429,9 +318,9 @@ describe('confirm', () => {
       return undefined;
     };
     // No timers while the refresh hangs: its request timeout must not end it.
-    const root = await renderApp(false);
+    const root = await renderApp(NO_TIMERS);
     expect(transport.callsTo(TOKEN)).toHaveLength(1);
-    await openDialog(root, false);
+    await openDialog(root, NO_TIMERS);
     // The request count when the status became signedOut.
     let sentAtSignOut: number | null = null;
     const unsubscribe = session.subscribe(status => {
@@ -439,7 +328,7 @@ describe('confirm', () => {
         sentAtSignOut = transport.calls.length;
       }
     });
-    await press(root, CONFIRM, false);
+    await press(root, CONFIRM, { settle: NO_TIMERS });
     unsubscribe();
     expect(session.getStatus()).toBe('signedOut');
     expect(sentAtSignOut).not.toBeNull();
