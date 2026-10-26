@@ -102,6 +102,16 @@ export const ru = {
       body: 'Проверьте подключение телевизора к сети и попробуйте снова.',
     },
   },
+  // Подписки (Story 3.2, E2; docs/focus-map.md §3 C1–C3). Empty: no CTA
+  // (C3). `{n}` is the number of tiles shown.
+  subs: {
+    title: 'Подписки',
+    loading: 'Загружаем подписки',
+    emptyTitle: 'Подписок пока нет',
+    emptyBody: 'Подписаться на авторов можно на сайте или в приложении Boosty. После этого авторы появятся здесь.',
+    errorTitle: 'Не удалось загрузить подписки',
+    firstOnly: 'Показаны первые {n}',
+  },
   common: {
     retry: 'Повторить',
   },
@@ -122,6 +132,11 @@ export const ru = {
     metaDate: ' · {date}',
     a11y: '{badge}. {title}. {author}, {date}.',
     a11yDuration: '{badge}. {title}. {author}, {date}. Длительность {duration}.',
+  },
+  // DESIGN.md AuthorCard (Story 3.2): «{title}. {owner}», or the title alone
+  // when the owner name is missing.
+  authorCard: {
+    a11y: '{title}. {owner}',
   },
   // Card dates (owner decision 2026-10-26), device local time:
   // «сегодня, 14:30» / «вчера» / «12 окт» (current year) / «12 окт 2025».

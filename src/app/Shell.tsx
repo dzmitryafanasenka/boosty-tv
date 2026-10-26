@@ -10,6 +10,7 @@ import {
 import { BackHandler, StyleSheet, TVFocusGuideView, View } from 'react-native';
 import { HomeScreen, type HomeFocusInfo, type HomeScreenProps } from '../features/home';
 import { SETTINGS_VERSION_ID, SettingsScreen } from '../features/settings';
+import { SubscriptionsScreen, type SubscriptionsFocusInfo } from '../features/subscriptions';
 import type { HttpClient } from '../shared/api';
 import { FocusZone, Screen, type FocusZoneHandle } from '../shared/focus';
 import { t } from '../shared/i18n';
@@ -31,7 +32,8 @@ export type ShellProps = {
    */
   routeKey: string;
   /**
-   * The active session's content client (`session.http`), for the feed.
+   * The active session's content client (`session.http`), for the feed and
+   * Подписки.
    * Passed down, never imported: demo mode must not reach the real API.
    */
   http: HttpClient;
@@ -62,6 +64,13 @@ const INITIAL_CONTENT_ID: Partial<Record<SectionId, string>> = {
 };
 
 const HOME: SectionId = 'home';
+
+/**
+ * Sections whose screen takes its content focus itself (restoration in a
+ * virtualized grid, or after the first data arrives), so the content zone
+ * does not focus its target on mount.
+ */
+const SELF_FOCUS_SECTIONS: ReadonlySet<SectionId> = new Set<SectionId>(['home', 'subs']);
 
 type View_ = { section: SectionId; focusContent: boolean };
 
@@ -220,6 +229,16 @@ export function Shell({
     }),
     [focusNav],
   );
+  // Подписки follows the same rules (docs/focus-map.md §1.6, §3 C).
+  const subsFocus = useMemo<SubscriptionsFocusInfo>(
+    () => ({
+      isActive: () => routeFocused.current,
+      current: () => lastFocusId.current,
+      sectionItemId: NAV_ID.subs,
+      focusSidebar: () => focusNav('subs'),
+    }),
+    [focusNav],
+  );
 
   return (
     <Screen testID="shell">
@@ -255,9 +274,8 @@ export function Shell({
         routeKey={routeKey}
         sectionId={view.section}
         initialFocusId={INITIAL_CONTENT_ID[view.section]}
-        // Главная takes its content focus itself (restoration in a
-        // virtualized grid, or after the first page arrives).
-        focusOnMount={view.focusContent && view.section !== HOME}
+        // Главная and Подписки take their content focus themselves.
+        focusOnMount={view.focusContent && !SELF_FOCUS_SECTIONS.has(view.section)}
         onItemFocus={onContentFocus}
         isActive={isShellActive}
         style={styles.content}
@@ -268,6 +286,7 @@ export function Shell({
           http={http}
           focusContent={view.focusContent}
           homeFocus={homeFocus}
+          subsFocus={subsFocus}
           onOpenSignOut={onOpenSignOut}
           onOpenFocusCheck={onOpenFocusCheck}
           onCheckSession={onCheckSession}
@@ -285,6 +304,7 @@ function SectionContent({
   http,
   focusContent,
   homeFocus,
+  subsFocus,
   onOpenSignOut,
   onOpenFocusCheck,
   onCheckSession,
@@ -296,6 +316,7 @@ function SectionContent({
   http: HttpClient;
   focusContent: boolean;
   homeFocus: HomeFocusInfo;
+  subsFocus: SubscriptionsFocusInfo;
   onOpenSignOut: (initiator: RefObject<HostView | null>) => void;
   onOpenFocusCheck?: () => void;
   onCheckSession?: () => void;
@@ -322,9 +343,17 @@ function SectionContent({
           onExpireSession={onExpireSession}
         />
       );
-    // Phase-gated off in Epic 2 (phaseFlags): never rendered.
-    case 'search':
     case 'subs':
+      return (
+        <SubscriptionsScreen
+          http={http}
+          routeKey={routeKey}
+          focusOnMount={focusContent}
+          focus={subsFocus}
+        />
+      );
+    // Phase-gated off (phaseFlags): never rendered.
+    case 'search':
     case 'events':
       return null;
   }

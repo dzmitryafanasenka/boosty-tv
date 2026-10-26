@@ -1,12 +1,13 @@
 /**
  * Phase gating (AD-20, docs/focus-map.md §1.7): a capability → enabled map.
  * An entry point whose flag is off is not rendered, so it is never
- * focusable. Epic 2 enables only Главная and Настройки.
+ * focusable. Epic 2 enabled Главная and Настройки; Story 3.2 enables
+ * Подписки.
  */
 export const phaseFlags = {
   home: true,
   search: false,
-  subs: false,
+  subs: true,
   events: false,
   settings: true,
 } as const satisfies Record<string, boolean>;

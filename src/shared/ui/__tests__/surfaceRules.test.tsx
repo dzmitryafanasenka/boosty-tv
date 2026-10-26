@@ -11,6 +11,7 @@ import { mapPost, type Post } from '../../entities/post';
 import { createLogger } from '../../services/logger';
 // eslint-disable-next-line boundaries/dependencies -- test-only fixtures
 import { feedPost, lockedPost } from '../../../test/feedFixtures';
+import { AuthorCard } from '../AuthorCard';
 import { Button } from '../Button';
 import { NavItem } from '../NavItem';
 import { PostCard } from '../PostCard';
@@ -29,6 +30,16 @@ const consumers: Array<[string, () => ReactElement]> = [
   ['SettingRow info', () => <SettingRow testID={ID} kind="info" label="x" value="1" />],
   ['PostCard', () => <PostCard testID={ID} post={asPost(feedPost(1))} width={221} />],
   ['PostCard locked', () => <PostCard testID={ID} post={asPost(lockedPost())} width={221} />],
+  [
+    'AuthorCard',
+    () => (
+      <AuthorCard
+        testID={ID}
+        author={{ blogUrl: 'b', title: 't', ownerName: 'o', avatarUrl: null }}
+        width={224}
+      />
+    ),
+  ],
 ];
 
 async function surfaceStyles(element: ReactElement): Promise<Record<string, unknown>[]> {

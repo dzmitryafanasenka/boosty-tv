@@ -672,3 +672,19 @@ Changes: A5–A8 `CodeScreen` (code field, 60 s resend countdown, resend with `t
 A median of 31–32 ms is this device's normal (the launcher shows the same). The 300+ post latency check ran on the owner's real feed (~160 rows ≈ 480 posts with real images), not on a synthetic feed (the `LONG_FEED_CHECK` switch built for it was removed afterwards, unused); the owner judged it acceptable.
 
 Not verified: TalkBack labels on cards; second-account cache isolation on the device (host tests only; action item 8).
+
+### Story 3.2 — Subscriptions grid, 2026-10-26
+
+**Status: implemented; partly verified on the pinned device (Chromecast with Google TV 4K, release-like build, the owner's existing session). Agent checks by adb (injected keys); the owner checked it with the physical remote: "everything works".**
+
+| Check | Result | Who / how |
+|---|---|---|
+| E2 with the content profile | HTTP 200 | agent, adb |
+| Sidebar `nav/home` ↓ `nav/subs` | Focus moves to «Подписки»; the section does not open on focus | agent, adb |
+| OK on «Подписки» | The grid loads; focus moves to the first tile | agent, adb |
+| → from the sidebar | Lands on the remembered tile | agent, adb |
+| ← ← from the grid → `nav/subs` | Focus returns to the current sidebar item | agent, adb |
+| Back | → `nav/home` (Главная) | agent, adb |
+| Physical remote (grid, focus states, Back order) | **Pass** (owner, 2026-10-26): tiles, OK → first tile, → ← Back, return restores the tile | owner, physical remote |
+
+Not measured on the device: the 55-author virtualized grid (fast ↓ column keeping, recycling, performance) — the owner's account has 3 subscriptions; host tests only. Not verified: «Показаны первые N» and the empty state (C3) on the device; TalkBack labels on tiles.

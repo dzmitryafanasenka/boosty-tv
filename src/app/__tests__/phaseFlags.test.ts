@@ -1,14 +1,14 @@
 import { SECTION_ORDER, enabledSections, phaseFlags } from '../phaseFlags';
 
-test('Epic 2 enables only Главная and Настройки', () => {
+test('Story 3.2 enables Главная, Подписки and Настройки', () => {
   expect(phaseFlags).toEqual({
     home: true,
     search: false,
-    subs: false,
+    subs: true,
     events: false,
     settings: true,
   });
-  expect(enabledSections()).toEqual(['home', 'settings']);
+  expect(enabledSections()).toEqual(['home', 'subs', 'settings']);
 });
 
 test('enabled sections keep the DESIGN.md sidebar order', () => {

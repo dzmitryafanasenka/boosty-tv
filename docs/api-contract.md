@@ -30,7 +30,7 @@ Rules:
 | Timeouts (reference) | connect 15 s, request 30 s, socket 30 s | `REF` |
 | `device_id` | A client-generated UUIDv4, persisted once per install and sent with refresh and phone auth | `REF` `SettingsRepository.getOrCreateDeviceId` |
 
-Boosty TV decision: two request profiles, `auth` (phone auth, refresh: the web-style set) and `content` (every other call: mobile Android Chrome UA, `Accept`, Bearer), as in the reference. See [ADR 0008](adr/0008-api-request-profiles.md). The content profile is `LIVE` for E8 (Story 1.6) and E5 (Story 3.1: production release-like build on the pinned device, owner's session, 2026-10-26: HTTP 200 with the owner's subscribed posts, accessible posts with video previews and durations, several pages via `extra.offset`); the other content endpoints are checked by the first production story that sends them.
+Boosty TV decision: two request profiles, `auth` (phone auth, refresh: the web-style set) and `content` (every other call: mobile Android Chrome UA, `Accept`, Bearer), as in the reference. See [ADR 0008](adr/0008-api-request-profiles.md). The content profile is `LIVE` for E8 (Story 1.6) and E5 (Story 3.1: production release-like build on the pinned device, owner's session, 2026-10-26: HTTP 200 with the owner's subscribed posts, accessible posts with video previews and durations, several pages via `extra.offset`) and E2 (Story 3.2: same device and session, 2026-10-26: HTTP 200, the owner's 3 subscriptions with titles, owners and avatars); the other content endpoints are checked by the first production story that sends them.
 
 ## 2. Authentication
 
@@ -372,6 +372,11 @@ Required by the reference: `id`, `isMultiple`, `isFinished`, a non-empty `option
 - `LIVE` (Story 1.7): E4 pages 2 and 3 fetched with the previous `extra.offset` (URL-encoded) returned the next posts, HTTP 200, for 3 blogs.
 - Unverified: whether the cursor stays stable while new posts arrive, and how long a cursor is valid.
 - Subscriptions (E2): no pagination in the reference. Whether `offset` is supported is unverified.
+- E2 notes (Story 3.2):
+  - `total` is not the item count: the live account returned `total` 5 with 3 items in `data` (sanitized fixture `e2-subscriptions.json`). What it counts is unverified. The client therefore shows «Показаны первые N» only when `data` reached the limit (30 raw items) **and** `total > 30`.
+  - `owner.hasAvatar`: read as "the avatar URL is a real avatar"; `false` → the client shows its placeholder even if `avatarUrl` is set. The `false` case was not observed live (all 3 items had `hasAvatar: true`).
+  - Top-level `offset` and `limit` are ignored (one request, no paging). Subscription fields (`price`, `currencyPrices`, `subscriptionLevel`, payment times) are never parsed.
+  - A `blogUrl` with whitespace, `/`, `?`, `#`, `%` or `..` drops the item (it becomes a focus id, a key and a path segment); a missing or blank `title` keeps it with the «Без названия» fallback.
 
 ## 6. Media URLs and quality mapping
 

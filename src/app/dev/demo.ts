@@ -14,7 +14,8 @@ import type { ReadResult, SecureStore } from '../../shared/platform/secureStore'
  * 200 with a synthetic id, send-code answers a synthetic challenge and
  * confirm synthetic tokens (so a demo sign-in on A5 lands; the id differs
  * from the stored `demo`, so it runs the account-switch hook, Story 2.8),
- * E5 (the feed, Story 3.1) synthetic posts, every other request a 404. The
+ * E5 (the feed, Story 3.1) synthetic posts, E2 (Подписки, Story 3.2)
+ * synthetic authors, every other request a 404. The
  * keychain is never touched, so the owner's stored session survives a demo
  * run.
  *
@@ -73,6 +74,29 @@ function demoFeedPage(url: string, total: number) {
   };
 }
 
+/** Demo subscriptions: the feed's authors first, then a few more (no avatars). */
+export const DEMO_SUBSCRIPTIONS = 8;
+
+/** The E2 body (shape of `src/test/fixtures/boosty/e2-subscriptions.json`). */
+function demoSubscriptions() {
+  return {
+    offset: 0,
+    limit: 30,
+    total: DEMO_SUBSCRIPTIONS,
+    data: Array.from({ length: DEMO_SUBSCRIPTIONS }, (_, i) => ({
+      id: 2000 + i,
+      blog: {
+        title:
+          i < DEMO_BLOGS.length
+            ? `Демо-блог ${i + 1}`
+            : `Демо-блог ${i + 1} с длинным названием для двух строк`,
+        blogUrl: i < DEMO_BLOGS.length ? DEMO_BLOGS[i] : `demo-blog-${i + 1}`,
+        owner: { name: `Демо-автор ${i + 1}`, hasAvatar: false },
+      },
+    })),
+  };
+}
+
 const DEMO_SESSION = JSON.stringify({
   v: 1,
   accessToken: 'demo-access-token',
@@ -101,6 +125,8 @@ export function createDemoSessionManager(): SessionManager {
     switch (request.path) {
       case '/v1/feed/post/':
         return { status: 200, body: demoFeedPage(request.url, DEMO_FEED_POSTS), delayMs: 300 };
+      case '/v1/user/subscriptions':
+        return { status: 200, body: demoSubscriptions(), delayMs: 300 };
       case '/v1/user/current':
         return { status: 200, body: { id: 1001 }, delayMs: 300 };
       case '/auth/phone/verification_code/send':
