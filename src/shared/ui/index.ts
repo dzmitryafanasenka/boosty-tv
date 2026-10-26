@@ -15,3 +15,15 @@ export { NavItem, type NavItemProps } from './NavItem';
 export { SettingRow, type SettingRowKind, type SettingRowProps } from './SettingRow';
 export { StateView, type StateViewAction, type StateViewProps } from './StateView';
 export { Dialog, type DialogAction, type DialogProps } from './Dialog';
+export {
+  PostCard,
+  PostCardSkeleton,
+  PostCardView,
+  postBadgeLabel,
+  postCardA11yLabel,
+  postCardHeight,
+  postCardThumbHeight,
+  postCardTitle,
+  postCardWidth,
+  type PostCardProps,
+} from './PostCard';

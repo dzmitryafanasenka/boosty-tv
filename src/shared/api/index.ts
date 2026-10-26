@@ -24,3 +24,4 @@ export {
   type ValidateResult,
 } from './sessionManager';
 export type { Transport } from './transport';
+export { queryKeys } from './queryKeys';

@@ -84,10 +84,16 @@ export const ru = {
     },
   },
   home: {
-    // Until Epic 3 brings the feed (EXPERIENCE › Shell).
-    placeholder: {
-      title: 'Лента появится здесь',
-      body: 'Новые посты из ваших подписок будут на этом экране.',
+    // «Новое в подписках» (Story 3.1, E5). Empty: owner decision 2026-10-26
+    // (StateView with one action «Обновить»).
+    feed: {
+      title: 'Новое в подписках',
+      loading: 'Загружаем ленту',
+      emptyTitle: 'Новых постов нет',
+      emptyBody: 'Когда авторы из ваших подписок опубликуют посты, они появятся здесь.',
+      refresh: 'Обновить',
+      errorTitle: 'Не удалось загрузить ленту',
+      loadMoreError: 'Не удалось загрузить следующие посты.',
     },
     // Cold start with a stored session and no network (Story 2.5). The
     // session is kept; this is never «Сессия истекла».
@@ -98,6 +104,46 @@ export const ru = {
   },
   common: {
     retry: 'Повторить',
+  },
+  // DESIGN.md PostCard (Story 3.1). `{n}` is the video count. The card's
+  // accessibility label reads «Видео. {title}. {author}, {date}.».
+  postCard: {
+    badge: {
+      video: 'Видео',
+      videos: '{n} видео',
+      audio: 'Аудио',
+      text: 'Текст и фото',
+      poll: 'Опрос',
+      file: 'Файл',
+      locked: 'Нет доступа',
+    },
+    untitled: 'Без названия',
+    /** After the author name, which ellipsizes; the date never does. */
+    metaDate: ' · {date}',
+    a11y: '{badge}. {title}. {author}, {date}.',
+    a11yDuration: '{badge}. {title}. {author}, {date}. Длительность {duration}.',
+  },
+  // Card dates (owner decision 2026-10-26), device local time:
+  // «сегодня, 14:30» / «вчера» / «12 окт» (current year) / «12 окт 2025».
+  date: {
+    today: 'сегодня, {time}',
+    yesterday: 'вчера',
+    dayMonth: '{day} {month}',
+    dayMonthYear: '{day} {month} {year}',
+    month: {
+      jan: 'янв',
+      feb: 'фев',
+      mar: 'мар',
+      apr: 'апр',
+      may: 'мая',
+      jun: 'июн',
+      jul: 'июл',
+      aug: 'авг',
+      sep: 'сен',
+      oct: 'окт',
+      nov: 'ноя',
+      dec: 'дек',
+    },
   },
   // The persistent badge of the debug-only demo mode (Story 2.5).
   demo: {

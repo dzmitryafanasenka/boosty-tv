@@ -41,11 +41,8 @@ function host(root: Root) {
 
 function surfaceBackground(root: Root): string | undefined {
   const [scaleNode] = byId(root, `${ID}/scale`);
-  const surface = scaleNode.children[0];
-  if (typeof surface === 'string') {
-    throw new Error('unexpected text node');
-  }
-  return StyleSheet.flatten(surface.props.style).backgroundColor as string;
+  // The scale view is also the surface (one native view).
+  return StyleSheet.flatten(scaleNode.props.style).backgroundColor as string;
 }
 
 let timing: jest.SpyInstance;

@@ -83,6 +83,8 @@ export function FocusZone({
   const order = useRef<string[]>([]);
   const refCallbacks = useRef(new Map<string, (view: HostView | null) => void>());
   const [destination, setDestination] = useState<HostView | null>(null);
+  /** The destination last set (read without a render). */
+  const destinationRef = useRef<HostView | null>(null);
   const onItemFocusRef = useRef(onItemFocus);
   onItemFocusRef.current = onItemFocus;
   const isActiveRef = useRef(isActive);
@@ -102,8 +104,31 @@ export function FocusZone({
 
   const refreshDestination = useCallback(() => {
     const next = targetView();
-    setDestination(prev => (prev === next ? prev : next));
+    if (next !== destinationRef.current) {
+      destinationRef.current = next;
+      setDestination(next);
+    }
   }, [targetView]);
+
+  /**
+   * Whether an item (un)mount can change the target: the target is the first
+   * mounted of [remembered, initial, ...registration order], so only these
+   * cases matter. A long virtualized list mounts and unmounts rows while it
+   * scrolls; other items skip the lookup and the guide update.
+   */
+  const affectsTarget = useCallback(
+    (focusId: string, view: HostView | null) => {
+      if (view === null) {
+        return views.current.get(focusId) === destinationRef.current;
+      }
+      return (
+        destinationRef.current === null ||
+        focusId === focusRestoration.peek(routeKey, sectionId)?.focusId ||
+        focusId === initialFocusId
+      );
+    },
+    [routeKey, sectionId, initialFocusId],
+  );
 
   const api = useMemo<ZoneApi>(
     () => ({
@@ -111,6 +136,7 @@ export function FocusZone({
         let callback = refCallbacks.current.get(focusId);
         if (!callback) {
           callback = (view: HostView | null) => {
+            const affects = affectsTarget(focusId, view);
             if (view) {
               views.current.set(focusId, view);
               if (!order.current.includes(focusId)) {
@@ -120,7 +146,9 @@ export function FocusZone({
               views.current.delete(focusId);
               order.current = order.current.filter(id => id !== focusId);
             }
-            refreshDestination();
+            if (affects) {
+              refreshDestination();
+            }
           };
           refCallbacks.current.set(focusId, callback);
         }
@@ -135,7 +163,7 @@ export function FocusZone({
         onItemFocusRef.current?.(focusId);
       },
     }),
-    [routeKey, sectionId, refreshDestination],
+    [routeKey, sectionId, refreshDestination, affectsTarget],
   );
 
   const focusTarget = useCallback(() => {

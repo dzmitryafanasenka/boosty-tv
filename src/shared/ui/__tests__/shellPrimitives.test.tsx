@@ -28,11 +28,8 @@ function host(root: Root) {
 
 function surface(root: Root) {
   const [scaleNode] = byId(root, `${ID}/scale`);
-  const node = scaleNode.children[0];
-  if (typeof node === 'string') {
-    throw new Error('unexpected text node');
-  }
-  return StyleSheet.flatten(node.props.style);
+  // The scale view is also the surface (one native view).
+  return StyleSheet.flatten(scaleNode.props.style);
 }
 
 async function setFocused(root: Root, focused: boolean) {

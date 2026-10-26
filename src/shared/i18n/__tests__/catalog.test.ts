@@ -33,8 +33,8 @@ describe('ru catalog', () => {
     expect(t('shell.nav.home')).toBe('Главная');
     expect(t('shell.nav.settings')).toBe('Настройки');
     expect(Object.keys(ru.shell.nav)).toEqual(['home', 'search', 'subs', 'events', 'settings']);
-    expect(t('home.placeholder.title')).toBe('Лента появится здесь');
-    expect(t('home.placeholder.body').length).toBeGreaterThan(0);
+    expect(t('home.feed.title')).toBe('Новое в подписках');
+    expect(ru.home).not.toHaveProperty('placeholder');
     expect(t('settings.version')).toBe('Версия');
     expect(ru.auth).not.toHaveProperty('signedIn');
   });

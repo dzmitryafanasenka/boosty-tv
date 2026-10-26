@@ -1,6 +1,6 @@
 # ADR 0009: Split SessionManager into modules behind an unchanged facade
 
-- Status: proposed (Epic 2 retro action item 5; the split itself is a later, separate change)
+- Status: accepted (owner, 2026-10-26; Epic 2 retro action item 5; the split itself is a later, separate change)
 - Date: 2026-10-26
 - Relates to: architecture spine AD-3 (session ownership), AD-4 (account scope); `docs/api-contract.md` §2.3 «Production refresh-coordinator requirements»; Epic 2 retro findings A2, A3, F7 (`_bmad-output/implementation-artifacts/epic-2-retro-2026-10-26.md`)
 - Code references are to `main` at `697de1f`.

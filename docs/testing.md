@@ -642,3 +642,33 @@ Changes: A5–A8 `CodeScreen` (code field, 60 s resend countdown, resend with `t
 | Logcat scan after the live run (phone digits, `Bearer`, 32+ runs, `sms_code`) | **Pass**: full buffer from the launch before the sign-in to after the cold start (about 3 900 lines), searched locally: `Bearer <value>`, `sms_code=`, `access_token`, `refresh_token`, `+` with 9+ digits → 0. 9+ digit runs only in a system launcher tag (package cache), 32+ runs only in system tags (IME, ActivityManager); the app's own lines are only `Running "BoostyTV"`. Buffer cleared, local copy deleted | agent via adb |
 | Corruption recovery through the production adapter and helper on the device | **Not verified on the device — open device item.** The production `KeychainStorageResetModule` differs from the Story 1.3 spike helper (checks `File.delete()`, removes `.tmp`, fixed failure reason; ADR 0006), so the Story 1.3 gate does not cover it. Not run here because overwriting the DataStore file would also wipe the spike's stored session. Host tests only | — |
 
+
+### Story 3.1 — Subscription feed on the Home screen, 2026-10-26
+
+**Status: implemented; verified on the pinned device (Chromecast with Google TV 4K, release-like build `assembleRelease -PreactNativeArchitectures=armeabi-v7a` + `zipalign` + `apksigner` with the SDK debug key) with the owner's existing session (no sign-in, no sign-out). Owner checks with the physical remote; agent checks by adb (injected keys, uiautomator, screencap, `dumpsys gfxinfo`/`meminfo`, `atrace`).**
+
+| Check | Result | Who / how |
+|---|---|---|
+| E5 with the content profile | HTTP 200, the owner's subscribed posts, video previews and durations, paging via `extra.offset` (recorded in `docs/api-contract.md` §1) | agent, adb |
+| Cold start focus | Focus moves to the first card once page 1 arrives (user had not moved) | agent, adb |
+| Focused row fully visible | Bottom row's scaled card and ring inside the viewport (after fix: slot padding, no JS scroll on focus) | agent, screencap |
+| Meta line | Long author names ellipsize, « · date» always visible | agent, screencap |
+| Fast ↓ keeps the column | 60 presses at 0.15 s and 0.3 s, 2 runs each: column 3 kept (after holding back the partial last row) | agent, adb |
+| End of list while loading | ↓ keeps focus on the last full row (end guide) | owner, physical remote |
+| Return to Главная | Scroll position kept; → lands on the remembered card | owner, physical remote |
+| Focus jumps on long scroll | Seen with the FlashList #1843 guard (it reverted user presses during mount hitches); guard removed; none after | owner, physical remote; agent adb (60 steps, ~18 appends, no move without a key) |
+| Overall feel | "Everything works"; 3-column grid accepted | owner, physical remote |
+
+**Performance (adb, 12–20× ↓ at 0.35 s):**
+
+| Build | Janky frames | Median / 90th | Page-mount stall per 20 rows | Memory |
+|---|---|---|---|---|
+| First build (full-size previews) | 100 % | 150 / 300 ms | — | PSS 763 MB, Graphics 325 MB |
+| `resizeMethod="resize"` | 9 % | 30 / 38 ms | — | PSS 229 MB, Graphics 37 MB |
+| FlatList, flattened card | 8–9 % | 31 / 38 ms | 2.0–2.2 s (top frame 400–450 ms) | deep scroll: PSS ≈ 360 MB, Graphics plateau ≈ 115 MB (image cache) |
+| FlashList 2.3.3 (ADR 0011) | — | — | 1.15–1.47 s (top frame ≈ 300 ms) | — |
+| Google TV launcher (baseline) | 0 % | 32 / 34 ms | — | — |
+
+A median of 31–32 ms is this device's normal (the launcher shows the same). The 300+ post latency check ran on the owner's real feed (~160 rows ≈ 480 posts with real images), not on a synthetic feed (the `LONG_FEED_CHECK` switch built for it was removed afterwards, unused); the owner judged it acceptable.
+
+Not verified: TalkBack labels on cards; second-account cache isolation on the device (host tests only; action item 8).
