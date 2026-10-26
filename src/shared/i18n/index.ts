@@ -30,6 +30,16 @@ export function t(key: MessageKey): string {
   return lookup(key) as string;
 }
 
+/**
+ * A message with `{name}` placeholders replaced by `values`. A placeholder
+ * without a value is left as is, so a missing value is visible in tests.
+ */
+export function tf(key: MessageKey, values: Readonly<Record<string, string>>): string {
+  return t(key).replace(/\{(\w+)\}/g, (match, name: string) =>
+    Object.prototype.hasOwnProperty.call(values, name) ? values[name] : match,
+  );
+}
+
 /** The plural form for `n` (non-negative integer; throws otherwise). */
 export function tp(key: PluralKey, n: number): string {
   return pluralRu(n, lookup(key) as RuPluralForms);

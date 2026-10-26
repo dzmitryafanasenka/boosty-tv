@@ -1,13 +1,15 @@
 /**
- * Typed root stack routes (ADR 0003 / ADR 0007). Params carry ids only,
- * never secrets: the phone and the challenge stay in `features/auth`'s
- * in-memory `authFlow`.
+ * Typed root stack routes (ADR 0003 / ADR 0007). Params carry ids and flags
+ * only, never secrets: the phone and the challenge stay in `features/auth`'s
+ * in-memory `authFlow`; tokens stay in SessionManager.
  */
 export type RootStackParamList = {
-  /** A1 */
-  Welcome: undefined;
+  /** A1. `signInAgain`: the stored session was corrupted and wiped. */
+  Welcome: { signInAgain?: boolean } | undefined;
   /** A2–A4, A9, A10 */
   Phone: undefined;
-  /** A5 (minimal until Story 2.3) */
+  /** A5–A8 */
   Code: undefined;
+  /** Temporary signed-in screen (Story 2.3; the Shell replaces it in 2.4). */
+  SignedIn: undefined;
 };

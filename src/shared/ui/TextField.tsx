@@ -129,6 +129,7 @@ export function TextField({
       {hasError ? (
         <Text
           testID={testID ? `${testID}/error` : undefined}
+          accessibilityLiveRegion="polite"
           variant="body-s"
           color="error-text"
           style={styles.error}

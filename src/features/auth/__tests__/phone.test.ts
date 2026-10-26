@@ -1,4 +1,4 @@
-import { DEFAULT_COUNTRY_CODE, normalizeCountryCodeInput, toE164 } from '../phone';
+import { DEFAULT_COUNTRY_CODE, maskPhone, normalizeCountryCodeInput, toE164 } from '../phone';
 
 describe('toE164', () => {
   it.each([
@@ -46,5 +46,30 @@ describe('normalizeCountryCodeInput', () => {
     ['+12345', '+123'],
   ])('%j → %j', (raw, expected) => {
     expect(normalizeCountryCodeInput(raw)).toBe(expected);
+  });
+});
+
+describe('maskPhone (A5 hint)', () => {
+  test.each([
+    ['+375291234567', '+375', '+375 •• ••• •• 67'],
+    ['+79162451807', '+7', '+7 ••• ••• •• 07'],
+    ['+12025550123', ' +1 ', '+1 ••• ••• •• 23'],
+    ['+49301234', '+49', '+49 •• •• 34'],
+  ])('%s (%s) → %s', (phone, cc, masked) => {
+    expect(maskPhone(phone, cc)).toBe(masked);
+  });
+
+  test('shows only the country code and the last two digits', () => {
+    const masked = maskPhone('+375291234567', '+375');
+    expect(masked.replace(/\D/g, '')).toBe('37567');
+  });
+
+  test.each([
+    ['country code mismatch', '+375291234567', '+7'],
+    ['not E.164', '375291234567', '+375'],
+    ['too short', '+3751', '+375'],
+    ['empty country code', '+375291234567', '+'],
+  ])('%s → empty', (_name, phone, cc) => {
+    expect(maskPhone(phone, cc)).toBe('');
   });
 });

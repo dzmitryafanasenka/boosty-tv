@@ -1,4 +1,4 @@
-import { t, tp } from '..';
+import { t, tf, tp } from '..';
 import { ru } from '../ru';
 
 /** AD-5: AppError.kind and AuthError.kind (epic-2-context › Errors). */
@@ -39,6 +39,14 @@ describe('ru catalog', () => {
     expect(t('error.TooManyAttempts')).toBe(
       'Слишком много попыток. Попробуйте позже',
     );
+  });
+
+  it('tf fills placeholders and leaves unknown ones visible', () => {
+    expect(tf('auth.code.sentTo', { phone: '+375 •• ••• •• 67' })).toBe(
+      'Код отправлен на +375 •• ••• •• 67.',
+    );
+    expect(tf('auth.code.resendIn', {})).toBe('через {time}');
+    expect(tf('auth.code.resendIn', { time: '0:42' })).toBe('через 0:42');
   });
 
   it.each([

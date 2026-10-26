@@ -127,6 +127,25 @@ Facts:
 - The website gets the same 429. Its `device_id`, client and headers differ from ours, so the limit is server-side. It is keyed by the phone number or the IP address, not by `device_id` or our request format. Phone vs IP was not separated: the website attempt probably used the same home IP.
 - The server does not say when sending is allowed again. The window and the threshold are unknown. Rejected attempts may extend the window; this was not tested and will not be tested on purpose.
 
+#### Production client (Stories 2.2–2.3)
+
+What the production code sends and how it reads the answers (`src/shared/api/authApiClient.ts`, `httpClient.ts`, `sessionManager.ts`; ADR 0008). Host-tested with sanitized mocks; the live status of each row is in the last column.
+
+| Request | Client / profile | Method, URL | Form fields (in order) | Parsed as | Error mapping | Live status |
+|---|---|---|---|---|---|---|
+| Send | `AuthApiClient` / `auth` | `POST /auth/phone/verification_code/send` | `phone`, `device_os=web`, `device_id` | `data.phoneCode.code` required (non-empty); `sentTransport`, `expiresIn` optional, dropped when odd | 429 `sms_gate_ratelimit` → `TooManyAttempts`; transport/timeout → `Network`; everything else → `Unknown` | `LIVE` 2026-10-26 (Story 2.3, production build, owner): HTTP 200; the code arrived in Telegram |
+| Resend | `AuthApiClient` / `auth` | `POST /auth/phone/verification_code/send` | `phone`, `transport=gate`, `device_os=web`, `device_id` | As send; the new `code` replaces the challenge | As send | Not sent in the Story 2.3 live run (not needed) |
+| Confirm | `AuthApiClient` / `auth` | `PUT /auth/phone/verification_code/confirm` | `phone`, `code` (the challenge), `sms_code`, `device_os=web`, `device_id` | `access_token`, `refresh_token` non-empty strings; `expires_in` a finite number > 300 and ≤ 315 360 000 (10 years; seconds) | 400 `invalid_sms_code` → `WrongCode`; transport/timeout → `Network`; everything else (including 429 and any 200 that fails the schema) → `Unknown`. Nothing maps to `CodeExpired` | `LIVE` 2026-10-26 (Story 2.3): HTTP 200, tokens parsed and saved |
+| E1 after confirm | `HttpClient` / `content` | `GET /v1/user/current` | — (`Authorization: Bearer <access_token>`) | Status 200 and `id` (number or non-empty string, stored as a string); the rest of the body is ignored | Any other status, a missing `id` or a transport failure → the tokens are dropped, nothing is saved; the challenge counts as spent, so A5 shows the A8 layout («Выслать новый код») with `Unknown` | `LIVE` 2026-10-26 (Story 2.3): **succeeded with the `content` profile** (the app reached SignedIn, which requires E1 200 with `id`). ADR 0008 check passed for E1. The release build logs no status line, so the exact code was not recorded |
+
+Common rules:
+- `auth` profile headers: desktop Chrome `User-Agent`, `X-App: web`, `X-Locale: ru_RU`, `Referer: https://boosty.to/`, `Origin: https://boosty.to`, `Accept: application/json, text/plain, */*`, `X-From-Id: <device_id>`, `Content-Type: application/x-www-form-urlencoded`; no `Authorization`. `content` profile: mobile Android Chrome `User-Agent`, `Accept`, `Authorization: Bearer`; nothing else. Unit tests assert the exact sets.
+- `credentials: 'omit'` on every request; one 30 s timeout per request (`AbortController`, also covering the `device_id` read); no automatic retry of send, resend, confirm or E1.
+- Same-argument single-flight: a repeated send/resend/confirm while one is in flight shares it; different arguments are rejected (`Unknown`) without a request. Send and resend share one slot.
+- Session creation order: confirm → E1 → save the phone (`boostytv.phone`; a failure is logged and not fatal, and its ADR 0006 recovery runs before the session exists) → save `{accessToken, refreshToken, expiresAt, accountId}` (`boostytv.session`) → signed in. A failed session save clears both and shows `Unknown` in the A8 layout.
+- Resend: every attempt, success or failure, restarts the 60 s client cooldown. `expiresAt` = confirm time + `expires_in` × 1000 ms.
+- Logs carry only the operation, the outcome, the HTTP status and the path; never the phone, the challenge, the code, tokens, the `device_id` or a body.
+
 ### 2.3 Token refresh (`REF`, partly `LIVE`)
 
 `POST /oauth/token/`

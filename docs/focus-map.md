@@ -111,7 +111,17 @@ Implementation notes (Story 2.2, device-verified by adb unless noted):
 - A2 routing uses two `TVFocusGuideView` destinations: the field row → the number field, the button row → «Получить код». So ↓ from either field lands on «Получить код» and ↑ from either button on the number, whatever the geometry. Inside a row, focus moves natively.
 - Moving focus to a text field (initial focus, after «Готово», after A4, on return to A2) calls `requestTVFocus()` on the field's non-collapsable host view, which focuses the input natively **without** opening the IME. `TextInput.focus()` is never used for this: it opens the keyboard.
 - Every return to A1 or A2 (Back, «Назад», «Изменить номер») focuses the target explicitly when the route regains focus.
-- Until Story 2.3 adds the code field, minimal A5 has one focusable element, «Изменить номер» (`auth/code/change-number`), with initial focus, so focus never stays on the covered A2 (host tests only; no send on the device in Story 2.2).
+- Story 2.3 replaced the minimal A5 of Story 2.2 (which had only «Изменить номер»).
+
+Implementation notes (Story 2.3, host tests only; A5 is reached only through a real send, so its device check is the owner's live sign-in):
+- A5 ids: `auth/code/field`, `auth/code/submit` («Войти»), `auth/code/resend`, `auth/code/change-number`; A8 replaces «Войти» and «Выслать повторно» with `auth/code/new-code`.
+- Like A2, the field row and the button row are `TVFocusGuideView` destinations: ↓ from the field lands on «Войти» (A8: «Выслать новый код»), ↑ from a button on the field. The field is focused with `requestTVFocus()` on its host view (the IME does not open).
+- «Выслать повторно» is `disabled` (not focusable) during the 60 s countdown; the sub-label «через 0:42» sits under it. When the countdown ends the button becomes focusable and the hint «Код не пришёл? Можно запросить ещё раз.» appears; focus does not move.
+- After a resend (success or failure) and after A7, focus goes to the code field; every resend attempt restarts the 60 s countdown. After A8 «Выслать новый код» succeeds, the form comes back with the field cleared and focused; after it fails, the button is locked by the countdown (sub-label «через 1:00») and focus goes to the field.
+- When confirm succeeded but E1 or the session save failed, the challenge is spent: A5 switches to the A8 layout with `error.Unknown` and «Выслать новый код» focused.
+- The inline errors, the resend hint and A1's «Войдите снова» are polite live regions (TalkBack announces them without a focus move). Network and unknown confirm errors leave focus where it is (the busy button keeps it).
+- After a successful sign-in the stack is replaced by the temporary SignedIn screen (no focusable element, Back exits the app). A sign-in that finishes after Back from A5 still opens SignedIn, because the session exists.
+- Startup: a splash with no focusable element until the stored session is read; A1 after a wiped (corrupted) store shows «Войдите снова» above «Войти в Boosty» (focus unchanged).
 - A9 also offers «На первый экран» (`auth/phone/to-welcome`, → A1), as in the mock. A10 hides «Попробовать снова» after its one retry; focus then goes to «Изменить номер» (host tests only).
 
 ## 3. Shell: sidebar and sections
