@@ -40,12 +40,35 @@ export const ru = {
       toWelcome: 'На первый экран',
       retry: 'Попробовать снова',
     },
-    // A5, minimal in Story 2.2 (the code field and confirm are Story 2.3).
+    // A5–A8 (code form, resend countdown, wrong code, expired). Copy from
+    // the A5–A8 mocks (Claude Design «Boosty TV - A B C»). A7 uses
+    // `error.WrongCode` and clears the field (docs/focus-map.md overrides
+    // the mock). `{phone}` is the masked number, `{time}` is m:ss.
     code: {
       step: 'Шаг 2 из 2',
-      title: 'Код из сообщения',
+      title: 'Введите код',
+      sentTo: 'Код отправлен на {phone}.',
+      sentBySmsTo: 'Код отправлен по SMS на {phone}.',
+      channels: 'Он может прийти по SMS, в мессенджер или в приложение Boosty.',
       body: 'Код может прийти по SMS, в мессенджер или в приложение Boosty.',
+      fieldLabel: 'Код из сообщения',
+      fieldPlaceholder: 'Введите код',
+      submit: 'Войти',
+      resend: 'Выслать повторно',
+      resendIn: 'через {time}',
+      resendHint: 'Код не пришёл? Можно запросить ещё раз.',
+      newCode: 'Выслать новый код',
       changeNumber: 'Изменить номер',
+    },
+    // Temporary signed-in screen (Story 2.3; replaced by the Shell in 2.4).
+    // No personal data.
+    signedIn: {
+      title: 'Вход выполнен',
+      body: 'Главный экран появится в следующей версии приложения.',
+    },
+    welcome: {
+      /** A1 after the stored session was unreadable and wiped. */
+      signInAgain: 'Войдите снова',
     },
   },
   error: {

@@ -339,8 +339,8 @@ describe('send', () => {
     expect(text).toContain(t('auth.code.title'));
     expect(text).toContain(t('auth.code.step'));
     expect(text).not.toContain(CHALLENGE);
-    const changeNumber = one(root, 'auth/code/change-number');
-    expect(changeNumber.props.hasTVPreferredFocus).toBe(true);
+    // A5 initial focus is the code field (Story 2.3: __tests__/codeFlow.test.tsx).
+    expect(lastFocusTarget()).toBe('auth/code/field/host');
     await unmount(root);
   });
 

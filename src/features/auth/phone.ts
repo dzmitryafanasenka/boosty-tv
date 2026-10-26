@@ -42,3 +42,37 @@ export function toE164(countryCode: string, nationalNumber: string): string | nu
   }
   return `+${cc}${national}`;
 }
+
+/**
+ * The A5 hint: the country code and the last two digits only. The hidden
+ * digits are `•`, grouped from the right as 2, then 3, then all the rest in
+ * one group, for example `+375291234567` with `+375` → `+375 •• ••• •• 67`
+ * and `+79162451807` with `+7` → `+7 ••• ••• •• 07`. `countryCode` is
+ * the A2 country code field the phone was built from. Returns '' when the
+ * phone does not start with that code or is not E.164.
+ */
+export function maskPhone(e164: string, countryCode: string): string {
+  const cc = countryCode.trim().replace(/^\+/, '');
+  if (!/^\+\d{8,15}$/.test(e164) || !/^\d{1,3}$/.test(cc) || !e164.startsWith(`+${cc}`)) {
+    return '';
+  }
+  const national = e164.slice(1 + cc.length);
+  if (national.length < 3) {
+    return '';
+  }
+  const shown = national.slice(-2);
+  let hidden = national.length - 2;
+  const groups: number[] = [];
+  for (const size of [2, 3]) {
+    if (hidden <= 0) {
+      break;
+    }
+    const take = Math.min(size, hidden);
+    groups.unshift(take);
+    hidden -= take;
+  }
+  if (hidden > 0) {
+    groups.unshift(hidden);
+  }
+  return [`+${cc}`, ...groups.map(n => '•'.repeat(n)), shown].join(' ');
+}

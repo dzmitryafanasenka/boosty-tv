@@ -20,6 +20,8 @@ const COLUMN_TOP = 150;
 export type WelcomeScreenProps = {
   /** OK on «Войти в Boosty»: open A2. */
   onSignIn: () => void;
+  /** The stored session was unreadable and wiped: show «Войдите снова». */
+  signInAgain?: boolean;
 };
 
 /**
@@ -27,9 +29,10 @@ export type WelcomeScreenProps = {
  * Boosty», with initial focus; OK opens A2. Whenever A1 becomes the focused
  * route again (Back from A2), focus is put back on the button explicitly:
  * Android's post-pop fallback focus is never relied on (ADR 0007).
- * Back is not intercepted, so Android exits the app.
+ * Back is not intercepted, so Android exits the app. After a wiped
+ * (corrupted) store, the line «Войдите снова» is shown above the button.
  */
-export function WelcomeScreen({ onSignIn }: WelcomeScreenProps) {
+export function WelcomeScreen({ onSignIn, signInAgain = false }: WelcomeScreenProps) {
   const signInRef = useRef<HostView>(null);
 
   useFocusEffect(
@@ -51,6 +54,17 @@ export function WelcomeScreen({ onSignIn }: WelcomeScreenProps) {
           <Text variant="body" color="text-secondary" style={styles.body}>
             {t('welcome.body')}
           </Text>
+          {signInAgain ? (
+            <Text
+              testID="auth/welcome/sign-in-again"
+              accessibilityLiveRegion="polite"
+              variant="body"
+              color="text"
+              style={styles.notice}
+            >
+              {t('auth.welcome.signInAgain')}
+            </Text>
+          ) : null}
           <Button
             ref={signInRef}
             testID={WELCOME_SIGN_IN_ID}
@@ -80,6 +94,9 @@ const styles = StyleSheet.create({
     width: COLUMN_WIDTH,
   },
   body: {
+    marginTop: spacing['6'],
+  },
+  notice: {
     marginTop: spacing['6'],
   },
   button: {

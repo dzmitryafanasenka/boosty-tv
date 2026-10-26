@@ -16,12 +16,18 @@ export type AuthErrorKind =
 
 export class AuthError extends Error {
   readonly kind: AuthErrorKind;
+  /**
+   * Confirm succeeded but the sign-in failed afterwards (E1 or the session
+   * save): the challenge is consumed, so a new code is needed.
+   */
+  readonly challengeSpent: boolean;
 
-  constructor(kind: AuthErrorKind) {
+  constructor(kind: AuthErrorKind, options: { challengeSpent?: boolean } = {}) {
     // The message is the kind only: no status text, body or input.
     super(kind);
     this.name = 'AuthError';
     this.kind = kind;
+    this.challengeSpent = options.challengeSpent === true;
   }
 }
 
@@ -46,6 +52,19 @@ function errorCode(body: unknown): string | undefined {
 export function mapSendCodeFailure(status: number, body: unknown): AuthErrorKind {
   if (status === 429 && errorCode(body) === 'sms_gate_ratelimit') {
     return 'TooManyAttempts';
+  }
+  return 'Unknown';
+}
+
+/**
+ * Error kind for a non-2xx response of `PUT /auth/phone/verification_code/confirm`.
+ * Verified: 400 `error=invalid_sms_code` (Story 1.3). An expired challenge,
+ * too many confirm attempts and captcha are unverified, so they are
+ * `Unknown`; nothing maps to `CodeExpired` yet.
+ */
+export function mapConfirmFailure(status: number, body: unknown): AuthErrorKind {
+  if (status === 400 && errorCode(body) === 'invalid_sms_code') {
+    return 'WrongCode';
   }
   return 'Unknown';
 }
