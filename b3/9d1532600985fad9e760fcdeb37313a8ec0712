@@ -1,0 +1,79 @@
+__tests__/codeFlow.test.tsx
+  s_8a5132ae1233f2::t_0bfed5085fb5e8 393-398
+__tests__/demoFlow.test.tsx
+  s_8a5132ae1233f2::t_f03315348b6db9 89,92,95,107-125
+__tests__/shellFlow.test.tsx
+  s_8a5132ae1233f2::t_9226a2654e9370 163,166-168
+__tests__/subscriptionsFlow.test.tsx
+  s_8a5132ae1233f2::t_7941566c9e3f35 1-653
+_bmad-output/implementation-artifacts/epic-3-context.md
+  s_8a5132ae1233f2::t_77ad64295e1618 7,11,20-30,34-43,47-53,55,59-60,62
+_bmad-output/implementation-artifacts/spec-3-2-subscriptions-grid.md
+  s_8a5132ae1233f2::t_6455fc751a1e1f 1-125
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_8a5132ae1233f2::t_2aa8aadecffea4 32,61-62
+docs/api-contract.md
+  s_8a5132ae1233f2::t_87491102336a34 33,375-379
+docs/focus-map.md
+  s_8a5132ae1233f2::t_9543a330357dd8 171-182
+docs/testing.md
+  s_8a5132ae1233f2::t_7456d0920c416f 675-690
+src/app/Shell.tsx
+  s_8a5132ae1233f2::t_d63be748cbb61a 13,35-36,68-74,232-241,277-278,289,307,319,347-356
+src/app/__tests__/phaseFlags.test.ts
+  s_8a5132ae1233f2::t_0c53c94ea5c9cc 3,7,11
+src/app/dev/demo.ts
+  s_8a5132ae1233f2::t_9a496de1fcd6db 17-18,77-99,128-129
+src/app/phaseFlags.ts
+  s_8a5132ae1233f2::t_5832cdb6a707c2 4-5,10
+src/features/subscriptions/SubscriptionsGrid.tsx
+  s_8a5132ae1233f2::t_f48c3979256a63 1-220
+src/features/subscriptions/SubscriptionsScreen.tsx
+  s_8a5132ae1233f2::t_b287149bb971a1 1-394
+src/features/subscriptions/index.ts
+  s_8a5132ae1233f2::t_2616dfa81ee1e8 1-7
+src/features/subscriptions/useSubscriptions.ts
+  s_8a5132ae1233f2::t_1fb687346930bb 1-71
+src/shared/api/dto/subscriptions.ts
+  s_8a5132ae1233f2::t_463acd921bde26 1-65
+src/shared/api/queryKeys.ts
+  s_8a5132ae1233f2::t_8ff22dcad3dbeb 10-11
+src/shared/entities/author/__tests__/authorRepository.test.ts
+  s_8a5132ae1233f2::t_0fc525eb021668 1-193
+src/shared/entities/author/authorRepository.ts
+  s_8a5132ae1233f2::t_9f2b9f6ec46e5a 1-47
+src/shared/entities/author/index.ts
+  s_8a5132ae1233f2::t_71a7776d3b9917 1-3
+src/shared/entities/author/mapAuthor.ts
+  s_8a5132ae1233f2::t_e32112709e312d 1-39
+src/shared/entities/author/types.ts
+  s_8a5132ae1233f2::t_1e4324b9cd2b0b 1-24
+src/shared/i18n/ru.ts
+  s_8a5132ae1233f2::t_7274d6f8ce1d9c 105-114,136-140
+src/shared/ui/AuthorCard.tsx
+  s_8a5132ae1233f2::t_6abcfbe73000f6 1-217
+src/shared/ui/__tests__/AuthorCard.test.tsx
+  s_8a5132ae1233f2::t_f9d5be68f376e0 1-207
+src/shared/ui/__tests__/surfaceRules.test.tsx
+  s_8a5132ae1233f2::t_434bb792a39d31 14,33-42
+src/shared/ui/index.ts
+  s_8a5132ae1233f2::t_0740472ec8aae6 30-39
+src/test/subscriptionFixtures.ts
+  s_8a5132ae1233f2::t_2dd8c80b999608 1-53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "b39d1532600985fad9e760fcdeb37313a8ec0712",
+  "prompts": {},
+  "sessions": {
+    "s_8a5132ae1233f2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7bd22f0c-fe48-4fca-bedc-1f4cab1db281",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
