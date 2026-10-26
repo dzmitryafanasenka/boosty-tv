@@ -390,7 +390,12 @@ describe('confirm and session creation', () => {
       root.container
         .queryAll(node => node.props.focusable === true)
         .map(node => node.props.testID),
-    ).toEqual(['nav/home', 'nav/settings', ...e5Posts().map(p => `home/feed/${p.id}`)]);
+    ).toEqual([
+      'nav/home',
+      'nav/subs',
+      'nav/settings',
+      ...e5Posts().map(p => `home/feed/${p.id}`),
+    ]);
 
     await back();
     expect(backHandler.exitApp).toHaveBeenCalled();

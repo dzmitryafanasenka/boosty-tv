@@ -27,3 +27,13 @@ export {
   postCardWidth,
   type PostCardProps,
 } from './PostCard';
+export {
+  AUTHOR_CARD_HEIGHT,
+  AuthorCard,
+  AuthorCardSkeleton,
+  AuthorCardView,
+  authorCardA11yLabel,
+  authorCardTitle,
+  authorCardWidth,
+  type AuthorCardProps,
+} from './AuthorCard';

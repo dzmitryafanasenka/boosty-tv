@@ -7,6 +7,8 @@
 export const queryKeys = {
   /** E5 «Новое в подписках» (Story 3.1), an infinite query. */
   subscriptionFeed: () => ['feed', 'subscriptions'] as const,
+  /** E2 the subscribed authors (Story 3.2), one request, no paging. */
+  subscriptions: () => ['subscriptions'] as const,
 } as const;
 
 /**

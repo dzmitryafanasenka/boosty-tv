@@ -86,19 +86,38 @@ test('fixture-backed Shell with the «ДЕМО» badge; SecureStore and the netw
   const focusable = root.container
     .queryAll(n => n.props.focusable === true)
     .map(n => n.props.testID as string);
-  expect(focusable.slice(0, 2)).toEqual(['nav/home', 'nav/settings']);
+  expect(focusable.slice(0, 3)).toEqual(['nav/home', 'nav/subs', 'nav/settings']);
   // Demo posts in order. (FlashList's Jest measurements report the list
   // end at once, so further demo pages may already be loaded.)
-  expect(focusable.slice(2, 11)).toEqual(
+  expect(focusable.slice(3, 12)).toEqual(
     Array.from({ length: 9 }, (_, i) => `home/feed/demo-post-${i}`),
   );
-  expect(focusable.slice(2).every(id => id.startsWith('home/feed/demo-post-'))).toBe(true);
+  expect(focusable.slice(3).every(id => id.startsWith('home/feed/demo-post-'))).toBe(true);
   // The demo's E1 is answered by FixtureTransport: no real request, no keychain.
   expect(fetchMock).not.toHaveBeenCalled();
   expect(keychain.getGenericPassword).not.toHaveBeenCalled();
   expect(keychain.setGenericPassword).not.toHaveBeenCalled();
   expect(keychain.resetGenericPassword).not.toHaveBeenCalled();
   expect(keychain.__values.get('boostytv.session')).toBe(STORED);
+  await act(async () => {
+    root.unmount();
+  });
+});
+
+test('Story 3.2: Подписки shows the demo authors (E2 answered by the demo transport)', async () => {
+  fetchMock.mockClear();
+  const root = await renderApp();
+  await press(root, 'nav/subs');
+  const tiles = root.container
+    .queryAll(n => n.props.focusable === true)
+    .map(n => n.props.testID as string)
+    .filter(id => id.startsWith('subs/tile/'));
+  expect(tiles.slice(0, 3)).toEqual([
+    'subs/tile/demo-blog-1',
+    'subs/tile/demo-blog-2',
+    'subs/tile/demo-blog-3',
+  ]);
+  expect(fetchMock).not.toHaveBeenCalled();
   await act(async () => {
     root.unmount();
   });
