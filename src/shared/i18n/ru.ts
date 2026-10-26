@@ -60,15 +60,55 @@ export const ru = {
       newCode: 'Выслать новый код',
       changeNumber: 'Изменить номер',
     },
-    // Temporary signed-in screen (Story 2.3; replaced by the Shell in 2.4).
-    // No personal data.
-    signedIn: {
-      title: 'Вход выполнен',
-      body: 'Главный экран появится в следующей версии приложения.',
-    },
     welcome: {
       /** A1 after the stored session was unreadable and wiped. */
       signInAgain: 'Войдите снова',
+    },
+  },
+  // The signed-in Shell (Story 2.4): wordmark and sidebar sections. Labels
+  // exist for every section; app/phaseFlags.ts decides which are rendered.
+  shell: {
+    wordmark: 'Boosty TV',
+    nav: {
+      home: 'Главная',
+      search: 'Поиск',
+      subs: 'Подписки',
+      events: 'События',
+      settings: 'Настройки',
+    },
+  },
+  home: {
+    // Until Epic 3 brings the feed (EXPERIENCE › Shell).
+    placeholder: {
+      title: 'Лента появится здесь',
+      body: 'Новые посты из ваших подписок будут на этом экране.',
+    },
+  },
+  settings: {
+    title: 'Настройки',
+    version: 'Версия',
+    /** Shown when the native versionName cannot be read. */
+    versionUnknown: 'неизвестна',
+  },
+  // Debug-only «Проверка фокуса» (Story 2.4, __DEV__ builds). Not product
+  // copy; the screens that use it are not in the release bundle.
+  dev: {
+    focusCheck: {
+      row: 'Проверка фокуса',
+      title: 'Проверка фокуса',
+      card: 'Карточка {n}',
+      openDialog: 'Открыть диалог',
+      refill: 'Вернуть 300 карточек',
+      empty: 'Карточек нет',
+      detailTitle: 'Карточка {n}',
+      detailBody: 'Назад вернёт фокус на эту карточку.',
+      deleteCard: 'Удалить эту карточку',
+      deleteAll: 'Удалить все карточки',
+      deleted: 'Удалено. Назад покажет запасной вариант фокуса.',
+      dialogTitle: 'Тестовый диалог',
+      dialogBody: 'Фокус не уходит за диалог. Назад закрывает его.',
+      dialogOk: 'Понятно',
+      dialogClose: 'Закрыть',
     },
   },
   error: {

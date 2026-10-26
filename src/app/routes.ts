@@ -10,6 +10,10 @@ export type RootStackParamList = {
   Phone: undefined;
   /** A5–A8 */
   Code: undefined;
-  /** Temporary signed-in screen (Story 2.3; the Shell replaces it in 2.4). */
-  SignedIn: undefined;
+  /** The signed-in Shell: sidebar + sections swapped in place (Story 2.4). */
+  Shell: undefined;
+  /** Debug builds only: «Проверка фокуса» (registered under `__DEV__`). */
+  DevFocus: undefined;
+  /** Debug builds only: the card detail pushed from «Проверка фокуса». */
+  DevFocusDetail: { id: string };
 };

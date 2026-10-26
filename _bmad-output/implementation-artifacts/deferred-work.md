@@ -106,3 +106,18 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-2-3-confirm-the-code-and-create-the-session.md`
   summary: Run the ADR 0006 corruption matrix with the production SecureStore and KeychainStorageResetModule on the device (debug build, run-as: corrupt RN_KEYCHAIN.preferences_pb → read → save → read; ciphertext corruption).
   evidence: maybe-false (would be medium). The production helper adds the delete-result check and `.tmp` removal, so the Story 1.3 gate does not cover it. Corrupting the file also deletes the spike session in the same DataStore file, so run it when the owner agrees (after the live sign-in, the production session would be lost too and need another sign-in).
+- source_spec: `_bmad-output/implementation-artifacts/spec-2-4-the-app-shell-sidebar-back-and-focus.md`
+  summary: The `AppInfo` native module name and `versionName` key are checked only on the device; JS tests fake the module.
+  evidence: Renaming `NAME`/`VERSION_NAME` in `AppInfoModule.kt` or dropping it from `BoostyNativePackage` keeps CI green and shows «неизвестна». Keep the device row in the regression checklist until native tests exist.
+- source_spec: `_bmad-output/implementation-artifacts/spec-2-4-the-app-shell-sidebar-back-and-focus.md`
+  summary: `focusRestoration.forget` is never called and sign-out must call `focusRestoration.clear()` (Story 2.7, account isolation).
+  evidence: Entries under removed route keys stay in memory for the app's lifetime; in-memory only, no persistence.
+- source_spec: `_bmad-output/implementation-artifacts/spec-2-4-the-app-shell-sidebar-back-and-focus.md`
+  summary: Modal host behavior when the initiator unmounts, when the stack is reset, or when a second dialog opens while one is open (medium, unverified).
+  evidence: Not reachable in 2.4. Settle when session-expiry/sign-out resets (Stories 2.5–2.7) or the first production dialog can run with a dialog open; add a fallback focus and close-on-reset.
+- source_spec: `_bmad-output/implementation-artifacts/spec-2-4-the-app-shell-sidebar-back-and-focus.md`
+  summary: Modal Back priority relies on its BackHandler listener being the newest (medium, unverified).
+  evidence: A screen that registers a Back listener while a dialog is open would handle Back under it. Settle with a documented contract in docs/focus-map.md (screens check `modal.isOpen()` first, or a central host handler) when the first production dialog lands.
+- source_spec: `_bmad-output/implementation-artifacts/spec-2-4-the-app-shell-sidebar-back-and-focus.md`
+  summary: The owner noticed slower remote response on the 300-card «Проверка фокуса» list (debug build, Metro over the network).
+  evidence: Observed with the physical remote on 2026-10-26, only on the debug build (dev-mode JS, no minification, dev checks); the release build has no 300-item list to compare. Measure D-pad latency on the first long production list (Epic 3 feed) in a release build on the pinned device before calling it acceptable.
