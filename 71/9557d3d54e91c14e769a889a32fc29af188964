@@ -1,0 +1,77 @@
+__tests__/accountScopeRegistry.test.js
+  s_476416fbc7fdcb::t_b1df5f0ff2bc5e 1-58
+__tests__/signOutFlow.test.tsx
+  s_476416fbc7fdcb::t_835a96dcea0510 1-433
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_476416fbc7fdcb::t_f9dc76646d4571 115,120,137,141
+_bmad-output/implementation-artifacts/spec-2-7-minimal-settings-and-sign-out.md
+  s_476416fbc7fdcb::t_d1664bf8e6e216 1-134
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_476416fbc7fdcb::t_1e6d07b4fb6b1c 32,55-56
+docs/feature-parity.md
+  s_476416fbc7fdcb::t_aaf19fb6f2342b 44
+docs/focus-map.md
+  s_476416fbc7fdcb::t_66a5b64ad56685 226,231-235
+docs/testing.md
+  s_476416fbc7fdcb::t_6618a38a2ce9a4 164-183
+src/app/App.tsx
+  s_476416fbc7fdcb::t_6d9f4f14e3af90 1-2,29-31,39,42,109,152-171,188-200,204,289-292,402
+src/app/Shell.tsx
+  s_476416fbc7fdcb::t_08b776c5ae9676 2-9,32-33,80,244,257,264,276
+src/app/bootstrap.ts
+  s_476416fbc7fdcb::t_6ef842290b8098 1-22
+src/app/session.ts
+  s_476416fbc7fdcb::t_0d50c85311ac52 1-33
+src/features/auth/authFlow.ts
+  s_476416fbc7fdcb::t_c571e6804c2261 1,53-55
+src/features/auth/index.ts
+  s_476416fbc7fdcb::t_85f3d38c201d66 5
+src/features/settings/SettingsScreen.tsx
+  s_476416fbc7fdcb::t_c8af001948eaae 1,6,10,21-26,48-51,54,63-73,89-96
+src/features/settings/SignOutDialog.tsx
+  s_476416fbc7fdcb::t_7acabfdfc0e5ef 1-98
+src/features/settings/index.ts
+  s_476416fbc7fdcb::t_4ec962aa877fc5 3,8-13
+src/shared/account/__tests__/accountScope.test.ts
+  s_476416fbc7fdcb::t_5e01020f48fc34 1-133
+src/shared/account/accountScope.ts
+  s_476416fbc7fdcb::t_1c52f830458758 1-112
+src/shared/account/defineAccountScoped.ts
+  s_476416fbc7fdcb::t_850f2a0bf920ad 1-24
+src/shared/account/index.ts
+  s_476416fbc7fdcb::t_e6b754b25ab3ec 1-8
+src/shared/api/__tests__/sessionManager.test.ts
+  s_476416fbc7fdcb::t_6cde2c40df8350 406-465
+src/shared/api/sessionManager.ts
+  s_476416fbc7fdcb::t_476d2f82d86cac 120-123
+src/shared/focus/focusRestoration.ts
+  s_476416fbc7fdcb::t_c66711dd43ec6b 1-2,107-111
+src/shared/focus/index.ts
+  s_476416fbc7fdcb::t_679a2a739b3fe3 5
+src/shared/i18n/ru.ts
+  s_476416fbc7fdcb::t_c70b3afd35a595 111-124
+src/shared/services/logger.ts
+  s_476416fbc7fdcb::t_7994c92cd82a89 1-2,153-159
+src/shared/ui/Dialog.tsx
+  s_476416fbc7fdcb::t_de2dd2c39dea70 1-106
+src/shared/ui/__tests__/Dialog.test.tsx
+  s_476416fbc7fdcb::t_4a0cfa9b551388 1-87
+src/shared/ui/index.ts
+  s_476416fbc7fdcb::t_3fd973c9b16902 17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "719557d3d54e91c14e769a889a32fc29af188964",
+  "prompts": {},
+  "sessions": {
+    "s_476416fbc7fdcb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "08ebeb55-8b1a-43e7-b7ba-11e4b9745838",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
