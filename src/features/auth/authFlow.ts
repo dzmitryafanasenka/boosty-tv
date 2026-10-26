@@ -1,3 +1,4 @@
+import { defineAccountScoped } from '../../shared/account';
 import { DEFAULT_COUNTRY_CODE } from './phone';
 
 /**
@@ -49,3 +50,6 @@ export const authFlow = {
     pending = null;
   },
 };
+
+/** The draft phone and the challenge belong to the account being signed in. */
+export const authFlowAccountStore = defineAccountScoped('authFlow', () => authFlow.reset());

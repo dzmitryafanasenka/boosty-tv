@@ -2,6 +2,7 @@ export {
   MAIN_SECTION,
   createFocusRestoration,
   focusRestoration,
+  focusRestorationAccountStore,
   resolveRestoreTarget,
   type FocusRestorationStore,
   type RestorationEntry,

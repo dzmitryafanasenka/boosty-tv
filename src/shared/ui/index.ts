@@ -14,3 +14,4 @@ export { TextField, type TextFieldHandle, type TextFieldProps } from './TextFiel
 export { NavItem, type NavItemProps } from './NavItem';
 export { SettingRow, type SettingRowKind, type SettingRowProps } from './SettingRow';
 export { StateView, type StateViewAction, type StateViewProps } from './StateView';
+export { Dialog, type DialogAction, type DialogProps } from './Dialog';

@@ -1,3 +1,5 @@
+// First: registers every account-scoped store before App renders (AD-4).
+import './bootstrap';
 import {
   NavigationContainer,
   DarkTheme,
@@ -24,12 +26,9 @@ import {
   PhoneScreen,
   WelcomeScreen,
 } from '../features/auth';
-import {
-  sessionManager,
-  type SessionManager,
-  type SignInResult,
-  type ValidateResult,
-} from '../shared/api';
+import { SignOutDialog } from '../features/settings';
+import { accountScope } from '../shared/account';
+import type { SignInResult, ValidateResult } from '../shared/api';
 import {
   ModalHostProvider,
   focusRestoration,
@@ -37,11 +36,10 @@ import {
   type ModalApi,
 } from '../shared/focus';
 import { t } from '../shared/i18n';
-import { Text, colors, components, spacing } from '../shared/ui';
-import { DEMO_MODE } from './appConfig';
-import type * as DemoModule from './dev/demo';
+import { Text, colors, components, spacing, type HostView } from '../shared/ui';
 import type * as DevFocusModule from './dev/devFocus';
 import type { RootStackParamList } from './routes';
+import { DEMO_ACTIVE, session } from './session';
 import { SessionUiContext, useSessionUi, type SessionUi } from './sessionUi';
 import { Shell } from './Shell';
 
@@ -53,18 +51,6 @@ import { Shell } from './Shell';
 const dev: typeof DevFocusModule | null = __DEV__
   ? require('./dev/devFocus')
   : null;
-
-/**
- * Debug-only demo mode (Story 2.5, `appConfig.DEMO_MODE`): folded away in
- * release bundles like `dev` above.
- */
-const demo: typeof DemoModule | null =
-  __DEV__ && DEMO_MODE ? require('./dev/demo') : null;
-
-/** The session the app runs on: the real one, or the demo's in-memory one. */
-const session: SessionManager = demo
-  ? demo.createDemoSessionManager()
-  : sessionManager;
 
 const Stack = createStackNavigator<RootStackParamList>();
 const navigationRef = createNavigationContainerRef<RootStackParamList>();
@@ -120,7 +106,7 @@ function Phone({
 /**
  * After a sign-in: a different account (or none before) drops the previous
  * account's FocusRestoration; the same account keeps it. Then the Shell on
- * Главная. Full AccountScope wipes are Stories 2.7–2.8.
+ * Главная. The account-switch wipe through AccountScope is Story 2.8.
  */
 function onSignedIn({ accountChanged }: SignInResult) {
   if (accountChanged) {
@@ -163,6 +149,26 @@ function openExpired() {
   navigationRef.reset({ index: 0, routes: [{ name: 'Expired' }] });
 }
 
+/**
+ * Story 2.7 «Выйти»: `AccountScope.reset()`, the only cleanup path (AD-4):
+ * the session (SecureStore, then memory) first, then every other
+ * account-scoped store. No network request. A rejection (a SecureStore
+ * clear failed) keeps everything and leaves the dialog open with its error
+ * line. On success the modal closes without a focus return (the Shell is
+ * going away) and the stack is replaced by `[Welcome]`, whose «Войти в
+ * Boosty» takes the initial focus; «Войдите снова» is not shown.
+ */
+async function signOut(modal: ModalApi): Promise<void> {
+  await accountScope.reset();
+  modal.close({ restoreFocus: false });
+  if (navigationRef.isReady()) {
+    navigationRef.reset({
+      index: 0,
+      routes: [{ name: 'Welcome', params: { signInAgain: false } }],
+    });
+  }
+}
+
 /** Hands the modal host API to App, which sits outside the provider. */
 function ModalBridge({ apiRef }: { apiRef: RefObject<ModalApi | null> }) {
   const modal = useModal();
@@ -179,9 +185,23 @@ function ShellRoute({
   navigation,
 }: StackScreenProps<RootStackParamList, 'Shell'>) {
   const ui = useSessionUi();
+  const modal = useModal();
+  const onOpenSignOut = useCallback(
+    (initiator: RefObject<HostView | null>) => {
+      modal.open(
+        <SignOutDialog
+          onCancel={() => modal.close()}
+          onConfirm={() => signOut(modal)}
+        />,
+        initiator,
+      );
+    },
+    [modal],
+  );
   return (
     <Shell
       routeKey={SHELL_RESTORATION_KEY}
+      onOpenSignOut={onOpenSignOut}
       onOpenFocusCheck={
         __DEV__ ? () => navigation.navigate('DevFocus') : undefined
       }
@@ -266,6 +286,10 @@ function App() {
       );
     });
     const unsubscribe = session.subscribe(status => {
+      if (status === 'signedOut') {
+        // Sign-out (Story 2.7): nothing of the old session stays on screen.
+        setHomeOffline(false);
+      }
       if (status === 'expired') {
         // The modal host first (AD-13), then the stack. The screen behind the
         // modal is going away: no focus return to its initiator.
@@ -375,7 +399,7 @@ function App() {
       ) : (
         <View testID="app/splash" style={styles.root} />
       )}
-      {demo ? <DemoBadge /> : null}
+      {DEMO_ACTIVE ? <DemoBadge /> : null}
     </GestureHandlerRootView>
   );
 }
