@@ -12,6 +12,8 @@ export type SessionUi = {
   onRetry: () => void;
   /** Debug builds only: the one live refresh check (Настройки row). */
   onCheckSession?: () => void;
+  /** Debug builds only (Story 2.6): `expired` in memory only (Настройки row). */
+  onExpireSession?: () => void;
 };
 
 export const SessionUiContext = createContext<SessionUi>({

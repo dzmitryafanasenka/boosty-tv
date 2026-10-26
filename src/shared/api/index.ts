@@ -22,6 +22,7 @@ export {
   type SessionManagerDeps,
   type SessionStatus,
   type SignInArgs,
+  type SignInResult,
   type ValidateResult,
 } from './sessionManager';
 export type { Transport } from './transport';

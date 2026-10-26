@@ -277,3 +277,143 @@ describe('restore', () => {
     await expect(manager.restore()).resolves.toEqual({ status: 'signedOut', reason: 'unavailable' });
   });
 });
+
+describe('expiry marker, re-login and the phone accessor (Story 2.6)', () => {
+  const marker = (accountId: string) => JSON.stringify({ v: 1, expired: true, accountId });
+  const session = JSON.stringify({ v: 1, accessToken: ACCESS, refreshToken: REFRESH, expiresAt: NOW + 3600_000, accountId: '1001' });
+
+  test('restore: the marker → expired (reason expired); no token in memory, nothing sent', async () => {
+    const { manager, sessionStore, http } = setup();
+    sessionStore.value = marker('1001');
+    await expect(manager.restore()).resolves.toEqual({ status: 'expired', reason: 'expired' });
+    expect(manager.getStatus()).toBe('expired');
+    await expect(manager.validate()).resolves.toEqual({ kind: 'skipped' });
+    expect(http.calls).toHaveLength(0);
+    expect(sessionStore.clear).not.toHaveBeenCalled();
+  });
+
+  test('restore: a kept phone without a session (e.g. a sign-in killed between the two writes) → signedOut (none)', async () => {
+    const { manager, phoneStore } = setup();
+    phoneStore.value = PHONE;
+    await expect(manager.restore()).resolves.toEqual({ status: 'signedOut', reason: 'none' });
+    expect(manager.getStatus()).toBe('signedOut');
+    await expect(manager.getExpiredPhone()).resolves.toBeNull();
+  });
+
+  test.each([
+    ['marker without accountId', JSON.stringify({ v: 1, expired: true })],
+    ['marker with expired:false', JSON.stringify({ v: 1, expired: false, accountId: '1001' })],
+    ['marker of another version', JSON.stringify({ v: 2, expired: true, accountId: '1001' })],
+  ])('an invalid marker (%s) → wiped, as any unreadable value', async (_name, value) => {
+    const { manager, sessionStore } = setup();
+    sessionStore.value = value;
+    await expect(manager.restore()).resolves.toEqual({ status: 'signedOut', reason: 'wiped' });
+  });
+
+  test('getExpiredPhone: the stored phone only while expired', async () => {
+    const { manager, sessionStore, phoneStore } = setup();
+    phoneStore.value = PHONE;
+    // signedOut (nothing restored yet)
+    await expect(manager.getExpiredPhone()).resolves.toBeNull();
+    sessionStore.value = session;
+    await manager.restore();
+    expect(manager.getStatus()).toBe('signedIn');
+    await expect(manager.getExpiredPhone()).resolves.toBeNull();
+    sessionStore.value = marker('1001');
+    await manager.restore();
+    await expect(manager.getExpiredPhone()).resolves.toBe(PHONE);
+  });
+
+  test('getExpiredPhone: no phone or a failing store → null, never rejects', async () => {
+    const { manager, sessionStore, phoneStore } = setup();
+    sessionStore.value = marker('1001');
+    await manager.restore();
+    await expect(manager.getExpiredPhone()).resolves.toBeNull();
+    phoneStore.value = PHONE;
+    phoneStore.read.mockRejectedValueOnce(new Error('keychain'));
+    await expect(manager.getExpiredPhone()).resolves.toBeNull();
+    phoneStore.read.mockResolvedValueOnce({ kind: 'unavailable' });
+    await expect(manager.getExpiredPhone()).resolves.toBeNull();
+  });
+
+  test('re-login with the same account id (marker) → accountChanged false; the marker is overwritten; the phone stays', async () => {
+    const { manager, sessionStore, phoneStore } = setup();
+    sessionStore.value = marker('1001');
+    phoneStore.value = PHONE;
+    await manager.restore();
+    await expect(manager.signIn(ARGS)).resolves.toEqual({ accountChanged: false });
+    expect(JSON.parse(sessionStore.value ?? '')).toMatchObject({ v: 1, accessToken: ACCESS, accountId: '1001' });
+    expect(JSON.parse(sessionStore.value ?? '')).not.toHaveProperty('expired');
+    expect(phoneStore.value).toBe(PHONE);
+    expect(manager.getStatus()).toBe('signedIn');
+    // Signed in again: the phone is no longer readable.
+    await expect(manager.getExpiredPhone()).resolves.toBeNull();
+  });
+
+  test('re-login with another account id → accountChanged true', async () => {
+    const { manager, sessionStore } = setup();
+    sessionStore.value = marker('2002');
+    await manager.restore();
+    await expect(manager.signIn(ARGS)).resolves.toEqual({ accountChanged: true });
+  });
+
+  test('no previous account id (nothing stored, or only a kept phone) → accountChanged true', async () => {
+    const first = setup();
+    await first.manager.restore();
+    await expect(first.manager.signIn(ARGS)).resolves.toEqual({ accountChanged: true });
+    const legacy = setup();
+    legacy.phoneStore.value = PHONE;
+    await legacy.manager.restore();
+    await expect(legacy.manager.signIn(ARGS)).resolves.toEqual({ accountChanged: true });
+  });
+
+  test('a second sign-in in the same run compares with the in-memory session', async () => {
+    const { manager } = setup();
+    await manager.signIn(ARGS);
+    await expect(manager.signIn({ ...ARGS, smsCode: '111111' })).resolves.toEqual({ accountChanged: false });
+  });
+
+  test('debugExpireInMemory: expired, the previous id kept, SecureStore untouched, nothing sent', async () => {
+    const { manager, sessionStore, phoneStore, http, logger } = setup();
+    sessionStore.value = session;
+    phoneStore.value = PHONE;
+    await manager.restore();
+    const statuses: string[] = [];
+    manager.subscribe(s => statuses.push(s));
+    manager.debugExpireInMemory?.();
+    expect(statuses).toEqual(['expired']);
+    expect(manager.getStatus()).toBe('expired');
+    expect(sessionStore.write).not.toHaveBeenCalled();
+    expect(sessionStore.clear).not.toHaveBeenCalled();
+    expect(sessionStore.value).toBe(session);
+    expect(http.calls).toHaveLength(0);
+    await expect(manager.getExpiredPhone()).resolves.toBe(PHONE);
+    await expect(manager.signIn(ARGS)).resolves.toEqual({ accountChanged: false });
+    // A restart reads the stored session again.
+    sessionStore.value = session;
+    await expect(manager.restore()).resolves.toEqual({ status: 'signedIn' });
+    expect(JSON.stringify(logger.entries())).toContain('debug: expired in memory');
+  });
+
+  test('sign-out forgets the previous account id', async () => {
+    const { manager, sessionStore } = setup();
+    sessionStore.value = marker('1001');
+    await manager.restore();
+    await manager.signOut();
+    await expect(manager.signIn(ARGS)).resolves.toEqual({ accountChanged: true });
+  });
+
+  test('logs never contain the phone or the account id', async () => {
+    const { manager, sessionStore, phoneStore, logger } = setup();
+    sessionStore.value = marker('1001');
+    phoneStore.value = PHONE;
+    await manager.restore();
+    await manager.getExpiredPhone();
+    await manager.signIn(ARGS);
+    manager.debugExpireInMemory?.();
+    const dump = JSON.stringify(logger.entries());
+    for (const secret of [PHONE, '1001', ACCESS, REFRESH, CHALLENGE, SMS_CODE]) {
+      expect(dump).not.toContain(secret);
+    }
+  });
+});

@@ -6,6 +6,7 @@ import {
   isAuthError,
   sessionManager,
   type AuthErrorKind,
+  type SignInResult,
 } from '../../shared/api';
 import { Screen } from '../../shared/focus';
 import { t, tf } from '../../shared/i18n';
@@ -37,9 +38,10 @@ export type CodeScreenProps = {
   /**
    * The session is saved: replace the stack with the signed-in screen.
    * Also called when the sign-in finishes after A5 was left (the session
-   * exists either way).
+   * exists either way). `accountChanged`: the E1 id differs from the
+   * previous account (Story 2.6), so the previous account's UI state goes.
    */
-  onSignedIn: () => void;
+  onSignedIn: (result: SignInResult) => void;
 };
 
 /** A5–A7 (form) or A8 (expired). */
@@ -188,13 +190,13 @@ export function CodeScreen({ onChangeNumber, onSignedIn }: CodeScreenProps) {
     setBusy('submit');
     setError(null);
     try {
-      await sessionManager.signIn({
+      const result = await sessionManager.signIn({
         phone: challenge.phone,
         challenge: challenge.challenge,
         smsCode,
       });
       authFlow.clearChallenge();
-      onSignedIn();
+      onSignedIn(result);
     } catch (failure) {
       if (!mounted.current) {
         return;

@@ -1,4 +1,11 @@
-import { DEFAULT_COUNTRY_CODE, maskPhone, normalizeCountryCodeInput, toE164 } from '../phone';
+import {
+  CALLING_CODES,
+  DEFAULT_COUNTRY_CODE,
+  maskPhone,
+  normalizeCountryCodeInput,
+  splitE164,
+  toE164,
+} from '../phone';
 
 describe('toE164', () => {
   it.each([
@@ -71,5 +78,43 @@ describe('maskPhone (A5 hint)', () => {
     ['empty country code', '+375291234567', '+'],
   ])('%s → empty', (_name, phone, cc) => {
     expect(maskPhone(phone, cc)).toBe('');
+  });
+});
+
+describe('splitE164 (A11 → A2 prefill)', () => {
+  it.each([
+    ['+375 (Belarus)', '+375291234567', '+375', '291234567'],
+    ['+7 (Russia)', '+79162451807', '+7', '9162451807'],
+    ['+1 (NANP)', '+12025550123', '+1', '2025550123'],
+    ['+44 (2 digits)', '+447911123456', '+44', '7911123456'],
+    ['+380 (3 digits starting like nothing shorter)', '+380501234567', '+380', '501234567'],
+    ['+49 shortest valid', '+49123456', '+49', '123456'],
+  ])('%s', (_name, phone, countryCode, number) => {
+    expect(splitE164(phone)).toEqual({ countryCode, number });
+    // The fields build the same phone again.
+    expect(toE164(countryCode, number)).toBe(phone);
+  });
+
+  it.each([
+    ['an unassigned code (+259)', '+259123456789'],
+    ['an unassigned code (+384)', '+384123456789'],
+    ['an unassigned code (+0…)', '+0123456789'],
+    ['not E.164: no +', '375291234567'],
+    ['not E.164: too short', '+3752912'],
+    ['not E.164: too long', '+3752912345678901'],
+    ['not E.164: letters', '+375abc234567'],
+    ['empty', ''],
+    ['+7 with the domestic trunk prefix (fails toE164)', '+789162451807'],
+  ])('null: %s', (_name, phone) => {
+    expect(splitE164(phone)).toBeNull();
+  });
+
+  it('the calling code list is prefix-free and has 1–3 digit codes only', () => {
+    const codes = [...CALLING_CODES];
+    expect(codes.filter(code => !/^[1-9]\d{0,2}$/.test(code))).toEqual([]);
+    const clashes = codes.flatMap(code =>
+      codes.filter(other => other !== code && other.startsWith(code)).map(other => `${code}<${other}`),
+    );
+    expect(clashes).toEqual([]);
   });
 });

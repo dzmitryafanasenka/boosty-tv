@@ -16,12 +16,18 @@ import {
 import { enabledSections, type SectionId } from './phaseFlags';
 
 export type ShellProps = {
-  /** The stack route key: FocusRestoration memory is per route + section. */
+  /**
+   * The FocusRestoration key: memory is per key + section. The app passes a
+   * constant, not `route.key`, because a stack reset (A11 → re-login) gives
+   * the Shell route a new key while the same account keeps its memory.
+   */
   routeKey: string;
   /** Debug builds only: open «Проверка фокуса» from Настройки. */
   onOpenFocusCheck?: () => void;
   /** Debug builds only: the live refresh check row in Настройки. */
   onCheckSession?: () => void;
+  /** Debug builds only: the in-memory A11 trigger row in Настройки. */
+  onExpireSession?: () => void;
   /** Главная's offline StateView (Story 2.5); absent: the placeholder. */
   homeOffline?: HomeScreenProps['offline'];
 };
@@ -60,7 +66,13 @@ type View_ = { section: SectionId; focusContent: boolean };
  * - When the Shell is the focused route again (pop), focus is restored
  *   explicitly: the remembered content element, or the current item.
  */
-export function Shell({ routeKey, onOpenFocusCheck, onCheckSession, homeOffline }: ShellProps) {
+export function Shell({
+  routeKey,
+  onOpenFocusCheck,
+  onCheckSession,
+  onExpireSession,
+  homeOffline,
+}: ShellProps) {
   const sections = useMemo(() => enabledSections(), []);
   const [view, setView] = useState<View_>({ section: HOME, focusContent: false });
   const sectionRef = useRef(view.section);
@@ -221,6 +233,7 @@ export function Shell({ routeKey, onOpenFocusCheck, onCheckSession, homeOffline 
           section={view.section}
           onOpenFocusCheck={onOpenFocusCheck}
           onCheckSession={onCheckSession}
+          onExpireSession={onExpireSession}
           homeOffline={homeOffline}
         />
       </FocusZone>
@@ -232,11 +245,13 @@ function SectionContent({
   section,
   onOpenFocusCheck,
   onCheckSession,
+  onExpireSession,
   homeOffline,
 }: {
   section: SectionId;
   onOpenFocusCheck?: () => void;
   onCheckSession?: () => void;
+  onExpireSession?: () => void;
   homeOffline?: HomeScreenProps['offline'];
 }) {
   switch (section) {
@@ -247,6 +262,7 @@ function SectionContent({
         <SettingsScreen
           onOpenFocusCheck={onOpenFocusCheck}
           onCheckSession={onCheckSession}
+          onExpireSession={onExpireSession}
         />
       );
     // Phase-gated off in Epic 2 (phaseFlags): never rendered.

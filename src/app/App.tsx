@@ -8,16 +8,34 @@ import {
   createStackNavigator,
   type StackScreenProps,
 } from '@react-navigation/stack';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from 'react';
 import { AppState, StatusBar, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { CodeScreen, PhoneScreen, WelcomeScreen } from '../features/auth';
+import {
+  CodeScreen,
+  ExpiredScreen,
+  PhoneScreen,
+  WelcomeScreen,
+} from '../features/auth';
 import {
   sessionManager,
   type SessionManager,
+  type SignInResult,
   type ValidateResult,
 } from '../shared/api';
-import { ModalHostProvider } from '../shared/focus';
+import {
+  ModalHostProvider,
+  focusRestoration,
+  useModal,
+  type ModalApi,
+} from '../shared/focus';
 import { t } from '../shared/i18n';
 import { Text, colors, components, spacing } from '../shared/ui';
 import { DEMO_MODE } from './appConfig';
@@ -58,7 +76,14 @@ const theme: Theme = {
 };
 
 /** The first route, decided by `sessionManager.restore()`. */
-type Boot = { initial: 'Welcome' | 'Shell'; signInAgain: boolean };
+type Boot = { initial: 'Welcome' | 'Shell' | 'Expired'; signInAgain: boolean };
+
+/**
+ * The Shell's FocusRestoration key (Story 2.6). A constant, not `route.key`:
+ * the reset after a re-login gives the Shell route a new key, and the same
+ * account keeps its memory.
+ */
+export const SHELL_RESTORATION_KEY = 'shell';
 
 /** Replace the whole stack with the Shell (Back on Главная then exits). */
 function openShell() {
@@ -79,46 +104,89 @@ function Welcome({
   );
 }
 
-function Phone({ navigation }: StackScreenProps<RootStackParamList, 'Phone'>) {
+function Phone({
+  navigation,
+  route,
+}: StackScreenProps<RootStackParamList, 'Phone'>) {
   return (
     <PhoneScreen
       onCodeSent={() => navigation.navigate('Code')}
       onExit={() => navigation.goBack()}
+      fromExpired={route.params?.fromExpired === true}
     />
   );
+}
+
+/**
+ * After a sign-in: a different account (or none before) drops the previous
+ * account's FocusRestoration; the same account keeps it. Then the Shell on
+ * Главная. Full AccountScope wipes are Stories 2.7–2.8.
+ */
+function onSignedIn({ accountChanged }: SignInResult) {
+  if (accountChanged) {
+    focusRestoration.clear();
+  }
+  openShell();
 }
 
 function Code({ navigation }: StackScreenProps<RootStackParamList, 'Code'>) {
   return (
     <CodeScreen
       onChangeNumber={() => navigation.goBack()}
-      onSignedIn={openShell}
+      onSignedIn={onSignedIn}
     />
   );
 }
 
-/** Story 2.5 (owner decision): `expired` → A1 «Войдите снова» until A11 (Story 2.6). */
-function openSignInAgain() {
-  if (navigationRef.isReady()) {
-    navigationRef.reset({
-      index: 0,
-      routes: [{ name: 'Welcome', params: { signInAgain: true } }],
-    });
+function Expired({ navigation }: StackScreenProps<RootStackParamList, 'Expired'>) {
+  const loadPhone = useCallback(() => session.getExpiredPhone(), []);
+  const onRelogin = useCallback(
+    () => navigation.navigate('Phone', { fromExpired: true }),
+    [navigation],
+  );
+  return <ExpiredScreen loadPhone={loadPhone} onRelogin={onRelogin} />;
+}
+
+/**
+ * Story 2.6: replace the whole stack with A11. Not ready yet: nothing
+ * happens, and `onNavigationReady` resets once the navigator is mounted.
+ * Already `[Expired]`: nothing happens (no remount).
+ */
+function openExpired() {
+  if (!navigationRef.isReady()) {
+    return;
   }
+  const state = navigationRef.getRootState();
+  if (state?.routes.length === 1 && state.routes[0].name === 'Expired') {
+    return;
+  }
+  navigationRef.reset({ index: 0, routes: [{ name: 'Expired' }] });
+}
+
+/** Hands the modal host API to App, which sits outside the provider. */
+function ModalBridge({ apiRef }: { apiRef: RefObject<ModalApi | null> }) {
+  const modal = useModal();
+  useEffect(() => {
+    apiRef.current = modal;
+    return () => {
+      apiRef.current = null;
+    };
+  }, [modal, apiRef]);
+  return null;
 }
 
 function ShellRoute({
   navigation,
-  route,
 }: StackScreenProps<RootStackParamList, 'Shell'>) {
   const ui = useSessionUi();
   return (
     <Shell
-      routeKey={route.key}
+      routeKey={SHELL_RESTORATION_KEY}
       onOpenFocusCheck={
         __DEV__ ? () => navigation.navigate('DevFocus') : undefined
       }
       onCheckSession={__DEV__ ? ui.onCheckSession : undefined}
+      onExpireSession={__DEV__ ? ui.onExpireSession : undefined}
       homeOffline={
         ui.homeOffline
           ? { retrying: ui.retrying, onRetry: ui.onRetry }
@@ -155,8 +223,14 @@ function DemoBadge() {
  * the background (single-flight, never moves focus) at cold start and on
  * every return to the foreground. A cold-start E1 that ends in `Network`
  * shows Главная's offline StateView; «Повторить» runs E1 again. Resume
- * failures change nothing visible. `expired` (refresh 400 `invalid_grant`)
- * resets the stack to A1 «Войдите снова» from any screen.
+ * failures change nothing visible.
+ *
+ * Story 2.6: `expired` (refresh 400 `invalid_grant`, or the debug trigger)
+ * closes an open modal, clears Главная's offline view and resets the stack
+ * to `[Expired]` (A11) from any screen; before the navigator is ready, the
+ * reset happens in `onNavigationReady`. A cold start after an expiry
+ * (`restore()` reason `expired`) boots into A11; a wiped store keeps A1
+ * «Войдите снова».
  *
  * The JS stack (ADR 0007): `detachInactiveScreens={false}` renders plain
  * Views, never react-native-screens; no header, no gestures (remote only).
@@ -168,6 +242,7 @@ function App() {
   const [homeOffline, setHomeOffline] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const alive = useRef(true);
+  const modalApi = useRef<ModalApi | null>(null);
 
   /** Cold start and «Повторить»: only `Network` keeps the offline view. */
   const applyColdResult = useCallback((result: ValidateResult) => {
@@ -185,17 +260,18 @@ function App() {
       setBoot(
         result.status === 'signedIn'
           ? { initial: 'Shell', signInAgain: false }
-          : {
-              initial: 'Welcome',
-              signInAgain:
-                result.reason === 'wiped' || result.reason === 'expired',
-            },
+          : result.status === 'expired'
+            ? { initial: 'Expired', signInAgain: false }
+            : { initial: 'Welcome', signInAgain: result.reason === 'wiped' },
       );
     });
     const unsubscribe = session.subscribe(status => {
       if (status === 'expired') {
+        // The modal host first (AD-13), then the stack. The screen behind the
+        // modal is going away: no focus return to its initiator.
+        modalApi.current?.close({ restoreFocus: false });
         setHomeOffline(false);
-        openSignInAgain();
+        openExpired();
       }
     });
     const appState = AppState.addEventListener('change', state => {
@@ -219,7 +295,7 @@ function App() {
    */
   const onNavigationReady = useCallback(() => {
     if (session.getStatus() === 'expired') {
-      openSignInAgain();
+      openExpired();
     } else if (session.getStatus() === 'signedIn') {
       session.validate().then(applyColdResult);
     }
@@ -245,6 +321,11 @@ function App() {
             session.debugCorruptAccessToken?.();
           }
         : undefined,
+      onExpireSession: __DEV__
+        ? () => {
+            session.debugExpireInMemory?.();
+          }
+        : undefined,
     }),
     [homeOffline, retrying, onRetry],
   );
@@ -255,6 +336,7 @@ function App() {
       {boot ? (
         <SessionUiContext.Provider value={ui}>
           <ModalHostProvider>
+            <ModalBridge apiRef={modalApi} />
             <NavigationContainer
               ref={navigationRef}
               theme={theme}
@@ -273,6 +355,7 @@ function App() {
                 <Stack.Screen name="Phone" component={Phone} />
                 <Stack.Screen name="Code" component={Code} />
                 <Stack.Screen name="Shell" component={ShellRoute} />
+                <Stack.Screen name="Expired" component={Expired} />
                 {__DEV__ && dev ? (
                   <>
                     <Stack.Screen

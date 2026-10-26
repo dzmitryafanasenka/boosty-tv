@@ -1,8 +1,9 @@
 /**
  * Story 2.4: the debug-only «Проверка фокуса» routes must not be in the
  * release bundle; Story 2.5: neither the live refresh trigger nor the demo
- * mode (FixtureTransport). Builds the Metro bundle with `--dev false` (and, as a
- * control that the grep can see them, `--dev true`) and searches it for the
+ * mode (FixtureTransport); Story 2.6: nor the in-memory A11 trigger.
+ * Builds the Metro bundle with `--dev false` (and, as a control that the
+ * grep can see them, `--dev true`) and searches it for the
  * dev route names and focus ids. Plain JS; runs the local react-native CLI.
  */
 const { execFileSync } = require('node:child_process');
@@ -23,6 +24,9 @@ const DEV_MARKERS = [
   'createDemoSessionManager',
   'demo-access-token',
   'createFixtureTransport',
+  // Story 2.6: the debug-only in-memory A11 trigger.
+  'settings/row/expired-check',
+  'debug: expired in memory',
 ];
 
 jest.setTimeout(240_000);
@@ -72,4 +76,6 @@ test('control: the debug bundle contains the dev routes', () => {
   expect(debug).toContain('dev/list/');
   expect(debug).toContain('settings/row/session-check');
   expect(debug).toContain('access token corrupted');
+  expect(debug).toContain('settings/row/expired-check');
+  expect(debug).toContain('debug: expired in memory');
 });
