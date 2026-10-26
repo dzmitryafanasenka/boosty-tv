@@ -1,0 +1,19 @@
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_8a5132ae1233f2::t_fd413ca2d3a595 166
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "13fb66570b0ed772cea3555b2ffdc7ee12ee6f7c",
+  "prompts": {},
+  "sessions": {
+    "s_8a5132ae1233f2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7bd22f0c-fe48-4fca-bedc-1f4cab1db281",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
