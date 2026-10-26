@@ -121,3 +121,9 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-2-4-the-app-shell-sidebar-back-and-focus.md`
   summary: The owner noticed slower remote response on the 300-card «Проверка фокуса» list (debug build, Metro over the network).
   evidence: Observed with the physical remote on 2026-10-26, only on the debug build (dev-mode JS, no minification, dev checks); the release build has no 300-item list to compare. Measure D-pad latency on the first long production list (Epic 3 feed) in a release build on the pinned device before calling it acceptable.
+- source_spec: `_bmad-output/implementation-artifacts/spec-2-5-stay-signed-in-across-restarts-and-expiry.md`
+  summary: Demo mode swaps only App's local SessionManager; the module-level `httpClient` export still targets the real network, so Epic 3 repositories must obtain the client from the active session (provider/context) instead of importing the singleton.
+  evidence: `src/shared/api/sessionManager.ts` exports `httpClient = sessionManager.http`; `src/app/App.tsx` picks `demo.createDemoSessionManager()` locally.
+- source_spec: `_bmad-output/implementation-artifacts/spec-2-5-stay-signed-in-across-restarts-and-expiry.md`
+  summary: Add a flow test that an `expired` transition after an offline cold start clears `homeOffline`, so the Shell after re-login shows the placeholder (fold into Story 2.6 with A11).
+  evidence: `src/app/App.tsx` `setHomeOffline(false)` on `expired` has no covering test (verification-gap review).

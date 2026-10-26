@@ -1,13 +1,17 @@
 import { getDeviceId } from '../platform/deviceId';
 import { logger as appLogger, type Logger } from '../services/logger';
-import { AuthError, mapConfirmFailure, mapSendCodeFailure } from './authError';
+import { errorCode, kindForStatus, type AppErrorKind } from './appError';
+import { AuthError, isAuthError, mapConfirmFailure, mapSendCodeFailure } from './authError';
 import { sendCodeResponseSchema } from './dto/phoneCode';
-import { tokensResponseSchema } from './dto/tokens';
+import { refreshTokensResponseSchema, tokensResponseSchema } from './dto/tokens';
 import { API_ORIGIN, authProfileHeaders, encodeForm } from './profiles';
+import { fetchTransport, parseJson, type Transport } from './transport';
 
 /**
- * `AuthApiClient` (ADR 0008 `auth` profile): phone-auth requests.
- * Send (Story 2.2), resend and confirm (Story 2.3); refresh is Story 2.5.
+ * `AuthApiClient` (ADR 0008 `auth` profile): phone-auth requests and the
+ * token refresh. Send (Story 2.2), resend and confirm (Story 2.3), refresh
+ * (Story 2.5, called only by SessionManager's refresh coordinator, which
+ * owns its single flight).
  *
  * - `credentials: 'omit'`: no cookie is sent or stored in the native jar.
  * - One 30 s timeout per request, covering the device id read and the
@@ -19,10 +23,13 @@ import { API_ORIGIN, authProfileHeaders, encodeForm } from './profiles';
  *   receive another call's result. Send and resend share one slot.
  * - Logs only the operation, the outcome and status; never the phone, the
  *   challenge, the code, the tokens, the device id or a body.
+ * - Refresh is never retried: refresh tokens are single-use (api-contract
+ *   §2.3), so a resend after a lost response would burn the session.
  */
 
 export const SEND_CODE_URL = `${API_ORIGIN}/auth/phone/verification_code/send`;
 export const CONFIRM_CODE_URL = `${API_ORIGIN}/auth/phone/verification_code/confirm`;
+export const REFRESH_URL = `${API_ORIGIN}/oauth/token/`;
 export const AUTH_REQUEST_TIMEOUT_MS = 30_000;
 
 export type SendCodeResult = {
@@ -33,16 +40,31 @@ export type SendCodeResult = {
   expiresIn?: number;
 };
 
-export type FetchLike = (
-  url: string,
-  init: {
-    method: string;
-    headers: Record<string, string>;
-    body?: string;
-    credentials: 'omit';
-    signal: AbortSignal;
-  },
-) => Promise<{ status: number; text(): Promise<string> }>;
+/** @deprecated The shared `Transport`; kept for existing tests. */
+export type FetchLike = Transport;
+
+/**
+ * The outcome of one refresh request. Only `rejected` (HTTP 400 with
+ * `error: "invalid_grant"`, `LIVE` Story 1.4) means the session is over;
+ * every `failed` keeps the tokens. `error_description` is never read.
+ */
+export type RefreshResult =
+  | {
+      kind: 'ok';
+      /** Secrets: handed to SessionManager only; never logged. */
+      accessToken: string;
+      /** Absent: the server did not rotate it (keep the old one). */
+      refreshToken?: string;
+      /** Seconds, already validated; absent: keep the previous expiry. */
+      expiresIn?: number;
+    }
+  | { kind: 'rejected' }
+  | {
+      kind: 'failed';
+      /** The kind the triggering request fails with. */
+      error: AppErrorKind;
+      status?: number;
+    };
 
 export type ConfirmCodeResult = {
   /** Secrets: handed to SessionManager only; never logged. */
@@ -66,30 +88,31 @@ export type AuthApiClient = {
     challenge: string,
     smsCode: string,
   ): Promise<ConfirmCodeResult>;
+  /**
+   * `POST /oauth/token/` with `grant_type=refresh_token`. Never rejects and
+   * is never retried.
+   */
+  refresh(refreshToken: string): Promise<RefreshResult>;
 };
 
 export type AuthApiClientDeps = {
-  fetch?: FetchLike;
+  transport?: Transport;
+  /** @deprecated Use `transport`. */
+  fetch?: Transport;
   getDeviceId?: () => Promise<string>;
   timeoutMs?: number;
   logger?: Logger;
 };
 
-function parseJson(text: string): unknown {
-  try {
-    return text.length > 0 ? JSON.parse(text) : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 export function createAuthApiClient({
-  fetch: fetchImpl = (url, init) => fetch(url, init),
+  transport,
+  fetch: legacyFetch,
   getDeviceId: deviceId = getDeviceId,
   timeoutMs = AUTH_REQUEST_TIMEOUT_MS,
   logger = appLogger,
 }: AuthApiClientDeps = {}): AuthApiClient {
-  type Op = 'sendCode' | 'resendCode' | 'confirmCode';
+  const fetchImpl: Transport = transport ?? legacyFetch ?? fetchTransport;
+  type Op = 'sendCode' | 'resendCode' | 'confirmCode' | 'refresh';
 
   const fail = (op: Op, kind: AuthError['kind'], status?: number): never => {
     logger.warn('auth', `${op} failed`, { kind, status });
@@ -197,6 +220,51 @@ export function createAuthApiClient({
     };
   }
 
+  async function refresh(refreshToken: string): Promise<RefreshResult> {
+    const op = 'refresh';
+    let response: { status: number; body: unknown };
+    try {
+      response = await request(op, 'POST', REFRESH_URL, id => [
+        ['grant_type', 'refresh_token'],
+        ['refresh_token', refreshToken],
+        ['device_id', id],
+        ['device_os', 'web'],
+      ]);
+    } catch (error) {
+      // `request` already logged it: Network (transport, timeout) or no device id.
+      const network = isAuthError(error) && error.kind === 'Network';
+      return { kind: 'failed', error: network ? 'Network' : 'Client' };
+    }
+    const { status, body } = response;
+    if (status === 400 && errorCode(body) === 'invalid_grant') {
+      logger.warn('auth', 'refresh rejected', { status });
+      return { kind: 'rejected' };
+    }
+    if (status < 200 || status > 299) {
+      const error = kindForStatus(status);
+      logger.warn('auth', 'refresh failed', { kind: error, status });
+      return { kind: 'failed', error, status };
+    }
+    const parsed = refreshTokensResponseSchema.safeParse(body);
+    if (!parsed.success) {
+      // The server may have spent the refresh token: keep state, no retry.
+      logger.warn('auth', 'refresh failed', { kind: 'Parse', status });
+      return { kind: 'failed', error: 'Parse', status };
+    }
+    const { access_token, refresh_token, expires_in } = parsed.data;
+    logger.info('auth', 'refresh ok', {
+      status,
+      rotated: refresh_token !== undefined,
+      expiresIn: expires_in !== undefined,
+    });
+    return {
+      kind: 'ok',
+      accessToken: access_token,
+      refreshToken: refresh_token,
+      expiresIn: expires_in,
+    };
+  }
+
   /** Same-arguments single-flight for one non-idempotent operation slot. */
   function singleFlight<T>(label: string) {
     let inFlight: { key: string; promise: Promise<T> } | null = null;
@@ -232,6 +300,7 @@ export function createAuthApiClient({
         confirm(phone, challenge, smsCode),
       );
     },
+    refresh,
   };
 }
 

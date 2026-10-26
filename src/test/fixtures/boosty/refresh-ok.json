@@ -1,0 +1,9 @@
+{
+  "case": "refresh-ok",
+  "status": 200,
+  "body": {
+    "access_token": "redacted",
+    "refresh_token": "redacted",
+    "expires_in": 2592000
+  }
+}

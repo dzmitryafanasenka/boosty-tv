@@ -110,8 +110,14 @@ beforeEach(() => {
   keychain.__reset();
   keychain.__values.set('boostytv.session', STORED);
   native.AppInfo = { versionName: '1.0' };
-  (globalThis as { fetch: unknown }).fetch = jest.fn(() =>
-    Promise.reject(new Error('no request expected')),
+  // Story 2.5: the background E1 after the boot succeeds; nothing else is sent.
+  (globalThis as { fetch: unknown }).fetch = jest.fn((url: string) =>
+    url === 'https://api.boosty.to/v1/user/current'
+      ? Promise.resolve({
+          status: 200,
+          text: () => Promise.resolve('{"id":1001}'),
+        })
+      : Promise.reject(new Error('no request expected')),
   );
 });
 

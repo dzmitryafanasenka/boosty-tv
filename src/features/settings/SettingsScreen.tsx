@@ -7,6 +7,11 @@ import { SettingRow, Text, spacing } from '../../shared/ui';
 /** Focus ids (docs/focus-map.md §1.5). */
 export const SETTINGS_VERSION_ID = 'settings/row/version';
 export const SETTINGS_FOCUS_CHECK_ID = 'settings/row/focus-check';
+/**
+ * Debug builds only. Folded to '' in release bundles (`__DEV__` is a Metro
+ * constant), so the id is not shipped (__tests__/releaseBundle.test.js).
+ */
+export const SETTINGS_SESSION_CHECK_ID = __DEV__ ? 'settings/row/session-check' : '';
 
 export type SettingsScreenProps = {
   /**
@@ -14,6 +19,12 @@ export type SettingsScreenProps = {
    * when this is given; the app passes it under `__DEV__`.
    */
   onOpenFocusCheck?: () => void;
+  /**
+   * Debug builds only (Story 2.5): the one live refresh check. Corrupts the
+   * in-memory access token, then E1 → 401 → refresh → retry. Rendered only
+   * when given; the app passes it under `__DEV__`.
+   */
+  onCheckSession?: () => void;
 };
 
 /**
@@ -21,9 +32,10 @@ export type SettingsScreenProps = {
  * (OK does nothing), the initial focus of the section. Sign-out arrives in
  * Story 2.7. Rendered inside the Shell's content FocusZone.
  */
-export function SettingsScreen({ onOpenFocusCheck }: SettingsScreenProps) {
+export function SettingsScreen({ onOpenFocusCheck, onCheckSession }: SettingsScreenProps) {
   const version = useZoneItem(SETTINGS_VERSION_ID);
   const focusCheck = useZoneItem(SETTINGS_FOCUS_CHECK_ID);
+  const sessionCheck = useZoneItem(SETTINGS_SESSION_CHECK_ID);
 
   return (
     <View testID="settings" style={styles.root}>
@@ -47,6 +59,16 @@ export function SettingsScreen({ onOpenFocusCheck }: SettingsScreenProps) {
             label={t('dev.focusCheck.row')}
             onPress={onOpenFocusCheck}
             onFocus={focusCheck.onFocus}
+          />
+        ) : null}
+        {__DEV__ && onCheckSession ? (
+          <SettingRow
+            ref={sessionCheck.ref}
+            testID={SETTINGS_SESSION_CHECK_ID}
+            kind="nav"
+            label={t('dev.sessionCheck.row')}
+            onPress={onCheckSession}
+            onFocus={sessionCheck.onFocus}
           />
         ) : null}
       </View>

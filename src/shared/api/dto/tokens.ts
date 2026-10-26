@@ -18,3 +18,29 @@ export const tokensResponseSchema = z.object({
 });
 
 export type TokensResponseDto = z.infer<typeof tokensResponseSchema>;
+
+/** True for an `expires_in` that may be adopted (finite, > 300 s, ≤ 10 years). */
+export function isAcceptableExpiresIn(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value > MIN_EXPIRES_IN_S &&
+    value <= MAX_EXPIRES_IN_S
+  );
+}
+
+/**
+ * 200 body of `POST /oauth/token/` (api-contract §2.3, `LIVE` Story 1.4):
+ * the confirm shape, read leniently. Only `access_token` is required. A
+ * missing or empty `refresh_token` keeps the old one; an `expires_in` that is
+ * not acceptable (`isAcceptableExpiresIn`) keeps the previous expiry. Both
+ * fall back to undefined instead of failing the refresh, because the refresh
+ * token was already spent by the server.
+ */
+export const refreshTokensResponseSchema = z.object({
+  access_token: z.string().min(1),
+  refresh_token: z.string().min(1).optional().catch(undefined),
+  expires_in: z.unknown().optional().transform(v => (isAcceptableExpiresIn(v) ? v : undefined)),
+});
+
+export type RefreshTokensResponseDto = z.infer<typeof refreshTokensResponseSchema>;

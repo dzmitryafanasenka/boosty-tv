@@ -2,6 +2,7 @@ import { createLogger } from '../../services/logger';
 import {
   CONFIRM_CODE_URL,
   createAuthApiClient,
+  REFRESH_URL,
   SEND_CODE_URL,
   type FetchLike,
 } from '../authApiClient';
@@ -413,6 +414,141 @@ describe('confirmCode', () => {
     await kindOf(wrong.client.confirmCode(PHONE, CHALLENGE, SMS_CODE));
     const dump = JSON.stringify([...ok.log.entries(), ...wrong.log.entries()]);
     for (const secret of [PHONE, '375291234567', CHALLENGE, SMS_CODE, ACCESS, REFRESH, DEVICE_ID]) {
+      expect(dump).not.toContain(secret);
+    }
+  });
+});
+
+describe('refresh (api-contract §2.3)', () => {
+  const OLD_REFRESH = 'r'.repeat(64);
+  const NEW_ACCESS = 'n'.repeat(64);
+  const NEW_REFRESH = 'm'.repeat(64);
+
+  test('POST /oauth/token/ with the §2.3 form, the auth profile and X-From-Id, no Authorization', async () => {
+    const { client, fetchMock } = setup(() =>
+      Promise.resolve(respond(200, { access_token: NEW_ACCESS, refresh_token: NEW_REFRESH, expires_in: 2592000 })),
+    );
+    await expect(client.refresh(OLD_REFRESH)).resolves.toEqual({
+      kind: 'ok',
+      accessToken: NEW_ACCESS,
+      refreshToken: NEW_REFRESH,
+      expiresIn: 2592000,
+    });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(REFRESH_URL);
+    expect(url).toBe('https://api.boosty.to/oauth/token/');
+    expect(init.method).toBe('POST');
+    expect(init.credentials).toBe('omit');
+    expect(init.body).toBe(
+      `grant_type=refresh_token&refresh_token=${OLD_REFRESH}&device_id=${DEVICE_ID}&device_os=web`,
+    );
+    expect(init.headers).toEqual({
+      'User-Agent': AUTH_USER_AGENT,
+      'X-App': 'web',
+      'X-Locale': 'ru_RU',
+      Referer: 'https://boosty.to/',
+      Origin: 'https://boosty.to',
+      Accept: 'application/json, text/plain, */*',
+      'X-From-Id': DEVICE_ID,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    });
+  });
+
+  test('only 400 invalid_grant is rejected; error_description is not read', async () => {
+    const { client } = setup(() =>
+      Promise.resolve(respond(400, { error: 'invalid_grant', error_description: 'anything' })),
+    );
+    await expect(client.refresh(OLD_REFRESH)).resolves.toEqual({ kind: 'rejected' });
+  });
+
+  test.each([
+    ['400 other error', 400, { error: 'invalid_request' }, 'Client'],
+    ['400 with only a matching description', 400, { error_description: 'invalid_grant' }, 'Client'],
+    ['401 invalid_grant', 401, { error: 'invalid_grant' }, 'Client'],
+    ['403', 403, {}, 'Client'],
+    ['429', 429, {}, 'RateLimited'],
+    ['500', 500, '<html>', 'Server'],
+    ['503', 503, {}, 'Server'],
+    ['200 without access_token', 200, { refresh_token: NEW_REFRESH }, 'Parse'],
+    ['200 not JSON', 200, '<html>', 'Parse'],
+  ])('%s → failed (%s), never rejected', async (_name, status, body, error) => {
+    const { client } = setup(() => Promise.resolve(respond(status as number, body)));
+    await expect(client.refresh(OLD_REFRESH)).resolves.toMatchObject({ kind: 'failed', error });
+  });
+
+  test('transport failure and timeout → failed Network, one request', async () => {
+    const { client, fetchMock } = setup(() => Promise.reject(new TypeError('Network request failed')));
+    await expect(client.refresh(OLD_REFRESH)).resolves.toEqual({ kind: 'failed', error: 'Network' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    jest.useFakeTimers();
+    try {
+      const hung = setup(
+        (_url, init) =>
+          new Promise((_resolve, reject) => {
+            init.signal.addEventListener('abort', () => reject(new Error('Aborted')));
+          }),
+      );
+      const result = hung.client.refresh(OLD_REFRESH);
+      // Let the device id resolve and the request start.
+      for (let i = 0; i < 5; i += 1) {
+        await Promise.resolve();
+      }
+      expect(hung.fetchMock).toHaveBeenCalledTimes(1);
+      jest.advanceTimersByTime(30_000);
+      await expect(result).resolves.toEqual({ kind: 'failed', error: 'Network' });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test.each([
+    ['missing', {}],
+    ['empty', { refresh_token: '' }],
+    ['not a string', { refresh_token: 5 }],
+  ])('refresh_token %s → undefined (keep the old one)', async (_name, extra) => {
+    const { client } = setup(() =>
+      Promise.resolve(respond(200, { access_token: NEW_ACCESS, expires_in: 2592000, ...extra })),
+    );
+    await expect(client.refresh(OLD_REFRESH)).resolves.toMatchObject({ kind: 'ok', refreshToken: undefined });
+  });
+
+  test.each([
+    ['300 (not above the window)', 300, undefined],
+    ['301', 301, 301],
+    ['0', 0, undefined],
+    ['negative', -5, undefined],
+    ['a string', '2592000', undefined],
+    ['missing', undefined, undefined],
+    ['above 10 years', 10 * 365 * 24 * 3600 + 1, undefined],
+    ['the live value', 2592000, 2592000],
+  ])('expires_in %s → %s', async (_name, value, expected) => {
+    const { client } = setup(() =>
+      Promise.resolve(respond(200, { access_token: NEW_ACCESS, refresh_token: NEW_REFRESH, expires_in: value })),
+    );
+    const result = await client.refresh(OLD_REFRESH);
+    expect(result).toMatchObject({ kind: 'ok' });
+    expect(result.kind === 'ok' && result.expiresIn).toBe(expected ?? undefined);
+  });
+
+  test('no device id → failed Client without a request', async () => {
+    const fetchMock = jest.fn();
+    const client = createAuthApiClient({
+      fetch: fetchMock,
+      getDeviceId: () => Promise.reject(new Error('native')),
+      logger: createLogger(),
+    });
+    await expect(client.refresh(OLD_REFRESH)).resolves.toEqual({ kind: 'failed', error: 'Client' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  test('logs carry no token or device id', async () => {
+    const { client, log } = setup(() =>
+      Promise.resolve(respond(200, { access_token: NEW_ACCESS, refresh_token: NEW_REFRESH, expires_in: 2592000 })),
+    );
+    await client.refresh(OLD_REFRESH);
+    const dump = JSON.stringify(log.entries());
+    for (const secret of [OLD_REFRESH, NEW_ACCESS, NEW_REFRESH, DEVICE_ID, 'Bearer']) {
       expect(dump).not.toContain(secret);
     }
   });

@@ -1,7 +1,7 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BackHandler, StyleSheet, TVFocusGuideView, View } from 'react-native';
-import { HomeScreen } from '../features/home';
+import { HomeScreen, type HomeScreenProps } from '../features/home';
 import { SETTINGS_VERSION_ID, SettingsScreen } from '../features/settings';
 import { FocusZone, Screen, useModal, type FocusZoneHandle } from '../shared/focus';
 import { t } from '../shared/i18n';
@@ -20,6 +20,10 @@ export type ShellProps = {
   routeKey: string;
   /** Debug builds only: open «Проверка фокуса» from Настройки. */
   onOpenFocusCheck?: () => void;
+  /** Debug builds only: the live refresh check row in Настройки. */
+  onCheckSession?: () => void;
+  /** Главная's offline StateView (Story 2.5); absent: the placeholder. */
+  homeOffline?: HomeScreenProps['offline'];
 };
 
 /** Focus ids of the sidebar items (docs/focus-map.md §1.5). */
@@ -56,7 +60,7 @@ type View_ = { section: SectionId; focusContent: boolean };
  * - When the Shell is the focused route again (pop), focus is restored
  *   explicitly: the remembered content element, or the current item.
  */
-export function Shell({ routeKey, onOpenFocusCheck }: ShellProps) {
+export function Shell({ routeKey, onOpenFocusCheck, onCheckSession, homeOffline }: ShellProps) {
   const sections = useMemo(() => enabledSections(), []);
   const [view, setView] = useState<View_>({ section: HOME, focusContent: false });
   const sectionRef = useRef(view.section);
@@ -145,6 +149,23 @@ export function Shell({ routeKey, onOpenFocusCheck }: ShellProps) {
     }, [focusNav, modal]),
   );
 
+  // The offline view went away (E1 succeeded) while «Повторить» had focus:
+  // its button is gone, so focus goes to the current item explicitly.
+  const offline = homeOffline !== undefined;
+  const wasOffline = useRef(offline);
+  useEffect(() => {
+    if (
+      wasOffline.current &&
+      !offline &&
+      routeFocused.current &&
+      zone.current === 'content' &&
+      sectionRef.current === HOME
+    ) {
+      focusNav(HOME);
+    }
+    wasOffline.current = offline;
+  }, [offline, focusNav]);
+
   const onSidebarFocus = useCallback(() => {
     if (routeFocused.current) {
       zone.current = 'sidebar';
@@ -196,7 +217,12 @@ export function Shell({ routeKey, onOpenFocusCheck }: ShellProps) {
         isActive={isShellActive}
         style={styles.content}
       >
-        <SectionContent section={view.section} onOpenFocusCheck={onOpenFocusCheck} />
+        <SectionContent
+          section={view.section}
+          onOpenFocusCheck={onOpenFocusCheck}
+          onCheckSession={onCheckSession}
+          homeOffline={homeOffline}
+        />
       </FocusZone>
     </Screen>
   );
@@ -205,15 +231,24 @@ export function Shell({ routeKey, onOpenFocusCheck }: ShellProps) {
 function SectionContent({
   section,
   onOpenFocusCheck,
+  onCheckSession,
+  homeOffline,
 }: {
   section: SectionId;
   onOpenFocusCheck?: () => void;
+  onCheckSession?: () => void;
+  homeOffline?: HomeScreenProps['offline'];
 }) {
   switch (section) {
     case 'home':
-      return <HomeScreen />;
+      return <HomeScreen offline={homeOffline} />;
     case 'settings':
-      return <SettingsScreen onOpenFocusCheck={onOpenFocusCheck} />;
+      return (
+        <SettingsScreen
+          onOpenFocusCheck={onOpenFocusCheck}
+          onCheckSession={onCheckSession}
+        />
+      );
     // Phase-gated off in Epic 2 (phaseFlags): never rendered.
     case 'search':
     case 'subs':

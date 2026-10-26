@@ -83,6 +83,19 @@ export const ru = {
       title: 'Лента появится здесь',
       body: 'Новые посты из ваших подписок будут на этом экране.',
     },
+    // Cold start with a stored session and no network (Story 2.5). The
+    // session is kept; this is never «Сессия истекла».
+    offline: {
+      title: 'Нет подключения к интернету',
+      body: 'Проверьте подключение телевизора к сети и попробуйте снова.',
+    },
+  },
+  common: {
+    retry: 'Повторить',
+  },
+  // The persistent badge of the debug-only demo mode (Story 2.5).
+  demo: {
+    badge: 'ДЕМО',
   },
   settings: {
     title: 'Настройки',
@@ -109,6 +122,11 @@ export const ru = {
       dialogBody: 'Фокус не уходит за диалог. Назад закрывает его.',
       dialogOk: 'Понятно',
       dialogClose: 'Закрыть',
+    },
+    // Debug-only live refresh check (Story 2.5): corrupts the in-memory
+    // access token, then E1 → 401 → refresh → retry.
+    sessionCheck: {
+      row: 'Проверка обновления сессии',
     },
   },
   error: {
