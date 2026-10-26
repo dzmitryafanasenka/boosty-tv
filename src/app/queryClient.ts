@@ -1,5 +1,6 @@
 import { QueryClient } from '@tanstack/react-query';
 import { defineAccountScoped } from '../shared/account';
+import { QUERY_STALE_TIME_MS } from '../shared/api';
 
 /**
  * Server state (AD-7, ADR 0010): one TanStack Query client for the app.
@@ -17,7 +18,7 @@ import { defineAccountScoped } from '../shared/account';
  *   cache.
  */
 
-export const QUERY_STALE_TIME_MS = 60_000;
+export { QUERY_STALE_TIME_MS };
 export const QUERY_GC_TIME_MS = 10 * 60_000;
 
 export function createAppQueryClient(): QueryClient {

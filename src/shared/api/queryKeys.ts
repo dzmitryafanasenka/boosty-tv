@@ -8,3 +8,10 @@ export const queryKeys = {
   /** E5 «Новое в подписках» (Story 3.1), an infinite query. */
   subscriptionFeed: () => ['feed', 'subscriptions'] as const,
 } as const;
+
+/**
+ * Server-state freshness (AD-7, ADR 0010): the app client's `staleTime`, and
+ * the age at which a resume refreshes the feed head. Here (not in
+ * `src/app`) so features can read it.
+ */
+export const QUERY_STALE_TIME_MS = 60_000;
