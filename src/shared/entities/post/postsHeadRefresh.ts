@@ -3,7 +3,7 @@ import { isAppError } from '../../api/appError';
 import { QUERY_STALE_TIME_MS } from '../../api/queryKeys';
 import { logger as appLogger, type Logger } from '../../services/logger';
 import { mergePosts } from './postRepository';
-import type { PostPage } from './types';
+import type { Post, PostPage } from './types';
 
 /**
  * Head refresh of a cached paged post list (AD-7): «Новое в подписках» on
@@ -38,7 +38,39 @@ export type PostsHeadRefreshOptions = {
    * Главная treats every empty page 1 as a gap, as before.
    */
   keepEmptyWithMore?: boolean;
+  /**
+   * The list puts its pinned post (if any) first (E4, Автор): a pinned fresh
+   * post is not evidence of overlap — only the non-pinned fresh posts decide
+   * a gap — and after a merge only the fresh page's pins stay pinned: a
+   * cached post that was pinned and is not pinned now leaves the merged
+   * head (its real place is unknown; paging brings it back in date order),
+   * so a re-pin or an unpin never shows two badges or an out-of-order card.
+   * Epic 3 retro A1. Главная (E5) does not set it.
+   */
+  pinnedFirst?: boolean;
 };
+
+/**
+ * Stale pins (pinned in the cache, not among the fresh pins) leave the merged
+ * first page and lose their pin on later pages (defensive: a pin sits only
+ * at the top of page 1).
+ */
+function dropStalePins(data: PostsData, freshPins: ReadonlySet<string>): PostsData {
+  const stale = (post: Post) => post.pinned && !freshPins.has(post.id);
+  if (!data.pages.some(page => page.posts.some(stale))) {
+    return data;
+  }
+  return {
+    ...data,
+    pages: data.pages.map((page, index) =>
+      !page.posts.some(stale)
+        ? page
+        : index === 0
+          ? { ...page, posts: page.posts.filter(post => !stale(post)) }
+          : { ...page, posts: page.posts.map(post => (stale(post) ? { ...post, pinned: false } : post)) },
+    ),
+  };
+}
 
 /**
  * Merge a fresh first page into the cached list:
@@ -55,11 +87,17 @@ export type PostsHeadRefreshOptions = {
  *   page list never grows and a later refetch walks the same cursor chain.
  *   `prepended` when page 1 brought a post id the cache lacked, else
  *   `unchanged` (the fresh copies are still written).
+ * - (`pinnedFirst`) the gap test ignores the fresh pinned posts (Автор's
+ *   page 1 starts with the pinned post when there is one), and stale pins
+ *   leave the merged head. `kind` still compares post ids only.
  */
 export function mergePostsHead(
   cached: PostsData,
   fresh: PostPage,
-  { keepEmptyWithMore = false }: { keepEmptyWithMore?: boolean } = {},
+  {
+    keepEmptyWithMore = false,
+    pinnedFirst = false,
+  }: { keepEmptyWithMore?: boolean; pinnedFirst?: boolean } = {},
 ): { kind: 'unchanged' | 'prepended' | 'replaced'; data: PostsData } {
   if (keepEmptyWithMore && fresh.posts.length === 0 && fresh.nextCursor !== null) {
     return { kind: 'unchanged', data: cached };
@@ -71,16 +109,24 @@ export function mergePostsHead(
     }
   }
   const shared = fresh.posts.filter(post => known.has(post.id)).length;
-  if (shared === 0 || cached.pages.length === 0) {
+  // Only non-pinned posts prove that page 1 reaches into the cache. A page
+  // of pins alone (no other post) proves nothing either way: merge it.
+  const evidence = pinnedFirst ? fresh.posts.filter(post => !post.pinned) : fresh.posts;
+  const overlap = evidence.filter(post => known.has(post.id)).length;
+  const gap = fresh.posts.length === 0 || (evidence.length > 0 && overlap === 0);
+  if (gap || cached.pages.length === 0) {
     return { kind: 'replaced', data: { pages: [fresh], pageParams: [null] } };
   }
   const [first, ...rest] = cached.pages;
+  const merged: PostsData = {
+    pages: [{ posts: mergePosts(fresh.posts, first.posts), nextCursor: first.nextCursor }, ...rest],
+    pageParams: cached.pageParams,
+  };
   return {
     kind: shared === fresh.posts.length ? 'unchanged' : 'prepended',
-    data: {
-      pages: [{ posts: mergePosts(fresh.posts, first.posts), nextCursor: first.nextCursor }, ...rest],
-      pageParams: cached.pageParams,
-    },
+    data: pinnedFirst
+      ? dropStalePins(merged, new Set(fresh.posts.filter(post => post.pinned).map(post => post.id)))
+      : merged,
   };
 }
 
@@ -107,7 +153,7 @@ export async function refreshPostsHead(
   now: number,
   logger: Logger = appLogger,
   log: PostsHeadRefreshLog = DEFAULT_LOG,
-  { skipWhileError = false, keepEmptyWithMore = false }: PostsHeadRefreshOptions = {},
+  { skipWhileError = false, keepEmptyWithMore = false, pinnedFirst = false }: PostsHeadRefreshOptions = {},
 ): Promise<PostsHeadRefreshResult> {
   const query = client.getQueryCache().find<PostsData>({ queryKey, exact: true });
   let inFlight = running.get(client);
@@ -143,7 +189,7 @@ export async function refreshPostsHead(
     ) {
       return 'skipped';
     }
-    const merged = mergePostsHead(cached, fresh, { keepEmptyWithMore });
+    const merged = mergePostsHead(cached, fresh, { keepEmptyWithMore, pinnedFirst });
     client.setQueryData<PostsData>(queryKey, merged.data, { updatedAt: now });
     return merged.kind;
   } catch (error) {

@@ -34,8 +34,9 @@ export function refreshAuthorPostsHead(
     logger,
     LOG,
     // A failed page append keeps its «Повторить»; an empty page 1 with more
-    // pages keeps the loaded posts (review loop 1).
-    { skipWhileError: true, keepEmptyWithMore: true },
+    // pages keeps the loaded posts (review loop 1); a leading pinned post is
+    // not evidence of overlap, and a re-pin drops the old pin (retro A1).
+    { skipWhileError: true, keepEmptyWithMore: true, pinnedFirst: true },
   );
 }
 

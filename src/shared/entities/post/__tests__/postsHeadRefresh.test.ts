@@ -9,6 +9,7 @@ const KEY_B = queryKeys.authorPosts('blog-b');
 const T0 = 1_000_000;
 
 const post = (id: string) => ({ id }) as Post;
+const pinnedPost = (id: string) => ({ id, pinned: true }) as Post;
 const page = (ids: string[], nextCursor: string | null): PostPage => ({
   posts: ids.map(post),
   nextCursor,
@@ -215,5 +216,70 @@ describe('refreshPostsHead (any paged post key)', () => {
     expect(await refreshPostsHead(client, KEY_A, fetch, t2, logger)).toBe('prepended');
     expect(fetch).toHaveBeenCalledTimes(3);
     expect(ids(client.getQueryData<PostsData>(KEY_A))?.slice(0, 3)).toEqual(['n2', 'n1', 'p0']);
+  });
+});
+
+describe('mergePostsHead with pinnedFirst (Автор, Epic 3 retro A1)', () => {
+  /** Author cache: the pin first, then p0…p38 over two pages. */
+  const authorCache = (): PostsData => ({
+    pages: [
+      { posts: [pinnedPost('pin'), ...range(0, 19).map(post)], nextCursor: 'c19' },
+      page(range(19, 39), 'c39'),
+    ],
+    pageParams: [null, 'c19'],
+  });
+
+  it('20+ new posts: only the pin is shared — a gap, page 1 replaces the cache (no silent loss)', () => {
+    const fresh: PostPage = { posts: [pinnedPost('pin'), ...range(100, 119).map(post)], nextCursor: 'n' };
+    const merged = mergePostsHead(authorCache(), fresh, { pinnedFirst: true });
+    expect(merged.kind).toBe('replaced');
+    expect(ids(merged.data)).toEqual(['pin', ...range(100, 119)]);
+    // Without the option (Главная) the pin counts as overlap: merged, as before.
+    expect(mergePostsHead(authorCache(), fresh).kind).toBe('prepended');
+  });
+
+  it('an ordinary refresh with a shared non-pinned post still merges', () => {
+    const fresh: PostPage = { posts: [pinnedPost('pin'), post('new'), ...range(0, 18).map(post)], nextCursor: 'n' };
+    const merged = mergePostsHead(authorCache(), fresh, { pinnedFirst: true });
+    expect(merged.kind).toBe('prepended');
+    expect(ids(merged.data)?.slice(0, 3)).toEqual(['pin', 'new', 'p0']);
+    expect(ids(merged.data)).toHaveLength(41);
+  });
+
+  it('a re-pin: one badge; the old pin leaves the head (no out-of-order card)', () => {
+    const fresh: PostPage = { posts: [pinnedPost('p5'), ...range(0, 5).map(post), ...range(6, 18).map(post)], nextCursor: 'n' };
+    const merged = mergePostsHead(authorCache(), fresh, { pinnedFirst: true });
+    const pinned = merged.data.pages.flatMap(p => p.posts).filter(p => p.pinned).map(p => p.id);
+    expect(pinned).toEqual(['p5']);
+    expect(ids(merged.data)).not.toContain('pin');
+    expect(merged.data.pages[0].posts.map(p => p.id).slice(0, 3)).toEqual(['p5', 'p0', 'p1']);
+  });
+
+  it('an unpin (no pin on the fresh page): the old pin leaves the head', () => {
+    const fresh = page(range(0, 19), 'n');
+    const merged = mergePostsHead(authorCache(), fresh, { pinnedFirst: true });
+    expect(merged.data.pages.flatMap(p => p.posts).some(p => p.pinned)).toBe(false);
+    expect(ids(merged.data)?.[0]).toBe('p0');
+  });
+
+  it('without the option (Главная) pin flags are left as they are', () => {
+    const fresh = page(range(0, 19), 'n');
+    const merged = mergePostsHead(authorCache(), fresh);
+    expect(merged.data.pages.flatMap(p => p.posts).filter(p => p.pinned).map(p => p.id)).toEqual(['pin']);
+  });
+
+  it('a page of pins alone proves nothing: merged, not replaced', () => {
+    const merged = mergePostsHead(authorCache(), { posts: [pinnedPost('pin')], nextCursor: 'n' }, { pinnedFirst: true });
+    expect(merged.kind).toBe('unchanged');
+    expect(ids(merged.data)).toHaveLength(40);
+  });
+
+  it('refreshPostsHead passes the option through', async () => {
+    seed(KEY_A, authorCache());
+    const fresh: PostPage = { posts: [pinnedPost('pin'), ...range(100, 119).map(post)], nextCursor: 'n' };
+    const result = await refreshPostsHead(client, KEY_A, async () => fresh, T0 + QUERY_STALE_TIME_MS, createLogger(), undefined, {
+      pinnedFirst: true,
+    });
+    expect(result).toBe('replaced');
   });
 });
