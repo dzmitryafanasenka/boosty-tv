@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 10-25-2026 14:34
-last_updated: 10-27-2026 16:23
+last_updated: 10-27-2026 16:39
 project: Boosty TV
 project_key: NOKEY
 tracking_system: file-system
@@ -184,7 +184,7 @@ action_items:
     action: "Add the navigation.isFocused() guard to Shell onOpenAuthor with a double-OK
       test"
     owner: "dev"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-10-27.md"
   - id: "epic-3-retro-item-11-align-главная-head-refresh-with-автор-fo"
     epic: 3

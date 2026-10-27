@@ -27,15 +27,15 @@ export type PostsHeadRefreshOptions = {
   /**
    * Skip while the query is in an error state (a failed page append): a
    * write would clear the error and unmount a focused load-more «Повторить»
-   * (Автор, spec-author-posts-refresh review loop 1). Off for Главная, whose
-   * behaviour is pinned by its tests (spec-feed-refresh-on-resume).
+   * (Автор, spec-author-posts-refresh review loop 1; Главная, Epic 3 retro
+   * A3).
    */
   skipWhileError?: boolean;
   /**
    * An empty page 1 with a next cursor keeps the cached data (written back
    * with `updatedAt: now`, so the next trigger waits a staleTime); an empty
-   * last page still replaces the cache (a truly empty list). Автор only;
-   * Главная treats every empty page 1 as a gap, as before.
+   * last page still replaces the cache (a truly empty list). Автор and
+   * Главная (Epic 3 retro A3); without it every empty page 1 is a gap.
    */
   keepEmptyWithMore?: boolean;
   /**
@@ -77,7 +77,7 @@ function dropStalePins(data: PostsData, freshPins: ReadonlySet<string>): PostsDa
  * - (`keepEmptyWithMore`) it is empty but has a next cursor: the cache stays
  *   as it is (`unchanged`, the same `cached` object); such an answer is no
  *   evidence of a gap and must not wipe the loaded pages. Without the
- *   option (Главная), or without a next cursor, an empty page is a gap;
+ *   option, or without a next cursor, an empty page is a gap;
  * - it shares no post id with the cache (a gap larger than a page): page 1
  *   alone replaces the cache (`replaced`);
  * - otherwise page 1 is collapsed into the cached first page: the fresh

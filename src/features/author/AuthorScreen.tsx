@@ -18,6 +18,7 @@ import {
   useHeadChangeRefocus,
   useHeldRowAutoFetch,
   useLoadMoreRetry,
+  useNotMovedLatch,
   useShownGridPosts,
   type HostView,
   type PostRowItem,
@@ -149,23 +150,20 @@ export function AuthorScreen({
     [stateAction],
   );
   // "The user has not moved since the page opened" (reopen focus, owner
-  // decision 2026-10-27): `moved` latches on the first focus event the page
-  // did not ask for (a D-pad move) or an OK on a card. `autoTargets` are the
-  // elements the page focused by itself (the sidebar item, the StateView
-  // action, a card), in request order; their native focus events, which may
-  // arrive after a newer automatic request, are never moves.
-  const moved = useRef(false);
-  const autoTargets = useRef<string[]>([]);
+  // decision 2026-10-27; shared with Главная, `useNotMovedLatch`): armed
+  // from the start; every element the page focuses by itself (the sidebar
+  // item, the StateView action, a card) is recorded as automatic.
+  const latch = useNotMovedLatch(focus.onFocusChange, { armed: true });
   /** The page's own sidebar focus (recorded as automatic). */
   const autoFocusSidebar = useCallback(() => {
-    autoTargets.current.push(focusRef.current.sectionItemId);
+    latch.auto(focusRef.current.sectionItemId);
     focusRef.current.focusSidebar();
-  }, []);
+  }, [latch]);
   /** The page's own StateView action focus (recorded as automatic). */
   const autoFocusAction = useCallback(() => {
-    autoTargets.current.push(AUTHOR_STATE_ACTION_ID);
+    latch.auto(AUTHOR_STATE_ACTION_ID);
     requestHostFocus(stateActionView.current);
-  }, []);
+  }, [latch]);
   // Nothing above the grid (no search or filters before Epic 5): the
   // StateView action when shown, else the sidebar's current item.
   const focusAbove = useCallback(() => {
@@ -230,52 +228,28 @@ export function AuthorScreen({
 
   const idsRef = useRef(ids);
   idsRef.current = ids;
-  useEffect(
-    () =>
-      focus.onFocusChange(focusId => {
-        if (moved.current) {
-          return;
-        }
-        const index = autoTargets.current.indexOf(focusId);
-        if (index >= 0) {
-          // Older automatic targets are settled.
-          autoTargets.current = autoTargets.current.slice(index);
-        } else {
-          moved.current = true;
-        }
-      }),
-    [focus],
-  );
   const shownRef = useRef(shownPosts);
   shownRef.current = shownPosts;
   const onOpenPostRef = useRef(onOpenPost);
   onOpenPostRef.current = onOpenPost;
-  const onCardPress = useCallback((postId: string) => {
-    // OK on a post is a move (the reopen rule), and opens Пост.
-    moved.current = true;
-    const post = shownRef.current.find(p => p.id === postId);
-    if (post) {
-      onOpenPostRef.current?.(post.author.blogUrl, post.id);
-    }
-  }, []);
-  const followHead = useCallback(
-    (current: string | null) =>
-      !moved.current && (current === null || autoTargets.current.includes(current)),
-    [],
+  const onCardPress = useCallback(
+    (postId: string) => {
+      // OK on a post is a move (the reopen rule), and opens Пост.
+      latch.move();
+      const post = shownRef.current.find(p => p.id === postId);
+      if (post) {
+        onOpenPostRef.current?.(post.author.blogUrl, post.id);
+      }
+    },
+    [latch],
   );
-  const onFollowHead = useCallback((id: string) => {
-    autoTargets.current.push(id);
-  }, []);
 
   const restoreOrFirst = useCallback(() => {
     if (restoration.restore().kind === 'none') {
-      const first = idsRef.current[0];
-      if (first !== undefined) {
-        autoTargets.current.push(first);
-      }
+      latch.auto(idsRef.current[0]);
       restoration.focusInitial();
     }
-  }, [restoration]);
+  }, [restoration, latch]);
 
   // First focus of the route and every return to it (a screen on top
   // popped). Declared before the phase effect: on the first focus it only
@@ -347,8 +321,8 @@ export function AuthorScreen({
     canFocus,
     restoration,
     list: adapterRef,
-    followHead,
-    onFollowHead,
+    followHead: latch.followHead,
+    onFollowHead: latch.onFollowHead,
   });
 
   const onRetryLoadMore = useLoadMoreRetry(posts, ids, restoration, () => {

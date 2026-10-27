@@ -23,6 +23,7 @@ import { focusRestoration } from '../src/shared/focus';
 import { logger } from '../src/shared/services/logger';
 import { t } from '../src/shared/i18n';
 import { requestHostFocus } from '../src/shared/ui/requestHostFocus';
+import type { Root } from 'test-renderer';
 import backHandler from '../src/test/backHandlerMock';
 import {
   E5_PATH,
@@ -1110,11 +1111,11 @@ describe('refresh on resume (spec-feed-refresh-on-resume, AD-7)', () => {
   }
 
   /** 30 synthetic posts; page 1 answered by `head` once set. */
-  let head: ((req: FixtureRequest) => FixtureReply) | null;
+  let head: ((req: FixtureRequest) => Reply) | null;
   function feedWithHead() {
     const pages = syntheticFeed({ total: 30 });
     head = null;
-    return (req: FixtureRequest): FixtureReply =>
+    return (req: FixtureRequest): Reply =>
       cursorOf(req.url) === null && head ? head(req) : pages(req);
   }
   /** A page-1 reply with these posts and the next cursor `cursor:<next>`. */
@@ -1284,7 +1285,7 @@ describe('refresh on resume (spec-feed-refresh-on-resume, AD-7)', () => {
     await unmount(root);
   });
 
-  it('«Повторить» focused during a resume prepend: focus stays on it, no scroll', async () => {
+  it('«Повторить» focused (a failed page append): the resume refresh is skipped; focus stays on it (Epic 3 retro A3)', async () => {
     const pages = syntheticFeed({ total: 30 });
     head = null;
     let failNext = true;
@@ -1302,11 +1303,20 @@ describe('refresh on resume (spec-feed-refresh-on-resume, AD-7)', () => {
     failNext = false;
     focusMock.mockClear();
     mockFlashList.scrollToIndex.mockClear();
+    const calls = feedCalls().length;
     head = () => headPage([newPost(0), newPost(1), ...Array.from({ length: 8 }, (_, i) => feedPost(i))], 8);
     await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
-    expect(gridPosts(root)[0].id).toBe('new-0');
+    // The feed query is in an error state: no E5 request; the retry row stays.
+    expect(feedCalls()).toHaveLength(calls);
+    expect(gridPosts(root)[0].id).toBe('feed-post-0');
+    expect(visible(root, 'home/feed/retry')).toBe(true);
     expect(focusMock).not.toHaveBeenCalled();
     expect(mockFlashList.scrollToIndex).not.toHaveBeenCalled();
+    // «Повторить» still works: the next page loads.
+    await press(root, 'home/feed/retry');
+    expect(visible(root, 'home/feed/retry')).toBe(false);
+    expect(feedCalls()).toHaveLength(calls + 1);
+    expect(cursorOf(feedCalls()[calls].url)).not.toBeNull();
     await unmount(root);
   });
 
@@ -1355,6 +1365,320 @@ describe('refresh on resume (spec-feed-refresh-on-resume, AD-7)', () => {
     expect(feedCalls()).toHaveLength(3);
     expect(gridPosts(root)[0].id).toBe('new-0');
     expect(focusTargets()).toEqual([]);
+    await unmount(root);
+  });
+  // Epic 3 retro A3 (owner decision 2026-10-27): Главная follows a changed
+  // head like Автор while the user has not moved since Главная took its
+  // content focus by itself.
+  describe('follow the head while the user has not moved (Epic 3 retro A3)', () => {
+    const twoNew = () =>
+      headPage([newPost(0), newPost(1), ...Array.from({ length: 8 }, (_, i) => feedPost(i))], 8);
+    const scrolledToTop = () =>
+      mockFlashList.scrollToOffset.mock.calls.some(
+        ([params]) => (params as { offset: number }).offset === 0,
+      );
+    /** 30 posts, page 1 loaded; Главная focused the first card by itself. */
+    async function untouched() {
+      feed = feedWithHead();
+      const root = await renderApp();
+      expect(lastFocusTarget()).toBe('home/feed/feed-post-0');
+      focusMock.mockClear();
+      mockFlashList.scrollToOffset.mockClear();
+      mockFlashList.scrollToIndex.mockClear();
+      return root;
+    }
+
+    it('untouched, the reply before the auto-focus event: the new first post, at the top', async () => {
+      const root = await untouched();
+      head = twoNew;
+      await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+      expect(feedCalls()).toHaveLength(2);
+      expect(gridPosts(root).slice(0, 3).map(p => p.id)).toEqual(['new-0', 'new-1', 'feed-post-0']);
+      expect(focusTargets()).toEqual(['home/feed/new-0']);
+      expect(scrolledToTop()).toBe(true);
+      expect(mockFlashList.scrollToIndex).not.toHaveBeenCalled();
+      // The native events of both automatic focus requests arrive late, in
+      // order: neither is a move, so the next head change still follows.
+      await focusOn(root, 'home/feed/feed-post-0');
+      await focusOn(root, 'home/feed/new-0');
+      focusMock.mockClear();
+      head = () =>
+        headPage([newPost(2), newPost(0), newPost(1), ...Array.from({ length: 7 }, (_, i) => feedPost(i))], 7);
+      await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+      expect(gridPosts(root)[0].id).toBe('new-2');
+      expect(focusTargets()).toEqual(['home/feed/new-2']);
+      await unmount(root);
+    });
+
+    it('untouched, the reply after the auto-focus event: the same result', async () => {
+      const root = await untouched();
+      await focusOn(root, 'home/feed/feed-post-0');
+      const reply = deferred();
+      head = () => reply.promise;
+      await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+      expect(feedCalls()).toHaveLength(2);
+      focusMock.mockClear();
+      reply.resolve(twoNew());
+      await settle();
+      expect(gridPosts(root).slice(0, 3).map(p => p.id)).toEqual(['new-0', 'new-1', 'feed-post-0']);
+      expect(focusTargets()).toEqual(['home/feed/new-0']);
+      expect(scrolledToTop()).toBe(true);
+      expect(mockFlashList.scrollToIndex).not.toHaveBeenCalled();
+      await unmount(root);
+    });
+
+    it('untouched, focus event on nav/home during the skeleton, the reply before the card event: the new first post', async () => {
+      feed = feedWithHead();
+      const first = deferred();
+      head = () => first.promise;
+      const root = await renderApp();
+      // The Shell's own nav/home focus reaches JS during the skeleton.
+      await focusOn(root, 'nav/home');
+      first.resolve(headPage(Array.from({ length: 10 }, (_, i) => feedPost(i)), 10));
+      await settle();
+      expect(lastFocusTarget()).toBe('home/feed/feed-post-0');
+      head = twoNew;
+      focusMock.mockClear();
+      mockFlashList.scrollToOffset.mockClear();
+      // The card's native event has not reached JS: the Shell still says nav/home.
+      await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+      expect(focusTargets()).toEqual(['home/feed/new-0']);
+      expect(scrolledToTop()).toBe(true);
+      await unmount(root);
+    });
+
+    it('untouched after OK on «Главная» from Настройки (the remembered card restored): the new first post', async () => {
+      feed = feedWithHead();
+      const root = await renderApp();
+      await focusOn(root, 'home/feed/feed-post-0');
+      await focusOn(root, 'home/feed/feed-post-1');
+      await focusOn(root, 'nav/home');
+      await focusOn(root, 'nav/settings');
+      await press(root, 'nav/settings');
+      await focusOn(root, 'nav/home');
+      focusMock.mockClear();
+      await press(root, 'nav/home');
+      // Главная took its content focus by itself: the remembered card.
+      expect(lastFocusTarget()).toBe('home/feed/feed-post-1');
+      await focusOn(root, 'home/feed/feed-post-1');
+      focusMock.mockClear();
+      mockFlashList.scrollToOffset.mockClear();
+      head = twoNew;
+      await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+      expect(focusTargets()).toEqual(['home/feed/new-0']);
+      expect(scrolledToTop()).toBe(true);
+      await unmount(root);
+    });
+
+    it('armed on a restored card in row 1, posts inserted below the first post: that card is refocused at its new index', async () => {
+      feed = feedWithHead();
+      const root = await renderApp();
+      await focusOn(root, 'home/feed/feed-post-0');
+      await focusOn(root, 'home/feed/feed-post-4');
+      await focusOn(root, 'nav/home');
+      await focusOn(root, 'nav/settings');
+      await press(root, 'nav/settings');
+      await focusOn(root, 'nav/home');
+      focusMock.mockClear();
+      await press(root, 'nav/home');
+      // Главная took its content focus by itself: the remembered card (row 1).
+      expect(lastFocusTarget()).toBe('home/feed/feed-post-4');
+      await focusOn(root, 'home/feed/feed-post-4');
+      focusMock.mockClear();
+      mockFlashList.scrollToOffset.mockClear();
+      mockFlashList.scrollToIndex.mockClear();
+      head = () =>
+        headPage([feedPost(0), newPost(0), ...Array.from({ length: 8 }, (_, i) => feedPost(i + 1))], 9);
+      await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+      const ids = gridPosts(root).map(p => p.id);
+      expect(ids.slice(0, 3)).toEqual(['feed-post-0', 'new-0', 'feed-post-1']);
+      expect(ids.indexOf('feed-post-4')).toBe(5);
+      // The first card is unchanged: no head-follow; row 1 regrouped.
+      expect(mockFlashList.scrollToIndex).toHaveBeenCalledWith(
+        expect.objectContaining({ index: 1, animated: false }),
+      );
+      expect(focusTargets()).toEqual(['home/feed/feed-post-4']);
+      expect(scrolledToTop()).toBe(false);
+      await unmount(root);
+    });
+
+    it('full-error «Повторить» (focused by the page) → grid → resume: the new first post, at the top (late action event)', async () => {
+      const pages = syntheticFeed({ total: 30 });
+      let failing = true;
+      head = null;
+      feed = req => {
+        if (failing) {
+          return { status: 400, body: { error: 'bad_request' } };
+        }
+        return cursorOf(req.url) === null && head ? head(req) : pages(req);
+      };
+      const root = await renderApp();
+      expect(visible(root, 'home/feed/error')).toBe(true);
+      // Opened with OK from Настройки: the page focuses «Повторить» itself.
+      await focusOn(root, 'nav/settings');
+      await press(root, 'nav/settings');
+      await focusOn(root, 'nav/home');
+      focusMock.mockClear();
+      await press(root, 'nav/home');
+      expect(visible(root, 'home/feed/error')).toBe(true);
+      expect(lastFocusTarget()).toBe('state/home/action');
+      failing = false;
+      const page1 = deferred();
+      head = () => page1.promise;
+      // OK reaches the action before its native focus event.
+      await press(root, 'state/home/action', { focus: false });
+      // The action's native focus event arrives late (while it still shows,
+      // busy): not a move. (Once unmounted, FocusZone drops its events.)
+      await focusOn(root, 'state/home/action');
+      head = null;
+      page1.resolve(headPage(Array.from({ length: 10 }, (_, i) => feedPost(i)), 10));
+      await settle();
+      expect(lastFocusTarget()).toBe('home/feed/feed-post-0');
+      focusMock.mockClear();
+      mockFlashList.scrollToOffset.mockClear();
+      head = twoNew;
+      await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+      expect(gridPosts(root)[0].id).toBe('new-0');
+      expect(focusTargets()).toEqual(['home/feed/new-0']);
+      expect(scrolledToTop()).toBe(true);
+      await unmount(root);
+    });
+
+    it('a move to a deeper row (row 2): that card keeps focus at its new index', async () => {
+      const root = await untouched();
+      await focusOn(root, 'home/feed/feed-post-0');
+      await focusOn(root, 'home/feed/feed-post-4');
+      await focusOn(root, 'home/feed/feed-post-7');
+      focusMock.mockClear();
+      head = twoNew;
+      await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+      expect(gridPosts(root).map(p => p.id).indexOf('feed-post-7')).toBe(9);
+      expect(mockFlashList.scrollToIndex).toHaveBeenCalledWith(
+        expect.objectContaining({ index: 3, animated: false }),
+      );
+      expect(focusTargets()).toEqual(['home/feed/feed-post-7']);
+      expect(scrolledToTop()).toBe(false);
+      await unmount(root);
+    });
+
+    it('a move to another sidebar item (nav/subs): nothing moves', async () => {
+      const root = await untouched();
+      await focusOn(root, 'home/feed/feed-post-0');
+      await focusOn(root, 'nav/home');
+      await focusOn(root, 'nav/subs');
+      focusMock.mockClear();
+      head = twoNew;
+      await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+      expect(gridPosts(root)[0].id).toBe('new-0');
+      expect(focusTargets()).toEqual([]);
+      expect(scrolledToTop()).toBe(false);
+      await unmount(root);
+    });
+
+    it.each([
+      ['a D-pad move to card 1', async (root: Root) => focusOn(root, 'home/feed/feed-post-1'), 'feed-post-1', 3],
+      [
+        '→ then ← back to the first card',
+        async (root: Root) => {
+          await focusOn(root, 'home/feed/feed-post-1');
+          await focusOn(root, 'home/feed/feed-post-0');
+        },
+        'feed-post-0',
+        2,
+      ],
+    ])('the user moved (%s): the focused card keeps focus at its new row', async (_name, move, target, index) => {
+      const root = await untouched();
+      await focusOn(root, 'home/feed/feed-post-0');
+      await move(root);
+      focusMock.mockClear();
+      head = twoNew;
+      await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+      expect(gridPosts(root).map(p => p.id).indexOf(target)).toBe(index);
+      expect(focusTargets()).toEqual([`home/feed/${target}`]);
+      // The grid scrolls by row (3 cards each).
+      expect(mockFlashList.scrollToIndex).toHaveBeenCalledWith(
+        expect.objectContaining({ index: Math.floor(index / 3), animated: false }),
+      );
+      expect(scrolledToTop()).toBe(false);
+      await unmount(root);
+    });
+
+    it('the user went back to the sidebar (nav/home): nothing moves', async () => {
+      const root = await untouched();
+      await focusOn(root, 'home/feed/feed-post-0');
+      await focusOn(root, 'nav/home');
+      focusMock.mockClear();
+      head = twoNew;
+      await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+      expect(gridPosts(root)[0].id).toBe('new-0');
+      expect(focusTargets()).toEqual([]);
+      expect(scrolledToTop()).toBe(false);
+      await unmount(root);
+    });
+
+    it('OK on a card is a move: Пост, Back, then a resume → that card keeps focus at index 2 (not the new first post)', async () => {
+      const root = await untouched();
+      await press(root, 'home/feed/feed-post-0');
+      expect(visible(root, 'post')).toBe(true);
+      await back();
+      expect(lastFocusTarget()).toBe('home/feed/feed-post-0');
+      focusMock.mockClear();
+      mockFlashList.scrollToOffset.mockClear();
+      mockFlashList.scrollToIndex.mockClear();
+      head = twoNew;
+      await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+      expect(gridPosts(root).map(p => p.id).indexOf('feed-post-0')).toBe(2);
+      expect(focusTargets()).toEqual(['home/feed/feed-post-0']);
+      expect(scrolledToTop()).toBe(false);
+      await unmount(root);
+    });
+
+    it('mounted with cached cards (no self focus, focus on nav/home): a head change takes no focus', async () => {
+      feed = feedWithHead();
+      const root = await renderApp();
+      await focusOn(root, 'home/feed/feed-post-0');
+      await focusOn(root, 'nav/home');
+      await focusOn(root, 'nav/settings');
+      await press(root, 'nav/settings');
+      await back(); // Back from Настройки → Главная, focus on nav/home
+      await focusOn(root, 'nav/home');
+      expect(gridPosts(root)).toHaveLength(9);
+      focusMock.mockClear();
+      mockFlashList.scrollToOffset.mockClear();
+      head = twoNew;
+      await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+      expect(gridPosts(root)[0].id).toBe('new-0');
+      expect(focusTargets()).toEqual([]);
+      expect(scrolledToTop()).toBe(false);
+      await unmount(root);
+    });
+  });
+
+  it('an empty page 1 with a next cursor: the cached feed stays (counted fresh); focus kept (Epic 3 retro A3)', async () => {
+    const root = await deepInTheFeed();
+    const before = gridPosts(root).map(p => p.id);
+    head = () => headPage([], 10);
+    await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+    expect(feedCalls()).toHaveLength(3);
+    expect(gridPosts(root).map(p => p.id)).toEqual(before);
+    expect(focusMock).not.toHaveBeenCalled();
+    expect(mockFlashList.scrollToIndex).not.toHaveBeenCalled();
+    // Written back as fresh: a resume within staleTime sends nothing.
+    await backgroundFor(QUERY_STALE_TIME_MS - 5_000);
+    expect(feedCalls()).toHaveLength(3);
+    await unmount(root);
+  });
+
+  it('an empty last page 1 (no next cursor): the cache is replaced; the empty state shows (Epic 3 retro A3)', async () => {
+    const root = await deepInTheFeed();
+    head = () => ({
+      status: 200,
+      body: { data: { posts: [], blogs: [], counters: {} }, extra: { offset: '', isLast: true } },
+    });
+    await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+    expect(feedCalls()).toHaveLength(3);
+    expect(visible(root, 'home/feed/empty')).toBe(true);
+    expect(visible(root, 'home/feed/list')).toBe(false);
     await unmount(root);
   });
 });

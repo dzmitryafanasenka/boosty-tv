@@ -202,10 +202,11 @@ export type HeadChangeRefocusOptions = {
   restoration: ListRestoration;
   list: RefObject<RestorableList>;
   /**
-   * Optional (Автор reopen, owner decision 2026-10-27): true when focus
-   * should follow the head instead (the user has not moved since the page
-   * opened; called with the focused element). The new first card then takes
-   * focus and the list shows the top.
+   * Optional (Автор reopen, owner decision 2026-10-27; Главная, Epic 3
+   * retro A3): true when focus should follow the head instead (the user has
+   * not moved since the page took focus by itself, `useNotMovedLatch`;
+   * called with the focused element). The new first card then takes focus
+   * and the list shows the top.
    */
   followHead?: (focused: string | null) => boolean;
   /** Called with the card id the head-follow focused (before the focus request). */
@@ -258,12 +259,11 @@ export function useHeadChangeRefocus({
     }
     const current = focusedRef.current();
     const follow = followRef.current;
-    if (follow.followHead?.(current) === true && canFocus()) {
+    // Follow only when the first card changed; with the same first card
+    // (posts inserted below it) the focused card keeps focus as below (its
+    // row may still remount).
+    if (follow.followHead?.(current) === true && canFocus() && previous[0] !== ids[0]) {
       const first = ids[0];
-      if (previous[0] === first) {
-        // The first card and its row key are unchanged: nothing to move.
-        return;
-      }
       list.current.scrollToOffset({ offset: 0, animated: false });
       follow.onFollowHead?.(first);
       restoration.focusItem(first);
@@ -295,6 +295,116 @@ export function useHeadChangeRefocus({
     }
     restoration.focusItem(current);
   }, [ids, cardIdPrefix, retryId, canFocus, restoration, list]);
+}
+
+/** "The user has not moved" for `useHeadChangeRefocus`'s `followHead` (see `useNotMovedLatch`). */
+export type NotMovedLatch = {
+  /**
+   * Record a focus the page requests by itself (call it before the
+   * request): its native focus event, however late, is not a move.
+   * Ignored while unarmed or after a move (nothing to protect).
+   */
+  auto(id: string | null | undefined): void;
+  /**
+   * (Re)start "not moved" now: the page takes focus by itself. `ids` are
+   * the elements whose native focus events may still arrive and are not
+   * moves (where focus was), in request order; they are appended to the
+   * still-unsettled automatic targets (deduped, null ignored). The target
+   * itself is recorded with `auto`.
+   */
+  arm(ids: readonly (string | null | undefined)[]): void;
+  /** Stop following (the content the latch protected is gone). */
+  disarm(): void;
+  /** An explicit user action that is not a focus event (OK on a card). */
+  move(): void;
+  /** `useHeadChangeRefocus`'s `followHead`. */
+  followHead(focused: string | null): boolean;
+  /** `useHeadChangeRefocus`'s `onFollowHead` (the head-follow focus is automatic). */
+  onFollowHead(id: string): void;
+};
+
+/**
+ * "The user has not moved since the page took focus by itself" (Автор
+ * reopen, owner decision 2026-10-27; Главная, Epic 3 retro A3): while it
+ * holds, a head refresh moves focus to the new first post instead of
+ * keeping the focused card (`useHeadChangeRefocus` `followHead`).
+ *
+ * - `armed` from the start (Автор: since the page opened) or from `arm()`
+ *   (Главная: since it took its content focus by itself); unarmed
+ *   (`disarm()`, e.g. the grid went away), it never follows. `arm()` keeps
+ *   the still-unsettled automatic targets, so a late native event of an
+ *   earlier automatic focus is not a move.
+ * - The latch closes on the first focus event (`onFocusChange`) of an
+ *   element the page did not focus by itself (a D-pad move), or on `move()`
+ *   (OK on a card). The page's own focus requests are recorded in request
+ *   order (`auto`, `arm`); their native events, which may arrive after a
+ *   newer automatic request, settle the older ones and are never moves. So
+ *   the result does not depend on whether a refresh reply or a native focus
+ *   event comes first. A move forgets the recorded targets; `auto()` is
+ *   ignored while unarmed or after a move.
+ * - A D-pad press that does not move focus is not observable in JS and is
+ *   not counted.
+ */
+export function useNotMovedLatch(
+  onFocusChange: (listener: (focusId: string) => void) => () => void,
+  { armed: armedInitially }: { armed: boolean },
+): NotMovedLatch {
+  const armed = useRef(armedInitially);
+  const moved = useRef(false);
+  const autoTargets = useRef<string[]>([]);
+  useEffect(
+    () =>
+      onFocusChange(focusId => {
+        if (!armed.current || moved.current) {
+          return;
+        }
+        const index = autoTargets.current.indexOf(focusId);
+        if (index >= 0) {
+          // Older automatic targets are settled.
+          autoTargets.current = autoTargets.current.slice(index);
+        } else {
+          moved.current = true;
+          autoTargets.current = [];
+        }
+      }),
+    [onFocusChange],
+  );
+  return useMemo<NotMovedLatch>(() => {
+    // Request order: a repeated id moves to the end (its newest request).
+    const add = (id: string | null | undefined) => {
+      if (id !== null && id !== undefined) {
+        autoTargets.current = [...autoTargets.current.filter(target => target !== id), id];
+      }
+    };
+    const auto = (id: string | null | undefined) => {
+      if (armed.current && !moved.current) {
+        add(id);
+      }
+    };
+    return {
+      auto,
+      arm: ids => {
+        armed.current = true;
+        moved.current = false;
+        // Earlier automatic targets whose events have not arrived stay.
+        for (const id of ids) {
+          add(id);
+        }
+      },
+      disarm: () => {
+        armed.current = false;
+      },
+      move: () => {
+        moved.current = true;
+        autoTargets.current = [];
+      },
+      followHead: focused =>
+        armed.current &&
+        !moved.current &&
+        (focused === null || autoTargets.current.includes(focused)),
+      onFollowHead: auto,
+    };
+  }, []);
 }
 
 /**

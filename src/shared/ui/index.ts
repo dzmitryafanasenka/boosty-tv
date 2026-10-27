@@ -56,9 +56,11 @@ export {
   useHeadChangeRefocus,
   useHeldRowAutoFetch,
   useLoadMoreRetry,
+  useNotMovedLatch,
   useShownGridPosts,
   visibleGridPosts,
   type HeadChangeRefocusOptions,
+  type NotMovedLatch,
   type PostGridProps,
   type PostRowItem,
 } from './PostGrid';

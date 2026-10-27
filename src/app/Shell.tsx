@@ -104,6 +104,21 @@ export function Shell({
   const zone = useRef<'sidebar' | 'content'>('sidebar');
   /** The last focused element (a nav id or a content item id); null: none yet. */
   const lastFocusId = useRef<string | null>(null);
+  /** Главная's focus listeners (`HomeFocusInfo.onFocusChange`). */
+  const focusListeners = useRef(new Set<(focusId: string) => void>());
+  /** A focus event of the focused Shell: remember it and tell the listeners. */
+  const recordFocus = useCallback((focusId: string) => {
+    lastFocusId.current = focusId;
+    for (const listener of [...focusListeners.current]) {
+      listener(focusId);
+    }
+  }, []);
+  const onFocusChange = useCallback((listener: (focusId: string) => void) => {
+    focusListeners.current.add(listener);
+    return () => {
+      focusListeners.current.delete(listener);
+    };
+  }, []);
   const nav = useSidebarNav(view.section);
   const navViews = nav.views;
   const contentRef = useRef<FocusZoneHandle>(null);
@@ -201,19 +216,25 @@ export function Shell({
     wasOffline.current = offline;
   }, [offline, focusNav]);
 
-  const onSidebarFocus = useCallback((section: SectionId) => {
-    if (routeFocused.current) {
-      zone.current = 'sidebar';
-      lastFocusId.current = NAV_ID[section];
-    }
-  }, []);
+  const onSidebarFocus = useCallback(
+    (section: SectionId) => {
+      if (routeFocused.current) {
+        zone.current = 'sidebar';
+        recordFocus(NAV_ID[section]);
+      }
+    },
+    [recordFocus],
+  );
   const isShellActive = useCallback(() => routeFocused.current, []);
-  const onContentFocus = useCallback((focusId: string) => {
-    if (routeFocused.current) {
-      zone.current = 'content';
-      lastFocusId.current = focusId;
-    }
-  }, []);
+  const onContentFocus = useCallback(
+    (focusId: string) => {
+      if (routeFocused.current) {
+        zone.current = 'content';
+        recordFocus(focusId);
+      }
+    },
+    [recordFocus],
+  );
   // Главная moves focus into its content only while the user has not moved
   // (docs/focus-map.md §1.6 skeleton rule), and never while the Shell is
   // covered or closing.
@@ -223,6 +244,7 @@ export function Shell({
       current: () => lastFocusId.current,
       sectionItemId: NAV_ID[HOME],
       focusSidebar: () => focusNav(HOME),
+      onFocusChange,
       setReturnFocus: restore => {
         sectionReturn.current = restore;
         // Clears the slot only while it still holds this registration (a
@@ -234,7 +256,7 @@ export function Shell({
         };
       },
     }),
-    [focusNav],
+    [focusNav, onFocusChange],
   );
   // Подписки follows the same rules (docs/focus-map.md §1.6, §3 C).
   const subsFocus = useMemo<SubscriptionsFocusInfo>(
