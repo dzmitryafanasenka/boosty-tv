@@ -2,6 +2,7 @@
 
 - Status: accepted with Story 3.1 (2026-10-26); the version and setup below are what Story 3.1 ships
 - Date: 2026-10-26
+- Superseded in part: Apple TV (tvOS) is out of scope (owner decision 2026-10-27).
 - Relates to: architecture spine AD-4 (account scope), AD-6 (retries), AD-7 (server state); `_bmad-output/implementation-artifacts/spec-3-1-subscription-feed-on-the-home-screen.md`; [ADR 0008](0008-api-request-profiles.md)
 
 ## Context
@@ -17,7 +18,7 @@ Epic 3 brings the first production content lists (E5 feed, then E2, E3, E4, E8).
 | Published | `5.104.2`: 2026-10-11T19:35Z (stable tag, more than two weeks old at adoption) |
 | Peer dependencies | `react: ^18 \|\| ^19` (the app runs React 19.2.3) |
 | Dependencies | `@tanstack/query-core` `5.104.2` only |
-| Native code | None (pure JS/TS). Metro resolves the package's `react-native` field (`src/index.ts`); Jest uses the CJS build. Works with react-native-tvos 0.87.1-1 like any JS module; no tvOS-specific concern for phase 4 |
+| Native code | None (pure JS/TS). Metro resolves the package's `react-native` field (`src/index.ts`); Jest uses the CJS build. Works with react-native-tvos 0.87.1-1 like any JS module |
 
 **Setup (`src/app/queryClient.ts`).** One `QueryClient` per app process (like `session`), provided in `App.tsx` around the navigator.
 

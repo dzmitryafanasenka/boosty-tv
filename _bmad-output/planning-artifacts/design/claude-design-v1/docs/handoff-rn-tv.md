@@ -1,6 +1,6 @@
 # Boosty TV — handoff для React Native TV
 
-Стек: React Native + `react-native-tvos`, Android TV / Google TV (Chromecast with Google TV 4K). Apple TV позже: компоненты переносимы, платформенные части помечены.
+Стек: React Native + `react-native-tvos`, Android TV / Google TV (Chromecast with Google TV 4K). Apple TV (tvOS) is out of scope (owner decision 2026-10-27).
 
 HTML-макеты и прототип — иллюстрация. Поведение фокуса проверяется только на устройстве.
 
@@ -17,7 +17,7 @@ HTML-макеты и прототип — иллюстрация. Поведен
 | `Sidebar` | Колонка из 5 `NavItem`, ловушка фокуса по вертикали | `current`, `onSelect` | Общая |
 | `Button` | primary / secondary / ghost, малая/обычная, только иконка | `kind`, `size`, `label`, `sub`, `icon`, `count` | Общая |
 | `FilterChip` | `Button` pill + счётчик или значение | `label`, `value`, `count` | Общая |
-| `TextField` | Поле телефона или кода; открывает системную клавиатуру по OK | `kind: 'phone' \| 'code' \| 'search'`, `value`, `error`, `prefix` | Android: `TextInput` с `showSoftInputOnFocus` по OK; tvOS — системный ввод |
+| `TextField` | Поле телефона или кода; открывает системную клавиатуру по OK | `kind: 'phone' \| 'code' \| 'search'`, `value`, `error`, `prefix` | Android: `TextInput` с `showSoftInputOnFocus` по OK |
 | `PostCard` | Превью 16:9, бейдж типа, длительность, прогресс, заголовок 2 строки, автор · дата | `post`, `progress?`, `duration?` | Общая |
 | `AuthorCard` | Плитка автора, метка «Мой блог» | `blog`, `mine` | Общая |
 | `LiveCard` | Эфир: идёт / запланирован / нужен уровень | `stream` | Общая |
@@ -92,5 +92,4 @@ HTML-макеты и прототип — иллюстрация. Поведен
 ## Платформенные пометки
 
 - «Системный видеоплеер» (PLAY-13) — только Android: `Intent.ACTION_VIEW`.
-- DASH на tvOS не поддерживается — список качества там строится только из HLS/MP4.
 - QR генерируется на устройстве, подписанные URL в логи не пишутся (SET-05).

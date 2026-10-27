@@ -161,7 +161,7 @@ Checked: every `sources` path resolves (brief, tokens, handoff, feature-parity, 
 
 ## 8. Shape fit — strong
 
-DESIGN.md follows the canonical order exactly (Brand & Style → Colors → Typography → Layout & Spacing → Elevation & Depth → Shapes → Components → Do's and Don'ts). EXPERIENCE.md has all eight required defaults. The required-when-applicable sections are present: Inspiration is triggered by BoostBuddy, and Responsive & Platform by the 720p/1080p/4K outputs and the later tvOS target. The invented sections earn their place: Visual references holds the override list, and Open items links back to api-contract §8.
+DESIGN.md follows the canonical order exactly (Brand & Style → Colors → Typography → Layout & Spacing → Elevation & Depth → Shapes → Components → Do's and Don'ts). EXPERIENCE.md has all eight required defaults. The required-when-applicable sections are present: Inspiration is triggered by BoostBuddy, and Responsive & Platform by the 720p/1080p/4K outputs. The invented sections earn their place: Visual references holds the override list, and Open items links back to api-contract §8.
 
 ### Findings
 - **[low]** The DESIGN.md frontmatter adds non-spec top-level groups (`focus`, `motion`, `units`, `title`, `status`, `created`, `sources`). They are useful, but generic DESIGN.md tooling may drop `focus` and `motion`, which component tokens reference. *Fix:* keep them, and add one line in the body noting that they are project extensions.

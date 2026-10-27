@@ -4,8 +4,7 @@
 Build an independent, unofficial Boosty client for television. Working title: Boosty TV (placeholder, not approved branding). This is a new React Native application, not a Kotlin UI port and not a WebView wrapper.
 
 - React Native + TypeScript strict + react-native-tvos.
-- Android TV / Google TV FIRST. Complete and validate Android before starting Apple TV implementation.
-- Apple TV is phase 2: preserve portable domain code and platform boundaries now, but do not spend phase-1 effort on tvOS builds, Siri Remote polish, or platform-specific features.
+- Android TV / Google TV only. Apple TV (tvOS) is out of scope (owner decision 2026-10-27): do not plan, build, test or keep code portable for it.
 - Use the unofficial Boosty API. Access only content the signed-in user is entitled to access. No paywall or DRM circumvention.
 - Product scope: feature parity with BoostBuddy, EXCEPT comments. No comment screens, comment actions, or comment API requests. Do not silently reduce parity to a video-only MVP.
 - Do not copy BoostBuddy's interface. Its behavior/API implementation is a reference, not the UX target.
@@ -24,7 +23,7 @@ Publicly described baseline features include subscriptions, posts feed, polls an
 Before implementing production screens:
 1. Inspect the current reference branch/release and record commit SHA and audit date.
 2. Trace screens, navigation, repositories, API methods, settings and player controls.
-3. Create docs/feature-parity.md. For EVERY discovered user-facing capability record: feature, evidence (file/symbol or release reference), expected behavior, API dependency, Android status, tests, Apple TV notes.
+3. Create docs/feature-parity.md. For EVERY discovered user-facing capability record: feature, evidence (file/symbol or release reference), expected behavior, API dependency, Android status, tests.
 4. Classify features as confirmed, inferred, or unverified. Distinguish reference parity from our improvements.
 5. Explicitly inventory auth/session refresh/logout; subscriptions; feed; author pages; search scopes; pagination; filters/tags/sorting; text/images/attachments; audio/video; multiple media per post; polls/voting/results; events; settings; update behavior; player settings and progress persistence. Include only confirmed capabilities as parity obligations, and flag unknowns for investigation.
 6. Mark comments as intentionally excluded. Do not omit other confirmed features without explicit owner approval. For platform-restricted behavior, preserve user intent and document the platform equivalent rather than blindly copying Android implementation.
@@ -34,9 +33,9 @@ Before implementing production screens:
 ## Stack and dependency policy
 - Prefer the maintained React Native TV Community CLI template with native projects under version control. Do not use ordinary mobile React Native core in parallel with react-native-tvos. No Expo adoption without an explicit reason and owner approval.
 - Resolve current compatible stable versions from primary documentation at initialization; record exact versions, package manager, runtime requirements and lockfile. Do not install everything at latest blindly.
-- Prefer a TV-compatible native-backed video library (evaluate react-native-video first). Verify the chosen version supports the RN TV version and future tvOS target with a playback spike. Avoid writing a custom playback engine.
+- Prefer a TV-compatible native-backed video library (evaluate react-native-video first). Verify the chosen version supports the RN TV version on Android TV with a playback spike. Avoid writing a custom playback engine.
 - Default candidates: TanStack Query for remote server state; Zod for boundary validation; Zustand only for truly shared UI/session state. Prefer local React state where adequate.
-- Evaluate navigation and secure-storage libraries against the selected TV stack before adopting them. Do not assume mobile-only modules support tvOS.
+- Evaluate navigation and secure-storage libraries against the selected TV stack before adopting them. Do not assume mobile-only modules support Android TV.
 - Prefer native focus facilities from react-native-tvos and TVFocusGuideView. Do not add a competing JS focus engine unless a reproducible problem justifies it and an ADR documents the decision.
 - No backend required by default. Any auth companion service, proxy, analytics, or sync server requires a separate design and explicit approval.
 
@@ -54,7 +53,7 @@ src/features/player/
 src/features/polls/
 src/features/settings/
 src/shared/api/           # HTTP, DTO schemas, mapping, refresh coordinator
-src/shared/domain/        # portable domain types and rules
+src/shared/domain/        # domain types and rules
 src/shared/platform/      # secure session storage, player/lifecycle adapters
 src/shared/focus/         # focus identity, restoration, shared focus components
 src/shared/ui/            # TV controls and design tokens
@@ -68,7 +67,7 @@ Rules:
 - No HTTP calls, raw API DTO parsing or token handling in screen components.
 - Stable content IDs and media IDs, not list indices, identify cards and playback progress.
 - Separate server state, navigation state, focus state, session secrets and local preferences.
-- Keep Android behavior behind narrow platform modules when it genuinely differs. Do not build speculative universal abstractions.
+- Keep native modules and platform APIs behind narrow adapters in `src/shared/platform`. Do not build speculative universal abstractions.
 - Model unavailable content, unsupported media, expired sessions and empty responses explicitly.
 - Document significant choices in concise ADRs. Update docs when behavior changes.
 
@@ -79,7 +78,7 @@ Rules:
 - The final login experience must work without a mouse. If current Boosty auth prevents this, report it as a release blocker with tested alternatives, not as a completed feature.
 - QR/phone login is a RESEARCH OPTION, not a committed capability. Never show a working-looking QR/code screen without an implemented secure transfer flow. Document expiry, pairing, replay protection and secret handling before implementing a companion flow.
 - Owner decision (2026-10-25, `docs/feature-parity.md` §12 Q1): the selected sign-in method is a native TV form for phone number + one-time code via Boosty's phone-auth API (AUTH-03, `docs/api-contract.md` §2.2). This is an explicit, approved exception to the "custom form" rule above, for this flow only. Never log the phone number, challenge or code, and never persist the challenge or code. The phone number may be persisted only in Keystore-backed secure storage to prefill re-login, and is wiped on logout (owner decision 2026-10-25). Phone input accepts any country code (E.164); `+7` is only a default. Captcha or rate limits that cannot be handled on TV are a release blocker. The website/WebView sign-in is fallback research only. The bans on password collection forms and on QR/companion sign-in still apply.
-- Store session secrets using a verified secure native solution backed by Android Keystore; future tvOS implementation should use Keychain. Never store tokens in plain AsyncStorage, URLs, logs, crash reports, screenshots, fixtures or git.
+- Store session secrets using a verified secure native solution backed by Android Keystore. Never store tokens in plain AsyncStorage, URLs, logs, crash reports, screenshots, fixtures or git.
 - Redact cookies, authorization headers, signed media URLs and personal data from diagnostics. Signing credentials remain outside the repository.
 - Single-flight refresh; bounded retries; prevent refresh loops and request storms. Retry automatically only where safe. Voting and other mutations must not be blindly replayed.
 - Differentiate unauthorized session, insufficient entitlement, expired media URL, unavailable content, rate limits and network failures based on verified responses. Never treat every 403 as an expired token.
@@ -127,9 +126,8 @@ Use design artifacts from Claude Design as visual/interaction specifications, no
 1. Android vertical slice: sign in -> subscriptions/feed -> post -> authorized video -> resume -> return with restored focus.
 2. Complete Android parity except comments: implement all confirmed remaining capabilities and settings from the matrix.
 3. Android polish: error/lifecycle cases, performance, accessibility, visual fidelity, release build and real-device regression.
-4. Apple TV ONLY after owner accepts Android: validate dependencies, implement auth/storage/player adapters and Siri Remote behavior, then run tvOS-specific QA. Shared code alone does not mean Apple TV works.
 
-Do not call phase 1 a feature-complete release. Do not start phase 4 just because shared code compiles.
+Do not call phase 1 a feature-complete release.
 
 ## Tests and definition of done
 - Unit tests: DTO/domain mapping, refresh coordination, pagination merge, filter state, progress identity/persistence and poll mutation rules.
@@ -139,7 +137,7 @@ Do not call phase 1 a feature-complete release. Do not start phase 4 just becaus
 - JS component tests do not prove native focus or decoder behavior. Never claim physical-device verification if only mocks or an emulator were used.
 - Android release build must install and appear in the TV launcher with correct TV manifest/banner assets and no mandatory touchscreen requirement.
 - Pin a test device and build configuration in docs/testing.md. Chromecast with Google TV 4K is a candidate; confirm the available hardware with the owner.
-- Apple TV status remains 'not implemented/not validated' until phase 4, even if a template includes a tvOS target.
+- The template's tvOS target is unused and unsupported; never report Apple TV status as implemented or validated.
 
 For every completed task report: changes, checks actually run, results, unresolved risks and next smallest step. If a toolchain/device is unavailable, report that explicitly.
 
@@ -149,7 +147,7 @@ For every completed task report: changes, checks actually run, results, unresolv
 - Do not replace real integration with permanent mocks and call the task done. Keep an explicit development-only demo mode if useful.
 - Do not add comments functionality, billing, donations, account registration, content creation, multi-profile support, cloud sync or tracking unless reference parity requires it or the owner explicitly approves it.
 - If a confirmed parity feature conflicts with a proposed exclusion or platform limit, document and ask; do not silently drop it.
-- Do not download/install app updates silently. Audit reference update behavior; document a safe Android distribution approach. Future Apple TV distribution is a separate platform concern.
+- Do not download/install app updates silently. Audit reference update behavior; document a safe Android distribution approach.
 - No publishing, credential export, destructive changes or unrelated refactoring without approval.
 
 ## Spec-driven workflow (BMAD)

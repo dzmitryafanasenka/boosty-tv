@@ -1,6 +1,6 @@
 # Focus map
 
-Normative focus contract for every screen of Boosty TV (Android TV, phase 1–3). UI stories implement this file; their component tests and device checks refer to its rows.
+Normative focus contract for every screen of Boosty TV (Android TV, phase 1–3). Apple TV (tvOS) is out of scope (owner decision 2026-10-27). UI stories implement this file; their component tests and device checks refer to its rows.
 
 - **Sources:** the design focus map (`_bmad-output/planning-artifacts/design/claude-design-v1/docs/focus-map.md`, Russian) and its handoff (`docs/handoff-rn-tv.md` in the same package), with every override from `_bmad-output/planning-artifacts/ux-designs/ux-boosty-tv-2026-10-25/EXPERIENCE.md`. Architecture rules: AD-12 (focus identity and restoration), AD-13 (navigation model), AD-20 (phase gating) in the architecture spine, and [ADR 0007](adr/0007-navigation-js-stack.md). Device facts come from the Story 1.2–1.7 spike (`docs/testing.md`).
 - **Precedence:** EXPERIENCE.md > this file > the design focus map > the mocks. A change to focus behavior updates this file in the same change.
