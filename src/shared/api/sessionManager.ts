@@ -16,12 +16,12 @@ import {
 } from './httpClient';
 import { createRefreshCoordinator, type RefreshHost } from './refreshCoordinator';
 import { decodeSession, encode, type ExpiryMarker, type StoredSession } from './session/codec';
+import { createSessionCore } from './session/core';
 import {
   CURRENT_USER_PATH,
   type AccountSwitchHook,
   type RestoreResult,
   type SessionManager,
-  type SessionStatus,
   type SignInArgs,
   type SignInResult,
   type ValidateResult,
@@ -102,78 +102,35 @@ export function createSessionManager({
   onAccountSwitch,
 }: SessionManagerDeps = {}): SessionManager {
   let accountSwitchHook: AccountSwitchHook | null = onAccountSwitch ?? null;
-  let status: SessionStatus = 'signedOut';
-  /** The signed-in session; memory only besides SecureStore. */
-  let session: StoredSession | null = null;
-  /**
-   * The account id of the session that expired (memory, or the stored
-   * marker); null when there is none. Compared with E1 on the next sign-in.
-   */
-  let previousAccountId: string | null = null;
-  /** Bumped by restore, sign-in and sign-out. */
-  let generation = 0;
-  const listeners = new Set<(next: SessionStatus) => void>();
+  const core = createSessionCore({ sessionStore, phoneStore, logger });
   let restoring: Promise<RestoreResult> | null = null;
   let signingIn: { key: string; promise: Promise<SignInResult> } | null = null;
   let validating: Promise<ValidateResult> | null = null;
   let appState = 'active';
-  /** Sign-out has started: the coordinator sees no session. */
-  let signingOut = false;
-  /** Serializes every SecureStore write and clear of this manager. */
-  let storeQueue: Promise<unknown> = Promise.resolve();
-
-  function enqueue<T>(op: () => Promise<T>): Promise<T> {
-    const result = storeQueue.then(op, op);
-    storeQueue = result.catch(() => undefined);
-    return result;
-  }
-
-  const setStatus = (next: SessionStatus) => {
-    if (next === status) {
-      return;
-    }
-    status = next;
-    logger.info('session', 'status', { status: next });
-    for (const listener of [...listeners]) {
-      listener(next);
-    }
-  };
 
   const host: RefreshHost<StoredSession> = {
-    current: () =>
-      status === 'signedIn' && session && !signingOut ? { session, generation } : null,
-    isExpired: () => status === 'expired',
-    isCurrent: g => g === generation,
-    persist: (next, g) =>
-      enqueue(async () => {
-        if (g !== generation || signingOut) {
-          return 'stale' as const;
-        }
-        await sessionStore.write(encode(next));
-        return 'saved' as const;
-      }),
-    adopt(next, g) {
-      if (g !== generation || status !== 'signedIn' || signingOut) {
-        return false;
-      }
-      session = next;
-      return true;
+    current: () => {
+      const session = core.current();
+      return core.getStatus() === 'signedIn' && session && !core.isSigningOut()
+        ? { session, generation: core.generation() }
+        : null;
     },
+    isExpired: () => core.getStatus() === 'expired',
+    isCurrent: g => core.isCurrent(g),
+    persist: (next, g) => core.writeSessionIf(next, () => core.isCurrent(g) && !core.isSigningOut()),
+    adopt: (next, g) => core.adoptRefreshed(next, g),
     expire(g) {
-      if (g !== generation || status !== 'signedIn') {
+      if (!core.isCurrent(g) || core.getStatus() !== 'signedIn') {
         logger.info('session', 'late rejection dropped');
         return false;
       }
       // Nothing further is sent with these tokens; the stored session is
       // replaced by the expiry marker (the phone stays for re-login). A
       // failed write is logged and does not change the status.
-      const accountId = session?.accountId ?? null;
-      previousAccountId = accountId;
-      session = null;
-      setStatus('expired');
+      const accountId = core.markExpired();
       if (accountId) {
         const marker: ExpiryMarker = { v: 1, expired: true, accountId };
-        enqueue(() => sessionStore.write(encode(marker))).catch(() => {
+        core.writeSession(encode(marker)).catch(() => {
           logger.error('session', 'expiry marker not saved');
         });
       }
@@ -190,19 +147,17 @@ export function createSessionManager({
   const http = createHttp(coordinator);
 
   async function readSession(): Promise<RestoreResult> {
-    generation += 1;
-    session = null;
-    previousAccountId = null;
-    const result = await sessionStore.read();
+    core.resetForRestore();
+    const result = await core.readSession();
     if (result.kind === 'empty') {
       // No session, whatever the phone store holds: a kept phone alone may
       // come from a sign-in interrupted between the phone and session writes,
       // so only the expiry marker means `expired`.
-      setStatus('signedOut');
+      core.setStatus('signedOut');
       return { status: 'signedOut', reason: 'none' };
     }
     if (result.kind !== 'value') {
-      setStatus('signedOut');
+      core.setStatus('signedOut');
     }
     if (result.kind === 'wiped') {
       return { status: 'signedOut', reason: 'wiped' };
@@ -214,23 +169,21 @@ export function createSessionManager({
     if (!decoded) {
       // Readable but not a session: treat as corrupted, start clean.
       logger.warn('session', 'stored session unreadable; clearing');
-      setStatus('signedOut');
+      core.setStatus('signedOut');
       try {
-        await enqueue(() => sessionStore.clear());
+        await core.clearSession();
       } catch {
         // Logged by the store; the next start tries again.
       }
       return { status: 'signedOut', reason: 'wiped' };
     }
     if (decoded.kind === 'expired') {
-      previousAccountId = decoded.accountId;
-      setStatus('expired');
+      core.restoreExpired(decoded.accountId);
       return { status: 'expired', reason: 'expired' };
     }
     // A past `expiresAt` is kept as is: the first request refreshes
     // proactively (and E1 runs right after the boot).
-    session = decoded.session;
-    setStatus('signedIn');
+    core.restoreSignedIn(decoded.session);
     return { status: 'signedIn' };
   }
 
@@ -254,9 +207,9 @@ export function createSessionManager({
   }
 
   async function discardSaved(): Promise<void> {
-    for (const store of [sessionStore, phoneStore]) {
+    for (const clear of [core.clearSession, core.clearPhone]) {
       try {
-        await enqueue(() => store.clear());
+        await clear();
       } catch {
         // Logged by the store.
       }
@@ -282,7 +235,7 @@ export function createSessionManager({
       accountId,
     };
     // The previous account: the in-memory session, else the expiry marker.
-    const previous = session?.accountId ?? previousAccountId;
+    const previous = core.current()?.accountId ?? core.previousAccountId();
     const accountChanged = previous === null || previous !== accountId;
     if (accountChanged) {
       // Story 2.8: wipe the previous account before anything of this one is
@@ -305,32 +258,30 @@ export function createSessionManager({
       logger.info('session', 'accountChanged');
     }
     // A new session: any refresh still running for an older one is dropped.
-    generation += 1;
+    core.bumpGeneration();
     // The phone first and non-fatal (it only prefills re-login): its ADR
     // 0006 recovery may delete the shared keychain file, which must happen
     // before the session is written, never after.
     try {
-      await enqueue(() => phoneStore.write(phone));
+      await core.writePhone(phone);
     } catch {
       logger.warn('session', 'phone not saved');
     }
     // Overwrites the expiry marker, if any.
     try {
-      await enqueue(() => sessionStore.write(encode(next)));
+      await core.writeSession(encode(next));
     } catch {
       logger.error('session', 'save failed; nothing kept');
       await discardSaved();
       throw spent();
     }
     logger.info('session', 'signed in', { accountChanged });
-    session = next;
-    previousAccountId = null;
-    setStatus('signedIn');
+    core.adoptSignedIn(next);
     return { accountChanged };
   }
 
   async function doValidate(): Promise<ValidateResult> {
-    if (status !== 'signedIn') {
+    if (core.getStatus() !== 'signedIn') {
       return { kind: 'skipped' };
     }
     try {
@@ -354,21 +305,20 @@ export function createSessionManager({
   }
 
   async function signOut(): Promise<void> {
-    generation += 1;
-    signingOut = true;
+    core.bumpGeneration();
+    core.beginSignOut();
     // SecureStore first, then memory (api-contract §2.3 «Logout order»).
     // The phone before the session entry: a phone failure then leaves the
     // stored session and memory exactly as they were.
     try {
-      await enqueue(() => phoneStore.clear());
-      await enqueue(() => sessionStore.clear());
+      await core.clearPhone();
+      await core.clearSession();
     } finally {
-      signingOut = false;
+      core.endSignOut();
     }
-    session = null;
-    previousAccountId = null;
+    core.clearMemory();
     logger.info('session', 'signed out');
-    setStatus('signedOut');
+    core.setStatus('signedOut');
   }
 
   function corrupt(token: string): string {
@@ -378,19 +328,14 @@ export function createSessionManager({
   }
 
   return {
-    getStatus: () => status,
-    subscribe(listener) {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
-    },
+    getStatus: core.getStatus,
+    subscribe: core.subscribe,
     restore() {
       if (!restoring) {
         restoring = readSession()
           .catch((): RestoreResult => {
             logger.error('session', 'restore failed');
-            setStatus('signedOut');
+            core.setStatus('signedOut');
             return { status: 'signedOut', reason: 'unavailable' };
           })
           .finally(() => {
@@ -419,13 +364,13 @@ export function createSessionManager({
       return promise;
     },
     async getExpiredPhone() {
-      if (status !== 'expired') {
+      if (core.getStatus() !== 'expired') {
         return null;
       }
       try {
-        const phone = await phoneStore.read();
+        const phone = await core.readPhone();
         // The status may have changed while reading.
-        return status === 'expired' && phone.kind === 'value' ? phone.value : null;
+        return core.getStatus() === 'expired' && phone.kind === 'value' ? phone.value : null;
       } catch {
         return null;
       }
@@ -444,8 +389,9 @@ export function createSessionManager({
     authApi: { sendCode: authApi.sendCode, resendCode: authApi.resendCode },
     debugCorruptAccessToken: __DEV__
       ? () => {
-          if (status === 'signedIn' && session) {
-            session = { ...session, accessToken: corrupt(session.accessToken) };
+          const session = core.current();
+          if (core.getStatus() === 'signedIn' && session) {
+            core.replaceAccessToken(corrupt(session.accessToken));
             logger.info('session', 'debug: access token corrupted in memory');
           }
           return validate();
@@ -453,13 +399,11 @@ export function createSessionManager({
       : undefined,
     debugExpireInMemory: __DEV__
       ? () => {
-          if (status === 'signedIn' && session) {
+          if (core.getStatus() === 'signedIn' && core.current()) {
             // As `host.expire`, minus the marker write: storage is untouched.
-            generation += 1;
-            previousAccountId = session.accountId;
-            session = null;
+            core.bumpGeneration();
             logger.info('session', 'debug: expired in memory');
-            setStatus('expired');
+            core.markExpired();
           }
         }
       : undefined,
