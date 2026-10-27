@@ -2,7 +2,7 @@
  * Story 3.4 through the real App with a stored session, over FixtureTransport
  * as the global `fetch`: Главная or Автор → OK on a card → Пост (E8 via
  * TanStack Query), every row of the spec's I/O matrix, the focus rules of
- * docs/focus-map.md §4 F (initial focus, the column guides, ParagraphStop),
+ * docs/focus-map.md §4 F (initial focus, the column guide, ParagraphStop),
  * the shared sidebar (ADR 0012), the author row (→ Автор, push or pop) and
  * Back to the same card. The keychain, BackHandler and the native focus
  * command are faked: these tests prove which element the app asks to focus
@@ -20,10 +20,11 @@ import {
   type FixtureRequest,
   type FixtureTransport,
 } from '../src/shared/api/fixtureTransport';
+import { videoRowsOf, type Post } from '../src/shared/entities/post';
 import { focusRestoration } from '../src/shared/focus';
 import { t } from '../src/shared/i18n';
 import { logger } from '../src/shared/services/logger';
-import { colors } from '../src/shared/ui';
+import { colors, spacing } from '../src/shared/ui';
 import { requestHostFocus } from '../src/shared/ui/requestHostFocus';
 import backHandler from '../src/test/backHandlerMock';
 import { e3Body, syntheticBlogPosts } from '../src/test/authorFixtures';
@@ -31,6 +32,7 @@ import { E5_PATH, syntheticFeed } from '../src/test/feedFixtures';
 import e1Ok from '../src/test/fixtures/boosty/e1-user-current.json';
 import {
   blockEnd,
+  e8Accessible,
   e8Locked,
   e8MissingReply,
   paragraph,
@@ -102,6 +104,21 @@ jest.mock('@shopify/flash-list', () => {
   return { ...actual, FlashList: RecordingFlashList };
 });
 
+/** `phaseFlags.player`, switchable per test (the app reads it at render). */
+const mockPlayerFlag = { on: false };
+jest.mock('../src/app/phaseFlags', () => {
+  const actual = jest.requireActual('../src/app/phaseFlags');
+  return {
+    ...actual,
+    phaseFlags: {
+      ...actual.phaseFlags,
+      get player() {
+        return mockPlayerFlag.on;
+      },
+    },
+  };
+});
+
 const focusMock = requestHostFocus as jest.Mock;
 
 /** As authorFlow: 30 rounds, no timers unless a row needs the AD-6 backoff or a transition. */
@@ -130,6 +147,7 @@ const AUTHOR_CARD = (n: number) => `author/${AUTHOR_BLOG}/post/blog-post-${n}`;
 const TILE = (n: number) => `subs/tile/${blogUrlOf(n)}`;
 const AUTHOR = (postId: string) => `post/${postId}/author`;
 const BLOCK = (postId: string, key: string) => `post/${postId}/block/${key}`;
+const VIDEO = (postId: string, mediaId: string) => `post/${postId}/video/${mediaId}`;
 const ACTION = 'state/post/action';
 const E8_RE = /^\/v1\/blog\/([^/]+)\/post\/([^/]+)$/;
 
@@ -228,6 +246,9 @@ function destinationIds(guide: string): string[] {
 }
 const contentIds = (root: Root) => focusableIds(root, byTestId(root, 'post/content')[0]);
 const pageText = (root: Root) => text(byTestId(root, 'post/page')[0]);
+/** The descendants of `node` with this testID. */
+const within = (node: { queryAll: (p: (n: any) => boolean) => unknown[] }, testID: string) =>
+  node.queryAll((n: any) => n.props.testID === testID);
 
 /** Главная (9 cards, focus on the first) → focus card `n` → OK → Пост. */
 async function openFromHome(n = 0) {
@@ -252,7 +273,7 @@ async function openFromAuthor(n = 1) {
 }
 
 describe('open from Главная (matrix «Text post», «Likes»)', () => {
-  it('OK on a feed card: E8 for that post (comments off, content profile); header left, paragraphs right; focus on the first paragraph', async () => {
+  it('OK on a feed card: E8 for that post (comments off, content profile); header on top, paragraphs below; focus on the first paragraph', async () => {
     const root = await openFromHome(2);
     const id = FEED_ID(2);
     expect(e8Calls()).toHaveLength(1);
@@ -358,7 +379,7 @@ describe('open from Главная (matrix «Text post», «Likes»)', () => {
 });
 
 describe('blocks (matrix «Mixed blocks», «Malformed block»)', () => {
-  it('video, image, file, audio, poll, unknown: one non-focusable placeholder each, in order; text (and a standalone link\'s text) between them', async () => {
+  it('image, file, audio, poll, unknown: one non-focusable placeholder each, in order; text (and a standalone link\'s text) between them; the video is a MediaRow on top', async () => {
     e8 = (_req, blogUrl, postId) => ({
       status: 200,
       body: postDetail(blogUrl, postId, [
@@ -375,8 +396,8 @@ describe('blocks (matrix «Mixed blocks», «Malformed block»)', () => {
     });
     const root = await openFromHome();
     const id = FEED_ID(0);
+    expect(visible(root, BLOCK(id, 'ok_video:v1'))).toBe(false);
     const placeholders = [
-      [BLOCK(id, 'ok_video:v1'), 'Видео'],
       [BLOCK(id, 'image:i1'), 'Изображение'],
       [BLOCK(id, 'file:f1'), 'Файл'],
       [BLOCK(id, 'audio_file:a1'), 'Аудио'],
@@ -388,20 +409,24 @@ describe('blocks (matrix «Mixed blocks», «Malformed block»)', () => {
       expect(node.props.focusable).toBe(false);
       expect(node.props.accessibilityLabel).toBe(label);
       expect(text(node)).toContain(label);
+      // Body placeholders are capped at the text measure, as paragraphs.
+      expect((StyleSheet.flatten(node.props.style) as Record<string, unknown>).maxWidth).toBe(
+        spacing['text-measure'],
+      );
     }
     expect(contentIds(root)).toEqual([
       AUTHOR(id),
+      VIDEO(id, 'v1'),
       BLOCK(id, 'text@1'),
       BLOCK(id, 'link@4'),
       BLOCK(id, 'text@9'),
     ]);
     expect(one(root, BLOCK(id, 'link@4')).props.accessibilityLabel).toBe('Link');
-    // Order on the page: video, Between, image, link (as text), file, audio, poll, unknown, After.
+    // Order on the page: Between, image, link (as text), file, audio, poll, unknown, After.
     const order = byTestId(root, 'post/body')[0]
       .queryAll(n => typeof n.props.testID === 'string' && n.props.testID.startsWith(`post/${id}/block/`) && !n.props.testID.endsWith('/scale'))
       .map(n => n.props.testID as string);
     expect([...new Set(order)]).toEqual([
-      BLOCK(id, 'ok_video:v1'),
       BLOCK(id, 'text@1'),
       BLOCK(id, 'image:i1'),
       BLOCK(id, 'link@4'),
@@ -411,7 +436,7 @@ describe('blocks (matrix «Mixed blocks», «Malformed block»)', () => {
       BLOCK(id, 'brand_new_block@8'),
       BLOCK(id, 'text@9'),
     ]);
-    // No block image is loaded (only the author's avatar); no «Смотреть».
+    // No block image is loaded (only the author's avatar; the video has no preview); no «Смотреть».
     const images = byTestId(root, 'post/page')[0]
       .queryAll(n => n.props.source !== undefined)
       .map(n => n.props.testID);
@@ -459,14 +484,14 @@ describe('blocks (matrix «Mixed blocks», «Malformed block»)', () => {
     await unmount(root);
   });
 
-  it('a post without text: focus on the author; → has no destination', async () => {
+  it('a post with neither a video row nor text: focus on the author; → has no destination', async () => {
     e8 = (_req, blogUrl, postId) => ({
       status: 200,
-      body: postDetail(blogUrl, postId, [{ type: 'ok_video', id: 'v1' }]),
+      body: postDetail(blogUrl, postId, [{ type: 'image', id: 'i1' }, { type: 'ok_video', title: 'no id' }]),
     });
     const root = await openFromHome();
     expect(lastFocusTarget()).toBe(AUTHOR(FEED_ID(0)));
-    expect(destinationIds('post/right')).toEqual([]);
+    expect(destinationIds('post/column')).toEqual([AUTHOR(FEED_ID(0))]);
     await unmount(root);
   });
 });
@@ -550,6 +575,10 @@ describe('locked, missing, errors (matrix «Locked», «Not found», «Error»)'
     e8 = () => e8MissingReply();
     const root = await openFromHome(4);
     expect(visible(root, 'post/unavailable')).toBe(true);
+    // The StateView replaces the column: no column, no header or skeleton.
+    expect(byTestId(root, 'post/column')).toHaveLength(0);
+    expect(byTestId(root, 'post/header')).toHaveLength(0);
+    expect(byTestId(root, 'post/header-skeleton')).toHaveLength(0);
     expect(pageText(root)).toContain('Пост недоступен');
     expect(pageText(root)).not.toContain(t('common.retry'));
     expect(one(root, ACTION).props.accessibilityLabel).toBe(t('common.back'));
@@ -586,6 +615,9 @@ describe('locked, missing, errors (matrix «Locked», «Not found», «Error»)'
     await focusOn(root, FEED_CARD(0));
     await press(root, FEED_CARD(0), { settle: WITH_TIMERS });
     expect(visible(root, 'post/error')).toBe(true);
+    expect(byTestId(root, 'post/column')).toHaveLength(0);
+    expect(byTestId(root, 'post/header')).toHaveLength(0);
+    expect(byTestId(root, 'post/header-skeleton')).toHaveLength(0);
     expect(pageText(root)).toContain(t(`error.${kind}` as 'error.Network'));
     expect(one(root, ACTION).props.accessibilityLabel).toBe(t('common.retry'));
     expect(lastFocusTarget()).toBe(ACTION);
@@ -627,6 +659,10 @@ describe('focus (focus-map §4 F)', () => {
     const root = await openFromHome();
     expect(visible(root, 'post/header-skeleton')).toBe(true);
     expect(visible(root, 'post/body-skeleton')).toBe(true);
+    // Matrix «States»: the skeleton is the single column (header, then body).
+    const [column] = byTestId(root, 'post/column');
+    expect(within(column, 'post/header-skeleton')).toHaveLength(1);
+    expect(within(column, 'post/body-skeleton')).toHaveLength(1);
     expect(contentIds(root)).toEqual([]);
     expect(lastFocusTarget()).toBe('post/nav/home');
     reply.resolve({ status: 200, body: postDetail(FEED_BLOG, FEED_ID(0), THREE) });
@@ -648,21 +684,32 @@ describe('focus (focus-map §4 F)', () => {
     await unmount(root);
   });
 
-  it('the columns: ← lands on the author (left guide), → on the last focused paragraph (right guide); each traps ↑ ↓', async () => {
+  it('one column (owner decision 2026-10-27): header on top, then the body, in one guide that traps ↑ ↓; its destination is the last focused element, else the initial one', async () => {
     const root = await openFromHome();
     const id = FEED_ID(0);
-    expect(destinationIds('post/left')).toEqual([AUTHOR(id)]);
-    expect(destinationIds('post/right')).toEqual([BLOCK(id, 'text@0')]);
+    // No left/right columns any more.
+    expect(byTestId(root, 'post/left')).toHaveLength(0);
+    expect(byTestId(root, 'post/right')).toHaveLength(0);
+    const [column] = byTestId(root, 'post/column');
+    expect(column.props).toMatchObject({ trapFocusUp: true, trapFocusDown: true });
+    expect(column.props.trapFocusLeft).toBeFalsy();
+    expect(column.props.trapFocusRight).toBeFalsy();
+    // The header is the first child of the scrolling column (not pinned).
+    const [scroll] = byTestId(root, 'post/body');
+    expect(within(scroll, 'post/header')).toHaveLength(1);
+    expect(scroll.props.stickyHeaderIndices).toBeUndefined();
+    expect(focusableIds(column)).toEqual([
+      AUTHOR(id),
+      BLOCK(id, 'text@0'),
+      BLOCK(id, 'text@2'),
+      BLOCK(id, 'text@4'),
+    ]);
+    expect(destinationIds('post/column')).toEqual([BLOCK(id, 'text@0')]);
     await focusOn(root, BLOCK(id, 'text@2'));
     await focusOn(root, BLOCK(id, 'text@4'));
+    expect(destinationIds('post/column')).toEqual([BLOCK(id, 'text@4')]);
     await focusOn(root, AUTHOR(id));
-    expect(destinationIds('post/right')).toEqual([BLOCK(id, 'text@4')]);
-    for (const guide of ['post/left', 'post/right']) {
-      const [node] = byTestId(root, guide);
-      expect(node.props).toMatchObject({ trapFocusUp: true, trapFocusDown: true });
-      expect(node.props.trapFocusLeft).toBeFalsy();
-      expect(node.props.trapFocusRight).toBeFalsy();
-    }
+    expect(destinationIds('post/column')).toEqual([AUTHOR(id)]);
     // The content zone: → from the sidebar returns to the remembered element.
     expect(destinationIds('post/content')).toEqual([AUTHOR(id)]);
     // The route is trapped on all sides (the Shell stays mounted below).
@@ -685,6 +732,45 @@ describe('focus (focus-map §4 F)', () => {
       await focusOn(root, BLOCK(id, `text@${i * 2}`));
       expect(destinationIds('post/content')).toEqual([BLOCK(id, `text@${i * 2}`)]);
     }
+    await unmount(root);
+  });
+
+  it('long text (matrix «Long text»): ↓ walks 30 paragraphs to the end with the header scrolling away; ↑ walks back to the author', async () => {
+    const many = Array.from({ length: 30 }, (_, i) => paragraph(`Paragraph ${i}`)).flat();
+    e8 = (_req, blogUrl, postId) => ({ status: 200, body: postDetail(blogUrl, postId, many) });
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    const [scroll] = byTestId(root, 'post/body');
+    // The header is inside the scrolling column, so it scrolls away (never pinned).
+    expect(within(scroll, 'post/header')).toHaveLength(1);
+    expect(scroll.props.stickyHeaderIndices).toBeUndefined();
+    const stops = focusableIds(byTestId(root, 'post/column')[0]);
+    expect(stops).toEqual([AUTHOR(id), ...Array.from({ length: 30 }, (_, i) => BLOCK(id, `text@${i * 2}`))]);
+    for (const stop of stops.slice(1)) {
+      await focusOn(root, stop);
+      expect(destinationIds('post/column')).toEqual([stop]);
+    }
+    for (const stop of [...stops].reverse()) {
+      await focusOn(root, stop);
+      expect(destinationIds('post/content')).toEqual([stop]);
+    }
+    expect(destinationIds('post/column')).toEqual([AUTHOR(id)]);
+    await unmount(root);
+  });
+
+  it('the sidebar (matrix «Sidebar»): ← from a paragraph leaves the column for `post/nav/<origin>`; → returns to that paragraph', async () => {
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    const [column] = byTestId(root, 'post/column');
+    // The sidebar is outside the column, and the column does not trap ← →.
+    expect(within(column, 'post/nav/home')).toHaveLength(0);
+    expect(column.props.trapFocusLeft).toBeFalsy();
+    await focusOn(root, BLOCK(id, 'text@2'));
+    await focusOn(root, 'post/nav/home');
+    expect(currentRoute()).toBe('Post');
+    // → from the sidebar: the content zone's (and the column's) remembered paragraph.
+    expect(destinationIds('post/content')).toEqual([BLOCK(id, 'text@2')]);
+    expect(destinationIds('post/column')).toEqual([BLOCK(id, 'text@2')]);
     await unmount(root);
   });
 
@@ -949,3 +1035,283 @@ describe('the sidebar (ADR 0012)', () => {
   });
 });
 
+
+describe('media rows (Story 3.5, focus-map §4 F)', () => {
+  const PREVIEW = 'https://example.invalid/preview';
+  const okVideo = (id: string | undefined, more: Record<string, unknown> = {}) => ({
+    type: 'ok_video',
+    ...(id === undefined ? {} : { id }),
+    ...more,
+  });
+  const TWO = [
+    okVideo('v1', { title: 'Часть первая', duration: 754, preview: PREVIEW }),
+    ...paragraph('First'),
+    okVideo('v2', { title: '' }),
+    ...paragraph('Second'),
+  ];
+  const withData = (data: unknown[]) => {
+    e8 = (_req, blogUrl, postId) => ({ status: 200, body: postDetail(blogUrl, postId, data) });
+  };
+  /** A row's text line (label, title or duration). */
+  const lineOf = (root: Root, testID: string) => byTestId(root, testID)[0]?.props.children;
+  /** The column's stops below the header, in page order (rows, then paragraphs). */
+  const bodyStops = (root: Root, id: string) =>
+    focusableIds(root, byTestId(root, 'post/body')[0]).filter(
+      x => x.startsWith(`post/${id}/`) && x !== AUTHOR(id),
+    );
+
+  it('two videos + text (matrix «Two videos»): «Видео 1», «Видео 2» on top in block order, then the paragraphs; focus on row 1', async () => {
+    withData(TWO);
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    expect(bodyStops(root, id)).toEqual([
+      VIDEO(id, 'v1'),
+      VIDEO(id, 'v2'),
+      BLOCK(id, 'text@1'),
+      BLOCK(id, 'text@4'),
+    ]);
+    expect(contentIds(root)[0]).toBe(AUTHOR(id));
+    expect(lineOf(root, `${VIDEO(id, 'v1')}/label`)).toBe('Видео 1');
+    expect(lineOf(root, `${VIDEO(id, 'v2')}/label`)).toBe('Видео 2');
+    expect(lineOf(root, `${VIDEO(id, 'v1')}/title`)).toBe('Часть первая');
+    // Matrix «Duration»: 754 s → «12:34»; missing → nothing.
+    expect(lineOf(root, `${VIDEO(id, 'v1')}/duration`)).toBe('12:34');
+    expect(visible(root, `${VIDEO(id, 'v2')}/duration`)).toBe(false);
+    // Matrix «No title»: «Видео N» only.
+    expect(visible(root, `${VIDEO(id, 'v2')}/title`)).toBe(false);
+    expect(one(root, VIDEO(id, 'v1')).props.accessibilityLabel).toBe('Видео 1. Часть первая. 12:34');
+    expect(one(root, VIDEO(id, 'v2')).props.accessibilityLabel).toBe('Видео 2');
+    // No video placeholders, no action, status or progress (Epic 4).
+    expect(visible(root, BLOCK(id, 'ok_video:v1'))).toBe(false);
+    for (const forbidden of ['Смотреть', 'Продолжить', 'С начала', 'Не начато', 'Осталось', 'Просмотрено']) {
+      expect(pageText(root)).not.toContain(forbidden);
+    }
+    // Initial focus: the first row (after the skeleton's sidebar item).
+    expect(focusTargets()).toEqual(['post/nav/home', VIDEO(id, 'v1')]);
+    expect(destinationIds('post/column')).toEqual([VIDEO(id, 'v1')]);
+    // Layout: the header first, then the rows at full width, then the text capped at the measure.
+    const [scroll] = byTestId(root, 'post/body');
+    expect(focusableIds(scroll)[0]).toBe(AUTHOR(id));
+    const outer = (testID: string) =>
+      StyleSheet.flatten(byTestId(root, testID)[0].props.style) as Record<string, unknown>;
+    expect(outer(VIDEO(id, 'v1')).maxWidth).toBeUndefined();
+    expect(outer(BLOCK(id, 'text@1')).maxWidth).toBe(spacing['text-measure']);
+    await unmount(root);
+  });
+
+  it('one video (matrix «One video»): one row «Видео 1», focused', async () => {
+    withData([okVideo('solo', { title: 'Solo', duration: 60 })]);
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    expect(bodyStops(root, id)).toEqual([VIDEO(id, 'solo')]);
+    expect(lineOf(root, `${VIDEO(id, 'solo')}/label`)).toBe('Видео 1');
+    expect(lastFocusTarget()).toBe(VIDEO(id, 'solo'));
+    await unmount(root);
+  });
+
+  it('thumbnails (matrix «No preview»): the preview URL with no headers; missing or failed → the placeholder', async () => {
+    withData(TWO);
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    const [thumb] = byTestId(root, `${VIDEO(id, 'v1')}/thumb`);
+    expect(thumb.props.source).toEqual({ uri: PREVIEW });
+    expect(thumb.props.resizeMethod).toBe('resize');
+    expect(thumb.props.fadeDuration).toBe(0);
+    expect(visible(root, `${VIDEO(id, 'v2')}/thumb-placeholder`)).toBe(true);
+    await act(async () => thumb.props.onError({ nativeEvent: {} }));
+    expect(visible(root, `${VIDEO(id, 'v1')}/thumb`)).toBe(false);
+    expect(visible(root, `${VIDEO(id, 'v1')}/thumb-placeholder`)).toBe(true);
+    // Images never go through the API transport.
+    expect(transport.calls.every(c => !c.url.includes('example.invalid'))).toBe(true);
+    await unmount(root);
+  });
+
+  it('a video without an id (matrix «No id»): a neutral placeholder, no row; it does not count for «Видео N»', async () => {
+    withData([okVideo(undefined, { title: 'No id' }), okVideo('v2'), ...paragraph('Text')]);
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    const [placeholder] = byTestId(root, BLOCK(id, 'ok_video@0'));
+    expect(placeholder.props.focusable).toBe(false);
+    expect(placeholder.props.accessibilityLabel).toBe('Видео');
+    expect(bodyStops(root, id)).toEqual([VIDEO(id, 'v2'), BLOCK(id, 'text@2')]);
+    expect(lineOf(root, `${VIDEO(id, 'v2')}/label`)).toBe('Видео 1');
+    await unmount(root);
+  });
+
+  it('a duplicate id (matrix «Duplicate id»): one row (the first)', async () => {
+    withData([okVideo('v1', { title: 'A' }), okVideo('v1', { title: 'B' }), ...paragraph('Text')]);
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    expect(bodyStops(root, id)).toEqual([VIDEO(id, 'v1'), BLOCK(id, 'text@2')]);
+    expect(byTestId(root, VIDEO(id, 'v1')).filter(n => n.props.focusable === true)).toHaveLength(1);
+    expect(lineOf(root, `${VIDEO(id, 'v1')}/title`)).toBe('A');
+    await unmount(root);
+  });
+
+  it('locked (matrix «Locked»): no rows; focus on the author', async () => {
+    e8 = (_req, blogUrl, postId) => {
+      const body = e8Locked();
+      return {
+        status: 200,
+        body: {
+          ...body,
+          id: postId,
+          user: { ...(body.user as object), blogUrl },
+          teaser: [okVideo('teaser-video'), ...(body.teaser as unknown[])],
+        },
+      };
+    };
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    expect(focusableIds(root).filter(x => x.startsWith(`post/${id}/video/`))).toEqual([]);
+    // A teaser video is a neutral placeholder, not a row.
+    expect(byTestId(root, BLOCK(id, 'ok_video:teaser-video'))[0].props.focusable).toBe(false);
+    expect(contentIds(root)).toEqual([AUTHOR(id)]);
+    expect(lastFocusTarget()).toBe(AUTHOR(id));
+    await unmount(root);
+  });
+
+  it('domain shape (matrix «Domain shape», live E8): no timeCode, playerUrls or signedQuery in the Post, the rows\' props, the query key or the route', async () => {
+    e8 = (_req, blogUrl, postId) => {
+      const body = e8Accessible();
+      return { status: 200, body: { ...body, id: postId, user: { ...(body.user as object), blogUrl } } };
+    };
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    const rows = bodyStops(root, id).filter(x => x.includes('/video/'));
+    expect(rows).toEqual([VIDEO(id, 'synthetic-id-7')]);
+    expect(lineOf(root, `${VIDEO(id, 'synthetic-id-7')}/duration`)).toBe('1:06:00');
+    const forbidden = /timeCode|playerUrls|signedQuery|example\.invalid\/player/;
+    const cached = queryClient.getQueryData(queryKeys.post(FEED_BLOG, id));
+    expect(JSON.stringify(cached)).not.toMatch(forbidden);
+    expect(JSON.stringify(queryKeys.post(FEED_BLOG, id))).not.toMatch(forbidden);
+    expect(JSON.stringify(navigationRef.getCurrentRoute()?.params)).not.toMatch(forbidden);
+    // The rows' data (what MediaRow receives) and every host prop under a row.
+    const post = (cached as { post: Post }).post;
+    expect(JSON.stringify(videoRowsOf(post))).not.toMatch(forbidden);
+    const rowNodes = root.container.queryAll(
+      n => typeof n.props.testID === 'string' && n.props.testID.startsWith(`post/${id}/video/`),
+    );
+    expect(rowNodes.length).toBeGreaterThan(0);
+    for (const node of rowNodes) {
+      const props = Object.entries(node.props).filter(([key]) => key !== 'children');
+      expect(JSON.stringify(props)).not.toMatch(forbidden);
+    }
+    expect(JSON.stringify(root.container.toJSON())).not.toMatch(forbidden);
+    await unmount(root);
+  });
+
+  it('↑ ↓ through the author, the rows, then the paragraphs in one column (matrix «Up to author»); the guide remembers the last one', async () => {
+    withData(TWO);
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    const column = byTestId(root, 'post/column')[0];
+    // One trapped column: ↑ from the first row reaches the author above it.
+    expect(focusableIds(column)).toEqual([
+      AUTHOR(id),
+      VIDEO(id, 'v1'),
+      VIDEO(id, 'v2'),
+      BLOCK(id, 'text@1'),
+      BLOCK(id, 'text@4'),
+    ]);
+    expect(column.props).toMatchObject({ trapFocusUp: true, trapFocusDown: true });
+    await focusOn(root, VIDEO(id, 'v2'));
+    expect(destinationIds('post/content')).toEqual([VIDEO(id, 'v2')]);
+    expect(destinationIds('post/column')).toEqual([VIDEO(id, 'v2')]);
+    await focusOn(root, BLOCK(id, 'text@1'));
+    await focusOn(root, VIDEO(id, 'v2'));
+    await focusOn(root, VIDEO(id, 'v1'));
+    await focusOn(root, AUTHOR(id));
+    expect(destinationIds('post/column')).toEqual([AUTHOR(id)]);
+    expect(destinationIds('post/content')).toEqual([AUTHOR(id)]);
+    await unmount(root);
+  });
+
+  it('`phaseFlags.player` reaches the rows: off → the text role and no action; on → the button role, still no action', async () => {
+    withData(TWO);
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    expect(one(root, VIDEO(id, 'v1')).props.accessibilityRole).toBe('text');
+    expect(one(root, VIDEO(id, 'v1')).props.onPress).toBeUndefined();
+    await unmount(root);
+    mockPlayerFlag.on = true;
+    try {
+      const on = await openFromHome();
+      expect(one(on, VIDEO(id, 'v1')).props.accessibilityRole).toBe('button');
+      expect(one(on, VIDEO(id, 'v1')).props.onPress).toBeUndefined();
+      expect(pageText(on)).not.toContain('Смотреть');
+      await unmount(on);
+    } finally {
+      mockPlayerFlag.on = false;
+    }
+  });
+
+  it('OK on a row does nothing (no player before Epic 4): no request, no route, no focus move', async () => {
+    withData(TWO);
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    await focusOn(root, VIDEO(id, 'v1'));
+    const before = transport.calls.length;
+    focusMock.mockClear();
+    await press(root, VIDEO(id, 'v1'));
+    expect(currentRoute()).toBe('Post');
+    expect(routeNames()).toEqual(['Shell', 'Post']);
+    expect(transport.calls).toHaveLength(before);
+    expect(focusTargets()).toEqual([]);
+    await unmount(root);
+  });
+
+  it('Back from a row → the origin card; Автор from the author row and Back → the author row', async () => {
+    withData(TWO);
+    const root = await openFromHome(5);
+    const id = FEED_ID(5);
+    await focusOn(root, VIDEO(id, 'v2'));
+    await focusOn(root, AUTHOR(id));
+    await press(root, AUTHOR(id));
+    expect(currentRoute()).toBe('Author');
+    focusMock.mockClear();
+    await back();
+    expect(currentRoute()).toBe('Post');
+    expect(lastFocusTarget()).toBe(AUTHOR(id));
+    // The column remembers the author (the last focused element).
+    expect(destinationIds('post/column')).toEqual([AUTHOR(id)]);
+    await focusOn(root, VIDEO(id, 'v2'));
+    focusMock.mockClear();
+    await back();
+    expect(currentRoute()).toBe('Shell');
+    expect(lastFocusTarget()).toBe(FEED_CARD(5));
+    await unmount(root);
+  });
+
+  it('a refetch that drops the focused row: the initial target (the first row)', async () => {
+    withData(TWO);
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    await focusOn(root, VIDEO(id, 'v2'));
+    focusMock.mockClear();
+    await act(async () => {
+      queryClient.setQueryData(queryKeys.post(FEED_BLOG, id), (data: any) => ({
+        ...data,
+        post: {
+          ...data.post,
+          blocks: data.post.blocks.filter((b: { type: string; id?: string }) => b.id !== 'v2'),
+        },
+      }));
+    });
+    await settle();
+    expect(visible(root, VIDEO(id, 'v2'))).toBe(false);
+    expect(focusTargets()).toEqual([VIDEO(id, 'v1')]);
+    await unmount(root);
+  });
+
+  it('reopening the post within staleTime: from the cache, the first row at once', async () => {
+    withData(TWO);
+    const root = await openFromHome();
+    await back();
+    focusMock.mockClear();
+    await press(root, FEED_CARD(0));
+    expect(e8Calls()).toHaveLength(1);
+    expect(focusTargets()).toEqual([VIDEO(FEED_ID(0), 'v1')]);
+    await unmount(root);
+  });
+});

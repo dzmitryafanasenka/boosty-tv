@@ -13,6 +13,7 @@ import { createLogger } from '../../services/logger';
 import { feedPost, lockedPost } from '../../../test/feedFixtures';
 import { AuthorCard } from '../AuthorCard';
 import { Button } from '../Button';
+import { MediaRow } from '../MediaRow';
 import { NavItem } from '../NavItem';
 import { PostCard } from '../PostCard';
 import { SettingRow } from '../SettingRow';
@@ -30,6 +31,22 @@ const consumers: Array<[string, () => ReactElement]> = [
   ['SettingRow info', () => <SettingRow testID={ID} kind="info" label="x" value="1" />],
   ['PostCard', () => <PostCard testID={ID} post={asPost(feedPost(1))} width={221} />],
   ['PostCard locked', () => <PostCard testID={ID} post={asPost(lockedPost())} width={221} />],
+  [
+    'MediaRow',
+    () => (
+      <MediaRow
+        testID={ID}
+        playable={false}
+        row={{
+          ref: { blogUrl: 'b', postId: 'p', mediaId: 'm' },
+          index: 0,
+          title: 't',
+          durationSec: 60,
+          previewUrl: 'https://example.invalid/preview',
+        }}
+      />
+    ),
+  ],
   [
     'AuthorCard',
     () => (

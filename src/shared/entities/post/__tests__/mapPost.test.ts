@@ -157,6 +157,15 @@ describe('blocks and kinds', () => {
     previewUrl: null,
   });
 
+  it('kindOf counts distinct non-empty video ids, as the Post screen\'s rows (Story 3.5)', () => {
+    expect(kindOf(true, [video('a'), video('a')])).toEqual({ kind: 'video' });
+    expect(kindOf(true, [video('a'), video(''), video('a')])).toEqual({ kind: 'video' });
+    expect(kindOf(true, [video('a'), video('a'), video('b')])).toEqual({ kind: 'videos', count: 2 });
+    // Every video id-less: the count of video blocks, as before.
+    expect(kindOf(true, [video(''), video('')])).toEqual({ kind: 'videos', count: 2 });
+    expect(kindOf(true, [video('')])).toEqual({ kind: 'video' });
+  });
+
   it('kindOf: locked, N videos, video, audio, poll, file, text', () => {
     expect(kindOf(false, [video('a')])).toEqual({ kind: 'locked' });
     expect(kindOf(true, [video('a'), video('b'), video('c')])).toEqual({ kind: 'videos', count: 3 });

@@ -60,3 +60,10 @@ export {
   type PostGridProps,
   type PostRowItem,
 } from './PostGrid';
+export {
+  MediaRow,
+  MediaRowView,
+  mediaRowA11yLabel,
+  mediaRowLabel,
+  type MediaRowProps,
+} from './MediaRow';

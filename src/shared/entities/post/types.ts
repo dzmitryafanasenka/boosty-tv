@@ -101,3 +101,29 @@ export type PostPage = {
  * «Пост недоступен», no retry).
  */
 export type PostResult = { kind: 'ok'; post: Post } | { kind: 'unavailable' };
+
+/**
+ * A playable item (AD-9): the post's blog, the post and the `ok_video` id.
+ * The only media identity for keys, focus ids, routes and progress (Epic
+ * 4); never an index, a URL, `timeCode` or a signed value.
+ */
+export type MediaRef = {
+  blogUrl: string;
+  postId: string;
+  mediaId: string;
+};
+
+/**
+ * One MediaRow of the Post screen (Story 3.5): a video of an accessible
+ * post, in block order. `index` is its position among the rows (0-based;
+ * the row reads «Видео {index + 1}»), for display only, never identity.
+ */
+export type VideoRow = {
+  ref: MediaRef;
+  index: number;
+  /** Empty when the video has no title. */
+  title: string;
+  /** Seconds, when the API gives it. */
+  durationSec: number | null;
+  previewUrl: string | null;
+};

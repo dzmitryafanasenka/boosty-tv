@@ -3,7 +3,7 @@ import type { Block, ListItem } from './types';
 /**
  * The Post screen's body (Story 3.4): the blocks as plain paragraphs and
  * neutral placeholders, in order. Styles, emoji, links, images, files,
- * audio and polls are Epic 6; video rows are Story 3.5.
+ * audio and polls are Epic 6.
  *
  * - `text` fragments are merged until a `BLOCK_END` fragment ends the
  *   paragraph. A `link` block is a fragment too (owner decision 2026-10-27,
@@ -17,10 +17,15 @@ import type { Block, ListItem } from './types';
  *   stops (`splitParagraph`), so ↓ walks through the text (owner decision
  *   2026-10-27, option A): Android scrolls a focused view only to its top,
  *   so a stop taller than the column would hide its rest.
- * - Every other block (video, image, file, audio, poll, unknown or
- *   malformed) is one placeholder.
- * - Every other block (video, image, file, audio, poll, unknown or
- *   malformed) is one placeholder.
+ * - An `ok_video` block with an id is a MediaRow above the body (Story
+ *   3.5, `videoRowsOf`), so it leaves the body when the caller passes
+ *   `videoRows: true` (the Post body of an accessible post; default off, so a
+ *   teaser or any other caller keeps its videos as placeholders). A video
+ *   without an id stays a `video` placeholder: an `ok_video` block whose id
+ *   is `''` (the type allows it; the DTO normally rejects it), or the
+ *   mapper's `Block.Unknown` with raw type `ok_video` (id missing).
+ * - Every other block (image, file, audio, poll, unknown or malformed) is
+ *   one placeholder.
  *
  * Keys (focus-map §1.5, block keys): `<type>:<id>` when the block has an
  * id, else `<type>@<index in data[]>`; a paragraph uses its first fragment's
@@ -29,15 +34,17 @@ import type { Block, ListItem } from './types';
  */
 
 /**
- * The longest ParagraphStop, in characters. The right column's text is
- * about 422 dp wide (720 content − 232 left column − 24 gap − 2 × 12
- * headroom − 18 paragraph padding and bar): ≈ 55 Cyrillic characters per
- * line at `typography.body` (14 sp, ≈ 7.7 dp per character), 22 dp per
- * line. 400 characters ≈ 8 lines ≈ 190 dp with the padding, well under
- * the column's ≈ 470 dp viewport (540 − 2 × 27 safe area − 12 headroom),
- * even with the wider glyphs of all-caps or emoji lines.
+ * The longest ParagraphStop, in characters. The Post column's text is
+ * capped at `spacing['text-measure']` (600 dp, owner decision 2026-10-27,
+ * header on top): 600 − 18 paragraph padding and bar ≈ 582 dp ≈ 75
+ * Cyrillic characters per line at `typography.body` (14 sp, ≈ 7.7 dp per
+ * character), 22 dp per line. 600 characters ≈ 8 lines ≈ 190 dp with the
+ * padding, well under the column's ≈ 470 dp viewport (540 − 2 × 27 safe
+ * area − 12 headroom), even with the wider glyphs of all-caps or emoji
+ * lines. (In the former two-column layout the text was ≈ 422 dp wide and
+ * the budget 400.)
  */
-export const PARAGRAPH_STOP_MAX_CHARS = 400;
+export const PARAGRAPH_STOP_MAX_CHARS = 600;
 
 /**
  * The cut position for a part that starts at `start` (`text.length - start`
@@ -133,6 +140,9 @@ function placeholderKind(block: Block): PlaceholderKind {
       return 'audio';
     case 'poll':
       return 'poll';
+    case 'unknown':
+      // An `ok_video` without an id: no MediaRef, a neutral video placeholder.
+      return block.rawType === 'ok_video' ? 'video' : 'unknown';
     default:
       return 'unknown';
   }
@@ -166,7 +176,15 @@ function listLines(items: readonly ListItem[], depth: number, out: string[]): vo
   }
 }
 
-export function postBodyItems(blocks: readonly Block[]): PostBodyItem[] {
+export type PostBodyOptions = {
+  /** The post's videos with an id are MediaRows: leave them out (default false). */
+  videoRows?: boolean;
+};
+
+export function postBodyItems(
+  blocks: readonly Block[],
+  { videoRows = false }: PostBodyOptions = {},
+): PostBodyItem[] {
   const items: PostBodyItem[] = [];
   const used = new Set<string>();
   /** Keys are unique within the body: a repeated id falls back to the index. */
@@ -199,6 +217,12 @@ export function postBodyItems(blocks: readonly Block[]): PostBodyItem[] {
   };
   blocks.forEach((block, index) => {
     if (block.type === 'link' && block.text.length === 0) {
+      return;
+    }
+    if (videoRows && block.type === 'ok_video' && block.id.length > 0) {
+      // A MediaRow above the body. It still ends the paragraph in progress,
+      // so the text around it keeps the paragraphs (and keys) it had.
+      flush();
       return;
     }
     if (block.type === 'text' || block.type === 'link') {

@@ -129,8 +129,8 @@ export const ru = {
     loadMoreError: 'Не удалось загрузить следующие публикации.',
   },
   // Пост (Story 3.4, E8; docs/focus-map.md §4 F). Missing post (E8 404,
-  // `not_found` verified): «Назад» only, no retry. Blocks other than text
-  // are neutral placeholders until Story 3.5 / Epic 6. `likes` forms carry
+  // `not_found` verified): «Назад» only, no retry. Videos are MediaRows
+  // (Story 3.5); other blocks are neutral placeholders until Epic 6. `likes` forms carry
   // `{n}`. No comment count anywhere.
   post: {
     loading: 'Загружаем пост',
@@ -147,6 +147,15 @@ export const ru = {
       audio: 'Аудио',
       poll: 'Опрос',
       unknown: 'Блок',
+    },
+    // DESIGN.md MediaRow (Story 3.5): «Видео N», the title, the duration.
+    // No status or action before Epic 4 (progress, «Смотреть»).
+    video: {
+      label: 'Видео {n}',
+      a11y: '{label}. {title}. {duration}',
+      a11yNoTitle: '{label}. {duration}',
+      a11yNoDuration: '{label}. {title}',
+      a11yLabelOnly: '{label}',
     },
   },
   common: {

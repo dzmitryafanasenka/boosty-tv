@@ -57,7 +57,7 @@ import type * as DevFocusModule from './dev/devFocus';
 import { queryClient, resetQueryCache } from './queryClient';
 import type { RootStackParamList } from './routes';
 import { DEMO_ACTIVE, session } from './session';
-import { enabledSections, type SectionId } from './phaseFlags';
+import { enabledSections, phaseFlags, type SectionId } from './phaseFlags';
 import { SessionUiContext, useSessionUi, type SessionUi } from './sessionUi';
 import { Shell } from './Shell';
 import { NAV_ID, Sidebar, sidebarLayout, useSidebarNav } from './Sidebar';
@@ -517,6 +517,7 @@ function PostRoute({ navigation, route }: StackScreenProps<RootStackParamList, '
           focus={focus}
           onBack={sidebar.onBack}
           onOpenAuthor={onOpenAuthor}
+          playerEnabled={phaseFlags.player}
         />
       </FocusZone>
     </Screen>

@@ -733,3 +733,45 @@ Host tests: `__tests__/postFlow.test.tsx` (every matrix row; initial focus first
 Seen on the device: the live posts put links inline (`text`, `link`, `text`, `BLOCK_END`), so the first build split such a sentence with a «Ссылка» placeholder. Owner decision 2026-10-27: a link's text stays in its paragraph as plain text (no placeholder); implemented and host-tested after the device run, not yet re-run on the device. An open Пост is not refreshed on resume (only Главная's and Автор's heads are); E8 is requested again only when Пост is reopened after `staleTime` (60 s). Not re-run on the device after the review fixes: the inline-link merge and the split of paragraphs longer than 400 characters into several stops (host-tested). Not verified on the device: the locked post, «Пост недоступен» and the error state (host and demo only); a post with a list, a poll, audio or a file; TalkBack labels; the physical remote; performance of very long posts (the right column is a plain ScrollView, not virtualized).
 
 Re-run after the review fixes (2026-10-27, agent by adb, a fresh release-like build, the owner's session): Главная → OK on the first card → Пост, focus on the first paragraph; the live post's inline links read as plain text inside their paragraphs (no «Ссылка» placeholder); the only placeholder is «Видео»; 6 × ↓ walk the paragraphs with the focused one scrolled into view (accent bar shown); Back → the same feed card. That post had no paragraph over the stop budget, so the long-paragraph split was not seen on the device (host-tested). Not checked by the owner with the physical remote.
+
+### Story 3.5 — Media rows in a post, 2026-10-27
+
+**Status: implemented and host-tested; the main path verified on the pinned device (Chromecast with Google TV 4K, release-like build, the owner's existing session) by the agent with adb (injected keys, uiautomator, screencap). Not yet checked by the owner with the physical remote.**
+
+**Build:** `./gradlew assembleRelease -PreactNativeArchitectures=armeabi-v7a` (JDK 17) BUILD SUCCESSFUL; release-like (`zipalign -p 4` + `apksigner`, SDK debug key outside the repo), installed with `adb install -r`. The shipped Hermes bundle: `state/post/action` 1, `createDemoSessionManager` 0. Nothing uninstalled or cleared; no sign-in, no sign-out.
+
+| Check | Result | Who / how |
+|---|---|---|
+| Главная → OK on a one-video post | One MediaRow on top of the right column: thumbnail, «Видео 1», the title, «1:13:30»; focus on the row (ring, `surface-focus-row`); the paragraphs follow; no «Смотреть» or status | agent, adb (screencap, uiautomator) |
+| ↓ / ↑ / ← / → | ↓ → the first paragraph; ↑ → the row; ← → the author row; → → back to the row | agent, adb |
+| OK on the row | Nothing: focus stays on the row, Пост stays | agent, adb (uiautomator) |
+| Back from the row | Главная, focus on the same card | agent, adb |
+| A two-video post (feed, «2 видео») | Two rows «Видео 1», «Видео 2» on top; focus on row 1. Row 1 had no preview and no duration in the live data: the neutral thumbnail plate, «Видео 1», its title, no duration line (label «Видео 1. Video»); row 2: thumbnail, title, «47:33» | agent, adb (screencap, uiautomator) |
+| ↓ ↓ ↑ ← → Back on the two-video post | Row 1 → row 2 → `text@0` → row 2 → author → row 2 (the remembered row) → Back: the same feed card | agent, adb (uiautomator) |
+
+Host tests: `__tests__/postFlow.test.tsx` «media rows» (every matrix row: two videos on top in block order with focus on row 1, one video, no title, duration «12:34» / none, no preview and a failed preview, no id → placeholder, duplicate id → one row, locked → no rows and the author, the domain shape on the live E8 fixture (no `timeCode` / `playerUrls` / `signedQuery` / player URL in the cached Post, the rows, the query key, the route params or the row props); ↑ ↓ rows then paragraphs, the column guides, OK on a row does nothing, Back to the card and the author row round trip, a refetch that drops the focused row, a cached reopen), the Story 3.4 tests updated (a video is a row, not a placeholder), `__tests__/demoFlow.test.tsx` (a demo post with two videos, the second without a title), unit tests `mediaRows.test.ts` (`videoRowsOf` / `mediaRefsOf`, domain shape), `postBody.test.ts` (videos leave the body; an id-less video stays a placeholder), `MediaRow.test.tsx` (states, label, thumbnail, native view budget ≤ 6), `surfaceRules.test.tsx`, `phaseFlags.test.ts` (`player: false`). The full suite ran 3× green (1103 tests); the new and changed suites ran 30× green.
+
+Not verified on the device: a failed thumbnail load (host only), a video without an id and a duplicate id (no live sample; host only), the locked post (Story 3.6), TalkBack reading the row labels (uiautomator shows the content descriptions), the physical remote.
+
+Story 3.5 review fixes (2026-10-27; host only, not re-run on the device): the `player` flag reaches the rows (off: no action, text role), the feed badge counts distinct video ids, `postBodyItems` keeps videos as placeholders unless the Post body asks for rows, thumbnail failure resets on a new preview URL. Orchestrator: lint, typecheck, check:fixtures clean; `npm test` ×3 1109 passed; post, demo, MediaRow and post-entity suites 30/30.
+
+### Post screen: header on top, 2026-10-27
+
+Owner decision 2026-10-27 (spec `_bmad-output/implementation-artifacts/spec-post-header-layout.md`): the Post screen is one vertically scrolling column (header → MediaRows → body) instead of two columns; body text capped at `spacing['text-measure']` (600 dp); `PARAGRAPH_STOP_MAX_CHARS` 400 → 600. Focus ids, components, states and restoration unchanged (docs/focus-map.md §4 F «Header on top»).
+
+**Status: implemented and host-tested; the main path verified on the pinned device (Chromecast with Google TV 4K, release-like build, the owner's existing session) by the agent with adb (injected keys, screencap). Not checked by the owner with the physical remote.**
+
+**Build:** `./gradlew assembleRelease -PreactNativeArchitectures=armeabi-v7a` (JDK 17, `ANDROID_HOME=/opt/homebrew/share/android-commandlinetools`) BUILD SUCCESSFUL; release-like (`zipalign -p 4` + `apksigner`, SDK debug key outside the repo), installed with `adb install -r`. Nothing uninstalled or cleared; no sign-in, no sign-out.
+
+| Check | Result | Who / how |
+|---|---|---|
+| Главная → OK on a one-video post | Header on top (author row, title on one line, «сегодня, 10:40 · 0 лайков»), then the MediaRow at full content width (focused: ring, `scale-row`, fully visible), then the paragraphs capped at ≈ 600 dp, left-aligned | agent, adb (screencap) |
+| ↓ × 25 on that post | Walks every paragraph to the last one (trapped at the end); the header scrolled away; each focused paragraph scrolled into view | agent, adb (screencap) |
+| ← then → | ← → the sidebar's current item «Главная» (ring); → → back to the same last paragraph | agent, adb (screencap) |
+| ↑ × 30 | Walks back through the paragraphs and the row to the author row (ring fully visible, trapped at the top); the header is back in view | agent, adb (screencap) |
+| Back | Главная, focus on the same card | agent, adb (screencap) |
+| A text post («Текст и фото», 2nd card) | Header on top; focus on the first paragraph (accent bar); ↓ × 15 to the last paragraph with the «Изображение» placeholder below it (capped at the measure); ↑ × 18 to the author; Back → the same card | agent, adb (screencap) |
+
+Host tests: `__tests__/postFlow.test.tsx` (the column guide `post/column` with ↑ ↓ traps and no ← → traps; no `post/left` / `post/right`; the header inside the scrolling `post/body`, not sticky; focus order author → rows → paragraphs; the guide's destination = the last focused element, else the initial one; matrix rows «Video post» (layout: rows without a width cap, paragraphs at `text-measure`), «Text post», «Up to author», «Long text» (30 paragraphs down and back to the author), «Sidebar», «Locked», «States» (the skeleton in the single column; the 404 / error StateView replaces the column: no column, no header)), placeholders capped at `text-measure` like paragraphs. The long-text, sidebar and «Up to author» host tests check guide destinations and focus order with simulated focus (`focusOn`), not native D-pad movement; native movement is the adb run above; `postBody.test.ts` (the 600-character budget against the measure and the viewport; split tests resized); `tokens.test.js` (`text-measure` in DESIGN.md and tokens.ts). Lint, typecheck, check:fixtures clean; the full suite ran 3× green (1112 tests); `postFlow`, the post-entity suites and `tokens.test.js` ran 30× green (170 tests each run).
+
+Not verified on the device: the locked post, «Пост недоступен», the error state and the skeleton in the new layout (host only); a post with several videos (host only in this layout); a paragraph split by the new 600-character budget (none seen on these posts); TalkBack; the physical remote.

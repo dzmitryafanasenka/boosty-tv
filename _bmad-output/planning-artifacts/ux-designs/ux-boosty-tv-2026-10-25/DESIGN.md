@@ -92,6 +92,7 @@ spacing:
   author-tile-width: 232
   author-tile-gap: 12
   focus-headroom: 12
+  text-measure: 600
 focus:
   ring-width: 2
   ring-offset: 2
@@ -189,11 +190,12 @@ Golos Text, bundled with the app, full Cyrillic. The UI reads from 2–3 m, so n
   - Posts: 4 × `{spacing.card-width}`, gaps `{spacing.card-gap-x}` / `{spacing.card-gap-y}`.
   - Authors: 3 × `{spacing.author-tile-width}`, gap `{spacing.author-tile-gap}`.
 - **Fifth card.** The fifth card of a horizontal row is cut by the edge as a scroll hint. The focused card is always fully inside the safe area. Rows keep `{spacing.focus-headroom}` inner padding so scaling is never clipped.
-- **Post screen.** Two columns.
-  - Left, ≈ 260 dp: author row (`{components.avatar.post}`), title, date · like count (read-only), primary and secondary buttons.
-  - Right, the rest: media rows, then text, images, link chips, files and the poll.
-  - Each column scrolls independently to the focused element.
-  - → Illustrated in `Post Screen.dc.html`.
+- **Post screen.** One vertically scrolling column in the content area, header on top (owner decision 2026-10-27; supersedes the two columns of `Post Screen.dc.html`).
+  - Header: author row (`{components.avatar.post}`), title, date · like count (read-only); the primary and secondary buttons (Epic 4) and the locked copy go in or right under it. Not pinned: it scrolls away with the content.
+  - Then the media rows (full content width), then text, images, link chips, files and the poll.
+  - Body text (paragraphs, placeholders) is capped at `{spacing.text-measure}` (≈ 75 Cyrillic characters at `body`), left-aligned; the header and the rows may use the full `{spacing.content-width}`.
+  - The column scrolls natively to the focused element.
+  - → `Post Screen.dc.html` still shows the earlier two-column layout; the order of elements is unchanged.
 - **Player overlay.**
   - Top band: avatar `{components.avatar.player}` · author, post title `{typography.player-title}`, video title if different.
   - Bottom band: Timeline, then elapsed / remaining time, then PlayerControls (play/pause, «Настройки»).

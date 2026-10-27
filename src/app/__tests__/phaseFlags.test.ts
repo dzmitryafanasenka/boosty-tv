@@ -7,8 +7,14 @@ test('Story 3.2 enables Главная, Подписки and Настройки'
     subs: true,
     events: false,
     settings: true,
+    player: false,
   });
   expect(enabledSections()).toEqual(['home', 'subs', 'settings']);
+});
+
+test('Story 3.5: the player capability is off and is not a sidebar section', () => {
+  expect(phaseFlags.player).toBe(false);
+  expect(SECTION_ORDER as readonly string[]).not.toContain('player');
 });
 
 test('enabled sections keep the DESIGN.md sidebar order', () => {

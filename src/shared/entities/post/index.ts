@@ -21,8 +21,10 @@ export {
   splitParagraph,
   postBodyItems,
   type PlaceholderKind,
+  type PostBodyOptions,
   type PostBodyItem,
 } from './postBody';
+export { mediaRefsOf, videoRowsOf } from './mediaRows';
 export {
   mergePostsHead,
   refreshPostsHead,
@@ -41,9 +43,11 @@ export type {
   Block,
   BlockType,
   ListItem,
+  MediaRef,
   Post,
   PostAuthor,
   PostKind,
   PostPage,
   PostResult,
+  VideoRow,
 } from './types';

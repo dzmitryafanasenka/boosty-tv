@@ -1,6 +1,7 @@
 import { createLogger } from '../../../services/logger';
 // eslint-disable-next-line boundaries/dependencies -- test-only fixtures
 import { blockEnd, e8Accessible, e8Locked, paragraph, postDetail, text } from '../../../../test/postFixtures';
+import { spacing, typography } from '../../../ui/tokens';
 import { mapPost } from '../mapPost';
 import {
   PARAGRAPH_STOP_MAX_CHARS,
@@ -12,7 +13,9 @@ import {
 import type { Block, Post } from '../types';
 
 const mapped = (raw: unknown) => mapPost(raw, createLogger()) as Post;
-const body = (data: unknown[]) => postBodyItems(mapped(postDetail('b', 'p', data as never)).blocks);
+/** As the Post body of an accessible post: videos with an id are MediaRows. */
+const body = (data: unknown[]) =>
+  postBodyItems(mapped(postDetail('b', 'p', data as never)).blocks, { videoRows: true });
 
 describe('postBodyItems (Story 3.4)', () => {
   it('merges text fragments until BLOCK_END into one paragraph; blank paragraphs are dropped', () => {
@@ -34,8 +37,8 @@ describe('postBodyItems (Story 3.4)', () => {
       { type: 'something_new' },
       ...paragraph('B'),
     ]);
+    // The video is a MediaRow (Story 3.5): not in the body.
     expect(items).toEqual([
-      { kind: 'placeholder', key: 'ok_video:v1', block: 'video' },
       { kind: 'paragraph', key: 'text@1', text: 'A' },
       { kind: 'placeholder', key: 'image:i1', block: 'image' },
       { kind: 'paragraph', key: 'link@4', text: 'L' },
@@ -121,13 +124,18 @@ describe('postBodyItems (Story 3.4)', () => {
     expect(items.map(i => i.key)).toEqual(['image:same', 'image@1']);
   });
 
-  it('the live accessible E8: a video placeholder, then paragraphs only (inline links merged)', () => {
-    const items = postBodyItems(mapped(e8Accessible()).blocks);
-    expect(items[0]).toEqual({ kind: 'placeholder', key: 'ok_video:synthetic-id-7', block: 'video' });
+  it('the live accessible E8: its video is a MediaRow, the body is paragraphs only (inline links merged)', () => {
+    const items = postBodyItems(mapped(e8Accessible()).blocks, { videoRows: true });
     expect(items.filter(i => i.kind === 'paragraph').length).toBeGreaterThan(10);
-    expect(items.filter(i => i.kind === 'placeholder')).toHaveLength(1);
-    expect(items.every(i => i.kind === 'placeholder' || /^(Sample text)+$/.test(i.text))).toBe(true);
+    expect(items.filter(i => i.kind === 'placeholder')).toHaveLength(0);
+    expect(items.every(i => i.kind === 'paragraph' && /^(Sample text)+$/.test(i.text))).toBe(true);
     expect(new Set(items.map(i => i.key)).size).toBe(items.length);
+    // Without rows (the default, e.g. a teaser) the video stays the Story 3.4 placeholder.
+    expect(postBodyItems(mapped(e8Accessible()).blocks)[0]).toEqual({
+      kind: 'placeholder',
+      key: 'ok_video:synthetic-id-7',
+      block: 'video',
+    });
   });
 
   it('the live locked E8: no blocks; the teaser is one image placeholder', () => {
@@ -136,6 +144,59 @@ describe('postBodyItems (Story 3.4)', () => {
     expect(postBodyItems(post.blocks)).toEqual([]);
     expect(postBodyItems(post.teaser)).toEqual([
       { kind: 'placeholder', key: 'image:synthetic-id-107', block: 'image' },
+    ]);
+  });
+});
+
+describe('postBodyItems: videos (Story 3.5)', () => {
+  it('videos with an id leave the body (also duplicates); the text keeps its paragraphs and keys', () => {
+    expect(
+      body([
+        text('Before'),
+        { type: 'ok_video', id: 'v1', title: 'x' },
+        text('After'),
+        blockEnd(),
+        { type: 'ok_video', id: 'v1', title: 'dup' },
+        ...paragraph('Tail'),
+      ]),
+    ).toEqual([
+      { kind: 'paragraph', key: 'text@0', text: 'Before' },
+      { kind: 'paragraph', key: 'text@2', text: 'After' },
+      { kind: 'paragraph', key: 'text@5', text: 'Tail' },
+    ]);
+  });
+
+  it('paragraph keys around a removed video match the keys without rows', () => {
+    const data = [
+      ...paragraph('Intro'),
+      text('Before'),
+      { type: 'ok_video', id: 'v1', title: 'x' },
+      text('After'),
+      blockEnd(),
+      { type: 'ok_video', id: 'v2' },
+      ...paragraph('Tail'),
+    ];
+    const blocks = mapped(postDetail('b', 'p', data as never)).blocks;
+    const withRows = postBodyItems(blocks, { videoRows: true });
+    const without = postBodyItems(blocks).filter(i => i.kind === 'paragraph');
+    expect(withRows.every(i => i.kind === 'paragraph')).toBe(true);
+    expect(withRows).toEqual(without);
+    expect(withRows.map(i => i.key)).toEqual(['text@0', 'text@2', 'text@4', 'text@7']);
+  });
+
+  it('the default (no rows, e.g. a teaser) keeps every video as a placeholder', () => {
+    const blocks = mapped(postDetail('b', 'p', [{ type: 'ok_video', id: 'v1' }, ...paragraph('A')] as never)).blocks;
+    expect(postBodyItems(blocks)).toEqual([
+      { kind: 'placeholder', key: 'ok_video:v1', block: 'video' },
+      { kind: 'paragraph', key: 'text@1', text: 'A' },
+    ]);
+  });
+
+  it('a video without an id (no MediaRef) stays a neutral video placeholder', () => {
+    expect(body([{ type: 'ok_video', title: 'No id' }, { type: 'ok_video', id: '' }, ...paragraph('A')])).toEqual([
+      { kind: 'placeholder', key: 'ok_video@0', block: 'video' },
+      { kind: 'placeholder', key: 'ok_video@1', block: 'video' },
+      { kind: 'paragraph', key: 'text@2', text: 'A' },
     ]);
   });
 });
@@ -154,11 +215,24 @@ describe('blockKey / listItemTexts', () => {
 });
 
 describe('long paragraphs (one stop must stay well under the column)', () => {
+  it('the budget fits the single-column text measure: ≈ 8 lines, well under half the viewport', () => {
+    // 600 dp measure − 18 dp paragraph padding and bar; ≈ 7.7 dp per Cyrillic character.
+    const perLine = Math.floor((spacing['text-measure'] - 18) / 7.7);
+    expect(perLine).toBeGreaterThanOrEqual(70);
+    expect(perLine).toBeLessThanOrEqual(80);
+    const lines = Math.ceil(PARAGRAPH_STOP_MAX_CHARS / perLine);
+    const height = lines * typography.body.lineHeight + 2 * spacing['3'];
+    // The column's viewport: 540 − 2 × safe-y − focus headroom.
+    const viewport = 540 - 2 * spacing['safe-y'] - spacing['focus-headroom'];
+    expect(height).toBeLessThan(viewport / 2);
+    expect(PARAGRAPH_STOP_MAX_CHARS).toBe(600);
+  });
+
   const words = (value: string) => value.split(/\s+/).filter(Boolean);
   const sentence = (n: number) => `Предложение номер ${n} с несколькими словами для длины.`;
 
   it('a long paragraph → several stops, each within the budget, order and text preserved', () => {
-    const long = Array.from({ length: 30 }, (_, i) => sentence(i)).join(' ');
+    const long = Array.from({ length: 45 }, (_, i) => sentence(i)).join(' ');
     expect(long.length).toBeGreaterThan(3 * PARAGRAPH_STOP_MAX_CHARS);
     const items = body([text(long), blockEnd()]);
     expect(items.length).toBeGreaterThan(3);
