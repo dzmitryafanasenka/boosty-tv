@@ -4,7 +4,7 @@ import {
   type SecureStore,
 } from '../platform/secureStore';
 import { logger as appLogger, type Logger } from '../services/logger';
-import { isAppError, type AppErrorKind } from './appError';
+import { isAppError } from './appError';
 import { authApiClient, type AuthApiClient } from './authApiClient';
 import { AuthError, isAuthError } from './authError';
 import { userCurrentSchema } from './dto/userCurrent';
@@ -17,6 +17,7 @@ import {
 import { createRefreshCoordinator } from './refreshCoordinator';
 import { decodeSession, encode, type StoredSession } from './session/codec';
 import { createSessionCore } from './session/core';
+import { createLifecycle } from './session/lifecycle';
 import { createRefreshHost } from './session/refreshHost';
 import { createSignOut } from './session/signOut';
 import {
@@ -26,7 +27,6 @@ import {
   type SessionManager,
   type SignInArgs,
   type SignInResult,
-  type ValidateResult,
 } from './session/types';
 
 export {
@@ -107,8 +107,6 @@ export function createSessionManager({
   const core = createSessionCore({ sessionStore, phoneStore, logger });
   let restoring: Promise<RestoreResult> | null = null;
   let signingIn: { key: string; promise: Promise<SignInResult> } | null = null;
-  let validating: Promise<ValidateResult> | null = null;
-  let appState = 'active';
 
   const host = createRefreshHost(core, logger);
 
@@ -254,29 +252,7 @@ export function createSessionManager({
     return { accountChanged };
   }
 
-  async function doValidate(): Promise<ValidateResult> {
-    if (core.getStatus() !== 'signedIn') {
-      return { kind: 'skipped' };
-    }
-    try {
-      await http.get(CURRENT_USER_PATH, userCurrentSchema);
-      logger.info('session', 'E1 ok');
-      return { kind: 'ok' };
-    } catch (error) {
-      const kind: AppErrorKind = isAppError(error) ? error.kind : 'Client';
-      logger.warn('session', 'E1 failed', { kind });
-      return kind === 'SessionExpired' ? { kind: 'expired' } : { kind: 'failed', error: kind };
-    }
-  }
-
-  function validate(): Promise<ValidateResult> {
-    if (!validating) {
-      validating = doValidate().finally(() => {
-        validating = null;
-      });
-    }
-    return validating;
-  }
+  const { validate, onAppStateChange } = createLifecycle({ core, http, logger });
 
   const signOut = createSignOut(core, logger);
 
@@ -339,11 +315,7 @@ export function createSessionManager({
       accountSwitchHook = hook;
     },
     validate,
-    onAppStateChange(next) {
-      const previous = appState;
-      appState = next;
-      return next === 'active' && previous !== 'active' ? validate() : null;
-    },
+    onAppStateChange,
     http,
     authApi: { sendCode: authApi.sendCode, resendCode: authApi.resendCode },
     debugCorruptAccessToken: __DEV__
