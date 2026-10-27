@@ -28,7 +28,7 @@ import {
   PhoneScreen,
   WelcomeScreen,
 } from '../features/auth';
-import { AuthorScreen, type AuthorFocusInfo } from '../features/author';
+import { AuthorScreen, refreshAuthorPostsHeads, type AuthorFocusInfo } from '../features/author';
 import { refreshFeedHead } from '../features/home';
 import { SignOutDialog } from '../features/settings';
 import { accountScope } from '../shared/account';
@@ -286,6 +286,14 @@ function AuthorRoute({
   const zoneRef = useRef<FocusZoneHandle>(null);
   /** The last focused element on this route (a sidebar or content id). */
   const lastFocusId = useRef<string | null>(null);
+  /** The page's focus listeners (`AuthorFocusInfo.onFocusChange`). */
+  const focusListeners = useRef(new Set<(focusId: string) => void>());
+  const recordFocus = useCallback((focusId: string) => {
+    lastFocusId.current = focusId;
+    for (const listener of [...focusListeners.current]) {
+      listener(focusId);
+    }
+  }, []);
   // `isFocused()`, not a ref set in a focus effect: the page's own effects
   // run before this component's, already on the first focus.
   const isActive = useCallback(() => navigation.isFocused(), [navigation]);
@@ -329,18 +337,18 @@ function AuthorRoute({
   const onSidebarFocus = useCallback(
     (section: SectionId) => {
       if (isActive()) {
-        lastFocusId.current = `${AUTHOR_NAV_PREFIX}${NAV_ID[section]}`;
+        recordFocus(`${AUTHOR_NAV_PREFIX}${NAV_ID[section]}`);
       }
     },
-    [isActive],
+    [isActive, recordFocus],
   );
   const onContentFocus = useCallback(
     (focusId: string) => {
       if (isActive()) {
-        lastFocusId.current = focusId;
+        recordFocus(focusId);
       }
     },
-    [isActive],
+    [isActive, recordFocus],
   );
   const views = nav.views;
   const focus = useMemo<AuthorFocusInfo>(
@@ -350,6 +358,12 @@ function AuthorRoute({
       sectionItemId: `${AUTHOR_NAV_PREFIX}${NAV_ID[AUTHOR_ORIGIN]}`,
       focusSidebar: () => requestHostFocus(views.current.get(AUTHOR_ORIGIN)),
       focusZoneTarget: () => zoneRef.current?.focusTarget() ?? false,
+      onFocusChange: listener => {
+        focusListeners.current.add(listener);
+        return () => {
+          focusListeners.current.delete(listener);
+        };
+      },
     }),
     [isActive, views],
   );
@@ -471,11 +485,14 @@ function App() {
     const appState = AppState.addEventListener('change', state => {
       // Resume: E1 again; only a success changes anything (offline → the
       // feed, and a stale cached feed gets its head refreshed: one E5 page 1,
-      // AD-7). Failures send nothing more.
+      // AD-7; so do the posts of every Author route in the stack: one E4
+      // page 1 each, spec-author-posts-refresh). Failures send nothing more.
       session.onAppStateChange(state)?.then(result => {
         if (alive.current && result.kind === 'ok') {
           setHomeOffline(false);
-          refreshFeedHead(queryClient, session.http, Date.now()).catch(() => {});
+          const now = Date.now();
+          refreshFeedHead(queryClient, session.http, now).catch(() => {});
+          refreshAuthorPostsHeads(queryClient, session.http, now).catch(() => {});
         }
       });
     });

@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -166,6 +167,137 @@ export function useHeldRowAutoFetch(paging: GridPaging, shownCount: number): voi
 }
 
 /**
+ * The posts a grid screen shows: `visibleGridPosts` (a trailing partial row
+ * held while `hold`), except that a held row containing the focused card
+ * (`focusedId`, read at render time) is shown. A head refresh that puts
+ * posts on top can move the focused card into the trailing partial row, and
+ * it must stay visible (and focused) there. Read before the remount moves
+ * native focus; once focus has left the row, the next render holds it again.
+ */
+export function useShownGridPosts(
+  posts: readonly Post[],
+  hold: boolean,
+  focusedId: string | null,
+  cardIdPrefix: string,
+): readonly Post[] {
+  return useMemo(() => {
+    const shown = visibleGridPosts(posts, hold);
+    return shown.length < posts.length &&
+      posts.slice(shown.length).some(post => `${cardIdPrefix}${post.id}` === focusedId)
+      ? posts
+      : shown;
+  }, [posts, hold, focusedId, cardIdPrefix]);
+}
+
+export type HeadChangeRefocusOptions = {
+  /** The shown cards' focus ids, in order. */
+  ids: readonly string[];
+  cardIdPrefix: string;
+  /** The load-more «Повторить» (never taken, even when it shares the card prefix). */
+  retryId: string;
+  /** The screen's last focused element (sidebar or content id); null: none yet. */
+  focused: () => string | null;
+  /** The screen's pending-focus gate (false while covered or inactive). */
+  canFocus: () => boolean;
+  restoration: ListRestoration;
+  list: RefObject<RestorableList>;
+  /**
+   * Optional (Автор reopen, owner decision 2026-10-27): true when focus
+   * should follow the head instead (the user has not moved since the page
+   * opened; called with the focused element). The new first card then takes
+   * focus and the list shows the top.
+   */
+  followHead?: (focused: string | null) => boolean;
+  /** Called with the card id the head-follow focused (before the focus request). */
+  onFollowHead?: (id: string) => void;
+};
+
+/**
+ * A head refresh changed the shown cards other than by an append (posts on
+ * top or inserted below the first one, or a gap that replaced the list):
+ * the rows regroup and remount (rows are keyed by their first post id), so
+ * a focused card would lose native focus. The trigger is that change of the
+ * ids, never frame timing. The focused element is read in a layout effect,
+ * right after the commit and before any native focus event of the remount
+ * reaches JS. A focused card that is still shown keeps focus and, if its
+ * index moved, is scrolled into view at its new row; a card that is gone
+ * follows the fallback chain (else the first card). Sidebar, StateView and
+ * «Повторить» focus is never taken, and a covered screen never takes focus
+ * (`canFocus`).
+ *
+ * With `followHead` returning true (the user has not moved), the first card
+ * takes focus instead and the list scrolls to the top, whether or not the
+ * native focus event of the earlier automatic focus has reached JS yet.
+ */
+export function useHeadChangeRefocus({
+  ids,
+  cardIdPrefix,
+  retryId,
+  focused,
+  canFocus,
+  restoration,
+  list,
+  followHead,
+  onFollowHead,
+}: HeadChangeRefocusOptions): void {
+  const focusedRef = useRef(focused);
+  focusedRef.current = focused;
+  const followRef = useRef({ followHead, onFollowHead });
+  followRef.current = { followHead, onFollowHead };
+  const lastIds = useRef(ids);
+  useLayoutEffect(() => {
+    const previous = lastIds.current;
+    lastIds.current = ids;
+    if (previous.length === 0 || ids.length === 0 || previous === ids) {
+      return;
+    }
+    const appended =
+      ids.length >= previous.length && previous.every((id, i) => ids[i] === id);
+    if (appended) {
+      return;
+    }
+    const current = focusedRef.current();
+    const follow = followRef.current;
+    if (follow.followHead?.(current) === true && canFocus()) {
+      const first = ids[0];
+      if (previous[0] === first) {
+        // The first card and its row key are unchanged: nothing to move.
+        return;
+      }
+      list.current.scrollToOffset({ offset: 0, animated: false });
+      follow.onFollowHead?.(first);
+      restoration.focusItem(first);
+      return;
+    }
+    if (
+      current === null ||
+      !current.startsWith(cardIdPrefix) ||
+      current === retryId ||
+      !canFocus()
+    ) {
+      return;
+    }
+    const index = ids.indexOf(current);
+    if (index < 0) {
+      if (restoration.restore().kind === 'none') {
+        restoration.focusInitial();
+      }
+      return;
+    }
+    const before = previous.indexOf(current);
+    const rowStart = (i: number) => i - (i % POST_GRID_COLUMNS);
+    if (before === index && previous[rowStart(before)] === ids[rowStart(index)]) {
+      // Same index, same row key: the card's row did not remount.
+      return;
+    }
+    if (before !== index) {
+      list.current.scrollToIndex({ index, animated: false, viewPosition: 0.5 });
+    }
+    restoration.focusItem(current);
+  }, [ids, cardIdPrefix, retryId, canFocus, restoration, list]);
+}
+
+/**
  * B5 load-more «Повторить»: reloads the failed page only. On success the
  * first new card is focused if focus is still on «Повторить»
  * (`retryFocused`); a retry that adds no card (the row is gone) focuses the
@@ -211,6 +343,7 @@ type GridCardProps = {
   cardIdPrefix: string;
   restoration: ListRestoration;
   onCardFocus: (index: number, view: HostView | null) => void;
+  onCardPress?: (postId: string) => void;
   nowMs?: number;
 };
 
@@ -225,6 +358,7 @@ const GridCard = memo(function GridCardView({
   cardIdPrefix,
   restoration,
   onCardFocus,
+  onCardPress,
   nowMs,
 }: GridCardProps) {
   const id = `${cardIdPrefix}${post.id}`;
@@ -247,6 +381,8 @@ const GridCard = memo(function GridCardView({
     restoration.onItemFocus(id, index);
     onCardFocus(index, view.current);
   }, [zone, restoration, id, index, onCardFocus]);
+  const postId = post.id;
+  const onPress = useCallback(() => onCardPress?.(postId), [onCardPress, postId]);
   return (
     <PostCard
       ref={ref}
@@ -255,6 +391,7 @@ const GridCard = memo(function GridCardView({
       width={POST_GRID_CARD_WIDTH}
       nowMs={nowMs}
       onFocus={onFocus}
+      onPress={onCardPress ? onPress : undefined}
       style={index % POST_GRID_COLUMNS === 0 ? styles.slot : styles.slotGap}
     />
   );
@@ -265,6 +402,7 @@ type GridRowProps = {
   cardIdPrefix: string;
   restoration: ListRestoration;
   onCardFocus: (index: number, view: HostView | null) => void;
+  onCardPress?: (postId: string) => void;
   nowMs?: number;
 };
 
@@ -274,6 +412,7 @@ const GridRow = memo(function GridRowView({
   cardIdPrefix,
   restoration,
   onCardFocus,
+  onCardPress,
   nowMs,
 }: GridRowProps) {
   return (
@@ -288,6 +427,7 @@ const GridRow = memo(function GridRowView({
           cardIdPrefix={cardIdPrefix}
           restoration={restoration}
           onCardFocus={onCardFocus}
+          onCardPress={onCardPress}
           nowMs={nowMs}
         />
       ))}
@@ -409,6 +549,8 @@ export type PostGridProps = {
   onRetry: () => void;
   /** Row to open at (keep scroll on return); undefined: the top. */
   initialRow?: number;
+  /** OK on a card (optional; a stable callback). */
+  onCardPress?: (postId: string) => void;
   nowMs?: number;
   /** Card focus ids are `<cardIdPrefix><postId>` (e.g. `home/feed/`). */
   cardIdPrefix: string;
@@ -435,6 +577,7 @@ export function PostGrid({
   onLoadMore,
   onRetry,
   initialRow,
+  onCardPress,
   nowMs,
   cardIdPrefix,
   retryId,
@@ -470,10 +613,11 @@ export function PostGrid({
         cardIdPrefix={cardIdPrefix}
         restoration={restoration}
         onCardFocus={onCardFocus}
+        onCardPress={onCardPress}
         nowMs={nowMs}
       />
     ),
-    [cardIdPrefix, restoration, onCardFocus, nowMs],
+    [cardIdPrefix, restoration, onCardFocus, onCardPress, nowMs],
   );
 
   const footerState = useMemo<FooterState>(

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FlashListRef } from '@shopify/flash-list';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import type { HttpClient } from '../../shared/api';
@@ -11,8 +11,10 @@ import {
   requestHostFocus,
   spacing,
   typography,
+  useHeadChangeRefocus,
   useHeldRowAutoFetch,
   useLoadMoreRetry,
+  useShownGridPosts,
   type HostView,
 } from '../../shared/ui';
 import {
@@ -22,7 +24,6 @@ import {
   FEED_LIST_TOP_GAP,
   FEED_RETRY_ID,
   FeedGrid,
-  visibleFeedPosts,
   type FeedRowItem,
   feedCardId,
   gridListAdapter,
@@ -111,26 +112,18 @@ export function HomeScreen({ offline, http, routeKey, focusOnMount = false, focu
   const listHeight = windowHeight - 2 * spacing['safe-y'] - HEADER_HEIGHT - FEED_LIST_TOP_GAP;
 
   const listRef = useRef<FlashListRef<FeedRowItem>>(null);
-  // The grid's posts: a trailing partial row is held while more pages may
-  // come (FeedGrid `visibleFeedPosts`). Restoration and focus use these ids,
-  // so a remembered card in a held row falls back by the chain.
-  //
-  // A held row that contains the focused card is shown: a resume refresh
-  // that puts posts on top can move the focused card into the trailing
-  // partial row, and it must stay visible (and focused) there. Read at
-  // render time, before the remount moves native focus; once focus has left
-  // the row, the next render holds it again.
-  const focusedId = focus.current();
-  const shownPosts = useMemo(() => {
-    // A failing next page shows the held row: it must not stay hidden behind
-    // «Повторить».
-    const hold = feed.hasNextPage && !feed.loadMoreFailed;
-    const shown = visibleFeedPosts(feed.posts, hold);
-    return shown.length < feed.posts.length &&
-      feed.posts.slice(shown.length).some(post => feedCardId(post.id) === focusedId)
-      ? feed.posts
-      : shown;
-  }, [feed.posts, feed.hasNextPage, feed.loadMoreFailed, focusedId]);
+  // The grid's posts (`useShownGridPosts` over PostGrid's
+  // `visibleGridPosts`): a trailing partial row is held while more pages may
+  // come. Restoration and focus use these ids, so a remembered card in a
+  // held row falls back by the chain. A held row that contains the focused
+  // card is shown, and so is one behind a failing next page (it must not
+  // stay hidden behind «Повторить»).
+  const shownPosts = useShownGridPosts(
+    feed.posts,
+    feed.hasNextPage && !feed.loadMoreFailed,
+    focus.current(),
+    FEED_CARD_PREFIX,
+  );
   // Keep scroll on return (owner decision 2026-10-26): mounted with cached
   // cards, the grid opens at the remembered card's row (so it is mounted and
   // → from the sidebar lands on it), then at the exact remembered offset.
@@ -267,56 +260,17 @@ export function HomeScreen({ offline, http, routeKey, focusOnMount = false, focu
   // Blur or unmount: stop a pending restore focus.
   useEffect(() => restoration.cancel, [restoration]);
 
-  // A resume refresh changed the shown cards other than by an append (posts
-  // on top or inserted below the first one, or a gap that replaced the
-  // feed): the rows regroup and remount (FeedGrid keys rows by their first
-  // post id), so a focused card would lose native focus. The trigger is that
-  // change of the ids, never frame timing. The focused element is read in a
-  // layout effect, right after the commit and before any native focus event
-  // of the remount reaches JS. A focused card that is still shown keeps
-  // focus and, if its index moved, is scrolled into view at its new row; a
-  // card that is gone follows the fallback chain (else the first card).
-  // Sidebar, StateView and «Повторить» focus is never taken, and a covered
-  // Shell never takes focus (`canFocus`).
-  const lastIds = useRef(ids);
-  useLayoutEffect(() => {
-    const previous = lastIds.current;
-    lastIds.current = ids;
-    if (previous.length === 0 || ids.length === 0 || previous === ids) {
-      return;
-    }
-    const appended =
-      ids.length >= previous.length && previous.every((id, i) => ids[i] === id);
-    if (appended) {
-      return;
-    }
-    const focused = focusRef.current.current();
-    if (
-      focused === null ||
-      !focused.startsWith(FEED_CARD_PREFIX) ||
-      focused === FEED_RETRY_ID ||
-      !canFocus()
-    ) {
-      return;
-    }
-    const index = ids.indexOf(focused);
-    if (index < 0) {
-      if (restoration.restore().kind === 'none') {
-        restoration.focusInitial();
-      }
-      return;
-    }
-    const before = previous.indexOf(focused);
-    const rowStart = (i: number) => i - (i % FEED_COLUMNS);
-    if (before === index && previous[rowStart(before)] === ids[rowStart(index)]) {
-      // Same index, same row key: the card's row did not remount.
-      return;
-    }
-    if (before !== index) {
-      adapterRef.current.scrollToIndex({ index, animated: false, viewPosition: 0.5 });
-    }
-    restoration.focusItem(focused);
-  }, [ids, canFocus, restoration]);
+  // A resume refresh changed the shown cards other than by an append: the
+  // focused card keeps focus (shared rule, `useHeadChangeRefocus`).
+  useHeadChangeRefocus({
+    ids,
+    cardIdPrefix: FEED_CARD_PREFIX,
+    retryId: FEED_RETRY_ID,
+    focused: () => focusRef.current.current(),
+    canFocus,
+    restoration,
+    list: adapterRef,
+  });
 
   // Load-more retry: on success, the first new card (if focus is still on «Повторить»).
   const onRetryLoadMore = useLoadMoreRetry(

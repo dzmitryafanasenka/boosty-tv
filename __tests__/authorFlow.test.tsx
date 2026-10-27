@@ -10,10 +10,11 @@
  */
 import { notifyManager } from '@tanstack/react-query';
 import { act } from 'react';
+import { AppState } from 'react-native';
 import App, { navigationRef } from '../src/app/App';
 import { queryClient, resetQueryCache } from '../src/app/queryClient';
 import { accountScope } from '../src/shared/account';
-import { queryKeys } from '../src/shared/api';
+import { QUERY_STALE_TIME_MS, queryKeys } from '../src/shared/api';
 import {
   type FixtureReply,
   type FixtureRequest,
@@ -33,7 +34,7 @@ import {
   e4Path,
   syntheticBlogPosts,
 } from '../src/test/authorFixtures';
-import { E5_PATH, cursorOf, e5Page, lockedPost } from '../src/test/feedFixtures';
+import { E5_PATH, cursorFor, cursorOf, e5Page, lockedPost } from '../src/test/feedFixtures';
 import e1Ok from '../src/test/fixtures/boosty/e1-user-current.json';
 import { E2_PATH, blogUrlOf, subscriptionsBody } from '../src/test/subscriptionFixtures';
 import {
@@ -818,5 +819,568 @@ describe('account scope', () => {
     await accountScope.reset();
     expect(queryClient.getQueryData(queryKeys.author(BLOG))).toBeUndefined();
     expect(queryClient.getQueryData(queryKeys.authorPosts(BLOG))).toBeUndefined();
+  });
+});
+
+describe('head refresh on reopen and resume (spec-author-posts-refresh)', () => {
+  let appStateHandlers: Array<(state: string) => void> = [];
+
+  beforeEach(() => {
+    appStateHandlers = [];
+    jest.spyOn(AppState, 'addEventListener').mockImplementation(((
+      _type: string,
+      listener: (state: string) => void,
+    ) => {
+      appStateHandlers.push(listener);
+      return {
+        remove: () => {
+          appStateHandlers = appStateHandlers.filter(h => h !== listener);
+        },
+      };
+    }) as unknown as typeof AppState.addEventListener);
+  });
+
+  async function changeAppState(state: string) {
+    await act(async () => {
+      for (const h of [...appStateHandlers]) {
+        h(state);
+      }
+    });
+    await settle();
+  }
+
+  /** HOME, `ms` later back: the clock moves without firing timers. */
+  async function backgroundFor(ms: number) {
+    await changeAppState('background');
+    jest.setSystemTime(Date.now() + ms);
+    await changeAppState('active');
+  }
+
+  /** `total` synthetic posts; page 1 answered by `head` once set. */
+  let head: ((req: FixtureRequest) => Reply) | null;
+  function postsWithHead(total: number) {
+    const pages = syntheticBlogPosts({ blogUrl: BLOG, total });
+    head = null;
+    return (req: FixtureRequest): Reply => (cursorOf(req.url) === null && head ? head(req) : pages(req));
+  }
+  /** A page-1 reply with these posts and the next cursor `cursor:<next>`. */
+  const headPage = (posts: Record<string, unknown>[], next: number): FixtureReply => ({
+    status: 200,
+    body: { data: posts, extra: { offset: cursorFor(next), isLast: false } },
+  });
+  const newPost = (n: number) => blogPost(BLOG, 1000 + n, { id: `new-${n}`, title: `New ${n}` });
+  const known = (from: number, to: number) =>
+    Array.from({ length: to - from }, (_, i) => blogPost(BLOG, from + i));
+  const pageOneCalls = () => e4Calls().filter(c => cursorOf(c.url) === null);
+
+  /** 60 posts; two pages loaded (40 posts, 39 shown); focus on post 13. */
+  async function deepInTheAuthor() {
+    e4 = postsWithHead(60);
+    const root = await openAuthor();
+    await focusOn(root, SYN(15));
+    expect(e4Calls()).toHaveLength(2);
+    await focusOn(root, SYN(13));
+    focusMock.mockClear();
+    mockLists.scrollToIndex.mockClear();
+    return root;
+  }
+
+  /** Open, load page 2 (40 posts), Back, then `ms` later OK on the same tile. */
+  async function reopenAfter(ms: number) {
+    e4 = postsWithHead(40);
+    const root = await openAuthor();
+    await focusOn(root, SYN(15));
+    // No timers: they would also run the query cache's gc of the popped posts.
+    await back();
+    expect(currentRoute()).toBe('Shell');
+    return {
+      root,
+      reopen: async () => {
+        jest.setSystemTime(Date.now() + ms);
+        focusMock.mockClear();
+        mockLists.scrollToOffset.mockClear();
+        mockLists.scrollToIndex.mockClear();
+        await press(root, TILE(1));
+        expect(currentRoute()).toBe('Author');
+      },
+    };
+  }
+
+  describe('reopen', () => {
+    it('fresh cache (< 60 s): no E4 request', async () => {
+      const { root, reopen } = await reopenAfter(QUERY_STALE_TIME_MS - 5_000);
+      await reopen();
+      expect(e4Calls()).toHaveLength(2);
+      expect(gridPosts()).toHaveLength(40);
+      expect(lastFocusTarget()).toBe(SYN(0));
+      await unmount(root);
+    });
+
+    it('stale cache, 2 new posts: one E4 page 1 (no cursor); on top; both loaded pages kept', async () => {
+      const { root, reopen } = await reopenAfter(QUERY_STALE_TIME_MS + 1_000);
+      head = () => headPage([newPost(0), newPost(1), ...known(0, 18)], 18);
+      await reopen();
+      expect(e4Calls()).toHaveLength(3);
+      expect(e4Calls()[2].url).toBe(
+        `https://api.boosty.to/v1/blog/${BLOG}/post/?limit=20&comments_limit=0&reply_limit=0`,
+      );
+      const ids = gridPosts();
+      expect(ids.slice(0, 3)).toEqual(['new-0', 'new-1', 'blog-post-0']);
+      expect(ids).toHaveLength(42);
+      expect(new Set(ids).size).toBe(42);
+      expect(ids).toContain('blog-post-39');
+      expect(visible(root, 'author/error')).toBe(false);
+      await unmount(root);
+    });
+
+    // Reopen focus (owner decision 2026-10-27, review loop 1, option 1).
+    const twoNew = () => headPage([newPost(0), newPost(1), ...known(0, 18)], 18);
+    const scrolledToTop = () =>
+      mockLists.scrollToOffset.mock.calls.some(
+        ([params]) => (params as { offset: number }).offset === 0,
+      );
+
+    it('new posts, the user has not moved, the reply before the mount focus event: the new first post, at the top', async () => {
+      const { root, reopen } = await reopenAfter(QUERY_STALE_TIME_MS + 1_000);
+      head = twoNew;
+      await reopen();
+      expect(e4Calls()).toHaveLength(3);
+      // The automatic focus of the first cached post had not reached JS.
+      expect(lastFocusTarget()).toBe(CARD('new-0'));
+      expect(scrolledToTop()).toBe(true);
+      expect(mockLists.scrollToIndex).not.toHaveBeenCalled();
+      // The native events of both automatic focus requests arrive late, in
+      // order: neither is a user move, so the next head change (a resume
+      // refresh on the same page) still follows the head.
+      await focusOn(root, SYN(0));
+      await focusOn(root, CARD('new-0'));
+      focusMock.mockClear();
+      head = () => headPage([newPost(2), newPost(0), newPost(1), ...known(0, 17)], 17);
+      await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+      expect(gridPosts()[0]).toBe('new-2');
+      expect(focusTargets()).toEqual([CARD('new-2')]);
+      await unmount(root);
+    });
+
+    it('new posts, the user has not moved, the reply after the mount focus event: the new first post, at the top', async () => {
+      const { root, reopen } = await reopenAfter(QUERY_STALE_TIME_MS + 1_000);
+      const reply = deferred();
+      head = () => reply.promise;
+      await reopen();
+      expect(lastFocusTarget()).toBe(SYN(0));
+      await focusOn(root, SYN(0));
+      focusMock.mockClear();
+      mockLists.scrollToOffset.mockClear();
+      reply.resolve(twoNew());
+      await settle();
+      expect(gridPosts().slice(0, 3)).toEqual(['new-0', 'new-1', 'blog-post-0']);
+      expect(focusTargets()).toEqual([CARD('new-0')]);
+      expect(scrolledToTop()).toBe(true);
+      expect(mockLists.scrollToIndex).not.toHaveBeenCalled();
+      await unmount(root);
+    });
+
+    it.each([
+      ['a D-pad move to card 1', async (root: Root) => focusOn(root, SYN(1)), SYN(1), 3],
+      [
+        '→ then ← back to the first card',
+        async (root: Root) => {
+          await focusOn(root, SYN(1));
+          await focusOn(root, SYN(0));
+        },
+        SYN(0),
+        2,
+      ],
+      ['OK on the first card', async (root: Root) => press(root, SYN(0)), SYN(0), 2],
+    ])(
+      'new posts after the user moved (%s): the focused card keeps focus at its new row',
+      async (_name, move, target, index) => {
+        const { root, reopen } = await reopenAfter(QUERY_STALE_TIME_MS + 1_000);
+        const reply = deferred();
+        head = () => reply.promise;
+        await reopen();
+        await focusOn(root, SYN(0));
+        await move(root);
+        focusMock.mockClear();
+        mockLists.scrollToOffset.mockClear();
+        reply.resolve(twoNew());
+        await settle();
+        expect(gridPosts().indexOf(target.slice(CARD('').length))).toBe(index);
+        expect(focusTargets()).toEqual([target]);
+        // The grid scrolls by row (3 cards each).
+        expect(mockLists.scrollToIndex).toHaveBeenCalledWith(
+          expect.objectContaining({ index: Math.floor(index / 3), animated: false }),
+        );
+        expect(scrolledToTop()).toBe(false);
+        await unmount(root);
+      },
+    );
+
+    it.each([
+      ['a network failure', (): FixtureReply => ({ network: true }), 3, 'Network'],
+      ['a 5xx', (): FixtureReply => ({ status: 503, body: { error: 'unavailable' } }), 2, 'Server'],
+      ['a 400', (): FixtureReply => ({ status: 400, body: { error: 'bad_request' } }), 1, 'Client'],
+    ])('the reopen refresh ends in %s: silent; the cache and focus stay', async (_name, reply, attempts, kind) => {
+      const { root, reopen } = await reopenAfter(QUERY_STALE_TIME_MS + 1_000);
+      logger.clear();
+      head = reply;
+      await reopen();
+      await settle(WITH_TIMERS);
+      // Page 1 of the first open, then the refresh with its AD-6 retries.
+      expect(pageOneCalls()).toHaveLength(1 + attempts);
+      expect(e4Calls()).toHaveLength(2 + attempts);
+      expect(gridPosts()).toEqual(Array.from({ length: 40 }, (_, i) => `blog-post-${i}`));
+      expect(focusTargets()).toEqual([SYN(0)]);
+      expect(visible(root, 'author/error')).toBe(false);
+      expect(visible(root, 'author/posts-error')).toBe(false);
+      expect(visible(root, 'author/posts/retry-row')).toBe(false);
+      expect(logger.entries().filter(e => e.scope === 'author')).toEqual([
+        expect.objectContaining({ message: 'head refresh failed', fields: { kind } }),
+      ]);
+      await unmount(root);
+    });
+
+    it('a failed page append, «Повторить» focused, then a stale resume: the refresh is skipped; the retry row and focus stay', async () => {
+      const pages = syntheticBlogPosts({ blogUrl: BLOG, total: 60 });
+      head = null;
+      let failPage2 = true;
+      e4 = req =>
+        cursorOf(req.url) === null && head
+          ? head(req)
+          : cursorOf(req.url) === 20 && failPage2
+            ? { status: 400, body: { error: 'bad_request' } }
+            : pages(req);
+      const root = await openAuthor();
+      await focusOn(root, SYN(15));
+      expect(visible(root, 'author/posts/retry-row')).toBe(true);
+      await focusOn(root, RETRY);
+      const calls = e4Calls().length;
+      focusMock.mockClear();
+      head = () => headPage([newPost(0), ...known(0, 19)], 19);
+      failPage2 = false;
+      await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+      expect(e4Calls()).toHaveLength(calls);
+      expect(gridPosts()[0]).toBe('blog-post-0');
+      expect(visible(root, RETRY)).toBe(true);
+      expect(focusMock).not.toHaveBeenCalled();
+      await unmount(root);
+    });
+
+    it('an empty fresh page 1 with more pages: the cached posts stay (no gap wipe); fresh until a staleTime later', async () => {
+      const { root, reopen } = await reopenAfter(QUERY_STALE_TIME_MS + 1_000);
+      head = () => ({ status: 200, body: { data: [], extra: { offset: cursorFor(0), isLast: false } } });
+      await reopen();
+      expect(e4Calls()).toHaveLength(3);
+      expect(visible(root, 'author/empty')).toBe(false);
+      expect(authorCards(root)).toContain(SYN(0));
+      const cached = queryClient.getQueryData<{ pages: Array<{ posts: Array<{ id: string }> }> }>(
+        queryKeys.authorPosts(BLOG),
+      );
+      expect(cached?.pages.flatMap(p => p.posts.map(x => x.id))).toEqual(
+        Array.from({ length: 40 }, (_, i) => `blog-post-${i}`),
+      );
+      expect(queryClient.getQueryState(queryKeys.authorPosts(BLOG))?.dataUpdatedAt).toBe(Date.now());
+      expect(focusTargets()).toEqual([SYN(0)]);
+      // The next reopen within a staleTime sends nothing.
+      await back();
+      await press(root, TILE(1));
+      expect(e4Calls()).toHaveLength(3);
+      await unmount(root);
+    });
+
+    it('an empty last page 1 (the author has no posts now): «Публикаций нет»', async () => {
+      const { root, reopen } = await reopenAfter(QUERY_STALE_TIME_MS + 1_000);
+      head = () => ({ status: 200, body: { data: [], extra: { isLast: true } } });
+      await reopen();
+      expect(e4Calls()).toHaveLength(3);
+      expect(visible(root, 'author/empty')).toBe(true);
+      expect(authorCards(root)).toEqual([]);
+      await unmount(root);
+    });
+
+    it('stale cache, nothing new: no visible change; the fresh copies are written', async () => {
+      const { root, reopen } = await reopenAfter(QUERY_STALE_TIME_MS + 1_000);
+      const before = queryClient.getQueryState(queryKeys.authorPosts(BLOG))?.dataUpdatedAt ?? 0;
+      await reopen();
+      expect(e4Calls()).toHaveLength(3);
+      expect(gridPosts()).toEqual(Array.from({ length: 40 }, (_, i) => `blog-post-${i}`));
+      expect(queryClient.getQueryState(queryKeys.authorPosts(BLOG))?.dataUpdatedAt).toBeGreaterThan(
+        before,
+      );
+      expect(lastFocusTarget()).toBe(SYN(0));
+      await unmount(root);
+    });
+
+    it('a gap (page 1 shares no post): the cache is page 1 alone', async () => {
+      const { root, reopen } = await reopenAfter(QUERY_STALE_TIME_MS + 1_000);
+      head = () => headPage(Array.from({ length: 20 }, (_, i) => newPost(i)), 20);
+      await reopen();
+      expect(e4Calls()).toHaveLength(3);
+      // 20 posts, more pages: the partial row held.
+      expect(gridPosts()).toEqual(Array.from({ length: 18 }, (_, i) => `new-${i}`));
+      // The user has not moved: the new first post.
+      expect(lastFocusTarget()).toBe(CARD('new-0'));
+      await unmount(root);
+    });
+
+    it('a first open without a cache loads normally (one E4 page 1)', async () => {
+      jest.setSystemTime(Date.now() + 10 * QUERY_STALE_TIME_MS);
+      e4 = postsWithHead(7);
+      const root = await openAuthor();
+      expect(pageOneCalls()).toHaveLength(1);
+      expect(gridPosts()).toHaveLength(7);
+      await unmount(root);
+    });
+  });
+
+  describe('resume', () => {
+    it('quick return (< 60 s): no E4 request', async () => {
+      const root = await deepInTheAuthor();
+      await backgroundFor(QUERY_STALE_TIME_MS - 5_000);
+      expect(e4Calls()).toHaveLength(2);
+      expect(focusMock).not.toHaveBeenCalled();
+      await unmount(root);
+    });
+
+    it('stale, Автор open, 2 new posts: one E4 page 1; on top; card 13 keeps focus at its new row', async () => {
+      const root = await deepInTheAuthor();
+      head = () => headPage([newPost(0), newPost(1), ...known(0, 18)], 18);
+      await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+      expect(e4Calls()).toHaveLength(3);
+      expect(cursorOf(e4Calls()[2].url)).toBeNull();
+      const ids = gridPosts();
+      expect(ids.slice(0, 3)).toEqual(['new-0', 'new-1', 'blog-post-0']);
+      // 42 posts, more pages: 42 shown (a multiple of 3); page 2 kept.
+      expect(ids).toHaveLength(42);
+      expect(ids).toContain('blog-post-39');
+      // Post 13 moved from row 4 to row 5: scrolled into view, focused again.
+      expect(ids.indexOf('blog-post-13')).toBe(15);
+      expect(mockLists.scrollToIndex).toHaveBeenCalledWith(
+        expect.objectContaining({ index: 5, animated: false }),
+      );
+      expect(focusTargets()).toEqual([SYN(13)]);
+      // The next page still continues from the last loaded page.
+      await focusOn(root, SYN(39));
+      expect(cursorOf(e4Calls()[e4Calls().length - 1].url)).toBe(40);
+      await unmount(root);
+    });
+
+    it('a 1-post prepend moves the focused last-row card into the held partial row: it stays shown and focused', async () => {
+      // Page 1: posts 0–17 (a multiple of 3). Later pages only repeat them
+      // with fresh cursors, so the auto-paging stops with more pages "possible".
+      head = null;
+      e4 = req => {
+        const n = cursorOf(req.url);
+        if (n === null && head) {
+          return head(req);
+        }
+        return headPage(known(0, 18), n === null ? 18 : n + 1);
+      };
+      const root = await openAuthor();
+      await focusOn(root, SYN(17));
+      await settle();
+      expect(gridPosts()).toHaveLength(18);
+      const calls = e4Calls().length;
+      focusMock.mockClear();
+      mockLists.scrollToIndex.mockClear();
+      head = () => headPage([newPost(0), ...known(0, 18)], 18);
+      await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+      expect(e4Calls()).toHaveLength(calls + 1);
+      // 19 posts with more pages: post 17 alone in the held row, but shown.
+      const ids = gridPosts();
+      expect(ids).toHaveLength(19);
+      expect(ids[18]).toBe('blog-post-17');
+      expect(mockLists.scrollToIndex).toHaveBeenCalledWith(
+        expect.objectContaining({ index: 6, animated: false }),
+      );
+      expect(focusTargets()).toEqual([SYN(17)]);
+      await unmount(root);
+    });
+
+    it('a gap: the cache is page 1 alone; focus follows the fallback chain', async () => {
+      const root = await deepInTheAuthor();
+      head = () => headPage(Array.from({ length: 20 }, (_, i) => newPost(i)), 20);
+      await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+      expect(gridPosts()).toEqual(Array.from({ length: 18 }, (_, i) => `new-${i}`));
+      // Post 13 (index 13) is gone: its neighbor by index.
+      expect(lastFocusTarget()).toBe(CARD('new-13'));
+      await unmount(root);
+    });
+
+    it('the refresh fails: nothing changes; only the error kind is logged', async () => {
+      const root = await deepInTheAuthor();
+      const before = gridPosts();
+      logger.clear();
+      head = () => ({ status: 400, body: { error: 'bad_request' } });
+      await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+      expect(e4Calls()).toHaveLength(3);
+      expect(gridPosts()).toEqual(before);
+      expect(focusMock).not.toHaveBeenCalled();
+      expect(logger.entries()).toContainEqual(
+        expect.objectContaining({ scope: 'author', message: 'head refresh failed', fields: { kind: 'Client' } }),
+      );
+      // The refresh's own entry carries the kind only (no blog, no content).
+      expect(JSON.stringify(logger.entries().filter(e => e.scope === 'author'))).not.toContain(BLOG);
+      await unmount(root);
+    });
+
+    it.each([
+      ['a network failure', (): FixtureReply => ({ network: true }), 3],
+      ['a 5xx', (): FixtureReply => ({ status: 503, body: { error: 'unavailable' } }), 2],
+    ])('the refresh E4 ends in %s: nothing changes', async (_name, reply, attempts) => {
+      const root = await deepInTheAuthor();
+      const before = gridPosts();
+      head = reply;
+      await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+      await settle(WITH_TIMERS);
+      // Page 1 of the open, then the refresh with its AD-6 retries
+      // (Network: 1 + 2, Server: 1 + 1).
+      expect(pageOneCalls()).toHaveLength(1 + attempts);
+      expect(gridPosts()).toEqual(before);
+      expect(focusMock).not.toHaveBeenCalled();
+      await unmount(root);
+    });
+
+    it('a page append in flight: the refresh is skipped', async () => {
+      e4 = postsWithHead(60);
+      const pages = e4;
+      const next = deferred();
+      e4 = req => (cursorOf(req.url) === 20 ? next.promise : pages(req));
+      const root = await openAuthor();
+      await focusOn(root, SYN(15));
+      expect(e4Calls()).toHaveLength(2);
+      head = () => headPage([newPost(0), ...known(0, 19)], 19);
+      await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+      expect(pageOneCalls()).toHaveLength(1);
+      next.resolve(syntheticBlogPosts({ blogUrl: BLOG, total: 60 })({ url: `x?offset=${cursorFor(20)}` } as FixtureRequest));
+      await settle();
+      expect(gridPosts()[0]).toBe('blog-post-0');
+      await unmount(root);
+    });
+
+    it('an account reset before the reply: the reply is dropped', async () => {
+      const root = await deepInTheAuthor();
+      const reply = deferred();
+      head = () => reply.promise;
+      await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+      expect(e4Calls()).toHaveLength(3);
+      await unmount(root);
+      await accountScope.reset();
+      reply.resolve(headPage([newPost(0), ...known(0, 19)], 19));
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(queryClient.getQueryData(queryKeys.authorPosts(BLOG))).toBeUndefined();
+    });
+
+    it('focus on the Author sidebar: the data is merged, focus stays', async () => {
+      const root = await deepInTheAuthor();
+      await focusOn(root, SIDEBAR_SUBS);
+      focusMock.mockClear();
+      head = () => headPage([newPost(0), newPost(1), ...known(0, 18)], 18);
+      await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+      expect(gridPosts()[0]).toBe('new-0');
+      expect(focusTargets()).toEqual([]);
+      await unmount(root);
+    });
+
+    it('a route above Автор (covered): the data is merged, Автор takes no focus; Back restores the card', async () => {
+      const root = await deepInTheAuthor();
+      await act(async () => {
+        navigationRef.navigate('DevFocusDetail', { id: 'stand-in' });
+      });
+      await settle();
+      focusMock.mockClear();
+      head = () => headPage([newPost(0), newPost(1), ...known(0, 18)], 18);
+      await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+      expect(pageOneCalls()).toHaveLength(2);
+      expect(gridPosts()[0]).toBe('new-0');
+      expect(focusTargets().filter(id => id?.startsWith('author/'))).toEqual([]);
+      focusMock.mockClear();
+      await back();
+      expect(lastFocusTarget()).toBe(SYN(13));
+      await unmount(root);
+    });
+
+    /**
+     * A first open without a cache: the skeleton's automatic sidebar focus,
+     * then E4 page 1 (20 of 60 posts) and
+     * the automatic first-post focus. `sidebarEventFirst`: the native event
+     * of the sidebar focus reaches JS before the E4 reply, else after it.
+     */
+    async function firstOpenUntouched(sidebarEventFirst: boolean) {
+      const pages = postsWithHead(60);
+      const firstPage = deferred();
+      let held = true;
+      e4 = req => (held && cursorOf(req.url) === null ? firstPage.promise : pages(req));
+      const root = await openAuthor();
+      expect(lastFocusTarget()).toBe(SIDEBAR_SUBS);
+      if (sidebarEventFirst) {
+        await focusOn(root, SIDEBAR_SUBS);
+      }
+      held = false;
+      firstPage.resolve(pages({ url: e4Calls()[0].url } as FixtureRequest) as FixtureReply);
+      await settle();
+      expect(lastFocusTarget()).toBe(SYN(0));
+      if (!sidebarEventFirst) {
+        // The late native event of the automatic sidebar focus.
+        await focusOn(root, SIDEBAR_SUBS);
+      }
+      await focusOn(root, SYN(0));
+      focusMock.mockClear();
+      mockLists.scrollToOffset.mockClear();
+      mockLists.scrollToIndex.mockClear();
+      return root;
+    }
+    const scrolledToTopOnResume = () =>
+      mockLists.scrollToOffset.mock.calls.some(
+        ([params]) => (params as { offset: number }).offset === 0,
+      );
+
+    it.each([
+      ['before', true],
+      ['after', false],
+    ])(
+      'first open without a cache, untouched (sidebar event %s the E4 reply), stale resume with 2 new posts: the new first post, at the top',
+      async (_order, sidebarEventFirst) => {
+        const root = await firstOpenUntouched(sidebarEventFirst);
+        head = () => headPage([newPost(0), newPost(1), ...known(0, 18)], 18);
+        await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+        expect(gridPosts().slice(0, 3)).toEqual(['new-0', 'new-1', 'blog-post-0']);
+        expect(focusTargets()).toEqual([CARD('new-0')]);
+        expect(scrolledToTopOnResume()).toBe(true);
+        expect(mockLists.scrollToIndex).not.toHaveBeenCalled();
+        await unmount(root);
+      },
+    );
+
+    it('a deliberate move to another sidebar item latches: a stale resume leaves focus on the user\'s item', async () => {
+      const root = await firstOpenUntouched(true);
+      await focusOn(root, 'author/nav/home');
+      focusMock.mockClear();
+      head = () => headPage([newPost(0), newPost(1), ...known(0, 18)], 18);
+      await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+      expect(gridPosts()[0]).toBe('new-0');
+      expect(focusTargets()).toEqual([]);
+      expect(scrolledToTopOnResume()).toBe(false);
+      await unmount(root);
+    });
+
+    it('a popped Автор (no observer) is not refreshed on resume', async () => {
+      e4 = postsWithHead(7);
+      const root = await openAuthor();
+      // The route unmounts after the closing transition (timers; they also
+      // run the gc of its posts, so the cache is seeded again, stale).
+      await back(WITH_TIMERS);
+      expect(visible(root, 'author')).toBe(false);
+      queryClient.setQueryData(
+        queryKeys.authorPosts(BLOG),
+        { pages: [{ posts: [], nextCursor: null }], pageParams: [null] },
+        { updatedAt: Date.now() },
+      );
+      await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+      expect(e4Calls()).toHaveLength(1);
+      await unmount(root);
+    });
   });
 });

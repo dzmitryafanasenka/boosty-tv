@@ -51,9 +51,12 @@ export {
   postGridListAdapter,
   postGridRowLayout,
   postGridRows,
+  useHeadChangeRefocus,
   useHeldRowAutoFetch,
   useLoadMoreRetry,
+  useShownGridPosts,
   visibleGridPosts,
+  type HeadChangeRefocusOptions,
   type PostGridProps,
   type PostRowItem,
 } from './PostGrid';

@@ -15,9 +15,10 @@ import {
   postGridListAdapter,
   requestHostFocus,
   spacing,
+  useHeadChangeRefocus,
   useHeldRowAutoFetch,
   useLoadMoreRetry,
-  visibleGridPosts,
+  useShownGridPosts,
   type HostView,
   type PostRowItem,
 } from '../../shared/ui';
@@ -46,6 +47,11 @@ export type AuthorFocusInfo = {
   focusSidebar(): void;
   /** Focus the content zone's remembered element; false when it has none. */
   focusZoneTarget(): boolean;
+  /**
+   * Listen to the route's focus events (the same ids as `current()`, while
+   * the route is active); returns the unsubscribe.
+   */
+  onFocusChange(listener: (focusId: string) => void): () => void;
 };
 
 export type AuthorScreenProps = {
@@ -80,6 +86,16 @@ type Phase = 'unavailable' | 'error' | 'loading' | 'postsError' | 'empty' | 'gri
  *   yet, or the StateView action just pressed). A StateView action takes
  *   focus the same way.
  * - Pagination, refetch and image loads never move focus.
+ * - A head refresh (reopen with a stale cache, resume) that changes the
+ *   head: while the user has not moved since the page opened (no D-pad move
+ *   or OK; focus is still where the page put it by itself: the first post,
+ *   the sidebar item or the StateView action, or none yet), the new first
+ *   post takes focus and the list shows the top (owner decision
+ *   2026-10-27, reopen focus), whichever comes first, the reply or the
+ *   native focus event. This is the one exception to "sidebar and StateView
+ *   focus are never taken": only the page's own automatic focus there is
+ *   taken, never one the user chose. Once the user has moved, the focused card keeps focus (scrolled to its new row), as on
+ *   Главная; a gap follows the fallback chain.
  * - Return to the route (a screen on top popped): the remembered post by id
  *   with the fallback chain (neighbor by index → first post → the action
  *   above / the sidebar item).
@@ -100,10 +116,13 @@ export function AuthorScreen({ http, blogUrl, routeKey, focus, onBack }: AuthorS
   const adapterRef = useRef(postGridListAdapter(listRef));
 
   // A trailing partial row is held while more pages may come (PostGrid);
-  // a failing next page shows it.
-  const shownPosts = useMemo(
-    () => visibleGridPosts(posts.posts, posts.hasNextPage && !posts.loadMoreFailed),
-    [posts.posts, posts.hasNextPage, posts.loadMoreFailed],
+  // a failing next page shows it, and so does a focused card in it (a head
+  // refresh can move the focused card there; `useShownGridPosts`).
+  const shownPosts = useShownGridPosts(
+    posts.posts,
+    posts.hasNextPage && !posts.loadMoreFailed,
+    focus.current(),
+    cardPrefix,
   );
   const ids = useMemo(() => shownPosts.map(post => `${cardPrefix}${post.id}`), [shownPosts, cardPrefix]);
   useHeldRowAutoFetch(posts, shownPosts.length);
@@ -119,15 +138,33 @@ export function AuthorScreen({ http, blogUrl, routeKey, focus, onBack }: AuthorS
     },
     [stateAction],
   );
+  // "The user has not moved since the page opened" (reopen focus, owner
+  // decision 2026-10-27): `moved` latches on the first focus event the page
+  // did not ask for (a D-pad move) or an OK on a card. `autoTargets` are the
+  // elements the page focused by itself (the sidebar item, the StateView
+  // action, a card), in request order; their native focus events, which may
+  // arrive after a newer automatic request, are never moves.
+  const moved = useRef(false);
+  const autoTargets = useRef<string[]>([]);
+  /** The page's own sidebar focus (recorded as automatic). */
+  const autoFocusSidebar = useCallback(() => {
+    autoTargets.current.push(focusRef.current.sectionItemId);
+    focusRef.current.focusSidebar();
+  }, []);
+  /** The page's own StateView action focus (recorded as automatic). */
+  const autoFocusAction = useCallback(() => {
+    autoTargets.current.push(AUTHOR_STATE_ACTION_ID);
+    requestHostFocus(stateActionView.current);
+  }, []);
   // Nothing above the grid (no search or filters before Epic 5): the
   // StateView action when shown, else the sidebar's current item.
   const focusAbove = useCallback(() => {
     if (stateActionView.current) {
-      requestHostFocus(stateActionView.current);
+      autoFocusAction();
     } else {
-      focusRef.current.focusSidebar();
+      autoFocusSidebar();
     }
-  }, []);
+  }, [autoFocusAction, autoFocusSidebar]);
   // A pending card focus lands only while the route is active and focus is
   // still where the page may take it: none yet, the sidebar's current item,
   // a card, the StateView action or the load-more «Повторить».
@@ -181,8 +218,43 @@ export function AuthorScreen({ http, blogUrl, routeKey, focus, onBack }: AuthorS
     );
   }, []);
 
+  const idsRef = useRef(ids);
+  idsRef.current = ids;
+  useEffect(
+    () =>
+      focus.onFocusChange(focusId => {
+        if (moved.current) {
+          return;
+        }
+        const index = autoTargets.current.indexOf(focusId);
+        if (index >= 0) {
+          // Older automatic targets are settled.
+          autoTargets.current = autoTargets.current.slice(index);
+        } else {
+          moved.current = true;
+        }
+      }),
+    [focus],
+  );
+  const onCardPress = useCallback(() => {
+    // OK on a post does nothing until Story 3.4 (Post), but it is a move.
+    moved.current = true;
+  }, []);
+  const followHead = useCallback(
+    (current: string | null) =>
+      !moved.current && (current === null || autoTargets.current.includes(current)),
+    [],
+  );
+  const onFollowHead = useCallback((id: string) => {
+    autoTargets.current.push(id);
+  }, []);
+
   const restoreOrFirst = useCallback(() => {
     if (restoration.restore().kind === 'none') {
+      const first = idsRef.current[0];
+      if (first !== undefined) {
+        autoTargets.current.push(first);
+      }
       restoration.focusInitial();
     }
   }, [restoration]);
@@ -197,18 +269,18 @@ export function AuthorScreen({ http, blogUrl, routeKey, focus, onBack }: AuthorS
       if (firstFocus.current) {
         firstFocus.current = false;
         if (phaseRef.current === 'loading' || phaseRef.current === 'empty') {
-          info.focusSidebar();
+          autoFocusSidebar();
         }
       } else {
         const current = info.current();
         if (current !== null && current.startsWith(cardPrefix) && phaseRef.current === 'grid') {
           restoreOrFirst();
         } else if (!(current !== null && current !== info.sectionItemId && info.focusZoneTarget())) {
-          info.focusSidebar();
+          autoFocusSidebar();
         }
       }
       return restoration.cancel;
-    }, [cardPrefix, restoreOrFirst, restoration]),
+    }, [cardPrefix, restoreOrFirst, restoration, autoFocusSidebar]),
   );
 
   const lastPhase = useRef<Phase | null>(null);
@@ -228,7 +300,7 @@ export function AuthorScreen({ http, blogUrl, routeKey, focus, onBack }: AuthorS
       // The skeleton has nothing focusable: a focused action (an E3 retry
       // that succeeded while E4 still loads) or card is gone.
       if (contentLost) {
-        info.focusSidebar();
+        autoFocusSidebar();
       }
     } else if (phase === 'grid') {
       if (mayTakeFocus()) {
@@ -237,13 +309,29 @@ export function AuthorScreen({ http, blogUrl, routeKey, focus, onBack }: AuthorS
     } else if (phase === 'empty') {
       // Nothing focusable in content: a focused action or card is gone.
       if (contentLost) {
-        info.focusSidebar();
+        autoFocusSidebar();
       }
     } else if (mayTakeFocus() || contentLost) {
       // A StateView with its one action (Повторить / Назад).
-      requestHostFocus(stateActionView.current);
+      autoFocusAction();
     }
-  }, [phase, mayTakeFocus, restoreOrFirst, cardPrefix, retryId]);
+  }, [phase, mayTakeFocus, restoreOrFirst, cardPrefix, retryId, autoFocusSidebar, autoFocusAction]);
+
+  // A head refresh (reopen or resume, spec-author-posts-refresh) changed the
+  // shown cards other than by an append: the new first post while the user
+  // has not moved (`followHead`), else the focused card keeps focus, as on
+  // Главная (`useHeadChangeRefocus`). A covered route never takes focus.
+  useHeadChangeRefocus({
+    ids,
+    cardIdPrefix: cardPrefix,
+    retryId,
+    focused: () => focusRef.current.current(),
+    canFocus,
+    restoration,
+    list: adapterRef,
+    followHead,
+    onFollowHead,
+  });
 
   const onRetryLoadMore = useLoadMoreRetry(posts, ids, restoration, () => {
     const info = focusRef.current;
@@ -349,6 +437,7 @@ export function AuthorScreen({ http, blogUrl, routeKey, focus, onBack }: AuthorS
           loadMoreFailed={posts.loadMoreFailed}
           onLoadMore={posts.fetchNextPage}
           onRetry={onRetryLoadMore}
+          onCardPress={onCardPress}
           cardIdPrefix={cardPrefix}
           retryId={retryId}
           testIDPrefix="author/posts"

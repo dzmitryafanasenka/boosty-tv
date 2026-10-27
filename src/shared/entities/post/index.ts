@@ -14,6 +14,13 @@ export {
   mergePosts,
 } from './postRepository';
 export {
+  mergePostsHead,
+  refreshPostsHead,
+  type PostsData,
+  type PostsHeadRefreshLog,
+  type PostsHeadRefreshResult,
+} from './postsHeadRefresh';
+export {
   MAX_AUTO_FETCHES,
   nextPageCursor,
   usePagedPosts,

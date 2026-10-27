@@ -17,6 +17,8 @@ export const queryKeys = {
   author: (blogUrl: string) => ['author', blogUrl] as const,
   /** E4 a blog's posts (Story 3.3), an infinite query (cursors are page params). */
   authorPosts: (blogUrl: string) => ['authorPosts', blogUrl] as const,
+  /** Every blog's E4 posts query (a prefix of `authorPosts`): the resume refresh. */
+  allAuthorPosts: () => ['authorPosts'] as const,
 } as const;
 
 /**

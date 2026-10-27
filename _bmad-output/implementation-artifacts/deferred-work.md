@@ -181,3 +181,6 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-3-author-page.md`
   summary: The demo Author test should load demo-blog-1's second page and check 30 distinct cards.
   evidence: `__tests__/demoFlow.test.tsx` asserts only that some cards exist; a demo transport that ignored the cursor would pass. Dev-only. Review 3.3, finding 3.
+- source_spec: `_bmad-output/implementation-artifacts/spec-author-posts-refresh.md`
+  summary: Главная's resume head refresh merges while the load-more «Повторить» row is shown and focused; the merge clears the query error, so the row (and focus) likely vanish.
+  evidence: Author skips the refresh in that state (`skipWhileError`); applying it to Главная breaks the pinned `homeFeedFlow` test that expects the merge. Unverified on Главная; needs an owner decision on the expected behaviour. Review of spec-author-posts-refresh, loop 2.

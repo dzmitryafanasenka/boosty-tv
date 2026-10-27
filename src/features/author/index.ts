@@ -6,3 +6,4 @@ export {
   type AuthorFocusInfo,
   type AuthorScreenProps,
 } from './AuthorScreen';
+export { refreshAuthorPostsHead, refreshAuthorPostsHeads } from './authorPostsRefresh';
