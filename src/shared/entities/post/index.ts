@@ -12,7 +12,17 @@ export {
   blogPostsPath,
   feedPath,
   mergePosts,
+  postPath,
 } from './postRepository';
+export {
+  blockKey,
+  listItemTexts,
+  PARAGRAPH_STOP_MAX_CHARS,
+  splitParagraph,
+  postBodyItems,
+  type PlaceholderKind,
+  type PostBodyItem,
+} from './postBody';
 export {
   mergePostsHead,
   refreshPostsHead,
@@ -35,4 +45,5 @@ export type {
   PostAuthor,
   PostKind,
   PostPage,
+  PostResult,
 } from './types';

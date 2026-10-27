@@ -85,6 +85,8 @@ export type Post = {
   durationSec: number | null;
   /** The level name, only if the post carries one. Never a price. */
   levelName: string | null;
+  /** `count.likes` (read-only, Story 3.4); null when the API gives none. */
+  likeCount: number | null;
 };
 
 /** One E5 page: the posts and the opaque cursor of the next page. */
@@ -93,3 +95,9 @@ export type PostPage = {
   /** Null on the last page (`isLast`, or no `extra`/`offset`). */
   nextCursor: string | null;
 };
+
+/**
+ * E8: the post, or `unavailable` for a missing one (404 `not_found`:
+ * «Пост недоступен», no retry).
+ */
+export type PostResult = { kind: 'ok'; post: Post } | { kind: 'unavailable' };

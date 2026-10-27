@@ -42,6 +42,8 @@ export type ShellProps = {
   homeOffline?: HomeScreenProps['offline'];
   /** Подписки: OK on a tile opens the Author page (Story 3.3). */
   onOpenAuthor?: (blogUrl: string) => void;
+  /** Главная: OK on a feed card opens Пост (Story 3.4). */
+  onOpenPost?: (blogUrl: string, postId: string) => void;
   /**
    * A section to open when the Shell is the focused route again: OK on a
    * sidebar item of a screen on top (Автор, owner decision 2026-10-27)
@@ -91,6 +93,7 @@ export function Shell({
   onExpireSession,
   homeOffline,
   onOpenAuthor,
+  onOpenPost,
   takePendingSection,
 }: ShellProps) {
   const sections = useMemo(() => enabledSections(), []);
@@ -105,8 +108,9 @@ export function Shell({
   const navViews = nav.views;
   const contentRef = useRef<FocusZoneHandle>(null);
   /**
-   * The current section's own return focus (Подписки: restoration by
-   * `blogUrl` with the fallback chain); null: the content zone's target.
+   * The current section's own return focus (Подписки: the tile by
+   * `blogUrl`; Главная: the card by id; both with the fallback chain);
+   * null: the content zone's target.
    */
   const sectionReturn = useRef<(() => boolean) | null>(null);
   const takePendingRef = useRef(takePendingSection);
@@ -219,6 +223,16 @@ export function Shell({
       current: () => lastFocusId.current,
       sectionItemId: NAV_ID[HOME],
       focusSidebar: () => focusNav(HOME),
+      setReturnFocus: restore => {
+        sectionReturn.current = restore;
+        // Clears the slot only while it still holds this registration (a
+        // newer section may have registered before this one unmounts).
+        return () => {
+          if (sectionReturn.current === restore) {
+            sectionReturn.current = null;
+          }
+        };
+      },
     }),
     [focusNav],
   );
@@ -231,6 +245,13 @@ export function Shell({
       focusSidebar: () => focusNav('subs'),
       setReturnFocus: restore => {
         sectionReturn.current = restore;
+        // Clears the slot only while it still holds this registration (a
+        // newer section may have registered before this one unmounts).
+        return () => {
+          if (sectionReturn.current === restore) {
+            sectionReturn.current = null;
+          }
+        };
       },
     }),
     [focusNav],
@@ -273,6 +294,7 @@ export function Shell({
           onExpireSession={onExpireSession}
           homeOffline={homeOffline}
           onOpenAuthor={onOpenAuthor}
+          onOpenPost={onOpenPost}
         />
       </FocusZone>
     </Screen>
@@ -292,6 +314,7 @@ function SectionContent({
   onExpireSession,
   homeOffline,
   onOpenAuthor,
+  onOpenPost,
 }: {
   section: SectionId;
   routeKey: string;
@@ -305,6 +328,7 @@ function SectionContent({
   onExpireSession?: () => void;
   homeOffline?: HomeScreenProps['offline'];
   onOpenAuthor?: (blogUrl: string) => void;
+  onOpenPost?: (blogUrl: string, postId: string) => void;
 }) {
   switch (section) {
     case 'home':
@@ -315,6 +339,7 @@ function SectionContent({
           routeKey={routeKey}
           focusOnMount={focusContent}
           focus={homeFocus}
+          onOpenPost={onOpenPost}
         />
       );
     case 'settings':

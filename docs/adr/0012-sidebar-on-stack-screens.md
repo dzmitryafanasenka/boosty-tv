@@ -17,7 +17,11 @@
 
 ## Consequences
 
-- Story 3.4 Post reuses the component, the prefix pattern (`post/nav/<section>` or a shared prefix) and the handshake; nothing new in the Shell.
+- Story 3.4 Post reuses the component, the prefix pattern and the handshake (implemented 2026-10-27: `PostRoute` and `AuthorRoute` share `useStackSidebar` in `src/app/App.tsx`; items `post/nav/<section>`; current item = the `section` route param, the origin Shell section). Amendments from 3.4:
+  - A sidebar OK pops with `popTo('Shell')`, not `goBack()`: Пост can sit above Автор (and Автор above Пост, from the author row), and the Shell must be reached in one step. OK on the origin item is still a return without a pending section.
+  - `pendingShellSection` records its owner route; only that route's unmount clears it. `popTo` through an Автор below unmounts that Автор at once, before the Shell reads the value.
+  - Автор takes an optional `section` param (default Подписки), so an Автор opened from a feed post shows Главная as its current item.
+  - Главная registers its own return restore with the Shell (the card by id through `useFocusRestoration.restore()`, card-only memory), which closes the Story 3.1 open item below.
 - The pending section is global mutable state with one writer per pop; the clearing rules above keep a stale value from opening a section on a later plain Back. A navigation param (`popTo('Shell', {open})`) was not used: the Shell would refocus its old content in its focus effect before a param effect could switch the section.
-- Главная still returns through the content zone's target; routing it through `useFocusRestoration.restore()` is the open item from Story 3.1 (epic-3 context, before 3.4).
+- Главная returned through the content zone's target until Story 3.4, which routes it through `useFocusRestoration.restore()` (see above).
 - tvOS (phase 4): not validated.

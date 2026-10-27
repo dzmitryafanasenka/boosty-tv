@@ -225,3 +225,20 @@ describe('blocks and kinds', () => {
     expect(firstText([])).toBe('');
   });
 });
+
+describe('mapPost: like count (Story 3.4)', () => {
+  it('reads count.likes only; missing or invalid → null', () => {
+    expect(mapped({ ...feedPost(1), count: { likes: 5, comments: 9, reactions: { like: 5 } } }).likeCount).toBe(5);
+    expect(mapped({ ...feedPost(1), count: { likes: 0 } }).likeCount).toBe(0);
+    expect(mapped({ ...feedPost(1), count: undefined }).likeCount).toBeNull();
+    expect(mapped({ ...feedPost(1), count: { likes: -1 } }).likeCount).toBeNull();
+    expect(mapped({ ...feedPost(1), count: { likes: 1.5 } }).likeCount).toBeNull();
+    expect(mapped({ ...feedPost(1), count: 'x' }).likeCount).toBeNull();
+    expect(lockedPost()).toBeDefined();
+  });
+
+  it('a post whose user.blogUrl is not route-safe is dropped', () => {
+    expect(mapPost({ ...feedPost(1), user: { name: 'n', blogUrl: 'a/b' } }, quiet())).toBeNull();
+    expect(mapPost({ ...feedPost(1), user: { name: 'n', blogUrl: '..' } }, quiet())).toBeNull();
+  });
+});

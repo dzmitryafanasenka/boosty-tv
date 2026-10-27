@@ -623,14 +623,15 @@ describe('focus (focus-map §4 D, §1.6)', () => {
     await unmount(root);
   });
 
-  it('OK on a post does nothing yet (Post is Story 3.4)', async () => {
+  it('OK on a post opens Пост for that post, sidebar origin Подписки (Story 3.4; the flow is in postFlow)', async () => {
     const root = await openAuthor();
-    focusMock.mockClear();
-    const before = transport.calls.length;
     await press(root, SYN(1));
-    expect(visible(root, 'author')).toBe(true);
-    expect(focusTargets().filter(Boolean)).toEqual([]);
-    expect(transport.calls).toHaveLength(before);
+    expect(currentRoute()).toBe('Post');
+    expect(navigationRef.getCurrentRoute()?.params).toEqual({
+      blogUrl: BLOG,
+      postId: 'blog-post-1',
+      section: 'subs',
+    });
     await unmount(root);
   });
 
@@ -991,7 +992,6 @@ describe('head refresh on reopen and resume (spec-author-posts-refresh)', () => 
         SYN(0),
         2,
       ],
-      ['OK on the first card', async (root: Root) => press(root, SYN(0)), SYN(0), 2],
     ])(
       'new posts after the user moved (%s): the focused card keeps focus at its new row',
       async (_name, move, target, index) => {
@@ -1015,6 +1015,48 @@ describe('head refresh on reopen and resume (spec-author-posts-refresh)', () => 
         await unmount(root);
       },
     );
+
+    it('OK on an Автор card is a move: OK on the first card, Back while the head reply is pending, then the reply → that card at index 2 (not the new first post)', async () => {
+      const { root, reopen } = await reopenAfter(QUERY_STALE_TIME_MS + 1_000);
+      const reply = deferred();
+      head = () => reply.promise;
+      await reopen();
+      await focusOn(root, SYN(0));
+      await press(root, SYN(0));
+      expect(currentRoute()).toBe('Post');
+      await back();
+      expect(currentRoute()).toBe('Author');
+      focusMock.mockClear();
+      reply.resolve(twoNew());
+      await settle();
+      expect(gridPosts().indexOf('blog-post-0')).toBe(2);
+      expect(focusTargets()).not.toContain(CARD('new-0'));
+      expect(lastFocusTarget()).toBe(SYN(0));
+      await unmount(root);
+    });
+
+    it('new posts while Пост (opened with OK on the first card) covers Автор: no focus taken; Back restores that card at its new row', async () => {
+      const { root, reopen } = await reopenAfter(QUERY_STALE_TIME_MS + 1_000);
+      const reply = deferred();
+      head = () => reply.promise;
+      await reopen();
+      await focusOn(root, SYN(0));
+      await press(root, SYN(0));
+      expect(currentRoute()).toBe('Post');
+      focusMock.mockClear();
+      reply.resolve(twoNew());
+      await settle();
+      expect(gridPosts().indexOf('blog-post-0')).toBe(2);
+      expect(focusTargets().filter(id => id?.startsWith('author/'))).toEqual([]);
+      mockLists.scrollToIndex.mockClear();
+      await back();
+      expect(currentRoute()).toBe('Author');
+      expect(lastFocusTarget()).toBe(SYN(0));
+      expect(mockLists.scrollToIndex).toHaveBeenCalledWith(
+        expect.objectContaining({ index: 0, animated: false }),
+      );
+      await unmount(root);
+    });
 
     it.each([
       ['a network failure', (): FixtureReply => ({ network: true }), 3, 'Network'],

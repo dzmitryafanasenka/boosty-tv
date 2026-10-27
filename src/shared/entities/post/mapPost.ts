@@ -252,5 +252,6 @@ export function mapPost(raw: unknown, logger: Logger = appLogger): Post | null {
         ? videos[0].durationSec
         : null,
     levelName: nonEmpty(dto.subscriptionLevel?.name),
+    likeCount: dto.count?.likes ?? null,
   };
 }

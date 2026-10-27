@@ -128,6 +128,27 @@ export const ru = {
     unavailableBody: 'Этой страницы нет или она закрыта.',
     loadMoreError: 'Не удалось загрузить следующие публикации.',
   },
+  // Пост (Story 3.4, E8; docs/focus-map.md §4 F). Missing post (E8 404,
+  // `not_found` verified): «Назад» only, no retry. Blocks other than text
+  // are neutral placeholders until Story 3.5 / Epic 6. `likes` forms carry
+  // `{n}`. No comment count anywhere.
+  post: {
+    loading: 'Загружаем пост',
+    unavailableTitle: 'Пост недоступен',
+    unavailableBody: 'Этого поста нет или он удалён.',
+    errorTitle: 'Не удалось загрузить пост',
+    likes: ['{n} лайк', '{n} лайка', '{n} лайков'] as RuPluralForms,
+    meta: '{date} · {likes}',
+    a11yAuthor: 'Автор: {name}. Открыть страницу автора',
+    block: {
+      video: 'Видео',
+      image: 'Изображение',
+      file: 'Файл',
+      audio: 'Аудио',
+      poll: 'Опрос',
+      unknown: 'Блок',
+    },
+  },
   common: {
     retry: 'Повторить',
     back: 'Назад',

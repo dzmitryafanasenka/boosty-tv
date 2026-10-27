@@ -711,3 +711,25 @@ Host tests: `__tests__/authorFlow.test.tsx` (every matrix row, the focus rules, 
 
 Not verified on the device: the empty, error and «Автор недоступен» states (the owner's blogs have posts and exist; host and demo only); the return to Автор from a pushed route (Post is Story 3.4; host-tested with a stand-in route); performance/jank of the Author grid (not measured; it is the Главная grid component); TalkBack labels; the physical remote.
 
+### Story 3.4 — Post screen, 2026-10-27
+
+**Status: implemented and host-tested; the main path verified on the pinned device (Chromecast with Google TV 4K, release-like build, the owner's existing session) by the agent with adb (injected keys, screencap). Not yet checked by the owner with the physical remote.**
+
+**Build:** `./gradlew assembleRelease -PreactNativeArchitectures=armeabi-v7a` (JDK 17) BUILD SUCCESSFUL; release-like (`zipalign -p 4` + `apksigner`, SDK debug key outside the repo), installed with `adb install -r`. The shipped Hermes bundle: `state/post/action` 1, `createDemoSessionManager` 0. Nothing uninstalled or cleared; no sign-in, no sign-out.
+
+| Check | Result | Who / how |
+|---|---|---|
+| E8 with the content profile | Posts rendered (title, date · likes, author, paragraphs, placeholders); no error state | agent, adb |
+| Главная → ↓ → OK on a text post | Пост opens; focus on the first paragraph (accent bar + `surface` background, no ring); sidebar current item «Главная»; «16 окт · 13 лайков» | agent, adb (screencap) |
+| ↓ / ← / → | ↓ → the next paragraph; ← → the author row; → → back to the last focused paragraph | agent, adb |
+| ← ← then Back | Sidebar «Главная», then Главная with focus on the same card | agent, adb |
+| OK on a video post (pre-decision build: before the inline-link decision and the long-paragraph split) | A «Видео» placeholder, then paragraphs; inline links shown as «Ссылка» placeholders (since replaced: link text stays in its paragraph); 8 × ↓ scrolls the right column natively | agent, adb |
+| Author row OK, Back, Back | Автор (sidebar current «Главная», focus on its first post); Back → Пост with focus on the author row; Back → Главная, the same card | agent, adb |
+| Подписки → Автор → OK on a post → author row OK | Pops to the same Автор, focus on the same card; Back → Подписки, the same tile | agent, adb |
+| Пост over Автор: sidebar «Главная» OK | The Shell on Главная, focus on the remembered feed card | agent, adb |
+
+Host tests: `__tests__/postFlow.test.tsx` (every matrix row; initial focus first paragraph / author for locked and text-less posts; the skeleton and a move during it; the column guides and traps; ↓ through 40 paragraphs; a refetch that drops the focused paragraph; Back to the same card from Главная and Автор, gone → the neighbor; the author row push/pop; sidebar items, origin and other sections, `popTo` through Автор; FocusRestoration forgotten on unmount), `__tests__/homeFeedFlow.test.tsx` and `__tests__/authorFlow.test.tsx` (OK on a card opens Пост; a stale reopen refresh while Пост covers Автор), `__tests__/demoFlow.test.tsx` (demo E8: paragraphs, mixed blocks, 404), unit tests `postBody.test.ts`, `postRepository.test.ts` (E8), `mapPost.test.ts` (like count, route-safe `blogUrl`), `queryKeys.test.ts`. The full suite ran 3× green (1059 tests); the new and changed flow suites (post, author, home, demo, shell, subscriptions: 219 tests) ran 30× green.
+
+Seen on the device: the live posts put links inline (`text`, `link`, `text`, `BLOCK_END`), so the first build split such a sentence with a «Ссылка» placeholder. Owner decision 2026-10-27: a link's text stays in its paragraph as plain text (no placeholder); implemented and host-tested after the device run, not yet re-run on the device. An open Пост is not refreshed on resume (only Главная's and Автор's heads are); E8 is requested again only when Пост is reopened after `staleTime` (60 s). Not re-run on the device after the review fixes: the inline-link merge and the split of paragraphs longer than 400 characters into several stops (host-tested). Not verified on the device: the locked post, «Пост недоступен» and the error state (host and demo only); a post with a list, a poll, audio or a file; TalkBack labels; the physical remote; performance of very long posts (the right column is a plain ScrollView, not virtualized).
+
+Re-run after the review fixes (2026-10-27, agent by adb, a fresh release-like build, the owner's session): Главная → OK on the first card → Пост, focus on the first paragraph; the live post's inline links read as plain text inside their paragraphs (no «Ссылка» placeholder); the only placeholder is «Видео»; 6 × ↓ walk the paragraphs with the focused one scrolled into view (accent bar shown); Back → the same feed card. That post had no paragraph over the stop budget, so the long-paragraph split was not seen on the device (host-tested). Not checked by the owner with the physical remote.

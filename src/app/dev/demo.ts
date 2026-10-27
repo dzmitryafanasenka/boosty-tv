@@ -16,8 +16,10 @@ import type { ReadResult, SecureStore } from '../../shared/platform/secureStore'
  * from the stored `demo`, so it runs the account-switch hook, Story 2.8),
  * E5 (the feed, Story 3.1) synthetic posts, E2 (Подписки, Story 3.2)
  * synthetic authors, E3/E4 (Автор, Story 3.3: `demo-blog-1` 2 pages,
- * `demo-blog-3` no posts, the last demo blog missing), every other request
- * a 404. The
+ * `demo-blog-3` no posts, the last demo blog missing), E8 (Пост, Story 3.4:
+ * every demo post with several paragraphs and a like count, every fourth
+ * one also with image, file, audio, poll and unknown blocks and an inline link;
+ * `demo-post-9` answers 404 `not_found`), every other request a 404. The
  * keychain is never touched, so the owner's stored session survives a demo
  * run.
  *
@@ -138,6 +140,58 @@ function demoBlogPage(url: string, blogUrl: string) {
 }
 
 const DEMO_BLOG_PATH = /^\/v1\/blog\/(demo-blog-\d+)(\/post\/)?$/;
+const DEMO_POST_PATH = /^\/v1\/blog\/(demo-blog-\d+)\/post\/([^/]+)$/;
+/** The demo post whose E8 answers 404 `not_found` («Пост недоступен»). */
+const DEMO_MISSING_POST = 'demo-post-9';
+
+const DEMO_PARAGRAPHS = [
+  'Это демо-пост: в нём нет настоящих данных Boosty. Абзацы ниже нужны, чтобы проверить чтение текста пультом.',
+  'Каждый абзац — отдельная остановка фокуса. Кнопки вверх и вниз переходят между абзацами, а колонка прокручивается к выбранному.',
+  'Кнопка влево возвращает к автору поста. Кнопка «Назад» возвращает к карточке, с которой открыт пост.',
+  'Последний абзац демо-текста. Под ним в некоторых постах есть заглушки блоков, которые появятся в следующих версиях.',
+];
+
+const textBlock = (text: string) => [
+  { type: 'text', content: JSON.stringify([text, 'unstyled', []]), modificator: '' },
+  { type: 'text', content: '', modificator: 'BLOCK_END' },
+];
+
+/** E8 for a demo post (shape of `src/test/fixtures/boosty/e8-post-accessible.json`, no URLs). */
+function demoPostDetail(blogUrl: string, postId: string) {
+  let base: ReturnType<typeof demoPost> | null = null;
+  const feed = /^demo-post-(\d+)$/.exec(postId);
+  const blog = new RegExp(`^${blogUrl}-post-(\\d+)$`).exec(postId);
+  if (feed) {
+    base = demoPost(Number(feed[1]));
+  } else if (blog) {
+    const n = Number(blog[1]) - 100000;
+    base = { ...demoPost(n, { blogUrl, index: demoBlogIndex(blogUrl) }), id: postId };
+  }
+  if (base === null || base.user.blogUrl !== blogUrl) {
+    return null;
+  }
+  const n = base.int_id - 100000;
+  const videos = base.data.filter(block => block.type === 'ok_video');
+  const mixed =
+    n % 4 === 1
+      ? [
+          { type: 'image', id: `demo-image-${n}`, width: 1280, height: 720 },
+          { type: 'text', content: '["Абзац со ","unstyled",[]]', modificator: '' },
+          { type: 'link', content: '["ссылкой","unstyled",[]]' },
+          ...textBlock(' между заглушками.'),
+          { type: 'file', id: `demo-file-${n}`, title: 'Файл' },
+          { type: 'audio_file', id: `demo-audio-${n}`, title: 'Аудио' },
+          { type: 'poll', id: 1000 + n },
+          { type: 'demo_unknown_block' },
+        ]
+      : [];
+  return {
+    ...base,
+    data: base.hasAccess ? [...videos, ...DEMO_PARAGRAPHS.flatMap(textBlock), ...mixed] : [],
+    teaser: base.hasAccess ? [] : [{ type: 'image', id: `demo-teaser-${n}`, width: 1280, height: 720 }],
+    count: { likes: (n * 7) % 40, comments: 0 },
+  };
+}
 
 const DEMO_SESSION = JSON.stringify({
   v: 1,
@@ -164,6 +218,15 @@ function memoryStore(initial: string | null): SecureStore {
 
 export function createDemoSessionManager(): SessionManager {
   const transport = createFixtureTransport(request => {
+    const single = DEMO_POST_PATH.exec(request.path);
+    if (single) {
+      const [, blogUrl, postId] = single;
+      const detail =
+        postId === DEMO_MISSING_POST ? null : demoPostDetail(blogUrl, decodeURIComponent(postId));
+      return detail
+        ? { status: 200, body: detail, delayMs: 300 }
+        : { status: 404, body: { error: 'not_found' }, delayMs: 300 };
+    }
     const blog = DEMO_BLOG_PATH.exec(request.path);
     if (blog) {
       const [, blogUrl, posts] = blog;

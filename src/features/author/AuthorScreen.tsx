@@ -64,6 +64,8 @@ export type AuthorScreenProps = {
   focus: AuthorFocusInfo;
   /** «Назад» on «Автор недоступен»: pop. */
   onBack: () => void;
+  /** OK on a post: open Пост (Story 3.4) by its identity. */
+  onOpenPost?: (blogUrl: string, postId: string) => void;
 };
 
 type Phase = 'unavailable' | 'error' | 'loading' | 'postsError' | 'empty' | 'grid';
@@ -99,9 +101,17 @@ type Phase = 'unavailable' | 'error' | 'loading' | 'postsError' | 'empty' | 'gri
  * - Return to the route (a screen on top popped): the remembered post by id
  *   with the fallback chain (neighbor by index → first post → the action
  *   above / the sidebar item).
- * - OK on a post does nothing until Story 3.4 (Post).
+ * - OK on a post opens Пост (Story 3.4); the card is remembered (by its
+ *   focus) and restored by id on return.
  */
-export function AuthorScreen({ http, blogUrl, routeKey, focus, onBack }: AuthorScreenProps) {
+export function AuthorScreen({
+  http,
+  blogUrl,
+  routeKey,
+  focus,
+  onBack,
+  onOpenPost,
+}: AuthorScreenProps) {
   const author = useAuthor(http, blogUrl);
   const posts = useAuthorPosts(http, blogUrl);
   const windowHeight = useWindowDimensions().height;
@@ -236,9 +246,17 @@ export function AuthorScreen({ http, blogUrl, routeKey, focus, onBack }: AuthorS
       }),
     [focus],
   );
-  const onCardPress = useCallback(() => {
-    // OK on a post does nothing until Story 3.4 (Post), but it is a move.
+  const shownRef = useRef(shownPosts);
+  shownRef.current = shownPosts;
+  const onOpenPostRef = useRef(onOpenPost);
+  onOpenPostRef.current = onOpenPost;
+  const onCardPress = useCallback((postId: string) => {
+    // OK on a post is a move (the reopen rule), and opens Пост.
     moved.current = true;
+    const post = shownRef.current.find(p => p.id === postId);
+    if (post) {
+      onOpenPostRef.current?.(post.author.blogUrl, post.id);
+    }
   }, []);
   const followHead = useCallback(
     (current: string | null) =>

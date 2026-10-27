@@ -53,6 +53,15 @@ export type HomeFocusInfo = {
   sectionItemId: string;
   /** Focus Главная's sidebar item (the last fallback of the grid). */
   focusSidebar(): void;
+  /**
+   * Registers how Главная restores its content focus when the Shell is the
+   * focused route again (Back from Пост, Story 3.4): the remembered card by
+   * id through FocusRestoration (scroll, index, focus) with the fallback
+   * chain. The function returns false when it did nothing (the Shell then
+   * uses the zone's target). Returns the unregister function, which clears
+   * the slot only while it still holds this registration.
+   */
+  setReturnFocus?(restore: () => boolean): () => void;
 };
 
 export type HomeScreenProps = {
@@ -69,6 +78,8 @@ export type HomeScreenProps = {
   /** The section was opened with OK: take the content focus once content exists. */
   focusOnMount?: boolean;
   focus: HomeFocusInfo;
+  /** OK on a feed card: open Пост (Story 3.4) by its identity. */
+  onOpenPost?: (blogUrl: string, postId: string) => void;
 };
 
 type Phase = 'offline' | 'loading' | 'error' | 'empty' | 'grid';
@@ -90,12 +101,21 @@ type Phase = 'offline' | 'loading' | 'error' | 'empty' | 'grid';
  * - Pagination, refetch and image loads never move focus. A load-more
  *   retry that succeeds focuses the first new card if focus is still on
  *   «Повторить».
- * - OK on a card does nothing yet (the Post screen is Story 3.4).
+ * - OK on a card opens Пост (Story 3.4). Back from it restores that card
+ *   by id (card-only memory: only a card entry is restored this way) with
+ *   the fallback chain neighbor by index → first card → the sidebar item.
  *
  * Offline: «Нет подключения к интернету» with «Повторить» (Story 2.5); the
  * feed is not requested meanwhile.
  */
-export function HomeScreen({ offline, http, routeKey, focusOnMount = false, focus }: HomeScreenProps) {
+export function HomeScreen({
+  offline,
+  http,
+  routeKey,
+  focusOnMount = false,
+  focus,
+  onOpenPost,
+}: HomeScreenProps) {
   const offlineRetry = useZoneItem(HOME_OFFLINE_RETRY_ID);
   const offlineRetryView = useRef<HostView | null>(null);
   const offlineRetryRef = useCallback(
@@ -260,6 +280,44 @@ export function HomeScreen({ offline, http, routeKey, focusOnMount = false, focu
   // Blur or unmount: stop a pending restore focus.
   useEffect(() => restoration.cancel, [restoration]);
 
+  // Return from Пост (the Shell is focused again with focus in content):
+  // the remembered card by id through FocusRestoration, with the fallback
+  // chain (deferred from Story 3.1: the content zone's target used zone
+  // order and no scroll). Card-only memory: the load-more «Повторить» and
+  // the StateView action return through the zone as before.
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+  useEffect(() => {
+    const info = focusRef.current;
+    const unregister = info.setReturnFocus?.(() => {
+      const remembered = focusRestoration.peek(routeKey, HOME_SECTION)?.focusId;
+      if (
+        phaseRef.current !== 'grid' ||
+        remembered === undefined ||
+        !remembered.startsWith(FEED_CARD_PREFIX) ||
+        remembered === FEED_RETRY_ID
+      ) {
+        return false;
+      }
+      if (restoration.restore().kind === 'none') {
+        restoration.focusInitial();
+      }
+      return true;
+    });
+    return () => unregister?.();
+  }, [restoration, routeKey]);
+
+  const postsRef = useRef(shownPosts);
+  postsRef.current = shownPosts;
+  const onOpenPostRef = useRef(onOpenPost);
+  onOpenPostRef.current = onOpenPost;
+  const onCardPress = useCallback((postId: string) => {
+    const post = postsRef.current.find(p => p.id === postId);
+    if (post) {
+      onOpenPostRef.current?.(post.author.blogUrl, post.id);
+    }
+  }, []);
+
   // A resume refresh changed the shown cards other than by an append: the
   // focused card keeps focus (shared rule, `useHeadChangeRefocus`).
   useHeadChangeRefocus({
@@ -371,6 +429,7 @@ export function HomeScreen({ offline, http, routeKey, focusOnMount = false, focu
           onLoadMore={feed.fetchNextPage}
           onRetry={onRetryLoadMore}
           initialRow={initialRow}
+          onCardPress={onCardPress}
         />
       ) : null}
     </View>

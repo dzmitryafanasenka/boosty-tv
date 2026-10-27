@@ -19,6 +19,11 @@ export const queryKeys = {
   authorPosts: (blogUrl: string) => ['authorPosts', blogUrl] as const,
   /** Every blog's E4 posts query (a prefix of `authorPosts`): the resume refresh. */
   allAuthorPosts: () => ['authorPosts'] as const,
+  /**
+   * E8 one post (Story 3.4), by its identity `{blogUrl, postId}` (AD-9); no
+   * URL or signed value. Its own root: never a prefix of a list key.
+   */
+  post: (blogUrl: string, postId: string) => ['post', blogUrl, postId] as const,
 } as const;
 
 /**

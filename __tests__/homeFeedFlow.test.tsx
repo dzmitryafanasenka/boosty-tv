@@ -11,7 +11,7 @@
 import { notifyManager } from '@tanstack/react-query';
 import { act } from 'react';
 import { AppState } from 'react-native';
-import App from '../src/app/App';
+import App, { navigationRef } from '../src/app/App';
 import { QUERY_STALE_TIME_MS, queryClient, resetQueryCache } from '../src/app/queryClient';
 import { queryKeys } from '../src/shared/api';
 import {
@@ -632,13 +632,16 @@ describe('content (matrix «Malformed post», «Unknown block», «Locked post»
     await unmount(root);
   });
 
-  it('OK on a card does nothing yet (Post screen: Story 3.4)', async () => {
+  it('OK on a card opens Пост for that post (Story 3.4; the flow is in postFlow)', async () => {
     const root = await renderApp();
-    const id = `home/feed/${e5Posts()[0].id}`;
-    focusMock.mockClear();
-    await press(root, id);
-    expect(visible(root, 'shell')).toBe(true);
-    expect(focusTargets()).toEqual([]);
+    const post = e5Posts()[0] as { id: string; user: { blogUrl: string } };
+    await press(root, `home/feed/${post.id}`);
+    expect(visible(root, 'post')).toBe(true);
+    expect(navigationRef.getCurrentRoute()?.params).toEqual({
+      blogUrl: post.user.blogUrl,
+      postId: post.id,
+      section: 'home',
+    });
     await unmount(root);
   });
 });

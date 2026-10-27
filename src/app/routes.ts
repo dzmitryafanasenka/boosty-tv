@@ -1,3 +1,5 @@
+import type { SectionId } from './phaseFlags';
+
 /**
  * Typed root stack routes (ADR 0003 / ADR 0007). Params carry ids and flags
  * only, never secrets: the phone and the challenge stay in `features/auth`'s
@@ -17,9 +19,17 @@ export type RootStackParamList = {
   Shell: undefined;
   /**
    * D Автор (Story 3.3): one blog's header and posts. `blogUrl` already
-   * passed `blogUrlSchema` (it came from an Author entity).
+   * passed `blogUrlSchema` (it came from an Author or Post entity).
+   * `section`: the origin Shell section, the sidebar's current item
+   * (default Подписки; Главная when opened from a post of the feed).
    */
-  Author: { blogUrl: string };
+  Author: { blogUrl: string; section?: SectionId };
+  /**
+   * F Пост (Story 3.4): one post by its identity (AD-9). `blogUrl` passed
+   * `blogUrlSchema` in the post mapper. `section`: the origin Shell section,
+   * the sidebar's current item (Главная from the feed, Подписки from Автор).
+   */
+  Post: { blogUrl: string; postId: string; section: SectionId };
   /** A11 Session expired (Story 2.6): the stack root after an expiry. */
   Expired: undefined;
   /** Debug builds only: «Проверка фокуса» (registered under `__DEV__`). */
