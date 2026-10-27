@@ -47,6 +47,8 @@ export const postDtoSchema = z.object({
     .object({ likes: z.number().int().nonnegative().nullish().catch(undefined) })
     .nullish()
     .catch(undefined),
+  /** E4: the author's pinned post comes first (Boosty's order); a wrong type → not pinned. */
+  isPinned: z.boolean().nullish().catch(undefined),
   /** Present only as a key in live posts; only `name` is read. */
   subscriptionLevel: z
     .object({ name: optionalString })

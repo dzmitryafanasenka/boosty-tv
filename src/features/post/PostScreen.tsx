@@ -1,6 +1,13 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, TVFocusGuideView, View } from 'react-native';
+import {
+  ScrollView,
+  StyleSheet,
+  TVFocusGuideView,
+  View,
+  type LayoutChangeEvent,
+  type ScrollViewInstance,
+} from 'react-native';
 import type { HttpClient } from '../../shared/api';
 import {
   postBodyItems,
@@ -11,7 +18,8 @@ import {
 import { useZoneItem } from '../../shared/focus';
 import { t } from '../../shared/i18n';
 import { StateView, requestHostFocus, spacing, type HostView } from '../../shared/ui';
-import { PostBody, PostBodySkeleton, PostVideoRows } from './PostBody';
+import { PostBody, PostBodySkeleton, PostVideoRows, TEASER_IMAGE_GAP } from './PostBody';
+import { LOCKED_NOTICE_GAP, LockedNotice } from './LockedNotice';
 import { PostHeader, PostHeaderSkeleton } from './PostHeader';
 import { usePost } from './usePost';
 
@@ -27,6 +35,35 @@ export const postVideoId = (postId: string, mediaId: string) =>
   `${postVideoPrefix(postId)}${mediaId}`;
 
 const NO_DESTINATIONS: HostView[] = [];
+
+/** The smallest teaser image cap, even when a long title leaves less room. */
+export const TEASER_IMAGE_MIN_HEIGHT = 96;
+
+/** The column's padding (focus headroom around the stops, room below the last one). */
+export const COLUMN_PADDING_X = spacing['focus-headroom'];
+export const COLUMN_PADDING_TOP = spacing['focus-headroom'];
+export const COLUMN_PADDING_BOTTOM = spacing['safe-y'];
+
+/**
+ * The tallest a locked post's teaser image may be (owner decision
+ * 2026-10-27, «Teaser fits the screen»): the column's measured viewport
+ * height, minus the copy's measured bottom (its y + height in the column's
+ * content: top padding, header and copy), the gap under the copy, the
+ * image's own bottom margin and the column's bottom padding, so the header,
+ * the copy and one image fit without scrolling. Until the viewport is
+ * measured: the minimum; until the copy is: half the viewport. Never below
+ * `TEASER_IMAGE_MIN_HEIGHT`.
+ */
+export function teaserImageMaxHeight(viewportHeight: number | null, copyBottom: number | null): number {
+  if (viewportHeight === null) {
+    return TEASER_IMAGE_MIN_HEIGHT;
+  }
+  const room =
+    copyBottom === null
+      ? viewportHeight / 2
+      : viewportHeight - copyBottom - LOCKED_NOTICE_GAP - TEASER_IMAGE_GAP - COLUMN_PADDING_BOTTOM;
+  return Math.max(TEASER_IMAGE_MIN_HEIGHT, Math.floor(room));
+}
 
 /** What the route tells the Post page about focus (it owns the sidebar and the zone). */
 export type PostFocusInfo = {
@@ -70,9 +107,11 @@ type Phase = 'unavailable' | 'error' | 'loading' | 'ready';
  * video (Story 3.5, in block order), then the blocks as plain paragraphs
  * (each a ParagraphStop) and neutral non-focusable placeholders, the text
  * capped at `spacing['text-measure']`. Not here yet:
- * «Смотреть» and progress (Epic 4), the locked copy (3.6), styles, collapse
- * and real blocks (Epic 6). A locked post shows its header and teaser
- * placeholders (no rows).
+ * «Смотреть» and progress (Epic 4), styles, collapse and real blocks (Epic
+ * 6). A locked post (Story 3.6) shows its header, the no-access copy
+ * (`LockedNotice`, with the level name when known; never a price or a
+ * subscribe action), then its teaser: images, paragraphs and placeholders
+ * (no rows). A locked post is never an error or a session problem.
  *
  * Focus:
  * - Skeleton: nothing focusable in content; focus goes to the sidebar's
@@ -118,7 +157,8 @@ export function PostScreen({
   const contentPrefix = postIdPrefix(postId);
 
   // The MediaRows (an accessible post's videos with an id, deduped) and the
-  // body: the other blocks of an accessible post, the teaser of a locked one.
+  // body: the other blocks of an accessible post, the teaser of a locked one
+  // (its images shown, Story 3.6).
   const rows: readonly VideoRow[] = useMemo(() => (post === null ? [] : videoRowsOf(post)), [post]);
   const items: readonly PostBodyItem[] = useMemo(
     () =>
@@ -126,7 +166,7 @@ export function PostScreen({
         ? []
         : post.hasAccess
           ? postBodyItems(post.blocks, { videoRows: true })
-          : postBodyItems(post.teaser),
+          : postBodyItems(post.teaser, { images: true }),
     [post],
   );
   /** The first stop below the header: the first MediaRow, else the first paragraph. */
@@ -137,6 +177,47 @@ export function PostScreen({
     const first = items.find(item => item.kind === 'paragraph');
     return first ? `${blockPrefix}${first.key}` : null;
   }, [rows, items, videoPrefix, blockPrefix]);
+  // The column's measured viewport and content height (the ScrollView's
+  // layout and content size).
+  const [viewport, setViewport] = useState<{ width: number; height: number } | null>(null);
+  const [contentHeight, setContentHeight] = useState<number | null>(null);
+  const onColumnLayout = useCallback((e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    setViewport(prev => (prev?.width === width && prev?.height === height ? prev : { width, height }));
+  }, []);
+  const onContentSizeChange = useCallback((_w: number, h: number) => setContentHeight(h), []);
+  // The teaser image cap follows the viewport and the copy's measured bottom
+  // (its y + height in the column's content, which includes the top padding).
+  // The measure belongs to one post state: a post change or a refetch that
+  // changes `hasAccess` forgets it (a later lock measures the copy again).
+  const copyKey = post === null ? null : `${post.id}:${post.hasAccess}`;
+  const [copyBottom, setCopyBottom] = useState<number | null>(null);
+  useEffect(() => {
+    setCopyBottom(null);
+  }, [copyKey]);
+  const onCopyLayout = useCallback((e: LayoutChangeEvent) => {
+    const { y, height } = e.nativeEvent.layout;
+    setCopyBottom(prev => (prev === y + height ? prev : y + height));
+  }, []);
+  const imageMaxHeight = teaserImageMaxHeight(viewport?.height ?? null, copyBottom);
+  const columnWidth = viewport === null ? null : viewport.width - 2 * COLUMN_PADDING_X;
+
+  // Scrolling stays on with a focus stop below the author (native focus
+  // scroll) or when the content is taller than the viewport (reachable
+  // overflow). Content that fits with nothing focusable below the author
+  // turns it off: on Android `scrollEnabled={false}` also makes the
+  // ScrollView non-focusable and leaves ↑ ↓ to focus search (RN's ScrollView
+  // ignores `focusable`), so ↓ keeps focus on the author (Story 3.6, device).
+  const overflows =
+    viewport === null || contentHeight === null || contentHeight > viewport.height + 0.5;
+  const scrollEnabled = firstStopId !== null || overflows;
+  const scrollRef = useRef<ScrollViewInstance | null>(null);
+  useEffect(() => {
+    if (!scrollEnabled) {
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+    }
+  }, [scrollEnabled]);
+
   /** The first row or paragraph; a locked post or one with neither: the author. */
   const initialId = post !== null && post.hasAccess && firstStopId !== null ? firstStopId : authorId;
 
@@ -343,7 +424,11 @@ export function PostScreen({
       >
         {post !== null ? (
           <ScrollView
+            ref={scrollRef}
             testID="post/body"
+            scrollEnabled={scrollEnabled}
+            onLayout={onColumnLayout}
+            onContentSizeChange={onContentSizeChange}
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
           >
@@ -354,6 +439,9 @@ export function PostScreen({
               onAuthorFocus={onAuthorFocus}
               onAuthorPress={onAuthorPress}
             />
+            {post.hasAccess ? null : (
+              <LockedNotice levelName={post.levelName} onLayout={onCopyLayout} />
+            )}
             <PostVideoRows
               rows={rows}
               idPrefix={videoPrefix}
@@ -366,6 +454,8 @@ export function PostScreen({
               idPrefix={blockPrefix}
               onParagraphView={onStopView}
               onParagraphFocus={onStopFocus}
+              imageMaxHeight={imageMaxHeight}
+              columnWidth={columnWidth}
             />
           </ScrollView>
         ) : (
@@ -396,9 +486,9 @@ const styles = StyleSheet.create({
   // Focus headroom around the author row, the rows and the paragraphs;
   // room below the last one.
   scrollContent: {
-    paddingHorizontal: spacing['focus-headroom'],
-    paddingTop: spacing['focus-headroom'],
-    paddingBottom: spacing['safe-y'],
+    paddingHorizontal: COLUMN_PADDING_X,
+    paddingTop: COLUMN_PADDING_TOP,
+    paddingBottom: COLUMN_PADDING_BOTTOM,
   },
   state: {
     flex: 1,

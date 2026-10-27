@@ -65,16 +65,19 @@ export function postCardTitle(post: Post): string {
   return text.length > 0 ? text : t('postCard.untitled');
 }
 
-export function postCardA11yLabel(post: Post, nowMs?: number): string {
+/** `showPinned` (the Author page): a pinned post's label starts with «Закреплено.». */
+export function postCardA11yLabel(post: Post, nowMs?: number, showPinned = false): string {
   const values = {
     badge: postBadgeLabel(post.kind),
     title: postCardTitle(post),
     author: post.author.name,
     date: formatCardDate(post.publishedAt, nowMs),
   };
-  return post.durationSec !== null
-    ? tf('postCard.a11yDuration', { ...values, duration: formatDuration(post.durationSec) })
-    : tf('postCard.a11y', values);
+  const label =
+    post.durationSec !== null
+      ? tf('postCard.a11yDuration', { ...values, duration: formatDuration(post.durationSec) })
+      : tf('postCard.a11y', values);
+  return showPinned && post.pinned ? tf('postCard.a11yPinned', { label }) : label;
 }
 
 export type PostCardProps = {
@@ -86,6 +89,11 @@ export type PostCardProps = {
   onFocus?: FocusableSurfaceProps['onFocus'];
   /** OK on the card (Главная and Автор open Пост, Story 3.4). */
   onPress?: () => void;
+  /**
+   * Mark a pinned post «Закреплено» (the Author page, where Boosty keeps it
+   * first; owner decision 2026-10-27). Главная shows no mark.
+   */
+  showPinned?: boolean;
   style?: StyleProp<ViewStyle>;
   ref?: Ref<HostView>;
 };
@@ -143,6 +151,7 @@ export function PostCardView({
   testID,
   onFocus,
   onPress,
+  showPinned = false,
   style,
   ref,
 }: PostCardProps) {
@@ -158,7 +167,7 @@ export function PostCardView({
       radius={TOKENS.radius}
       scaleFocus={TOKENS.scaleFocus}
       accessibilityRole="button"
-      accessibilityLabel={postCardA11yLabel(post, nowMs)}
+      accessibilityLabel={postCardA11yLabel(post, nowMs, showPinned)}
       onFocus={onFocus}
       onPress={onPress}
       style={style}
@@ -204,6 +213,16 @@ export function PostCardView({
       >
         {postBadgeLabel(post.kind)}
       </Text>
+      {showPinned && post.pinned ? (
+        <Text
+          testID={testID ? `${testID}/pin` : undefined}
+          variant="badge"
+          numberOfLines={1}
+          style={[styles.badge, styles.badgeTopRight]}
+        >
+          {t('postCard.pinned')}
+        </Text>
+      ) : null}
       {post.durationSec !== null ? (
         <Text
           testID={testID ? `${testID}/duration` : undefined}
@@ -306,6 +325,10 @@ const styles = StyleSheet.create({
   badgeTopLeft: {
     top: spacing['3'],
     left: spacing['3'],
+  },
+  badgeTopRight: {
+    top: spacing['3'],
+    right: spacing['3'],
   },
   badgeRight: {
     right: spacing['3'],

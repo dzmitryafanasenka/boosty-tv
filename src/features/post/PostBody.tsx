@@ -1,5 +1,5 @@
-import { memo, useCallback } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { memo, useCallback, useState } from 'react';
+import { Image, StyleSheet, View, type ImageLoadEvent } from 'react-native';
 import type { PlaceholderKind, PostBodyItem, VideoRow } from '../../shared/entities/post';
 import { useZoneItem } from '../../shared/focus';
 import { t } from '../../shared/i18n';
@@ -86,35 +86,145 @@ function BlockPlaceholder({ id, kind }: { id: string; kind: PlaceholderKind }) {
   );
 }
 
+/** The aspect of a teaser image until its real size is known, when the block gives none. */
+const DEFAULT_ASPECT = 16 / 9;
+/** The room below a teaser image (its bottom margin). */
+export const TEASER_IMAGE_GAP = spacing['6'];
+
+type TeaserImageProps = {
+  id: string;
+  url: string;
+  width: number | null;
+  height: number | null;
+  /** The tallest the image may be (the Post screen fits it in the viewport). */
+  maxHeight: number;
+  /** The column's measured inner width; null until measured. */
+  columnWidth: number | null;
+};
+
+const aspectOf = (width: number | null | undefined, height: number | null | undefined) =>
+  width && height && width > 0 && height > 0 ? width / height : null;
+
+/**
+ * A locked post's teaser image (Story 3.6): non-focusable, the column width
+ * capped at the text measure and at `maxHeight` (owner decision 2026-10-27,
+ * «Teaser fits the screen»: the box shrinks with its aspect). The aspect is
+ * the loaded image's real one (the block's width/height can be wrong, e.g.
+ * 4:3 for a 16:9 picture), until then the block's, else 16:9. Plain `{uri}`
+ * source: no auth headers. No URL or a load failure → the neutral
+ * «Изображение» placeholder.
+ */
+function TeaserImage({ id, url, width, height, maxHeight, columnWidth }: TeaserImageProps) {
+  // A failure and the loaded size are remembered per URL: a refetch with a
+  // new URL starts over.
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState<{ url: string; aspect: number } | null>(null);
+  if (failedUrl === url) {
+    return <BlockPlaceholder id={id} kind="image" />;
+  }
+  const aspect =
+    (loaded?.url === url ? loaded.aspect : null) ?? aspectOf(width, height) ?? DEFAULT_ASPECT;
+  // An explicit box: with `width: '100%'` + `maxWidth` + `aspectRatio`, Yoga
+  // takes the height from the unclamped width (seen on the device: a box
+  // taller than its cap, with letterbox bars). The width is the smallest of
+  // the column, the text measure and the height cap; the height follows it.
+  const boxWidth = Math.min(
+    columnWidth ?? spacing['text-measure'],
+    spacing['text-measure'],
+    maxHeight * aspect,
+  );
+  const boxHeight = boxWidth / aspect;
+  const onLoad = (e: ImageLoadEvent) => {
+    const real = aspectOf(e.nativeEvent.source?.width, e.nativeEvent.source?.height);
+    if (real !== null) {
+      setLoaded({ url, aspect: real });
+    }
+  };
+  // The accessible element is a plain View: `focusable={false}` holds there,
+  // while an accessible Image becomes a D-pad focus stop on Android (seen on
+  // the device, Story 3.6). The Image itself is not accessible.
+  return (
+    <View
+      testID={id}
+      focusable={false}
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={t('post.block.image')}
+      style={[styles.image, { width: boxWidth, height: boxHeight }]}
+    >
+      <Image
+        key={url}
+        testID={`${id}/image`}
+        source={{ uri: url }}
+        resizeMode="contain"
+        resizeMethod="resize"
+        fadeDuration={0}
+        onLoad={onLoad}
+        onError={() => setFailedUrl(url)}
+        accessibilityIgnoresInvertColors
+        style={styles.imageFill}
+      />
+    </View>
+  );
+}
+
 export type PostBodyProps = {
   items: readonly PostBodyItem[];
   /** `post/<postId>/block/` */
   idPrefix: string;
   onParagraphView: (id: string, view: HostView | null) => void;
   onParagraphFocus: (id: string) => void;
+  /** The tallest a teaser image may be (Story 3.6, fits the viewport). */
+  imageMaxHeight: number;
+  /** The column's measured inner width (teaser images); null until measured. */
+  columnWidth: number | null;
 };
 
 /**
  * The post's blocks below the rows, in order (ids
- * `post/<postId>/block/<blockKey>`). Paragraphs and placeholders are capped
- * at the text measure, left-aligned (owner decision 2026-10-27).
+ * `post/<postId>/block/<blockKey>`). Paragraphs, placeholders and a locked
+ * post's teaser images are capped at the text measure, left-aligned (owner
+ * decision 2026-10-27).
  */
-export function PostBody({ items, idPrefix, onParagraphView, onParagraphFocus }: PostBodyProps) {
+export function PostBody({
+  items,
+  idPrefix,
+  onParagraphView,
+  onParagraphFocus,
+  imageMaxHeight,
+  columnWidth,
+}: PostBodyProps) {
   return (
     <>
-      {items.map(item =>
-        item.kind === 'paragraph' ? (
-          <ParagraphStop
-            key={item.key}
-            id={`${idPrefix}${item.key}`}
-            text={item.text}
-            onView={onParagraphView}
-            onFocus={onParagraphFocus}
-          />
-        ) : (
-          <BlockPlaceholder key={item.key} id={`${idPrefix}${item.key}`} kind={item.block} />
-        ),
-      )}
+      {items.map(item => {
+        const id = `${idPrefix}${item.key}`;
+        switch (item.kind) {
+          case 'paragraph':
+            return (
+              <ParagraphStop
+                key={item.key}
+                id={id}
+                text={item.text}
+                onView={onParagraphView}
+                onFocus={onParagraphFocus}
+              />
+            );
+          case 'image':
+            return (
+              <TeaserImage
+                key={item.key}
+                id={id}
+                url={item.url}
+                width={item.width}
+                height={item.height}
+                maxHeight={imageMaxHeight}
+                columnWidth={columnWidth}
+              />
+            );
+          default:
+            return <BlockPlaceholder key={item.key} id={id} kind={item.block} />;
+        }
+      })}
     </>
   );
 }
@@ -233,6 +343,16 @@ const styles = StyleSheet.create({
   paragraphFocused: {
     backgroundColor: colors.surface,
     borderLeftColor: colors.accent,
+  },
+  image: {
+    marginBottom: TEASER_IMAGE_GAP,
+    borderRadius: rounded.md,
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
+  },
+  imageFill: {
+    width: '100%',
+    height: '100%',
   },
   placeholder: {
     paddingVertical: spacing['5'],

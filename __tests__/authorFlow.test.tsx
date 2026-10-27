@@ -297,7 +297,7 @@ describe('open from Подписки (matrix «Loaded»)', () => {
     const header = byTestId(root, 'author/header')[0];
     expect(text(header)).toContain('Blog Title');
     expect(text(header)).toContain('Owner Name');
-    expect(header.props.accessibilityLabel).toBe('Автор: Blog Title. Owner Name');
+    expect(header.props.accessibilityLabel).toBe('Автор: Owner Name. Blog Title');
     expect(visible(root, 'author/header/avatar-placeholder')).toBe(true);
     expect(focusableIds(root, header)).toEqual([]);
     const page = text(byTestId(root, 'author/page')[0]);
@@ -353,6 +353,18 @@ describe('open from Подписки (matrix «Loaded»)', () => {
     // Locked live posts are normal cards in the grid.
     const locked = e4Page(2).data.find(p => p.hasAccess === false) as { id: string };
     expect(gridPosts()).toContain(locked.id);
+    await unmount(root);
+  });
+
+  it('the live pinned post (E4 isPinned) keeps Boosty\'s place and is marked with the pin badge (owner decisions 2026-10-27)', async () => {
+    e4 = () => ({ status: 200, body: e4Page(2, { isLast: true }) });
+    const root = await openAuthor();
+    const [first, second] = gridPosts();
+    expect(first).toBe((e4Page(2).data[0] as { id: string }).id);
+    expect(visible(root, `${CARD(first)}/pin`)).toBe(true);
+    expect(text(byTestId(root, `${CARD(first)}/date`)[0])).not.toContain('Закреплено');
+    expect(one(root, CARD(first)).props.accessibilityLabel).toMatch(/^Закреплено\. /);
+    expect(visible(root, `${CARD(second)}/pin`)).toBe(false);
     await unmount(root);
   });
 

@@ -548,7 +548,7 @@ describe('locked, missing, errors (matrix «Locked», «Not found», «Error»)'
     await unmount(root);
   });
 
-  it('locked: header + the teaser placeholder, no error, focus on the author', async () => {
+  it('locked: header + the teaser image, no error, focus on the author', async () => {
     e8 = (_req, blogUrl, postId) => {
       const body = e8Locked();
       return {
@@ -1312,6 +1312,353 @@ describe('media rows (Story 3.5, focus-map §4 F)', () => {
     await press(root, FEED_CARD(0));
     expect(e8Calls()).toHaveLength(1);
     expect(focusTargets()).toEqual([VIDEO(FEED_ID(0), 'v1')]);
+    await unmount(root);
+  });
+});
+
+describe('locked posts (Story 3.6, focus-map §4 F)', () => {
+  const TEASER_IMAGE = 'image:synthetic-id-107';
+  const LIVE_LEVEL = 'redacted';
+  const COPY_WITH = (level: string) =>
+    `Нет доступа. Этот пост доступен подписчикам уровня «${level}». Оформить подписку можно на сайте или в приложении Boosty.`;
+  const COPY_NO_LEVEL =
+    'Нет доступа. Этот пост доступен подписчикам автора. Оформить подписку можно на сайте или в приложении Boosty.';
+  /** The live locked E8 for any post, with these overrides. */
+  const withLocked = (overrides: Record<string, unknown> = {}) => {
+    e8 = (_req, blogUrl, postId) => {
+      const body = e8Locked();
+      return {
+        status: 200,
+        body: { ...body, id: postId, user: { ...(body.user as object), blogUrl }, ...overrides },
+      };
+    };
+  };
+  const copyOf = (root: Root) => byTestId(root, 'post/locked')[0];
+  /** The header, the copy and the body's blocks, in page order (host views, deduped). */
+  const columnOrder = (root: Root, id: string) => {
+    const blocks = `post/${id}/block/`;
+    const ids = byTestId(root, 'post/body')[0]
+      .queryAll((n: any) => typeof n.type === 'string' && typeof n.props.testID === 'string')
+      .map((n: any) => n.props.testID as string)
+      .filter(
+        x =>
+          x === 'post/header' ||
+          x === 'post/locked' ||
+          (x.startsWith(blocks) && !x.slice(blocks.length).includes('/')),
+      );
+    return ids.filter((x, i) => ids.indexOf(x) === i);
+  };
+
+  it('with a level (matrix «Locked with level»): header, then the copy with the level, then the teaser image; focus on the author', async () => {
+    const level = 'Базовый';
+    withLocked({ subscriptionLevel: { ...(e8Locked().subscriptionLevel as object), name: level } });
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    const copy = copyOf(root);
+    expect(copy.props.accessibilityLabel).toBe(COPY_WITH(level));
+    expect(copy.props.accessible).toBe(true);
+    expect(copy.props.focusable).toBe(false);
+    expect(text(copy)).toContain(COPY_WITH(level));
+    expect(columnOrder(root, id)).toEqual(['post/header', 'post/locked', BLOCK(id, TEASER_IMAGE)]);
+    // The copy is not a focus stop; the author is the only one.
+    expect(contentIds(root)).toEqual([AUTHOR(id)]);
+    expect(lastFocusTarget()).toBe(AUTHOR(id));
+    expect(destinationIds('post/column')).toEqual([AUTHOR(id)]);
+    await unmount(root);
+  });
+
+  it('the live locked E8: the copy names its level; the teaser image (non-focusable, no headers, capped)', async () => {
+    withLocked();
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    expect(copyOf(root).props.accessibilityLabel).toBe(COPY_WITH(LIVE_LEVEL));
+    // The accessible, non-focusable box (a View: an accessible Image is a
+    // D-pad stop on Android) and the Image inside it (not accessible).
+    const [box] = byTestId(root, BLOCK(id, TEASER_IMAGE));
+    expect(box.props.focusable).toBe(false);
+    expect(box.props.accessible).toBe(true);
+    expect(box.props.accessibilityLabel).toBe(t('post.block.image'));
+    const [image] = byTestId(root, `${BLOCK(id, TEASER_IMAGE)}/image`);
+    expect(image.props.source).toEqual({ uri: 'https://example.invalid/image' });
+    expect(image.props.resizeMethod).toBe('resize');
+    expect(image.props.fadeDuration).toBe(0);
+    expect(image.props.accessible).toBeFalsy();
+    expect(focusableIds(root).filter(x => x.includes('/block/image'))).toEqual([]);
+    // Until the image loads: the block's 1111 × 625 aspect; an explicit box.
+    const boxSize = StyleSheet.flatten(box.props.style);
+    expect((boxSize.width as number) / (boxSize.height as number)).toBeCloseTo(1111 / 625);
+    await unmount(root);
+  });
+
+  describe('the teaser fits the screen (owner decision 2026-10-27)', () => {
+    /** The pinned device's column viewport: 720 × 486 dp (540 − 2 × 27 safe area). */
+    const VIEWPORT = { width: 720, height: 486 };
+    const scroll = (root: Root) => byTestId(root, 'post/body')[0];
+    const boxStyle = (root: Root, key = TEASER_IMAGE) => {
+      const style = StyleSheet.flatten(byTestId(root, BLOCK(FEED_ID(0), key))[0].props.style);
+      const width = style.width as number;
+      const height = style.height as number;
+      return { width, height, aspectRatio: width / height };
+    };
+    /** The ScrollView's layout (the viewport). */
+    const layoutColumn = (root: Root, size: { width: number; height: number }) =>
+      act(async () =>
+        scroll(root).props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, ...size } } }),
+      );
+    /** The ScrollView's content height. */
+    const contentSize = (root: Root, height: number) =>
+      act(async () => scroll(root).props.onContentSizeChange(VIEWPORT.width, height));
+    /** The copy's layout in the column: its bottom at `bottom`. */
+    const layoutCopy = (root: Root, bottom: number) =>
+      act(async () =>
+        copyOf(root).props.onLayout({
+          nativeEvent: { layout: { x: 12, y: bottom - 60, width: 600, height: 60 } },
+        }),
+      );
+
+    it('the cap follows the measured viewport and the copy: header + copy + image fit (≈ 239 dp on the pinned device)', async () => {
+      withLocked();
+      const root = await openFromHome();
+      await layoutColumn(root, VIEWPORT);
+      // Before the copy is measured: half the viewport.
+      expect(boxStyle(root).height).toBeCloseTo(243);
+      // The device's layout: the copy ends at 192 dp in the column → 486 − 192 − 16 − 12 − 27 = 239.
+      await layoutCopy(root, 192);
+      expect(boxStyle(root).height).toBeCloseTo(239);
+      expect(boxStyle(root).width).toBeCloseTo(239 * (1111 / 625));
+      // A taller viewport leaves more room (the width stays under the measure).
+      await layoutColumn(root, { width: 720, height: 666 });
+      expect(boxStyle(root).width).toBeCloseTo(Math.min(600, (666 - 192 - 16 - 12 - 27) * (1111 / 625)));
+      await unmount(root);
+    });
+
+    it('the copy measure is forgotten when the post unlocks (a refetch): a later lock measures again', async () => {
+      withLocked();
+      const root = await openFromHome();
+      await layoutColumn(root, VIEWPORT);
+      await layoutCopy(root, 470);
+      expect(boxStyle(root).height).toBeCloseTo(96);
+      const key = queryKeys.post(FEED_BLOG, FEED_ID(0));
+      const locked = queryClient.getQueryData(key) as any;
+      await act(async () => {
+        queryClient.setQueryData(key, { ...locked, post: { ...locked.post, hasAccess: true } });
+      });
+      await settle();
+      expect(visible(root, 'post/locked')).toBe(false);
+      await act(async () => {
+        queryClient.setQueryData(key, locked);
+      });
+      await settle();
+      // Not the stale 470 (→ 96): half the viewport until the copy is measured again.
+      expect(boxStyle(root).height).toBeCloseTo(243);
+      await unmount(root);
+    });
+
+    it('a column narrower than the measure: the box shrinks with its aspect (no bars)', async () => {
+      withLocked();
+      const root = await openFromHome();
+      await layoutColumn(root, { width: 424, height: 486 });
+      await layoutCopy(root, 192);
+      // 424 − 2 × 12 = 400 wide → 400 × 225 (16:9-ish block aspect kept).
+      expect(boxStyle(root).width).toBeCloseTo(400);
+      expect(boxStyle(root).aspectRatio).toBeCloseTo(1111 / 625);
+      await unmount(root);
+    });
+
+    it('the loaded image\'s real aspect replaces the block\'s (no letterbox bars)', async () => {
+      withLocked({ teaser: [{ type: 'image', id: 'synthetic-id-107', url: 'https://example.invalid/image', width: 4, height: 3 }] });
+      const root = await openFromHome();
+      await layoutColumn(root, VIEWPORT);
+      await layoutCopy(root, 192);
+      expect(boxStyle(root).aspectRatio).toBeCloseTo(4 / 3);
+      expect(boxStyle(root).height).toBeCloseTo(239);
+      await act(async () =>
+        byTestId(root, `${BLOCK(FEED_ID(0), TEASER_IMAGE)}/image`)[0].props.onLoad({
+          nativeEvent: { source: { width: 1920, height: 1080, uri: 'x' } },
+        }),
+      );
+      expect(boxStyle(root).aspectRatio).toBeCloseTo(16 / 9);
+      expect(boxStyle(root).height).toBeCloseTo(239);
+      await unmount(root);
+    });
+
+    it('a locked post whose content fits with nothing focusable below the author: no scrolling, not focusable', async () => {
+      withLocked();
+      const root = await openFromHome();
+      // Not measured yet: scrolling stays on.
+      expect(scroll(root).props.scrollEnabled).toBe(true);
+      await layoutColumn(root, VIEWPORT);
+      await contentSize(root, VIEWPORT.height);
+      // RN Android: `scrollEnabled={false}` makes the ScrollView non-focusable.
+      expect(scroll(root).props.scrollEnabled).toBe(false);
+      expect(focusableIds(root)).not.toContain('post/body');
+      expect(destinationIds('post/column')).toEqual([AUTHOR(FEED_ID(0))]);
+      await unmount(root);
+    });
+
+    it('a locked post with two teaser images overflows: it scrolls', async () => {
+      withLocked({
+        teaser: [
+          { type: 'image', id: 'a', url: 'https://example.invalid/a', width: 16, height: 9 },
+          { type: 'image', id: 'b', url: 'https://example.invalid/b', width: 16, height: 9 },
+        ],
+      });
+      const root = await openFromHome();
+      await layoutColumn(root, VIEWPORT);
+      await layoutCopy(root, 192);
+      await contentSize(root, 192 + 16 + 2 * (239 + 12) + 27);
+      expect(scroll(root).props.scrollEnabled).toBe(true);
+      await unmount(root);
+    });
+
+    it('a placeholder-only post: scrolls when it overflows, not when it fits', async () => {
+      e8 = (_req, blogUrl, postId) => ({
+        status: 200,
+        body: postDetail(blogUrl, postId, [{ type: 'file', id: 'f1' }, { type: 'poll', id: 1 }]),
+      });
+      const root = await openFromHome();
+      await layoutColumn(root, VIEWPORT);
+      await contentSize(root, 900);
+      expect(scroll(root).props.scrollEnabled).toBe(true);
+      await contentSize(root, 300);
+      expect(scroll(root).props.scrollEnabled).toBe(false);
+      await unmount(root);
+    });
+
+    it.each([
+      ['a video-only post', [{ type: 'ok_video', id: 'v1', title: 'V' }]],
+      ['a text post', [...paragraph('One'), ...paragraph('Two')]],
+    ])('%s (a stop below the author): scrolling stays on even when it fits', async (_name, data) => {
+      e8 = (_req, blogUrl, postId) => ({ status: 200, body: postDetail(blogUrl, postId, data) });
+      const root = await openFromHome();
+      await layoutColumn(root, VIEWPORT);
+      await contentSize(root, 300);
+      expect(scroll(root).props.scrollEnabled).toBe(true);
+      await unmount(root);
+    });
+  });
+
+  it.each([
+    ['no subscriptionLevel', { subscriptionLevel: undefined }],
+    ['a null subscriptionLevel', { subscriptionLevel: null }],
+    ['a blank name', { subscriptionLevel: { name: '  ' } }],
+    ['a malformed level', { subscriptionLevel: { name: 5 } }],
+  ])('without a level (matrix «Locked, no level», %s): the copy without a level', async (_name, overrides) => {
+    withLocked(overrides);
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    expect(copyOf(root).props.accessibilityLabel).toBe(COPY_NO_LEVEL);
+    expect(columnOrder(root, id)).toEqual(['post/header', 'post/locked', BLOCK(id, TEASER_IMAGE)]);
+    expect(lastFocusTarget()).toBe(AUTHOR(id));
+    await unmount(root);
+  });
+
+  it('empty data (matrix «Empty data»): hasAccess true but data [] → treated as locked: copy + teaser', async () => {
+    withLocked({ hasAccess: true, data: [] });
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    expect(copyOf(root).props.accessibilityLabel).toBe(COPY_WITH(LIVE_LEVEL));
+    expect(visible(root, BLOCK(id, TEASER_IMAGE))).toBe(true);
+    expect(contentIds(root)).toEqual([AUTHOR(id)]);
+    expect(lastFocusTarget()).toBe(AUTHOR(id));
+    await unmount(root);
+  });
+
+  it('teaser image failure (matrix «Teaser kinds»): the neutral «Изображение» placeholder', async () => {
+    withLocked();
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    await act(async () =>
+      byTestId(root, `${BLOCK(id, TEASER_IMAGE)}/image`)[0].props.onError({ nativeEvent: {} }),
+    );
+    expect(visible(root, `${BLOCK(id, TEASER_IMAGE)}/image`)).toBe(false);
+    const [placeholder] = byTestId(root, BLOCK(id, TEASER_IMAGE));
+    expect(placeholder.props.source).toBeUndefined();
+    expect(placeholder.props.focusable).toBe(false);
+    expect(placeholder.props.accessibilityLabel).toBe(t('post.block.image'));
+    expect(text(placeholder)).toContain('Изображение');
+    expect(contentIds(root)).toEqual([AUTHOR(id)]);
+    await unmount(root);
+  });
+
+  it('teaser kinds (matrix «Teaser kinds»): an image without a URL → placeholder; text → a paragraph stop; video → placeholder; focus still on the author', async () => {
+    withLocked({
+      teaser: [
+        { type: 'image', id: 'no-url', width: 100, height: 100 },
+        ...paragraph('Teaser text'),
+        { type: 'ok_video', id: 'teaser-video', title: 'T' },
+      ],
+    });
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    const [noUrl] = byTestId(root, BLOCK(id, 'image:no-url'));
+    expect(noUrl.props.source).toBeUndefined();
+    expect(noUrl.props.accessibilityLabel).toBe(t('post.block.image'));
+    expect(one(root, BLOCK(id, 'text@1')).props.accessibilityLabel).toBe('Teaser text');
+    expect(byTestId(root, BLOCK(id, 'ok_video:teaser-video'))[0].props.focusable).toBe(false);
+    expect(focusableIds(root).filter(x => x.startsWith(`post/${id}/video/`))).toEqual([]);
+    expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, 'text@1')]);
+    expect(columnOrder(root, id)).toEqual([
+      'post/header',
+      'post/locked',
+      BLOCK(id, 'image:no-url'),
+      BLOCK(id, 'text@1'),
+      BLOCK(id, 'ok_video:teaser-video'),
+    ]);
+    // Locked → the author, even with a teaser paragraph.
+    expect(lastFocusTarget()).toBe(AUTHOR(id));
+    await unmount(root);
+  });
+
+  it('no teaser (matrix «Teaser kinds», none): header and copy only', async () => {
+    withLocked({ teaser: [] });
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    expect(columnOrder(root, id)).toEqual(['post/header', 'post/locked']);
+    expect(contentIds(root)).toEqual([AUTHOR(id)]);
+    await unmount(root);
+  });
+
+  it('price fields (matrix «Price fields»): never shown; no subscribe action, QR or level list; no refresh, A11 or extra E1', async () => {
+    withLocked({ price: 990, currencyPrices: { RUB: 990, USD: 11, EUR: 10 }, promo: { price: 1 } });
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    const e1Calls = transport.callsTo(E1).length;
+    const page = pageText(root);
+    for (const forbidden of ['990', '₽', 'RUB', 'USD', 'EUR', 'руб', 'Подписаться', 'QR', 'коммент']) {
+      expect(page).not.toContain(forbidden);
+    }
+    // The only button on the page is the author row; the copy is text.
+    const buttons = byTestId(root, 'post/page')[0]
+      .queryAll((n: any) => typeof n.type === 'string' && n.props.accessibilityRole === 'button')
+      .map((n: any) => n.props.testID);
+    expect(buttons).toEqual([AUTHOR(id)]);
+    expect(copyOf(root).props.accessibilityRole).toBe('text');
+    expect(transport.callsTo('/oauth/token/')).toHaveLength(0);
+    expect(visible(root, 'auth/expired')).toBe(false);
+    expect(visible(root, 'post/error')).toBe(false);
+    expect(currentRoute()).toBe('Post');
+    await settle();
+    expect(transport.callsTo(E1)).toHaveLength(e1Calls);
+    await unmount(root);
+  });
+
+  it('an accessible post has no locked copy', async () => {
+    const root = await openFromHome();
+    expect(visible(root, 'post/locked')).toBe(false);
+    await unmount(root);
+  });
+
+  it('from Автор (matrix «Card»): the locked copy, focus on the author; Back → the same card', async () => {
+    withLocked();
+    const root = await openFromAuthor(2);
+    const id = 'blog-post-2';
+    expect(copyOf(root).props.accessibilityLabel).toBe(COPY_WITH(LIVE_LEVEL));
+    expect(lastFocusTarget()).toBe(AUTHOR(id));
+    focusMock.mockClear();
+    await back();
+    expect(currentRoute()).toBe('Author');
+    expect(lastFocusTarget()).toBe(AUTHOR_CARD(2));
     await unmount(root);
   });
 });

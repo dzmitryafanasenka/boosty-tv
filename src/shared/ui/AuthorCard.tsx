@@ -36,10 +36,29 @@ export function authorCardTitle(author: Author): string {
   return author.title.length > 0 ? author.title : t('postCard.untitled');
 }
 
-/** «{title}. {owner}», or the title alone without an owner name. */
+/**
+ * The main (larger) line: the owner's name — the channel's name — else the
+ * blog title (owner decision 2026-10-27: the title is usually a tagline).
+ */
+export function authorPrimaryName(author: Author): string {
+  return author.ownerName ?? authorCardTitle(author);
+}
+
+/** The second line: the blog title under the owner's name; null when none or the same. */
+export function authorSecondaryLine(author: Author): string | null {
+  if (author.ownerName === null) {
+    return null;
+  }
+  const title = author.title;
+  const same = (a: string) => a.toLocaleLowerCase('ru').replace(/\s+/g, ' ');
+  return title.length > 0 && same(title) !== same(author.ownerName) ? title : null;
+}
+
+/** «{name}. {title}», or the main line alone. */
 export function authorCardA11yLabel(author: Author): string {
-  const title = authorCardTitle(author);
-  return author.ownerName ? tf('authorCard.a11y', { title, owner: author.ownerName }) : title;
+  const name = authorPrimaryName(author);
+  const title = authorSecondaryLine(author);
+  return title !== null ? tf('authorCard.a11y', { name, title }) : name;
 }
 
 export type AuthorCardProps = {
@@ -100,6 +119,7 @@ export function AuthorCardView({
   style,
   ref,
 }: AuthorCardProps) {
+  const secondary = authorSecondaryLine(author);
   return (
     <FocusableSurface
       ref={ref}
@@ -126,22 +146,22 @@ export function AuthorCardView({
           <AuthorAvatar url={author.avatarUrl} testID={testID ? `${testID}/avatar` : undefined} />
           <View style={styles.text}>
             <Text
-              testID={testID ? `${testID}/title` : undefined}
+              testID={testID ? `${testID}/${author.ownerName !== null ? 'owner' : 'title'}` : undefined}
               variant="card-title"
               color={focused ? 'text' : 'text-card'}
               numberOfLines={2}
             >
-              {authorCardTitle(author)}
+              {authorPrimaryName(author)}
             </Text>
-            {author.ownerName ? (
+            {secondary !== null ? (
               <Text
-                testID={testID ? `${testID}/owner` : undefined}
+                testID={testID ? `${testID}/title` : undefined}
                 variant="meta"
                 color="text-meta"
                 numberOfLines={1}
-                style={styles.owner}
+                style={styles.secondary}
               >
-                {author.ownerName}
+                {secondary}
               </Text>
             ) : null}
           </View>
@@ -208,7 +228,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: TEXT_GAP,
   },
-  owner: {
+  secondary: {
     marginTop: OWNER_GAP,
   },
   skeleton: {

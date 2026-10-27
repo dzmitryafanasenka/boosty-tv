@@ -118,8 +118,8 @@ export const ru = {
   author: {
     loading: 'Загружаем страницу автора',
     loadingPosts: 'Загружаем публикации',
-    a11yHeader: 'Автор: {title}. {owner}',
-    a11yHeaderNoOwner: 'Автор: {title}',
+    a11yHeader: 'Автор: {name}. {title}',
+    a11yHeaderNameOnly: 'Автор: {name}',
     emptyTitle: 'Публикаций нет',
     emptyBody: 'Когда автор опубликует посты, они появятся здесь.',
     errorTitle: 'Не удалось загрузить страницу автора',
@@ -140,6 +140,15 @@ export const ru = {
     likes: ['{n} лайк', '{n} лайка', '{n} лайков'] as RuPluralForms,
     meta: '{date} · {likes}',
     a11yAuthor: 'Автор: {name}. Открыть страницу автора',
+    // Locked post (Story 3.6, EXPERIENCE.md «Honest limits»): plain text,
+    // never a price, a subscribe button or a payment link. `{level}` is the
+    // post's subscription level name.
+    locked: {
+      withLevel:
+        'Нет доступа. Этот пост доступен подписчикам уровня «{level}». Оформить подписку можно на сайте или в приложении Boosty.',
+      noLevel:
+        'Нет доступа. Этот пост доступен подписчикам автора. Оформить подписку можно на сайте или в приложении Boosty.',
+    },
     block: {
       video: 'Видео',
       image: 'Изображение',
@@ -177,13 +186,18 @@ export const ru = {
     untitled: 'Без названия',
     /** After the author name, which ellipsizes; the date never does. */
     metaDate: ' · {date}',
+    // The pin badge on a pinned card's preview, top right (the Author page;
+    // Boosty keeps the pinned post first; owner decisions 2026-10-27).
+    pinned: '📌',
+    a11yPinned: 'Закреплено. {label}',
     a11y: '{badge}. {title}. {author}, {date}.',
     a11yDuration: '{badge}. {title}. {author}, {date}. Длительность {duration}.',
   },
-  // DESIGN.md AuthorCard (Story 3.2): «{title}. {owner}», or the title alone
-  // when the owner name is missing.
+  // DESIGN.md AuthorCard: «{name}. {title}» — the owner's name first, the
+  // blog title second (owner decision 2026-10-27); the main line alone when
+  // there is no second line.
   authorCard: {
-    a11y: '{title}. {owner}',
+    a11y: '{name}. {title}',
   },
   // Card dates (owner decision 2026-10-26), device local time:
   // «сегодня, 14:30» / «вчера» / «12 окт» (current year) / «12 окт 2025».

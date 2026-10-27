@@ -24,8 +24,9 @@ import type { Block, ListItem } from './types';
  *   without an id stays a `video` placeholder: an `ok_video` block whose id
  *   is `''` (the type allows it; the DTO normally rejects it), or the
  *   mapper's `Block.Unknown` with raw type `ok_video` (id missing).
- * - Every other block (image, file, audio, poll, unknown or malformed) is
- *   one placeholder.
+ * - With `images: true` (a locked post's teaser, Story 3.6), an `image`
+ *   block with a URL is an `image` item; otherwise every other block
+ *   (image, file, audio, poll, unknown or malformed) is one placeholder.
  *
  * Keys (focus-map §1.5, block keys): `<type>:<id>` when the block has an
  * id, else `<type>@<index in data[]>`; a paragraph uses its first fragment's
@@ -103,7 +104,13 @@ export type PlaceholderKind = 'video' | 'image' | 'file' | 'audio' | 'poll' | 'u
 
 export type PostBodyItem =
   | { kind: 'paragraph'; key: string; text: string }
-  | { kind: 'placeholder'; key: string; block: PlaceholderKind };
+  | { kind: 'placeholder'; key: string; block: PlaceholderKind }
+  /**
+   * A teaser image of a locked post (Story 3.6, owner decision 2026-10-27,
+   * option A; only with `images: true`). `width`/`height` are positive or
+   * null. Images inside accessible posts stay placeholders until Story 6.2.
+   */
+  | { kind: 'image'; key: string; url: string; width: number | null; height: number | null };
 
 const MAX_LIST_DEPTH = 8;
 
@@ -179,11 +186,18 @@ function listLines(items: readonly ListItem[], depth: number, out: string[]): vo
 export type PostBodyOptions = {
   /** The post's videos with an id are MediaRows: leave them out (default false). */
   videoRows?: boolean;
+  /**
+   * Image blocks with a URL are `image` items (a locked post's teaser, Story
+   * 3.6); without a URL they stay placeholders. Default false.
+   */
+  images?: boolean;
 };
+
+const positive = (n: number | null): number | null => (n !== null && n > 0 ? n : null);
 
 export function postBodyItems(
   blocks: readonly Block[],
-  { videoRows = false }: PostBodyOptions = {},
+  { videoRows = false, images = false }: PostBodyOptions = {},
 ): PostBodyItem[] {
   const items: PostBodyItem[] = [];
   const used = new Set<string>();
@@ -237,6 +251,19 @@ export function postBodyItems(
       return;
     }
     flush();
+    if (images && block.type === 'image' && block.url !== null) {
+      push(
+        {
+          kind: 'image',
+          key: blockKey(block, index),
+          url: block.url,
+          width: positive(block.width),
+          height: positive(block.height),
+        },
+        index,
+      );
+      return;
+    }
     if (block.type === 'list') {
       const lines = listItemTexts(block.items);
       if (lines.length > 0) {
