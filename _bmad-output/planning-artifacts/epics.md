@@ -33,6 +33,8 @@ Phase tags follow CLAUDE.md:
 
 Production implementation does not start before P0 passes.
 
+Apple TV (tvOS) is out of scope (owner decision 2026-10-27).
+
 ## Requirements Inventory
 
 ### Functional Requirements
@@ -106,7 +108,7 @@ The full text and testable consequences are in `prd.md` §4.
 - NFR5 Performance: smooth D-pad scrolling with hundreds of items. A time-to-first-frame target is set after the spike.
 - NFR6 TV accessibility: remote-only. Russian accessibility labels. Contrast per DESIGN.md. Minimum text size 11 sp.
 - NFR7 Localization: Russian copy with an i18n-ready structure. Code and docs in English.
-- NFR8 Portability: platform-agnostic domain and API layers. Android behind ports. Apple TV later.
+- NFR8 Platform boundaries: domain and API layers do not call native modules or platform APIs directly. Android behind ports.
 - NFR9 Verification: unit, component and integration tests per CLAUDE.md. Every P1 FR is verified on the physical device. Emulator and mock results are never reported as device verification.
 
 ### Additional Requirements
@@ -1654,4 +1656,4 @@ So that I can retire BoostBuddy with confidence.
 
 **Given** the results
 **When** they are presented to the owner
-**Then** the owner explicitly accepts the Android release. The SM-1 and SM-2 observation periods start, and Apple TV work stays out of scope until this acceptance (CLAUDE.md phase 4).
+**Then** the owner explicitly accepts the Android release. The SM-1 and SM-2 observation periods start.

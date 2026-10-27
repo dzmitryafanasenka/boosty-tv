@@ -1,5 +1,7 @@
 # Android TV auth and playback spike plan (phase 0)
 
+> Superseded in part: Apple TV (tvOS) is out of scope (owner decision 2026-10-27).
+
 Goal: before any production screen is built, prove on a real Android TV device:
 1. real sign-in;
 2. token persistence;
@@ -34,8 +36,8 @@ Inputs: `docs/feature-parity.md` (AUTH-*, PLAY-*), `docs/api-contract.md` (§2, 
 | Need | Candidate to evaluate first | Must verify |
 |---|---|---|
 | Embedded sign-in page | Not needed: phone auth was selected. Evaluate `react-native-webview` only if S1 fallback research is triggered. | — |
-| Secure token storage | A Keystore-backed library, e.g. `react-native-keychain` (evaluate, not decided) | Keystore backing on the device's Android version. Survives app restart and update. Is wiped on logout. Has a future tvOS Keychain path. |
-| Video | `react-native-video` (ExoPlayer/Media3 on Android) | HLS, DASH and MP4 playback. Seek, rate and source switching. Exposes error events with HTTP status if possible. Media key events with RN TV. Supports the tvOS target later (phase 4 only, not tested now). |
+| Secure token storage | A Keystore-backed library, e.g. `react-native-keychain` (evaluate, not decided) | Keystore backing on the device's Android version. Survives app restart and update. Is wiped on logout. |
+| Video | `react-native-video` (ExoPlayer/Media3 on Android) | HLS, DASH and MP4 playback. Seek, rate and source switching. Exposes error events with HTTP status if possible. Media key events with RN TV. |
 
 Architecture decisions to confirm in this step (see `docs/adr/0001`–`0003` and the architecture spine):
 - Bootstrap: does the community template `--version 0.87.1` with `react-native` aliased to `react-native-tvos@0.87.1-1` build and run on the device? Record the exact steps.

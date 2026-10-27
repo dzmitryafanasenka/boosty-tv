@@ -2,6 +2,7 @@
 
 - Status: proposed
 - Date: 2026-10-27
+- Superseded in part: Apple TV (tvOS) is out of scope (owner decision 2026-10-27).
 - Relates to: `_bmad-output/implementation-artifacts/spec-3-3-author-page.md` (owner decision 2026-10-27, option A), `docs/focus-map.md` §3 and §4 D, [ADR 0007](0007-navigation-js-stack.md)
 
 ## Context
@@ -25,4 +26,3 @@
 - The pending section is global mutable state with one writer per pop; the clearing rules above keep a stale value from opening a section on a later plain Back. A navigation param (`popTo('Shell', {open})`) was not used: the Shell would refocus its old content in its focus effect before a param effect could switch the section.
 - Главная returned through the content zone's target until Story 3.4, which routes it through `useFocusRestoration.restore()` (see above).
 - Where it lives (Epic 3 retro A7, 2026-10-27): `src/app/stackRoutes.tsx` holds the handshake (`pendingShellSection`, `takePendingShellSection`), `useStackSidebar` and one wrapper, `StackSidebarRoute`, for the stack routes that keep the Shell sidebar (`name`: `'author' | 'post'`): the shared screen wrapper → `Sidebar` with the `<name>/` prefix → content `FocusZone` under the route key + `main`, Back, sidebar OK, FocusRestoration forget on unmount. `AuthorRoute` and `PostRoute` are thin users of it. A route may override Back with `onBackPress` (called first; true = handled, e.g. a layer of its own to close first); without it, or when it returns false, Back pops one route. A later stack route that keeps the sidebar adds its name to the union and uses the same wrapper; a route without the sidebar (e.g. a full-screen player) does not use it. `App.tsx` keeps the navigator, boot, resume orchestration, the auth routes and `ShellRoute`. A Shell section registers its return restore through one Shell callback (`setReturnFocus` in `src/app/Shell.tsx`, shared by Главная and Подписки). Пост keeps its own column focus memory instead of `useFocusRestoration` (a deliberate AD-12 deviation, reason in `docs/focus-map.md` §1.6); its route-level return goes through the content zone's FocusRestoration as above.
-- tvOS (phase 4): not validated.

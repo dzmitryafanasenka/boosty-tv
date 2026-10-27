@@ -48,7 +48,6 @@ Video is the main job. Text, images, audio, files, polls, live streams, search, 
 
 - Anyone outside the household. Not published to Google Play.
 - Authors or creators managing their own blog (no content creation).
-- Apple TV users (a later phase).
 - Phone or tablet users.
 
 ### 2.3 Key User Journeys
@@ -405,7 +404,7 @@ The app checks the latest release of the public project repository (GitHub Relea
   - Contrast follows `DESIGN.md`.
   - The minimum text size is 11 sp.
 - **NFR-7 Localization:** Russian copy with an i18n-ready structure. Code identifiers and docs are in English.
-- **NFR-8 Portability:** domain logic and the API layer stay platform-agnostic. Android-specific behavior sits behind narrow platform modules, so Apple TV can be added later (not validated now).
+- **NFR-8 Platform boundaries:** domain logic and the API layer do not call native modules or platform APIs directly. Android-specific behavior sits behind narrow platform modules.
 - **NFR-9 Verification:**
   - Unit, component and integration tests as listed in CLAUDE.md.
   - Every [P1] FR is verified on the physical test device before P1 is accepted.
@@ -422,7 +421,7 @@ The app checks the latest release of the public project repository (GitHub Relea
 - No live chat and no live DVR/seek.
 - No in-app download or install of updates; only the update check and notice (FR-56). No Google Play publication in v1.
 - No own backend, proxy or cloud sync. Continue history is device-local.
-- No Apple TV work before the owner accepts Android.
+- No Apple TV work: Apple TV (tvOS) is out of scope (owner decision 2026-10-27).
 
 Excluded reference items, per `feature-parity.md` and the owner decisions in §12:
 - website and virtual-cursor sign-in (AUTH-01, AUTH-02);
@@ -469,7 +468,6 @@ The MVP proves UJ-0, UJ-1, UJ-2 and UJ-3 on the device. Per CLAUDE.md it is **no
   - performance tuning;
   - visual fidelity;
   - device regression.
-- **Phase 4, Apple TV:** future, not planned here.
 
 Sign-out (FR-8) was moved into P1 by the owner (2026-10-25) so that logout and re-login can be tested in the slice.
 

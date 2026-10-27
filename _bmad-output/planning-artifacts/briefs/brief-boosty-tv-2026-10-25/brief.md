@@ -9,6 +9,8 @@ updated: 2026-10-25
 
 _Working title. Not approved branding._
 
+> Superseded in part: Apple TV (tvOS) is out of scope (owner decision 2026-10-27).
+
 ## Executive Summary
 
 Boosty TV is an unofficial Boosty client for the television, operated entirely with a TV remote. It is built for one household: the owner and their family, sharing one Boosty account on a Chromecast with Google TV 4K. Android TV comes first, and Apple TV follows later.
@@ -74,8 +76,6 @@ There is one Boosty account per device and no profiles.
 - a QR or companion sign-in;
 - any own backend;
 - the Boosty website features BoostBuddy does not have.
-
-**Later:** Apple TV is phase 4 and starts only after the owner accepts the Android version.
 
 ## Risks and Unknowns
 

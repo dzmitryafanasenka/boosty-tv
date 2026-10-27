@@ -2,6 +2,7 @@
 
 - Status: accepted (owner decision 2026-10-26, Story 3.1 device profiling; the owner accepted it on the device 2026-10-26)
 - Date: 2026-10-26
+- Superseded in part: Apple TV (tvOS) is out of scope (owner decision 2026-10-27).
 - Relates to: `_bmad-output/implementation-artifacts/spec-3-1-subscription-feed-on-the-home-screen.md` (Spec Change Log, 2026-10-26 device profiling), `docs/focus-map.md` §3, [ADR 0010](0010-server-state-tanstack-query.md)
 
 ## Context
@@ -75,4 +76,3 @@ The recycling guards (`resetKey`, image keys) are harmless with FlatList.
   - **not done:** TalkBack on cards; a stale image on a recycled cell was not checked separately.
 - In Jest, FlashList's fixed 100 × 100 measurements report the list end at once. `homeFeedFlow.test.tsx` keeps `onEndReached` away from the real list and calls it itself; other flow tests may load further pages by themselves.
 - **Rollback trigger:** a reproducible focus defect caused by recycling that a fix keyed off D-pad events (`TVEventHandler`) cannot solve, or a FlashList regression on react-native-tvos. Rollback = the FlatList steps above.
-- **tvOS (phase 4):** FlashList v2 is New-Architecture JS with no native code, but tvOS uses a different focus engine (UIKit focus, Siri Remote). Re-verify recycling, focus search across recycled rows, the end guide and restoration on tvOS before phase 4; nothing here is validated for tvOS.

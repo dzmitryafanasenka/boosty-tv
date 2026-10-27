@@ -4,7 +4,7 @@ type: architecture-spine
 purpose: build-substrate
 altitude: initiative
 paradigm: 'feature-sliced layered app with ports & adapters at the platform edge'
-scope: 'Boosty TV Android TV app (React Native TV), phases 0–3; Apple TV only as a preserved seam'
+scope: 'Boosty TV Android TV app (React Native TV), phases 0–3; Apple TV (tvOS) is out of scope (owner decision 2026-10-27)'
 status: final
 created: '2026-10-25'
 updated: '2026-10-25'
@@ -30,7 +30,7 @@ companions: []
 
 - **Features** are vertical slices. Inside a slice, dependencies go one way: **Screen → feature hook → repository → API client / platform port**.
 - **Shared entities** (Post, Media, Author, Poll, Live stream) are owned once in `shared/entities` and reused by every feature.
-- **Platform specifics** sit behind ports. The Android adapters implement them now; tvOS adapters come later.
+- **Platform specifics** sit behind ports. The Android adapters implement them.
 
 ```mermaid
 flowchart TD
@@ -81,7 +81,7 @@ Arrows mean "may import". `shared` never imports `features` or `app`. Features n
 ### AD-2 — Platform ports [ADOPTED]
 
 - **Binds:** NFR-8, FR-3, FR-6, FR-35, FR-39, FR-42–51, FR-56
-- **Prevents:** Android specifics leaking into features, which would block Apple TV.
+- **Prevents:** Android specifics leaking into features.
 - **Rule:**
   - The ports are TypeScript interfaces in `shared/platform`:
     - `SecureStore`;
@@ -428,7 +428,7 @@ flowchart LR
 | NFR-5 Performance | lists, images | Conventions › Lists; Deferred |
 | NFR-6 TV accessibility | `shared/ui`, `shared/focus` | AD-12, DESIGN.md |
 | NFR-7 Localization | `shared/i18n` | Conventions › i18n |
-| NFR-8 Portability | ports | AD-2 |
+| NFR-8 Platform boundaries | ports | AD-2 |
 | NFR-9 Verification | tests, FixtureTransport, docs/testing.md | AD-15 |
 
 ## Deferred
@@ -441,5 +441,4 @@ flowchart LR
 - **Server `timeCode` round-trip:** spike S8. AD-10 already covers both outcomes.
 - **Virtualization tuning and FlashList:** measured in P3.
 - **Events paging:** after E18 is verified.
-- **tvOS adapters** (phase 4): the AD-2 ports are the only commitment. async-storage 3 does not list tvOS — revisit then.
 - **Crash reporting:** none in v1 (no telemetry). It needs owner approval.

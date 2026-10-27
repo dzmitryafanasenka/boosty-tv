@@ -19,7 +19,7 @@ sources:
 
 ## Foundation
 
-- **Form factor.** One surface: Android TV / Google TV, 10-foot UI, remote only (D-pad, OK, Back, media keys). Reference device: Chromecast with Google TV 4K. Apple TV comes later and has no separate flows now.
+- **Form factor.** One surface: Android TV / Google TV, 10-foot UI, remote only (D-pad, OK, Back, media keys). Reference device: Chromecast with Google TV 4K. Apple TV (tvOS) is out of scope (owner decision 2026-10-27).
 - **UI system.** React Native + react-native-tvos with native focus (`TVFocusGuideView`, `hasTVPreferredFocus`). There is no JS focus engine. `DESIGN.md` is the visual identity reference; this spine defines behavior.
 - **Audience.** One household and one shared Boosty account, with no profiles. The owner is technical; the other family members are not.
 - **References.** Feature IDs (`AUTH-03`, `PLAY-10`, …) point to `docs/feature-parity.md`. Screen IDs (`A1`…`L5`) point to the Claude Design package.
@@ -248,12 +248,6 @@ Error classes stay distinct (CLAUDE.md): session expired ≠ no access ≠ media
 
 - **One logical layout (960×540 dp)** for 720p, 1080p and 4K outputs. [ASSUMPTION] Verify on the device.
 - **Android only:** «Системный видеоплеер».
-- **tvOS (later):**
-  - no DASH;
-  - Keychain instead of Keystore;
-  - Siri Remote mapping.
-  
-  Out of scope now.
 
 ## Inspiration & Anti-patterns
 

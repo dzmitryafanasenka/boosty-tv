@@ -1,5 +1,7 @@
 # Testing
 
+Apple TV (tvOS) is out of scope (owner decision 2026-10-27); every check here is Android TV only.
+
 ## Pinned test device
 
 | Item | Value |
@@ -67,7 +69,7 @@ Changes on top of the template:
 
 - `package.json`: `react-native` aliased to `npm:react-native-tvos@0.87.1-1`;
   `overrides.react-native = "$react-native"` so `@react-native-tvos/virtualized-lists`
-  (peer `react-native: 0.87.1`) resolves to the tvOS fork instead of pulling a
+  (peer `react-native: 0.87.1`) resolves to the react-native-tvos fork instead of pulling a
   second, core `react-native@0.87.1` into `node_modules`; all versions pinned
   exactly; template-only packages removed (`@react-native/new-app-screen`,
   `react-native-safe-area-context`, `react-test-renderer`,

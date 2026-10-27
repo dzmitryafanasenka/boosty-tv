@@ -2,6 +2,7 @@
 
 - Status: accepted by the owner (2026-10-25), with a verification gate. If the gate fails, the own Keystore module described under Alternatives applies. Gate: **passed** on the device (2026-10-25, see "Gate result").
 - Date: 2026-10-25
+- Superseded in part: Apple TV (tvOS) is out of scope (owner decision 2026-10-27).
 - Amends: [ADR 0002](0002-secure-storage-keychain.md). The library choice stays; the corruption-recovery mechanism is added.
 
 ## Context
@@ -52,7 +53,6 @@ If the library's in-process DataStore cannot recover without a restart, or the f
 - File-level recovery deletes the whole shared DataStore file, so it wipes **every** react-native-keychain entry, not only the failing service. Keep only data that may be lost together (session tokens, stored phone) in react-native-keychain.
 - The production helper must check the result of `file.delete()` (not only `!exists()`), also remove a leftover `RN_KEYCHAIN.preferences_pb.tmp` if present, and report a non-sensitive failure reason. The spike helper did neither.
 - The helper depends on the library's private file name (`RN_KEYCHAIN.preferences_pb`). Pin the library version, and re-run the gate on every keychain update.
-- tvOS (phase 4) still needs a Keychain adapter; the port does not change.
 
 ## Gate result (Story 1.3, 2026-10-25): passed
 Run on the pinned Chromecast with Google TV 4K, debug build (file edits need `run-as`), branch `spike/1-3-phone-auth`. Details are in `docs/testing.md` (Story 1.3).
