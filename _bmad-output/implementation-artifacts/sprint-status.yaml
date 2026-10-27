@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 10-25-2026 14:34
-last_updated: 10-27-2026 15:27
+last_updated: 10-27-2026 16:06
 project: Boosty TV
 project_key: NOKEY
 tracking_system: file-system
@@ -63,8 +63,8 @@ development_status:
   3-3-author-page: done
   3-4-post-screen: done
   3-5-media-rows-in-a-post: done
-  3-6-locked-posts: review
-  epic-3-retrospective: optional
+  3-6-locked-posts: done
+  epic-3-retrospective: done
 
   epic-4: backlog
   4-1-play-a-video-from-a-post: backlog
@@ -143,27 +143,27 @@ action_items:
     action: "Extract a shared flow-test harness and move the 7 flow-test files onto
       it"
     owner: "dev"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-10-26.md"
   - id: "epic-2-retro-item-5-plan-a-split-of-sessionmanager-before-ep"
     epic: 2
     action: "Plan a split of SessionManager before Epic 3 adds session concerns"
     owner: "architect"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-10-26.md"
   - id: "epic-2-retro-item-6-open-prs-only-after-review-fixes-when-as"
     epic: 2
     action: "Open PRs only after review fixes; when asked earlier, open a draft marked
       do not merge"
     owner: "agent"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-10-26.md"
   - id: "epic-2-retro-item-7-run-the-full-suite-3-times-and-new-focus"
     epic: 2
     action: "Run the full suite 3+ times and new focus/timer test files 30+ times
       before review"
     owner: "agent"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-10-26.md"
   - id: "epic-2-retro-item-8-device-pass-with-a-second-boosty-account"
     epic: 2
@@ -172,3 +172,74 @@ action_items:
     owner: "owner"
     status: open
     ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-10-26.md"
+  - id: "epic-3-retro-item-9-head-refresh-ignore-pinned-posts-when-de"
+    epic: 3
+    action: "Head refresh: ignore pinned posts when deciding the gap and when merging;
+      test 20+ new posts and an unpin/re-pin"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-10-27.md"
+  - id: "epic-3-retro-item-10-add-the-navigation-isfocused-guard-to-sh"
+    epic: 3
+    action: "Add the navigation.isFocused() guard to Shell onOpenAuthor with a double-OK
+      test"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-10-27.md"
+  - id: "epic-3-retro-item-11-align-главная-head-refresh-with-автор-fo"
+    epic: 3
+    action: "Align Главная head refresh with Автор: followHead on an untouched page
+      (owner decision), keep a focused Повторить, empty page 1 with more pages keeps
+      the cache"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-10-27.md"
+  - id: "epic-3-retro-item-12-device-check-of-sidebar-ok-from-автор-по"
+    epic: 3
+    action: "Device check of sidebar OK from Автор/Пост with animations off (pendingShellSection
+      unmount timing)"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-10-27.md"
+  - id: "epic-3-retro-item-13-tests-resume-while-пост-covers-главная-r"
+    epic: 3
+    action: "Tests: resume while Пост covers Главная; resume with nested stacks; Главная
+      never shows the pin badge"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-10-27.md"
+  - id: "epic-3-retro-item-14-live-check-of-hasaccess-true-with-empty"
+    epic: 3
+    action: "Live check of hasAccess true with empty data and of all-locked lists
+      after a token refresh; record in api-contract §7"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-10-27.md"
+  - id: "epic-3-retro-item-15-before-epic-4-with-the-sessionmanager-sp"
+    epic: 3
+    action: "Before Epic 4 with the SessionManager split: extract shared screen focus
+      pieces, the lastError hook and one stack-route wrapper; move flow-test helpers
+      into src/test/flow.tsx"
+    owner: "architect"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-10-27.md"
+  - id: "epic-3-retro-item-16-owner-physical-remote-pass-of-epic-3-flo"
+    epic: 3
+    action: "Owner physical-remote pass of Epic 3 flows and a TalkBack pass"
+    owner: "owner"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-10-27.md"
+  - id: "epic-3-retro-item-17-reconcile-planning-artifacts-to-the-as-b"
+    epic: 3
+    action: "Reconcile planning artifacts to the as-built (epics.md, EXPERIENCE.md,
+      DESIGN.md, superseded mocks) and the deferred feature-parity Epic 3 pass"
+    owner: "pm"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-10-27.md"
+  - id: "epic-3-retro-item-18-show-a-device-screenshot-of-a-visible-ui"
+    epic: 3
+    action: "Show a device screenshot of a visible UI choice before the review loop;
+      never push a branch the owner did not ask to push"
+    owner: "agent"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-10-27.md"
