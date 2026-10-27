@@ -706,6 +706,38 @@ describe('focus (focus-map §4 D, §1.6)', () => {
     await unmount(root);
   });
 
+  it('two tile OKs before the transition settles: one Автор, for the first tile; Back → that tile (Epic 3 retro F8)', async () => {
+    const root = await openSubs();
+    await focusOn(root, TILE(1));
+    await act(async () => {
+      one(root, TILE(1)).props.onClick({ nativeEvent: {} });
+      one(root, TILE(2)).props.onClick({ nativeEvent: {} });
+    });
+    await settle();
+    const routes = navigationRef.getRootState()?.routes ?? [];
+    const authors = routes.filter(r => r.name === 'Author');
+    expect(authors).toHaveLength(1);
+    expect((authors[0].params as { blogUrl: string }).blogUrl).toBe(blogUrlOf(1));
+    expect(e3Calls(blogUrlOf(2))).toHaveLength(0);
+    focusMock.mockClear();
+    await back();
+    expect(lastFocusTarget()).toBe(TILE(1));
+    await unmount(root);
+  });
+
+  it('a double OK on the same tile: one Автор, one E3 (Epic 3 retro F8)', async () => {
+    const root = await openSubs();
+    await act(async () => {
+      one(root, TILE(1)).props.onClick({ nativeEvent: {} });
+      one(root, TILE(1)).props.onClick({ nativeEvent: {} });
+    });
+    await settle();
+    const routes = navigationRef.getRootState()?.routes ?? [];
+    expect(routes.filter(r => r.name === 'Author')).toHaveLength(1);
+    expect(e3Calls(blogUrlOf(1))).toHaveLength(1);
+    await unmount(root);
+  });
+
   it('OK on «Главная» twice in a row: the Shell on Главная; a later Author + Back returns to the tile (no section switch)', async () => {
     const root = await openAuthor(3);
     await press(root, 'author/nav/home', { settle: { rounds: 1 } });
