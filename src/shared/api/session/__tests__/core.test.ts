@@ -198,3 +198,44 @@ describe('generation and transitions', () => {
     expect(core.getStatus()).toBe('expired');
   });
 });
+
+describe('session robustness (spec-session-robustness)', () => {
+  test('the same listener subscribed twice is notified twice; after one unsubscribe, once per change', () => {
+    const { core } = setup();
+    const listener = jest.fn();
+    const unsubscribe = core.subscribe(listener);
+    core.subscribe(listener);
+    core.setStatus('signedIn');
+    expect(listener).toHaveBeenCalledTimes(2);
+    unsubscribe();
+    core.setStatus('expired');
+    expect(listener).toHaveBeenCalledTimes(3);
+    core.setStatus('signedOut');
+    expect(listener).toHaveBeenCalledTimes(4);
+  });
+
+  test('markExpired without a session is a no-op and returns null', () => {
+    const { core } = setup();
+    const listener = jest.fn();
+    core.subscribe(listener);
+    expect(core.markExpired()).toBeNull();
+    expect(core.getStatus()).toBe('signedOut');
+    expect(listener).not.toHaveBeenCalled();
+    core.restoreExpired('2002');
+    expect(core.markExpired()).toBeNull();
+    expect(core.previousAccountId()).toBe('2002');
+    expect(core.getStatus()).toBe('expired');
+  });
+
+  test('overlapping sign-outs: isSigningOut holds until the last one ends', () => {
+    const { core } = setup();
+    core.restoreSignedIn(SESSION);
+    core.beginSignOut();
+    core.beginSignOut();
+    core.endSignOut();
+    expect(core.isSigningOut()).toBe(true);
+    expect(core.adoptRefreshed(SESSION, core.generation())).toBe(false);
+    core.endSignOut();
+    expect(core.isSigningOut()).toBe(false);
+  });
+});

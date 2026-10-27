@@ -1,3 +1,4 @@
+import type { ReadResult } from '../../platform/secureStore';
 import type { Logger } from '../../services/logger';
 import { decodeSession } from './codec';
 import type { SessionCore } from './core';
@@ -19,13 +20,45 @@ export type SessionRestore = {
  * stored expiry marker means `expired`; a readable value that is neither a
  * session nor a marker is treated as corrupted: `signedOut` first, then a
  * best-effort queued clear (result `wiped`). Never logs a stored value.
+ *
+ * `restore()` runs at cold start only (App mount, the UI gated on `boot`).
+ * It is not blocked while `signedIn` (a reload while a refresh is in flight
+ * drops the late result through the generation). If the generation moves
+ * while the read runs (a sign-in or a sign-out; the debug expiry also bumps
+ * it, a refresh 400 `invalid_grant` does not), the read is stale: restore
+ * writes no state and reports the current status.
  */
 export function createRestore(core: SessionCore, logger: Logger): SessionRestore {
   let restoring: Promise<RestoreResult> | null = null;
 
+  /** The current status as a restore result (a stale read changes nothing). */
+  function currentResult(): RestoreResult {
+    switch (core.getStatus()) {
+      case 'signedIn':
+        return { status: 'signedIn' };
+      case 'expired':
+        return { status: 'expired', reason: 'expired' };
+      case 'signedOut':
+        return { status: 'signedOut', reason: 'none' };
+    }
+  }
+
   async function readSession(): Promise<RestoreResult> {
     core.resetForRestore();
-    const result = await core.readSession();
+    const generation = core.generation();
+    let result: ReadResult;
+    try {
+      result = await core.readSession();
+    } catch (error) {
+      if (core.isCurrent(generation)) {
+        throw error;
+      }
+      result = { kind: 'unavailable' };
+    }
+    if (!core.isCurrent(generation)) {
+      logger.info('session', 'restore read dropped: session changed');
+      return currentResult();
+    }
     if (result.kind === 'empty') {
       // No session, whatever the phone store holds: a kept phone alone may
       // come from a sign-in interrupted between the phone and session writes,

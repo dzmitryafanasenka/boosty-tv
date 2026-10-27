@@ -666,3 +666,98 @@ test('debug trigger: corrupts the in-memory token only → E1 401 → one real r
   expect(t.storedSession()).toMatchObject({ accessToken: NEW_ACCESS, refreshToken: NEW_REFRESH });
   expectNoSecrets(t.logger);
 });
+
+describe('session robustness (spec-session-robustness)', () => {
+  const CONFIRM = '/auth/phone/verification_code/confirm';
+
+  test('overlapping sign-outs: one fails while the other clears; a refresh then writes no token', async () => {
+    const t = setup({
+      session: stored({ expiresAt: NOW }),
+      route: req => (req.path === TOKEN ? refreshOk() : e1ByToken(req)),
+    });
+    await t.manager.restore();
+    t.phoneStore.clear.mockRejectedValueOnce(new Error('keychain'));
+    const clearing = deferred<void>();
+    t.sessionStore.clear.mockImplementationOnce(async () => {
+      t.events.push('session.clear');
+      await clearing.promise;
+      t.sessionStore.value = null;
+    });
+    const first = t.manager.signOut();
+    const second = t.manager.signOut();
+    await expect(first).rejects.toThrow('keychain');
+    for (let i = 0; i < 5 && !t.events.includes('session.clear'); i += 1) {
+      await flush();
+    }
+    expect(t.events).toContain('session.clear');
+    // The second sign-out is still clearing: no refresh may land after it.
+    const request = t.manager.http.get(E1).catch(() => undefined);
+    await flush();
+    clearing.resolve();
+    await second;
+    await request;
+    await flush();
+    expect(t.sessionStore.write).not.toHaveBeenCalled();
+    expect(t.sessionStore.value).toBeNull();
+    expect(t.phoneStore.value).toBeNull();
+    expect(t.manager.getStatus()).toBe('signedOut');
+  });
+
+  test('validate across a re-login: a new E1 is sent, the old result is not reused', async () => {
+    const firstE1 = deferred<FixtureReply>();
+    let e1Count = 0;
+    const t = setup({
+      route: req => {
+        if (req.path === CONFIRM) {
+          return refreshOk();
+        }
+        if (req.path === E1) {
+          e1Count += 1;
+          return e1Count === 1 ? firstE1.promise : fixtureReply(e1Ok);
+        }
+        return undefined;
+      },
+    });
+    await t.manager.restore();
+    const before = t.manager.validate();
+    await flush();
+    expect(t.e1Calls()).toHaveLength(1);
+    t.manager.debugExpireInMemory?.();
+    await expect(
+      t.manager.signIn({ phone: '+375291234567', challenge: 'c'.repeat(64), smsCode: '482193' }),
+    ).resolves.toEqual({ accountChanged: false });
+    const after = t.manager.validate();
+    expect(after).not.toBe(before);
+    await flush();
+    // The first validate, the sign-in's own E1, then the new validate.
+    expect(t.e1Calls()).toHaveLength(3);
+    expect(t.e1Calls()[2].headers.Authorization).toBe(`Bearer ${NEW_ACCESS}`);
+    await expect(after).resolves.toEqual({ kind: 'ok' });
+    firstE1.resolve(fixtureReply(e1Ok));
+    await before;
+    expectNoSecrets(t.logger);
+  });
+
+  test.each([
+    ['ok', refreshOk],
+    ['rejected', () => refreshRejected],
+  ])('expiry (debug) during a refresh, reply %s: dropped; old tokens kept, no new token, no marker', async (_name, reply) => {
+    const pending = deferred<FixtureReply>();
+    const t = setup({
+      session: stored({ expiresAt: NOW }),
+      route: req => (req.path === TOKEN ? pending.promise : fixtureReply(e1Ok)),
+    });
+    await t.manager.restore();
+    const request = kindOf(t.manager.http.get(E1));
+    await flush();
+    t.manager.debugExpireInMemory?.();
+    pending.resolve(reply());
+    expect(await request).toBe('Client');
+    expect(t.statuses).toEqual(['signedIn', 'expired']);
+    expect(t.manager.getStatus()).toBe('expired');
+    expect(t.sessionStore.write).not.toHaveBeenCalled();
+    expect(t.storedSession()).toEqual(stored({ expiresAt: NOW }));
+    expect(t.e1Calls()).toHaveLength(0);
+    expect(JSON.stringify(t.logger.entries())).toContain('refresh result dropped');
+  });
+});

@@ -27,7 +27,14 @@ export function createLifecycle({
   http: HttpClient;
   logger: Logger;
 }): SessionLifecycle {
-  let validating: Promise<ValidateResult> | null = null;
+  /**
+   * The running E1, keyed by the session generation it started in: a
+   * validate after a sign-in, a sign-out or a restore (the debug expiry
+   * also bumps the generation) sends a new E1 rather than reusing a result
+   * about the previous session. A refresh 400 `invalid_grant` does not bump
+   * it.
+   */
+  let validating: { generation: number; promise: Promise<ValidateResult> } | null = null;
   let appState = 'active';
 
   async function doValidate(): Promise<ValidateResult> {
@@ -46,12 +53,17 @@ export function createLifecycle({
   }
 
   function validate(): Promise<ValidateResult> {
-    if (!validating) {
-      validating = doValidate().finally(() => {
-        validating = null;
-      });
+    const generation = core.generation();
+    if (validating && validating.generation === generation) {
+      return validating.promise;
     }
-    return validating;
+    const promise = doValidate().finally(() => {
+      if (validating?.promise === promise) {
+        validating = null;
+      }
+    });
+    validating = { generation, promise };
+    return promise;
   }
 
   return {

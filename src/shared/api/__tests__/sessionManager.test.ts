@@ -5,6 +5,8 @@ import { AuthError } from '../authError';
 import { createFixtureTransport, type FixtureReply } from '../fixtureTransport';
 import { createHttpClient } from '../httpClient';
 import { createSessionManager } from '../sessionManager';
+// eslint-disable-next-line boundaries/dependencies -- a test under src/shared may use the src/test harness
+import { deferred, flush } from '../../../test/async';
 
 const PHONE = '+375291234567';
 const CHALLENGE = 'c'.repeat(64);
@@ -633,5 +635,74 @@ describe('account-switch hook (Story 2.8)', () => {
     for (const secret of [PHONE, '1001', '2002', ACCESS, REFRESH, CHALLENGE, SMS_CODE]) {
       expect(dump).not.toContain(secret);
     }
+  });
+});
+
+describe('session robustness (spec-session-robustness)', () => {
+  const marker = (accountId: string) => JSON.stringify({ v: 1, expired: true, accountId });
+
+  test.each([
+    ['an expiry marker', marker('1001')],
+    ['a corrupted value', 'garbage'],
+  ])('restore vs sign-in: a read (%s) that resolves after the sign-in writes no state', async (_name, value) => {
+    const { manager, sessionStore } = setup();
+    const reading = deferred<ReadResult>();
+    sessionStore.read.mockImplementationOnce(() => reading.promise);
+    const statuses: string[] = [];
+    manager.subscribe(s => statuses.push(s));
+    const restoring = manager.restore();
+    await flush();
+    await manager.signIn(ARGS);
+    const signedIn = sessionStore.value;
+    reading.resolve({ kind: 'value', value });
+    await expect(restoring).resolves.toEqual({ status: 'signedIn' });
+    expect(manager.getStatus()).toBe('signedIn');
+    expect(statuses).toEqual(['signedIn']);
+    expect(sessionStore.clear).not.toHaveBeenCalled();
+    expect(sessionStore.value).toBe(signedIn);
+    expect(JSON.parse(signedIn ?? '')).toMatchObject({ accessToken: ACCESS, accountId: '1001' });
+  });
+
+  test('restore vs sign-in: a read that rejects after the sign-in writes no state', async () => {
+    const { manager, sessionStore } = setup();
+    const reading = deferred<ReadResult>();
+    sessionStore.read.mockImplementationOnce(() => reading.promise);
+    const restoring = manager.restore();
+    await flush();
+    await manager.signIn(ARGS);
+    reading.reject(new Error('keychain'));
+    await expect(restoring).resolves.toEqual({ status: 'signedIn' });
+    expect(manager.getStatus()).toBe('signedIn');
+  });
+
+  test('a failed same-account re-login write keeps the marker and the phone; a restart opens A11', async () => {
+    const { manager, sessionStore, phoneStore } = setup();
+    sessionStore.value = marker('1001');
+    phoneStore.value = PHONE;
+    await manager.restore();
+    // As an ADR 0006 recovery: the failed write took the stored entry with it.
+    sessionStore.write.mockImplementationOnce(async () => {
+      sessionStore.value = null;
+      throw new Error('keychain');
+    });
+    await expect(manager.signIn(ARGS)).rejects.toMatchObject({ kind: 'Unknown', challengeSpent: true });
+    expect(sessionStore.value).toBe(marker('1001'));
+    expect(phoneStore.value).toBe(PHONE);
+    expect(phoneStore.clear).not.toHaveBeenCalled();
+    expect(manager.getStatus()).toBe('expired');
+    await expect(manager.getExpiredPhone()).resolves.toBe(PHONE);
+    await expect(manager.restore()).resolves.toEqual({ status: 'expired', reason: 'expired' });
+    await expect(manager.getExpiredPhone()).resolves.toBe(PHONE);
+  });
+
+  test('a failed new-account re-login write discards the marker and the phone', async () => {
+    const { manager, sessionStore, phoneStore } = setup();
+    sessionStore.value = marker('2002');
+    phoneStore.value = PHONE;
+    await manager.restore();
+    sessionStore.write.mockRejectedValueOnce(new Error('keychain'));
+    await expect(manager.signIn(ARGS)).rejects.toMatchObject({ kind: 'Unknown', challengeSpent: true });
+    expect(sessionStore.value).toBeNull();
+    expect(phoneStore.value).toBeNull();
   });
 });

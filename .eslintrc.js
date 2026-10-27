@@ -6,7 +6,12 @@
  * - imports that resolve to no known element or file fail lint
  *   (no-unknown-dependencies), so unresolvable paths cannot bypass the rules;
  * - a feature imports another feature only through its index.ts, and only
- *   along the allowlisted edges listed in FEATURE_EDGES.
+ *   along the allowlisted edges listed in FEATURE_EDGES;
+ * - src/shared/api/session/ is private to the SessionManager facade (ADR
+ *   0009): only sessionManager.ts imports it, and among the session
+ *   modules a session module imports only ./core, ./codec and ./types
+ *   (eslint-plugin-boundaries sees shared/api as one element, so
+ *   no-restricted-imports enforces this).
  * __tests__/boundaries.test.js proves the rules fail on forbidden imports.
  */
 
@@ -29,6 +34,13 @@ const featureEdgePolicies = Object.entries(FEATURE_EDGES).map(
     },
   }),
 );
+
+const SESSION_PRIVATE_MESSAGE =
+  'src/shared/api/session/ is private: import the SessionManager facade (ADR 0009).';
+const SESSION_MODULE_MESSAGE =
+  'Among the session modules, a session module imports only ./core, ./codec and ./types, never the facade (ADR 0009).';
+/** The session folder by its full path, from anywhere. */
+const SESSION_FOLDER = ['**/shared/api/session', '**/shared/api/session/**'];
 
 const COPY_MESSAGE = 'UI strings come from the i18n catalog (t / tp).';
 /** A JS expression rendered as a JSX child (not an attribute value). */
@@ -94,6 +106,116 @@ module.exports = {
     'boundaries/no-unknown-dependencies': 2,
   },
   overrides: [
+    {
+      // ADR 0009: outside the facade and session/ itself, nothing imports a
+      // session module.
+      files: ['**/*.{js,jsx,ts,tsx}'],
+      excludedFiles: [
+        'src/shared/api/sessionManager.ts',
+        'src/shared/api/session/**',
+      ],
+      rules: {
+        'no-restricted-imports': [
+          2,
+          {
+            patterns: [
+              {
+                group: SESSION_FOLDER,
+                message: SESSION_PRIVATE_MESSAGE,
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      // Another shared module reaches session/ through `../api/session`.
+      files: ['src/shared/**/*.{js,jsx,ts,tsx}'],
+      excludedFiles: ['src/shared/api/**'],
+      rules: {
+        'no-restricted-imports': [
+          2,
+          {
+            patterns: [
+              {
+                group: [
+                  ...SESSION_FOLDER,
+                  '../api/session',
+                  '../api/session/**',
+                  '../../api/session',
+                  '../../api/session/**',
+                ],
+                message: SESSION_PRIVATE_MESSAGE,
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      // Inside shared/api, relative paths reach session/ without the
+      // shared/api prefix.
+      files: ['src/shared/api/**/*.{js,jsx,ts,tsx}'],
+      excludedFiles: [
+        'src/shared/api/sessionManager.ts',
+        'src/shared/api/session/**',
+      ],
+      rules: {
+        'no-restricted-imports': [
+          2,
+          {
+            patterns: [
+              {
+                group: [
+                  ...SESSION_FOLDER,
+                  './session',
+                  './session/**',
+                  '../session',
+                  '../session/**',
+                ],
+                message: SESSION_PRIVATE_MESSAGE,
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      // ADR 0009: among the session modules, a session module imports only
+      // core, codec and types (directly as ./x, not up and back into
+      // session/); never the facade. Their tests (session/__tests__) may
+      // import any module.
+      files: ['src/shared/api/session/*.{js,jsx,ts,tsx}'],
+      rules: {
+        'no-restricted-imports': [
+          2,
+          {
+            paths: [
+              { name: '..', message: SESSION_MODULE_MESSAGE },
+              { name: '../', message: SESSION_MODULE_MESSAGE },
+            ],
+            patterns: [
+              {
+                group: ['./*', '!./core', '!./codec', '!./types'],
+                message: SESSION_MODULE_MESSAGE,
+              },
+              {
+                group: [
+                  ...SESSION_FOLDER,
+                  '../session',
+                  '../session/**',
+                  '../../api/session',
+                  '../../api/session/**',
+                  '../sessionManager',
+                  '../index',
+                ],
+                message: SESSION_MODULE_MESSAGE,
+              },
+            ],
+          },
+        ],
+      },
+    },
     {
       // UI copy only through the typed i18n catalog (src/shared/i18n).
       // no-raw-text catches literals outside <Text>; it allows any element

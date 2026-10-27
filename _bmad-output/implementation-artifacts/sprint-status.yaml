@@ -67,7 +67,7 @@ development_status:
   epic-3-retrospective: done
 
   epic-4: in-progress
-  4-1-play-a-video-from-a-post: review
+  4-1-play-a-video-from-a-post: done
   4-2-progress-is-saved-and-playback-resumes: backlog
   4-3-choose-video-quality: backlog
   4-4-recover-from-expired-links-and-playback-errors: backlog
