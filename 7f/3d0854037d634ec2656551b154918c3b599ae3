@@ -1,0 +1,109 @@
+__tests__/authorFlow.test.tsx
+  s_06dd4e6f3c24d0::t_e6cd40e6dcf2fa 1-822
+__tests__/demoFlow.test.tsx
+  s_06dd4e6f3c24d0::t_7dc82bdc6048d6 126-160
+__tests__/subscriptionsFlow.test.tsx
+  s_06dd4e6f3c24d0::t_1b305fe668808f 560,562-564,566-570
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_06dd4e6f3c24d0::t_8fc8bd6cdb320d 177-183
+_bmad-output/implementation-artifacts/spec-3-3-author-page.md
+  s_06dd4e6f3c24d0::t_9803b0f966e439 1-130
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_06dd4e6f3c24d0::t_ca732904208bf0 32,62-63
+docs/adr/0011-feed-list-flashlist.md
+  s_06dd4e6f3c24d0::t_a72c0f0276af5b 71-72
+docs/adr/0012-sidebar-on-stack-screens.md
+  s_06dd4e6f3c24d0::t_9c93b4bd0e9480 1-23
+docs/api-contract.md
+  s_06dd4e6f3c24d0::t_b352df40f27676 33
+docs/focus-map.md
+  s_06dd4e6f3c24d0::t_86ff8ef58f0a78 61,181,198-208
+docs/testing.md
+  s_06dd4e6f3c24d0::t_33eb6adfc746b9 691-711
+src/app/App.tsx
+  s_06dd4e6f3c24d0::t_46fb24d50d75a0 7,22,31,37-38,40-41,43,47-54,59,62,74-75,208-219,224-227,256-257,262-388,556
+src/app/Shell.tsx
+  s_06dd4e6f3c24d0::t_d0976823e73371 10,16,18,43-50,93-94,104-105,107-113,122-127,144-158,180,232-234,241,243-249,261,275,294,307,336
+src/app/dev/demo.ts
+  s_06dd4e6f3c24d0::t_cde03691cb1b53 18-20,36-39,62,103-141,167-176
+src/app/routes.ts
+  s_06dd4e6f3c24d0::t_2643a874667efa 18-22
+src/features/author/AuthorScreen.tsx
+  s_06dd4e6f3c24d0::t_8f3663a8cf4f51 1-385
+src/features/author/index.ts
+  s_06dd4e6f3c24d0::t_970f2f01d5876a 1-8
+src/features/author/useAuthor.ts
+  s_06dd4e6f3c24d0::t_27ede2624cb3c6 1-57
+src/features/author/useAuthorPosts.ts
+  s_06dd4e6f3c24d0::t_77db5f79e0687a 1-17
+src/features/home/HomeScreen.tsx
+  s_06dd4e6f3c24d0::t_3ce3db977a93ab 14-15,147-148,322-327
+src/features/subscriptions/SubscriptionsGrid.tsx
+  s_06dd4e6f3c24d0::t_c831e2985a4b06 83,89,91,109-110,118,124-128,130,141,155-156,172,177,179
+src/features/subscriptions/SubscriptionsScreen.tsx
+  s_06dd4e6f3c24d0::t_4e6b28e286aefd 46-52,63-64,84-87,98,253-273,390
+src/shared/api/__tests__/queryKeys.test.ts
+  s_06dd4e6f3c24d0::t_82f74f88763a7d 1-15
+src/shared/api/dto/feed.ts
+  s_06dd4e6f3c24d0::t_43d43a14156d0d 27-40
+src/shared/api/queryKeys.ts
+  s_06dd4e6f3c24d0::t_b3cf1601ff3a70 12-19
+src/shared/entities/author/__tests__/authorRepository.test.ts
+  s_06dd4e6f3c24d0::t_55eaabe2065755 12-14,196-247
+src/shared/entities/author/authorRepository.ts
+  s_06dd4e6f3c24d0::t_b2c6faaeda4a56 1-2,5-6,48-78
+src/shared/entities/author/index.ts
+  s_06dd4e6f3c24d0::t_1e89f45af558ed 2-8
+src/shared/entities/author/types.ts
+  s_06dd4e6f3c24d0::t_5a75fa4f380806 25-30
+src/shared/entities/post/__tests__/postRepository.test.ts
+  s_06dd4e6f3c24d0::t_36f4e353220a85 7-9,153-232
+src/shared/entities/post/index.ts
+  s_06dd4e6f3c24d0::t_9072241ee53042 8-22
+src/shared/entities/post/postRepository.ts
+  s_06dd4e6f3c24d0::t_7c20f9f5c090de 1,40-67,80-95,98
+src/shared/i18n/ru.ts
+  s_06dd4e6f3c24d0::t_00824ee60eb542 115-130,133
+src/shared/ui/AuthorCard.tsx
+  s_06dd4e6f3c24d0::t_c6154b6086e1eb 50,56-70,82,89,126
+src/shared/ui/index.ts
+  s_06dd4e6f3c24d0::t_c2cf3aa8e220f1 32,41-59
+src/app/Sidebar.tsx
+  s_dde4300f20e318::t_9d3a010c9153ad 1-142
+src/features/author/AuthorHeader.tsx
+  s_dde4300f20e318::t_61f4edc3fb5447 1-107
+src/features/home/FeedGrid.tsx
+  s_dde4300f20e318::t_b80472813d44a4 2-16,18-24,31-38,40,42-45,47-50,52,54-59
+src/features/home/useSubscriptionFeed.ts
+  s_dde4300f20e318::t_b3d068e40aebf4 1-15,18-21,24-26,28
+src/shared/entities/post/usePagedPosts.ts
+  s_dde4300f20e318::t_d4481f48bfb847 1-174
+src/shared/ui/PostGrid.tsx
+  s_dde4300f20e318::t_0e1fdab55d0ac9 1-573
+src/test/authorFixtures.ts
+  s_dde4300f20e318::t_a014caa5daeb9c 1-82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "7f3d0854037d634ec2656551b154918c3b599ae3",
+  "prompts": {},
+  "sessions": {
+    "s_06dd4e6f3c24d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b17b1d18-d247-4604-86f0-d38f6644be98",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_dde4300f20e318": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a3e0ca9555d0016e0",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
