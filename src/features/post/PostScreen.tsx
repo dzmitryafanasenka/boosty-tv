@@ -132,7 +132,9 @@ type Phase = 'unavailable' | 'error' | 'loading' | 'ready';
  * (Epic 6). A locked post (Story 3.6) shows its header, the no-access copy
  * (`LockedNotice`, with the level name when known; never a price or a
  * subscribe action), then its teaser: images, paragraphs and placeholders
- * (no rows). A locked post is never an error or a session problem.
+ * (no rows). A locked post is never an error; `usePost` first asks the
+ * SessionCheck port (E1) whether a dead session hides behind it (Epic 3
+ * retro A6).
  *
  * Focus:
  * - Skeleton: nothing focusable in content; focus goes to the sidebar's

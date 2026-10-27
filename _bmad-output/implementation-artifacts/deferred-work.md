@@ -229,6 +229,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-4-1-play-a-video-from-a-post.md`
   summary: A post that the player's fresh E8 reports locked is shown «Нет доступа к этому видео» without re-validating the session (an invalid token returns 200 anonymous); validate with E1 first. Do with retro A6 / the session-robustness pass before 4.2.
   evidence: api-contract §7 («Content request with an expired or invalid token»); `PostRepository.videoSources`. Review 4.1, finding 15.
+  status: Done 2026-10-27 in `_bmad-output/implementation-artifacts/spec-epic-3-retro-a6-locked-session-check.md`: the player's fresh E8 locked runs E1 through the SessionCheck port first (`expired` → A11, `ok` → one E8 refetch).
 - source_spec: `_bmad-output/implementation-artifacts/spec-4-1-play-a-video-from-a-post.md`
   summary: Device-verify the Story 4.1 player paths that were host-tested only: the error states («Не удалось воспроизвести видео», «Нет доступа к этому видео», «Видео недоступно»), the buffering spinner (500 ms), the PlaybackArbiter (another playback stopped), the entry guard with the physical remote, and TalkBack on the Post «Смотреть», MediaRows and the player controls.
   evidence: No safe way to provoke them on the device during the Story 4.1 run; docs/testing.md «Story 4.1» «Not verified on the device».
@@ -238,3 +239,7 @@
 - source_spec: none
   summary: Validate the session with E1 before showing «all locked» content (player «Нет доступа», paged lists) — a dead token returns 200 anonymous; plus the live check whether E8/E4 return `hasAccess: true` with empty `data` (Epic 3 retro A6, review 4.1 finding 15).
   evidence: Split from the session-robustness pass (owner decision 2026-10-27): independent PR with its own live/device verification; do before or with Story 4.2.
+  status: Done 2026-10-27 in `_bmad-output/implementation-artifacts/spec-epic-3-retro-a6-locked-session-check.md`: `src/shared/api/sessionCheck.ts` (SessionCheck port, per-trigger-point 5 min window, one `refetch` per window) provided by `App`; trigger points: the player's fresh E8, the Post screen's E8, Главная page 1 all locked (Автор excluded, owner decision). F5 live check: no `hasAccess: true` with empty `data` in 37 E5 and 23 E4 pages (api-contract §7). Retro item 14 closes after the merge.
+- source_spec: `_bmad-output/implementation-artifacts/spec-epic-3-retro-a6-locked-session-check.md`
+  summary: Flow-test that `sessionCheck.reset()` runs on a session status change (a locked check, sign-out → sign-in or A11 → re-login, then a locked answer within 5 min sends a new E1).
+  evidence: Wired in `src/app/App.tsx` and unit-tested in `sessionCheck.test.ts` only; review A6 finding 13.

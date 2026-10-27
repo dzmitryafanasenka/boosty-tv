@@ -117,8 +117,10 @@ export function postPath(blogUrl: string, postId: string): string {
  * §7) → `unavailable`. HttpClient keeps no 404 body, so every E8 404 maps
  * here (as E3). A body that the one mapper rejects (no `id`, `user.blogUrl`,
  * …) is `Parse`; every other failure rejects with its `AppError`. A locked
- * post (`hasAccess=false`, empty `data`) is an ordinary `ok` result, never a
- * session problem.
+ * post (`hasAccess=false`, empty `data`) is an ordinary `ok` result here; a
+ * dead token also answers it (200 as anonymous, api-contract §7), so the
+ * Post screen asks the SessionCheck port (E1) before it trusts it (Epic 3
+ * retro A6). This repository never treats it as a session problem itself.
  */
 async function onePost(
   http: HttpClient,
@@ -163,9 +165,11 @@ async function fetchPost(
  * are bound to the mobile Android client, ADR 0008) and the sources of one
  * video (`MediaRef.mediaId`), for the player's media resolver. The same
  * request and mapping as `post()`; the sources never enter the Post entity.
- * A locked post (`hasAccess=false`) is `locked` (never retried, never a
- * session problem); E8 404 or a video no longer in the post is
- * `unavailable`; any other failure rejects with its `AppError`.
+ * A locked post (`hasAccess=false`) is `locked` (never retried here; the
+ * player asks the SessionCheck port, E1, before it trusts it, because a dead
+ * token also answers «locked»: api-contract §7, Epic 3 retro A6); E8 404 or
+ * a video no longer in the post is `unavailable`; any other failure rejects
+ * with its `AppError`.
  */
 async function videoSources(
   http: HttpClient,

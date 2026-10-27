@@ -353,6 +353,29 @@ describe('content (matrix «No posts», «Locked posts», «Malformed post»)', 
     await unmount(root);
   });
 
+  it('page 1 all locked: ordinary for a blog; no session check (no E1, no refetch; Epic 3 retro A6)', async () => {
+    e4 = () => ({
+      status: 200,
+      body: {
+        data: [
+          { ...lockedPost(), id: 'locked-1', user: { name: 'A', blogUrl: BLOG } },
+          { ...lockedPost(), id: 'locked-2', user: { name: 'A', blogUrl: BLOG } },
+        ],
+        extra: { isLast: true },
+      },
+    });
+    const root = await openAuthor();
+    await settle();
+    expect(authorCards(root)).toEqual([CARD('locked-1'), CARD('locked-2')]);
+    expect(visible(root, `${CARD('locked-2')}/lock`)).toBe(true);
+    // Only the cold-start E1 and one E4; the Author page never asks for more.
+    expect(transport.callsTo(E1)).toHaveLength(1);
+    expect(e4Calls()).toHaveLength(1);
+    expect(transport.callsTo('/oauth/token/')).toHaveLength(0);
+    expect(visible(root, 'author')).toBe(true);
+    await unmount(root);
+  });
+
   it('a post without id or user.blogUrl is dropped and logged (post id only); the page never fails', async () => {
     e4 = () => ({
       status: 200,

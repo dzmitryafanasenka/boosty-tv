@@ -245,7 +245,9 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit }: PlayerScreenP
   // replacing the surface): Android then moves focus to the first focusable
   // view of the window, on a covered screen. So the request is repeated two
   // frames later unless focus already arrived (as the modal host does; on
-  // the device only the late request stuck).
+  // the device only the late request stuck); both requests only while the
+  // player is still the focused route (a locked E8's session check can end in A11
+  // within those frames: Epic 3 retro A6).
   const surfaceFocusable = phase === 'loading' || (playing && !overlay);
   const errorTarget = phase === 'error' ? 'retry' : phase === 'locked' || phase === 'unavailable' ? 'back' : null;
   useEffect(() => {
@@ -259,19 +261,19 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit }: PlayerScreenP
             : surfaceFocusable
               ? [surfaceView, PLAYER_SURFACE_ID]
               : [null, null];
-    if (view === null) {
+    if (view === null || !isActive()) {
       return;
     }
     requestHostFocus(view.current);
     let frame = requestAnimationFrame(() => {
       frame = requestAnimationFrame(() => {
-        if (focused.current !== id) {
+        if (focused.current !== id && isActive()) {
           requestHostFocus(view.current);
         }
       });
     });
     return () => cancelAnimationFrame(frame);
-  }, [errorTarget, playing, overlay, surfaceFocusable]);
+  }, [errorTarget, playing, overlay, surfaceFocusable, isActive]);
 
   // -------------------------------------------------------------- actions
 

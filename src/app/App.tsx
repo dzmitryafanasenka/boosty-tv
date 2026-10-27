@@ -31,7 +31,12 @@ import { refreshAuthorPostsHeads } from '../features/author';
 import { refreshFeedHead } from '../features/home';
 import { SignOutDialog } from '../features/settings';
 import { accountScope } from '../shared/account';
-import type { SignInResult, ValidateResult } from '../shared/api';
+import {
+  SessionCheckContext,
+  createSessionCheck,
+  type SignInResult,
+  type ValidateResult,
+} from '../shared/api';
 import { ModalHostProvider, useModal, type ModalApi } from '../shared/focus';
 import { t } from '../shared/i18n';
 import { Text, colors, components, spacing, type HostView } from '../shared/ui';
@@ -286,8 +291,15 @@ function DemoBadge() {
  * Views, never react-native-screens; no header, no gestures (remote only).
  * Covered screens stay mounted; each screen traps focus (`Screen`). The one
  * modal host sits above the stack (AD-13).
+ *
+ * Epic 3 retro A6: the SessionCheck port (`SessionCheckContext`) lets the
+ * player, the Post screen and Главная run E1 before they trust a «locked»
+ * answer (a dead token reads as anonymous, api-contract §7). An `expired`
+ * result reaches A11 through the status listener below; every status change
+ * starts the port's cooldown windows afresh.
  */
 function App() {
+  const [sessionCheck] = useState(() => createSessionCheck({ validate: () => session.validate() }));
   const [boot, setBoot] = useState<Boot | null>(null);
   const [homeOffline, setHomeOffline] = useState(false);
   const [retrying, setRetrying] = useState(false);
@@ -316,6 +328,8 @@ function App() {
       );
     });
     const unsubscribe = session.subscribe(status => {
+      // A new session (or none) owes nothing to the old one's checks.
+      sessionCheck.reset();
       if (status === 'signedOut') {
         // Sign-out (Story 2.7): nothing of the old session stays on screen.
         setHomeOffline(false);
@@ -347,7 +361,7 @@ function App() {
       unsubscribe();
       appState.remove();
     };
-  }, [applyColdResult]);
+  }, [applyColdResult, sessionCheck]);
 
   /**
    * The navigator is mounted: the cold-start E1 runs now, in the background,
@@ -396,45 +410,47 @@ function App() {
       {boot ? (
         <QueryClientProvider client={queryClient}>
           <SessionUiContext.Provider value={ui}>
-            <ModalHostProvider>
-              <ModalBridge apiRef={modalApi} />
-              <NavigationContainer
-                ref={navigationRef}
-                theme={theme}
-                onReady={onNavigationReady}
-              >
-                <Stack.Navigator
-                  initialRouteName={boot.initial}
-                  detachInactiveScreens={false}
-                  screenOptions={{ headerShown: false, gestureEnabled: false }}
+            <SessionCheckContext.Provider value={sessionCheck}>
+              <ModalHostProvider>
+                <ModalBridge apiRef={modalApi} />
+                <NavigationContainer
+                  ref={navigationRef}
+                  theme={theme}
+                  onReady={onNavigationReady}
                 >
-                  <Stack.Screen
-                    name="Welcome"
-                    component={Welcome}
-                    initialParams={{ signInAgain: boot.signInAgain }}
-                  />
-                  <Stack.Screen name="Phone" component={Phone} />
-                  <Stack.Screen name="Code" component={Code} />
-                  <Stack.Screen name="Shell" component={ShellRoute} />
-                  <Stack.Screen name="Author" component={AuthorRoute} />
-                  <Stack.Screen name="Post" component={PostRoute} />
-                  <Stack.Screen name="Player" component={PlayerRoute} />
-                  <Stack.Screen name="Expired" component={Expired} />
-                  {__DEV__ && dev ? (
-                    <>
-                      <Stack.Screen
-                        name="DevFocus"
-                        component={dev.DevFocusRoute}
-                      />
-                      <Stack.Screen
-                        name="DevFocusDetail"
-                        component={dev.DevFocusDetailRoute}
-                      />
-                    </>
-                  ) : null}
-                </Stack.Navigator>
-              </NavigationContainer>
-            </ModalHostProvider>
+                  <Stack.Navigator
+                    initialRouteName={boot.initial}
+                    detachInactiveScreens={false}
+                    screenOptions={{ headerShown: false, gestureEnabled: false }}
+                  >
+                    <Stack.Screen
+                      name="Welcome"
+                      component={Welcome}
+                      initialParams={{ signInAgain: boot.signInAgain }}
+                    />
+                    <Stack.Screen name="Phone" component={Phone} />
+                    <Stack.Screen name="Code" component={Code} />
+                    <Stack.Screen name="Shell" component={ShellRoute} />
+                    <Stack.Screen name="Author" component={AuthorRoute} />
+                    <Stack.Screen name="Post" component={PostRoute} />
+                    <Stack.Screen name="Player" component={PlayerRoute} />
+                    <Stack.Screen name="Expired" component={Expired} />
+                    {__DEV__ && dev ? (
+                      <>
+                        <Stack.Screen
+                          name="DevFocus"
+                          component={dev.DevFocusRoute}
+                        />
+                        <Stack.Screen
+                          name="DevFocusDetail"
+                          component={dev.DevFocusDetailRoute}
+                        />
+                      </>
+                    ) : null}
+                  </Stack.Navigator>
+                </NavigationContainer>
+              </ModalHostProvider>
+            </SessionCheckContext.Provider>
           </SessionUiContext.Provider>
         </QueryClientProvider>
       ) : (

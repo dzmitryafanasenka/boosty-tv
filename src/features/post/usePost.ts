@@ -1,7 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
+import { useRef } from 'react';
 import {
+  SESSION_CHECK_KEYS,
   queryKeys,
   useHeldError,
+  useLockedSessionCheck,
   type AppErrorKind,
   type HttpClient,
 } from '../../shared/api';
@@ -25,14 +28,30 @@ export type PostState = {
  * `{blogUrl, postId}` (`queryKeys.post`; no URL or signed value). The
  * HttpClient is the active session's, passed down from the route (never a
  * singleton); no query-level retry (HttpClient owns AD-6).
+ *
+ * A fresh E8 that says locked asks the SessionCheck port (Epic 3 retro A6):
+ * a dead token also answers «locked» (api-contract §7). The locked post
+ * stays shown meanwhile; `refetch` reloads E8 once, `expired` opens A11
+ * through the app's status listener.
  */
 export function usePost(http: HttpClient, blogUrl: string, postId: string): PostState {
+  const refetchRef = useRef<() => void>(() => {});
+  const checkLocked = useLockedSessionCheck(SESSION_CHECK_KEYS.post, () => refetchRef.current());
   const query = useQuery({
     queryKey: queryKeys.post(blogUrl, postId),
-    queryFn: () => PostRepository.post(http, blogUrl, postId),
+    queryFn: async () => {
+      const result = await PostRepository.post(http, blogUrl, postId);
+      if (result.kind === 'ok' && !result.post.hasAccess) {
+        checkLocked();
+      }
+      return result;
+    },
     retry: false,
   });
   const { data, error, status, isFetching, refetch } = query;
+  refetchRef.current = () => {
+    refetch().catch(() => {});
+  };
 
   // The error StateView keeps its busy «Повторить» during a retry.
   const shownError = useHeldError({ empty: data === undefined, status, error, isFetching });

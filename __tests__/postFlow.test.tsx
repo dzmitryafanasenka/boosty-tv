@@ -14,7 +14,7 @@ import { act } from 'react';
 import { StyleSheet } from 'react-native';
 import App, { navigationRef } from '../src/app/App';
 import { queryClient, resetQueryCache } from '../src/app/queryClient';
-import { queryKeys } from '../src/shared/api';
+import { QUERY_STALE_TIME_MS, queryKeys } from '../src/shared/api';
 import {
   type FixtureReply,
   type FixtureRequest,
@@ -30,6 +30,10 @@ import backHandler from '../src/test/backHandlerMock';
 import { e3Body, syntheticBlogPosts } from '../src/test/authorFixtures';
 import { E5_PATH, syntheticFeed } from '../src/test/feedFixtures';
 import e1Ok from '../src/test/fixtures/boosty/e1-user-current.json';
+import e1Unauthorized from '../src/test/fixtures/boosty/e1-no-token.json';
+import e8NoToken from '../src/test/fixtures/boosty/e8-no-token.json';
+import refreshRejected from '../src/test/fixtures/boosty/refresh-invalid-grant.json';
+import refreshOk from '../src/test/fixtures/boosty/refresh-ok.json';
 import {
   blockEnd,
   e8Accessible,
@@ -520,9 +524,156 @@ describe('locked, missing, errors (matrix «Locked», «Not found», «Error»)'
     );
     expect(contentIds(root)).toEqual([AUTHOR(id)]);
     expect(lastFocusTarget()).toBe(AUTHOR(id));
-    // Still signed in: no A11, no extra E1.
+    // Still signed in: no A11. The session check (A6, below) ran one E1 and
+    // its one refetch, which is locked again: nothing more.
     expect(currentRoute()).toBe('Post');
+    expect(transport.callsTo(E1)).toHaveLength(2);
+    expect(e8Calls()).toHaveLength(2);
     await unmount(root);
+  });
+
+  describe('a locked E8 checks the session first (Epic 3 retro A6)', () => {
+    const TOKEN = '/oauth/token/';
+    const REFRESHED = `Bearer ${refreshOk.body.access_token}`;
+    /** The stored token died after the cold start: E1 401, E8 anonymous (locked). */
+    let dead: boolean;
+    let e1Reply: () => FixtureReply;
+
+    /** The live no-token E8 (200, `hasAccess=false`, empty `data`) for this post. */
+    const anonymous = (blogUrl: string, postId: string): FixtureReply => ({
+      status: e8NoToken.status,
+      body: { ...e8NoToken.body, id: postId, user: { ...(e8NoToken.body.user as object), blogUrl } },
+    });
+
+    function install(refresh: FixtureReply) {
+      dead = false;
+      e1Reply = () => ({ status: e1Unauthorized.status, body: e1Unauthorized.body });
+      installNativeModules(INSTALL_ID);
+      transport = installFixtureTransport(req => {
+        const stale = dead && req.headers.Authorization !== REFRESHED;
+        if (req.path === TOKEN) {
+          return refresh;
+        }
+        if (stale && req.path === E1) {
+          return e1Reply();
+        }
+        const single = E8_RE.exec(req.path);
+        if (stale && single) {
+          return anonymous(decodeURIComponent(single[1]), decodeURIComponent(single[2]));
+        }
+        return fullHandler(req);
+      });
+    }
+
+    /**
+     * Cold start (E1 200), then the token dies and OK on a card opens Пост.
+     * `timers` only for the AD-6 backoff and the reset to A11: running every
+     * pending timer also moves the fake clock past the 5 min window (the
+     * query gc timers).
+     */
+    async function openDead({ timers = false } = {}) {
+      const root = await render(<App />);
+      expect(transport.callsTo(E1)).toHaveLength(1);
+      dead = true;
+      await focusOn(root, FEED_CARD(0));
+      await press(root, FEED_CARD(0), timers ? { settle: WITH_TIMERS } : undefined);
+      return root;
+    }
+
+    it('dead session (E1 401 → refresh invalid_grant): A11, no «Нет доступа» behind it', async () => {
+      install({ status: refreshRejected.status, body: refreshRejected.body });
+      const root = await openDead({ timers: true });
+      expect(transport.callsTo(E1)).toHaveLength(2);
+      expect(transport.callsTo(TOKEN)).toHaveLength(1);
+      expect(e8Calls()).toHaveLength(1);
+      expect(routeNames()).toEqual(['Expired']);
+      expect(visible(root, 'post')).toBe(false);
+      expect(lastFocusTarget()).toBe('auth/expired/relogin');
+      await unmount(root);
+    });
+
+    it('silent refresh (E1 401 → refresh ok → 200): one refetch with the new token, the post opens', async () => {
+      install({ status: refreshOk.status, body: refreshOk.body });
+      const root = await openDead();
+      expect(transport.callsTo(TOKEN)).toHaveLength(1);
+      expect(e8Calls()).toHaveLength(2);
+      expect(e8Calls()[1].headers.Authorization).toBe(REFRESHED);
+      expect(currentRoute()).toBe('Post');
+      expect(visible(root, BLOCK(FEED_ID(0), 'text@0'))).toBe(true);
+      expect(visible(root, 'auth/expired')).toBe(false);
+      await unmount(root);
+    });
+
+    it('truly locked (E1 200): one refetch, still locked; no E1 for another locked post within 5 min, one after', async () => {
+      install({ status: refreshOk.status, body: refreshOk.body });
+      e1Reply = () => ({ status: 200, body: e1Ok.body });
+      const root = await openDead();
+      expect(transport.callsTo(E1)).toHaveLength(2);
+      expect(transport.callsTo(TOKEN)).toHaveLength(0);
+      expect(e8Calls()).toHaveLength(2);
+      expect(visible(root, 'post/header')).toBe(true);
+      expect(visible(root, BLOCK(FEED_ID(0), 'text@0'))).toBe(false);
+      await back();
+      // Another locked post inside the window: its E8 only.
+      await focusOn(root, FEED_CARD(1));
+      await press(root, FEED_CARD(1));
+      expect(transport.callsTo(E1)).toHaveLength(2);
+      expect(e8Calls()).toHaveLength(3);
+      await back();
+      // Past the window: one E1 and one refetch again.
+      await act(async () => {
+        jest.advanceTimersByTime(5 * 60 * 1000);
+      });
+      await focusOn(root, FEED_CARD(2));
+      await press(root, FEED_CARD(2));
+      expect(transport.callsTo(E1)).toHaveLength(3);
+      expect(e8Calls()).toHaveLength(5);
+      expect(visible(root, 'auth/expired')).toBe(false);
+      await unmount(root);
+    });
+
+    it('a failed E1 drops the window; a cached locked post re-opened within staleTime sends no E1 (and no E8)', async () => {
+      install({ status: refreshOk.status, body: refreshOk.body });
+      // 403 → `Client`: not retried (AD-6), the session is kept.
+      e1Reply = () => ({ status: 403, body: { error: 'forbidden' } });
+      const root = await openDead();
+      expect(transport.callsTo(E1)).toHaveLength(2);
+      expect(e8Calls()).toHaveLength(1);
+      expect(visible(root, 'post/header')).toBe(true);
+      await back();
+      // Cached and fresh: no queryFn, so no check.
+      await focusOn(root, FEED_CARD(0));
+      await press(root, FEED_CARD(0));
+      expect(currentRoute()).toBe('Post');
+      expect(e8Calls()).toHaveLength(1);
+      expect(transport.callsTo(E1)).toHaveLength(2);
+      await back();
+      // Stale: a fresh E8, locked again; the dropped window lets it check at once.
+      await act(async () => {
+        jest.advanceTimersByTime(QUERY_STALE_TIME_MS + 1);
+      });
+      await focusOn(root, FEED_CARD(0));
+      await press(root, FEED_CARD(0));
+      expect(e8Calls()).toHaveLength(2);
+      expect(transport.callsTo(E1)).toHaveLength(3);
+      expect(visible(root, 'auth/expired')).toBe(false);
+      await unmount(root);
+    });
+
+    it('offline (E1 Network): the locked post as today, no refetch, no A11', async () => {
+      install({ status: refreshOk.status, body: refreshOk.body });
+      e1Reply = () => ({ network: true });
+      const root = await openDead({ timers: true });
+      // The cold-start E1, then the check's E1 with its AD-6 retries (3 attempts).
+      expect(transport.callsTo(E1)).toHaveLength(4);
+      expect(transport.callsTo(TOKEN)).toHaveLength(0);
+      expect(e8Calls()).toHaveLength(1);
+      expect(currentRoute()).toBe('Post');
+      expect(visible(root, 'post/header')).toBe(true);
+      expect(visible(root, 'post/error')).toBe(false);
+      expect(lastFocusTarget()).toBe(AUTHOR(FEED_ID(0)));
+      await unmount(root);
+    });
   });
 
   it('E8 404 not_found: «Пост недоступен» + «Назад» (focused), no retry; «Назад» pops to the same card', async () => {

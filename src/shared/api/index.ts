@@ -26,3 +26,14 @@ export {
 export type { Transport } from './transport';
 export { QUERY_STALE_TIME_MS, queryKeys } from './queryKeys';
 export { useHeldError, type HeldErrorInput } from './useHeldError';
+export {
+  SESSION_CHECK_COOLDOWN_MS,
+  SESSION_CHECK_KEYS,
+  SessionCheckContext,
+  createSessionCheck,
+  useLockedSessionCheck,
+  type SessionCheck,
+  type SessionCheckController,
+  type SessionCheckKey,
+  type SessionCheckOutcome,
+} from './sessionCheck';

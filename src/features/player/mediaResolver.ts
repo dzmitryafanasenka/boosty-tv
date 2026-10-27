@@ -1,6 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useRef } from 'react';
-import { isAppError, queryKeys, useHeldError, type AppErrorKind, type HttpClient } from '../../shared/api';
+import {
+  SESSION_CHECK_KEYS,
+  isAppError,
+  queryKeys,
+  useHeldError,
+  useLockedSessionCheck,
+  type AppErrorKind,
+  type HttpClient,
+} from '../../shared/api';
 import {
   PostRepository,
   type MediaRef,
@@ -110,11 +118,25 @@ export type MediaSource = {
  * The player's source for `ref` via TanStack Query: a fresh E8 on every
  * player mount, never refetched by itself while the player shows (no stale
  * refetch: a new URL would reload the video), only by `retry()`.
+ *
+ * A fresh E8 that says locked asks the SessionCheck port (Epic 3 retro A6):
+ * a dead token also answers «locked» (api-contract §7). «Нет доступа к
+ * этому видео» stays shown meanwhile; `refetch` sends one more E8 (a
+ * silent token refresh made it accessible: the video plays), `expired`
+ * opens A11 through the app's status listener.
  */
 export function useMediaSource(http: HttpClient, ref: MediaRef): MediaSource {
+  const refetchRef = useRef<() => void>(() => {});
+  const checkLocked = useLockedSessionCheck(SESSION_CHECK_KEYS.player, () => refetchRef.current());
   const query = useQuery({
     queryKey: queryKeys.mediaSource(ref.blogUrl, ref.postId, ref.mediaId),
-    queryFn: () => PostRepository.videoSources(http, ref),
+    queryFn: async () => {
+      const result = await PostRepository.videoSources(http, ref);
+      if (result.kind === 'locked') {
+        checkLocked();
+      }
+      return result;
+    },
     staleTime: Infinity,
     gcTime: MEDIA_SOURCE_GC_TIME_MS,
     retry: false,
@@ -123,6 +145,9 @@ export function useMediaSource(http: HttpClient, ref: MediaRef): MediaSource {
     structuralSharing: false,
   });
   const { error, isFetching, refetch, status, isFetchedAfterMount } = query;
+  refetchRef.current = () => {
+    refetch().catch(() => {});
+  };
   // Data from before this mount (a reopen within `gcTime`) is never played:
   // until this mount's own E8 has landed, the player is loading. Otherwise
   // the cached URL would start and restart when the fresh E8 arrives.
@@ -138,8 +163,10 @@ export function useMediaSource(http: HttpClient, ref: MediaRef): MediaSource {
   const heldError = useHeldError({ empty: data === undefined, status, error, isFetching });
   // A failed E8 with older data (a retry after a start failure): its own
   // error kind, not the generic copy; kept (busy) while another retry runs.
+  // A locked answer has no retry, so its only refetch is the session check's
+  // (A6): when that one fails, the locked state stays (never error copy).
   const dataError: AppErrorKind | null =
-    isFetchedAfterMount && status === 'error' && data !== undefined
+    isFetchedAfterMount && status === 'error' && data !== undefined && data.kind !== 'locked'
       ? isAppError(error)
         ? error.kind
         : 'Client'
