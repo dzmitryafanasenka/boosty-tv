@@ -12,6 +12,7 @@ class BoostyNativePackage : ReactPackage {
       InstallIdModule(reactContext),
       KeychainStorageResetModule(reactContext),
       AppInfoModule(reactContext),
+      SeekKeysModule(reactContext),
     )
 
   override fun createViewManagers(

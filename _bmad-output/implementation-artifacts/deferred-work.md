@@ -213,3 +213,24 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-session-manager-split.md`
   summary: Session robustness review before or with Story 4.2 — pre-existing races surfaced by the split review: overlapping sign-outs share a boolean `signingOut`; a same-account sign-in can race an in-flight refresh between `bumpGeneration` and `adoptSignedIn`; `restore()` keeps `signedIn` while its read runs; restore vs a finishing sign-in; the `validate()` single-flight spans a generation change; `discardSaved` clears the expiry marker on a failed same-account re-login; `subscribe` dedupes by function identity; `markExpired`/`restoreSignedIn` rely on caller guards.
   evidence: All present verbatim in the pre-split closure (ADR 0009 kept behaviour); now each sits in one module (`session/core.ts`, `signIn.ts`, `restore.ts`, `lifecycle.ts`, `signOut.ts`). Add a `debugExpireInMemory`-during-refresh test and an eslint import restriction for `src/shared/api/session/` at the same time.
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-1-play-a-video-from-a-post.md`
+  summary: Device check of a two-video post («Смотреть · Видео 1» → video 1; Back → «Смотреть»; OK on «Видео 2» → video 2; Back → that row).
+  evidence: No multi-video post in the first ≈ 50 rows of Главная or ≈ 12 rows per author during the Story 4.1 run; host-tested only.
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-1-play-a-video-from-a-post.md`
+  summary: The timeline's focused state (5 dp track, 16 dp thumb, no ring) is subtle on the device; confirm with the owner whether it reads as focus from 2–3 m or needs a stronger cue.
+  evidence: DESIGN.md Timeline says «thicker when focused»; screenshots from the Story 4.1 run.
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-1-play-a-video-from-a-post.md`
+  summary: The adaptive 1080p cap relies on the declared HLS/DASH variant bitrates from `onLoad` (`adaptiveBitrateCap`); before `onLoad` there is no cap, and a stream whose 1440p variant declares a lower bitrate than 1080p would not be capped.
+  evidence: react-native-video 6.19.3 exposes only `maxBitRate` for adaptive limits on Android. Device: 360p → 720p → 1080p, no 1440p after the fix (Story 4.1).
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-1-play-a-video-from-a-post.md`
+  summary: Story 4.5 «Ended» relies on `setReturnFocus` to the next unfinished MediaRow, but the Post's content zone reads restoration through `peek`, so the one-shot override is never consumed; the player exit now uses `remember`. Decide the mechanism in 4.5.
+  evidence: `src/app/stackRoutes.tsx` PlayerRoute exit; focus-map §4 G «Ended». Review 4.1, finding 14.
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-1-play-a-video-from-a-post.md`
+  summary: A post that the player's fresh E8 reports locked is shown «Нет доступа к этому видео» without re-validating the session (an invalid token returns 200 anonymous); validate with E1 first. Do with retro A6 / the session-robustness pass before 4.2.
+  evidence: api-contract §7 («Content request with an expired or invalid token»); `PostRepository.videoSources`. Review 4.1, finding 15.
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-1-play-a-video-from-a-post.md`
+  summary: Device-verify the Story 4.1 player paths that were host-tested only: the error states («Не удалось воспроизвести видео», «Нет доступа к этому видео», «Видео недоступно»), the buffering spinner (500 ms), the PlaybackArbiter (another playback stopped), the entry guard with the physical remote, and TalkBack on the Post «Смотреть», MediaRows and the player controls.
+  evidence: No safe way to provoke them on the device during the Story 4.1 run; docs/testing.md «Story 4.1» «Not verified on the device».
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-1-play-a-video-from-a-post.md`
+  summary: Backlog (owner decision 2026-10-27) — frame preview while scrubbing: a debug-only spike of a second muted ExoPlayer on the DASH 144p variant that renders the frame at the pending seek target. Accepted thresholds: preview frame p95 ≤ 500 ms; zero decoder errors on the main player while it runs. Measure on the pinned Chromecast before any production work.
+  evidence: `docs/research/seek-preview-thumbnails.md`; Story 4.1 ships hold-scrub without a preview (the scrub pauses playback, bubble + thumb + fill only).

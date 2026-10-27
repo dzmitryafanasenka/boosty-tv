@@ -41,7 +41,7 @@ import type { RootStackParamList } from './routes';
 import { DEMO_ACTIVE, session } from './session';
 import { SessionUiContext, useSessionUi, type SessionUi } from './sessionUi';
 import { Shell } from './Shell';
-import { AuthorRoute, PostRoute, takePendingShellSection } from './stackRoutes';
+import { AuthorRoute, PlayerRoute, PostRoute, takePendingShellSection } from './stackRoutes';
 
 /**
  * Debug builds only (Story 2.4 «Проверка фокуса»). `__DEV__` is a constant
@@ -418,6 +418,7 @@ function App() {
                   <Stack.Screen name="Shell" component={ShellRoute} />
                   <Stack.Screen name="Author" component={AuthorRoute} />
                   <Stack.Screen name="Post" component={PostRoute} />
+                  <Stack.Screen name="Player" component={PlayerRoute} />
                   <Stack.Screen name="Expired" component={Expired} />
                   {__DEV__ && dev ? (
                     <>

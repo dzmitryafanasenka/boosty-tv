@@ -24,6 +24,14 @@ export const queryKeys = {
    * URL or signed value. Its own root: never a prefix of a list key.
    */
   post: (blogUrl: string, postId: string) => ['post', blogUrl, postId] as const,
+  /**
+   * The player's fresh E8 for one video (Story 4.1), by its `MediaRef` ids
+   * only (AD-9). The cached value holds signed URLs in memory: the query
+   * uses a short `gcTime` and is never persisted. Its own root: never a
+   * prefix of `post`.
+   */
+  mediaSource: (blogUrl: string, postId: string, mediaId: string) =>
+    ['mediaSource', blogUrl, postId, mediaId] as const,
 } as const;
 
 /**

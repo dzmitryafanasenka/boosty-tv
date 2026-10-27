@@ -4,7 +4,8 @@ import { blogUrlSchema } from '../../api/dto/subscriptions';
 import type { HttpClient } from '../../api/httpClient';
 import { logger as appLogger, type Logger } from '../../services/logger';
 import { mapPost } from './mapPost';
-import type { Post, PostPage, PostResult } from './types';
+import type { MediaRef, Post, PostPage, PostResult } from './types';
+import { videoSourcesOf, type VideoSourcesResult } from './videoSources';
 
 /**
  * PostRepository (AD-1, AD-8): the only caller of the post endpoints. The
@@ -125,6 +126,21 @@ async function onePost(
   postId: string,
   logger: Logger = appLogger,
 ): Promise<PostResult> {
+  const fetched = await fetchPost(http, blogUrl, postId, logger);
+  return fetched === null ? { kind: 'unavailable' } : { kind: 'ok', post: fetched.post };
+}
+
+/**
+ * The one E8 request: the mapped post and the raw `data[]` (only the
+ * player's `videoSources` reads it), or null for E8 404. A body the mapper
+ * rejects is `Parse`; every other failure rejects with its `AppError`.
+ */
+async function fetchPost(
+  http: HttpClient,
+  blogUrl: string,
+  postId: string,
+  logger: Logger,
+): Promise<{ post: Post; rawData: readonly unknown[] } | null> {
   const path = postPath(blogUrl, postId);
   try {
     const { body } = await http.get(path);
@@ -132,13 +148,44 @@ async function onePost(
     if (mapped === null) {
       throw new AppError('Parse');
     }
-    return { kind: 'ok', post: mapped };
+    const data = (body as { data?: unknown } | null)?.data;
+    return { post: mapped, rawData: Array.isArray(data) ? data : [] };
   } catch (error) {
     if (isAppError(error) && error.kind === 'NotFound') {
-      return { kind: 'unavailable' };
+      return null;
     }
     throw error;
   }
 }
 
-export const PostRepository = { feedPage, blogPage, post: onePost } as const;
+/**
+ * Player-only (Story 4.1): a fresh E8 (content profile, so the signed URLs
+ * are bound to the mobile Android client, ADR 0008) and the sources of one
+ * video (`MediaRef.mediaId`), for the player's media resolver. The same
+ * request and mapping as `post()`; the sources never enter the Post entity.
+ * A locked post (`hasAccess=false`) is `locked` (never retried, never a
+ * session problem); E8 404 or a video no longer in the post is
+ * `unavailable`; any other failure rejects with its `AppError`.
+ */
+async function videoSources(
+  http: HttpClient,
+  ref: MediaRef,
+  logger: Logger = appLogger,
+): Promise<VideoSourcesResult> {
+  const fetched = await fetchPost(http, ref.blogUrl, ref.postId, logger);
+  if (fetched === null) {
+    return { kind: 'unavailable' };
+  }
+  const { post, rawData } = fetched;
+  if (!post.hasAccess) {
+    return { kind: 'locked', post };
+  }
+  const sources = videoSourcesOf(rawData, ref.mediaId);
+  const block = post.blocks.find(b => b.type === 'ok_video' && b.id === ref.mediaId);
+  if (sources === null || block === undefined || block.type !== 'ok_video') {
+    return { kind: 'unavailable' };
+  }
+  return { kind: 'ok', post, videoTitle: block.title.trim(), sources };
+}
+
+export const PostRepository = { feedPage, blogPage, post: onePost, videoSources } as const;

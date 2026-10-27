@@ -1,3 +1,4 @@
+import type { MediaRef } from '../shared/entities/post';
 import type { SectionId } from './phaseFlags';
 
 /**
@@ -30,6 +31,13 @@ export type RootStackParamList = {
    * the sidebar's current item (Главная from the feed, Подписки from Автор).
    */
   Post: { blogUrl: string; postId: string; section: SectionId };
+  /**
+   * G Плеер (Story 4.1): one video by its identity (AD-9) and where it was
+   * opened from: the origin route's key and the focus id of the element
+   * whose OK opened it (`post/<postId>/primary` or a MediaRow), so exit
+   * returns focus there. Ids only: never a URL, `signedQuery` or `timeCode`.
+   */
+  Player: { ref: MediaRef; origin: { routeKey: string; focusId: string } };
   /** A11 Session expired (Story 2.6): the stack root after an expiry. */
   Expired: undefined;
   /** Debug builds only: «Проверка фокуса» (registered under `__DEV__`). */

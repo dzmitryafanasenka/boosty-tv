@@ -3,7 +3,9 @@ import type { StackNavigationProp, StackScreenProps } from '@react-navigation/st
 import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { BackHandler } from 'react-native';
 import { AuthorScreen } from '../features/author';
+import { PlayerScreen } from '../features/player';
 import { PostScreen } from '../features/post';
+import type { MediaRef } from '../shared/entities/post';
 import {
   FocusZone,
   MAIN_SECTION,
@@ -286,6 +288,17 @@ export function AuthorRoute({
 export function PostRoute({ navigation, route }: StackScreenProps<RootStackParamList, 'Post'>) {
   const { blogUrl, postId, section: origin } = route.params;
   const routeKey = route.key;
+  // OK on «Смотреть» or a MediaRow (Story 4.1): the Player for exactly that
+  // video; exit returns focus to `focusId` on this route. Only while Пост is
+  // the focused route (a second OK during the transition is dropped).
+  const onOpenPlayer = useCallback(
+    (ref: MediaRef, focusId: string) => {
+      if (navigation.isFocused()) {
+        navigation.push('Player', { ref, origin: { routeKey, focusId } });
+      }
+    },
+    [navigation, routeKey],
+  );
   const onOpenAuthor = useCallback(
     (authorBlogUrl: string) => {
       if (!navigation.isFocused()) {
@@ -315,9 +328,50 @@ export function PostRoute({ navigation, route }: StackScreenProps<RootStackParam
           focus={focus}
           onBack={onBack}
           onOpenAuthor={onOpenAuthor}
+          onOpenPlayer={onOpenPlayer}
           playerEnabled={phaseFlags.player}
         />
       )}
     </StackSidebarRoute>
+  );
+}
+
+/**
+ * G Плеер (Story 4.1): full screen in the shared screen wrapper (trapped on
+ * all sides), **without** the sidebar (not a `StackSidebarRoute`); the
+ * player handles Back itself (overlay → exit). Whenever the route is removed
+ * (exit, Back, Stop, «Назад», or any other path: `beforeRemove`), the origin
+ * route's content zone is pointed at the element that opened the player
+ * (FocusRestoration, route key + `main`), keeping that route's remembered
+ * scroll offset and index, so the origin screen's return focus lands on it.
+ * `setReturnFocus` is not used: the content zone reads with `peek`, so a
+ * one-shot override would never be consumed there.
+ */
+export function PlayerRoute({ navigation, route }: StackScreenProps<RootStackParamList, 'Player'>) {
+  const { ref, origin } = route.params;
+  const isActive = useCallback(() => navigation.isFocused(), [navigation]);
+  useEffect(
+    () =>
+      navigation.addListener('beforeRemove', () => {
+        const kept = focusRestoration.peek(origin.routeKey, MAIN_SECTION);
+        focusRestoration.remember(
+          origin.routeKey,
+          MAIN_SECTION,
+          origin.focusId,
+          kept?.scrollOffset ?? 0,
+          kept?.index,
+        );
+      }),
+    [navigation, origin.routeKey, origin.focusId],
+  );
+  const onExit = useCallback(() => {
+    if (navigation.isFocused()) {
+      navigation.goBack();
+    }
+  }, [navigation]);
+  return (
+    <Screen testID="player">
+      <PlayerScreen http={session.http} mediaRef={ref} isActive={isActive} onExit={onExit} />
+    </Screen>
   );
 }

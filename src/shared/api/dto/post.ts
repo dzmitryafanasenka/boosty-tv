@@ -122,3 +122,24 @@ export const listItemDtoSchema = z.object({
   data: z.array(z.unknown()).nullish().catch(undefined),
   items: z.array(z.unknown()).nullish().catch(undefined),
 });
+
+/**
+ * Player-only (Story 4.1): an `ok_video` block's signed `playerUrls`
+ * (api-contract §6). Parsed only for the player's media resolver from a
+ * fresh E8 (`PostRepository.videoSources`); never part of the Post entity,
+ * a query key of the post, a route, storage or a log. An entry with a
+ * missing or wrong-typed `type`/`url` is skipped by the mapper; a missing or
+ * malformed `playerUrls` is no source.
+ */
+export const okVideoSourcesDtoSchema = z.object({
+  type: z.literal('ok_video'),
+  id: z.string().min(1),
+  /** Each entry is parsed on its own (`playerUrlDtoSchema`): one bad entry never drops the others. */
+  playerUrls: z.array(z.unknown()).nullish().catch(undefined),
+});
+
+/** One `playerUrls[]` entry; a wrong-typed `type` or `url` makes it unusable, not an error. */
+export const playerUrlDtoSchema = z.object({
+  type: z.string().catch(''),
+  url: z.string().nullish().catch(undefined),
+});

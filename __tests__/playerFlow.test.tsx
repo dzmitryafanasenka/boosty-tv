@@ -1,0 +1,1217 @@
+/**
+ * Story 4.1 through the real App with a stored session, over FixtureTransport
+ * as the global `fetch`: Главная → Пост → «Смотреть» or a MediaRow → Player
+ * (a fresh E8, the source order), the overlay, remote seeking, auto-hide,
+ * the spinner, Back, origin focus, the error states and the PlaybackArbiter
+ * slot. Every row of the spec's I/O matrix. The PlayerEngine port is
+ * mocked (`src/test/playerEngineMock`): these tests prove what the player
+ * asks of the engine and which element it asks to focus, not native
+ * playback, decoding or focus movement (device checks, docs/testing.md).
+ */
+import { notifyManager } from '@tanstack/react-query';
+import { act } from 'react';
+import { DeviceEventEmitter, StyleSheet } from 'react-native';
+import App, { navigationRef } from '../src/app/App';
+import { queryClient, resetQueryCache } from '../src/app/queryClient';
+import { queryKeys } from '../src/shared/api';
+import { type FixtureReply, type FixtureRequest, type FixtureTransport } from '../src/shared/api/fixtureTransport';
+import { focusRestoration } from '../src/shared/focus';
+import { logger } from '../src/shared/services/logger';
+import { playbackArbiter } from '../src/shared/platform/playbackArbiter';
+import { requestHostFocus } from '../src/shared/ui/requestHostFocus';
+import backHandler from '../src/test/backHandlerMock';
+import { engine } from '../src/test/playerEngineMock';
+import { tvEvents } from '../src/test/tvEventMock';
+import { E5_PATH, syntheticFeed } from '../src/test/feedFixtures';
+import e1Ok from '../src/test/fixtures/boosty/e1-user-current.json';
+import { e8Accessible, e8Locked, e8MissingReply, paragraph, postDetail } from '../src/test/postFixtures';
+import {
+  byTestId,
+  clearNativeModules,
+  createFlow,
+  deferred,
+  focusTargets,
+  installFixtureTransport,
+  installNativeModules,
+  lastFocusTarget,
+  resetKeychain,
+  resetRecorders,
+  text,
+  unmount,
+  visible,
+} from '../src/test/flow';
+
+jest.mock('react-native-keychain');
+jest.mock('../src/shared/ui/requestHostFocus', () => ({
+  requestHostFocus: jest.fn(),
+}));
+jest.mock('react-native/Libraries/Utilities/BackHandler', () =>
+  require('../src/test/backHandlerMock'),
+);
+jest.mock('react-native/Libraries/Components/TV/TVEventHandler', () =>
+  require('../src/test/tvEventMock'),
+);
+jest.mock('react-native/Libraries/Components/TV/TVFocusGuideView', () =>
+  require('../src/test/flow').recordingFocusGuideModule(),
+);
+jest.mock('@shopify/flash-list', () => require('../src/test/flow').recordingFlashListModule());
+jest.mock('../src/shared/platform/PlayerEngineView', () => require('../src/test/playerEngineMock'));
+
+const focusMock = requestHostFocus as jest.Mock;
+
+const { settle, render, one, focusOn, press, back } = createFlow({
+  settle: { rounds: 30, timerRounds: 0 },
+  one: 'focusable',
+  pressFocuses: true,
+  submitSettles: false,
+});
+
+const STORED = JSON.stringify({
+  v: 1,
+  accessToken: 'a'.repeat(64),
+  refreshToken: 'r'.repeat(64),
+  expiresAt: 4_000_000_000_000,
+  accountId: '1001',
+});
+const E1 = '/v1/user/current';
+const FEED_BLOG = 'synthetic-blog-1';
+const POST = 'feed-post-0';
+const FEED_CARD = `home/feed/${POST}`;
+const PRIMARY = `post/${POST}/primary`;
+const VIDEO = (mediaId: string) => `post/${POST}/video/${mediaId}`;
+const SURFACE = 'player/surface';
+const TIMELINE = 'player/timeline';
+const PLAYPAUSE = 'player/playpause';
+const RETRY = 'player/error/retry';
+const BACK = 'player/error/back';
+const E8_RE = /^\/v1\/blog\/([^/]+)\/post\/([^/]+)$/;
+const URL = 'https://example.invalid/player';
+
+type Reply = FixtureReply | Promise<FixtureReply> | undefined;
+let e8: (req: FixtureRequest, blogUrl: string, postId: string) => Reply;
+let transport: FixtureTransport;
+
+const okVideo = (id: string, playerUrls: unknown[], more: Record<string, unknown> = {}) => ({
+  type: 'ok_video',
+  id,
+  title: `Title ${id}`,
+  duration: 600,
+  playerUrls,
+  ...more,
+});
+const ALL = [
+  { type: 'dash', url: URL },
+  { type: 'full_hd', url: URL },
+  { type: 'hls', url: URL },
+  { type: 'ultra_hd', url: '' },
+];
+const ONE = [okVideo('v1', ALL), ...paragraph('Body')];
+const TWO = [okVideo('v1', ALL), okVideo('v2', ALL, { title: '' }), ...paragraph('Body')];
+const withData = (data: unknown[]) => {
+  e8 = (_req, blogUrl, postId) => ({ status: 200, body: postDetail(blogUrl, postId, data) });
+};
+
+beforeAll(() => {
+  jest.useFakeTimers();
+  notifyManager.setScheduler(callback => {
+    Promise.resolve().then(callback);
+  });
+});
+
+afterAll(() => {
+  jest.useRealTimers();
+  notifyManager.setScheduler(callback => setTimeout(callback, 0));
+});
+
+beforeEach(() => {
+  jest.spyOn(console, 'log').mockImplementation(() => {});
+  jest.spyOn(console, 'warn').mockImplementation(() => {});
+  jest.spyOn(console, 'error').mockImplementation(() => {});
+  focusMock.mockClear();
+  backHandler.reset();
+  tvEvents.reset();
+  engine.reset();
+  resetRecorders();
+  resetKeychain({ 'boostytv.session': STORED });
+  installNativeModules({ AppInfo: { versionName: '1.0' } });
+  withData(ONE);
+  const feed = syntheticFeed({ total: 3 });
+  transport = installFixtureTransport((req: FixtureRequest): Reply => {
+    if (req.path === E1) {
+      return { status: 200, body: e1Ok.body };
+    }
+    if (req.path === E5_PATH) {
+      return feed(req);
+    }
+    const single = E8_RE.exec(req.path);
+    if (single) {
+      return e8(req, decodeURIComponent(single[1]), decodeURIComponent(single[2]));
+    }
+    return undefined;
+  });
+});
+
+afterEach(async () => {
+  await resetQueryCache();
+  clearNativeModules();
+  focusRestoration.clear();
+  logger.clear();
+  jest.restoreAllMocks();
+});
+
+type Root = Awaited<ReturnType<typeof render>>;
+
+const currentRoute = () => navigationRef.getCurrentRoute()?.name;
+const routeNames = () => navigationRef.getRootState()?.routes.map(r => r.name);
+const e8Calls = () => transport.calls.filter(c => E8_RE.test(c.path));
+const playerText = (root: Root) => text(byTestId(root, 'player/page')[0]);
+
+/** Advance fake time (timers and `Date.now`), then settle. */
+async function advance(ms: number) {
+  await act(async () => {
+    jest.advanceTimersByTime(ms);
+  });
+  await settle();
+}
+
+/** A raw remote key (key up unless `action` says otherwise). */
+async function key(eventType: string, action = 1) {
+  await act(async () => {
+    tvEvents.emit({ eventType, eventKeyAction: action });
+  });
+  await settle();
+}
+
+/** Engine events through the mocked port. */
+async function fire<K extends 'onLoad' | 'onProgress' | 'onBuffering' | 'onSeekDone' | 'onEnd' | 'onError'>(
+  name: K,
+  ...args: Parameters<NonNullable<NonNullable<typeof engine.props>[K]>>
+) {
+  await act(async () => {
+    const handler = engine.props?.[name] as ((...a: unknown[]) => void) | undefined;
+    expect(handler).toBeDefined();
+    handler?.(...args);
+  });
+  await settle();
+}
+
+/** Главная → OK on the first card → Пост. */
+async function openPost(): Promise<Root> {
+  const root = await render(<App />);
+  await focusOn(root, FEED_CARD);
+  await press(root, FEED_CARD);
+  expect(currentRoute()).toBe('Post');
+  return root;
+}
+
+/** Пост → OK on `from` → Player; the engine loaded (600 s), past the entry guard. */
+async function openPlayer(from = VIDEO('v1'), { load = true } = {}): Promise<Root> {
+  const root = await openPost();
+  focusMock.mockClear();
+  await press(root, from);
+  expect(currentRoute()).toBe('Player');
+  if (load) {
+    // Native focus lands on the surface at mount (the entry guard starts there).
+    await focusOn(root, SURFACE);
+    await fire('onLoad', { durationSec: 600 });
+    await fire('onBuffering', false);
+    await advance(600);
+  }
+  return root;
+}
+
+describe('Пост: «Смотреть» and MediaRows (Story 4.1, owner decision option A)', () => {
+  it('«Смотреть» right under the header, before the rows; initial focus on it; ↑ the author, ↓ the rows', async () => {
+    const root = await openPost();
+    const column = byTestId(root, 'post/column')[0];
+    const ids = column
+      .queryAll(n => n.props.focusable === true)
+      .map(n => n.props.testID as string);
+    expect(ids).toEqual([`post/${POST}/author`, PRIMARY, VIDEO('v1'), `post/${POST}/block/text@1`]);
+    expect(one(root, PRIMARY).props.accessibilityLabel).toBe('Смотреть');
+    expect(one(root, PRIMARY).props.accessibilityRole).toBe('button');
+    expect(lastFocusTarget()).toBe(PRIMARY);
+    // The rows are buttons now.
+    expect(one(root, VIDEO('v1')).props.accessibilityRole).toBe('button');
+    await unmount(root);
+  });
+
+  it('a two-video post: «Смотреть · Видео 1», and it opens the first video', async () => {
+    withData(TWO);
+    const root = await openPost();
+    expect(one(root, PRIMARY).props.accessibilityLabel).toBe('Смотреть · Видео 1');
+    await press(root, PRIMARY);
+    expect(currentRoute()).toBe('Player');
+    expect(navigationRef.getCurrentRoute()?.params).toEqual({
+      ref: { blogUrl: FEED_BLOG, postId: POST, mediaId: 'v1' },
+      origin: { routeKey: expect.any(String), focusId: PRIMARY },
+    });
+    await unmount(root);
+  });
+
+  it('a locked post or a post without video: no «Смотреть»', async () => {
+    e8 = () => ({ status: 200, body: e8Locked() });
+    const locked = await openPost();
+    expect(visible(locked, PRIMARY.replace(POST, (e8Locked() as { id: string }).id))).toBe(false);
+    expect(text(byTestId(locked, 'post/page')[0])).not.toContain('Смотреть');
+    await unmount(locked);
+    withData(paragraph('Text only'));
+    const plain = await openPost();
+    expect(visible(plain, PRIMARY)).toBe(false);
+    await unmount(plain);
+  });
+});
+
+describe('open the player (matrix «Open from a row», «Source order», «Progressive only»)', () => {
+  it('OK on a row: Player route with ids only; a fresh E8 (content profile, comments off); HLS; plays; focus on the surface', async () => {
+    withData(TWO);
+    const root = await openPlayer(VIDEO('v2'), { load: false });
+    expect(routeNames()).toEqual(['Shell', 'Post', 'Player']);
+    const params = navigationRef.getCurrentRoute()?.params;
+    expect(params).toEqual({
+      ref: { blogUrl: FEED_BLOG, postId: POST, mediaId: 'v2' },
+      origin: { routeKey: expect.any(String), focusId: VIDEO('v2') },
+    });
+    expect(JSON.stringify(params)).not.toMatch(/example\.invalid|playerUrls|signedQuery|timeCode/);
+    // Пост's E8, then the player's own fresh E8.
+    expect(e8Calls()).toHaveLength(2);
+    const call = e8Calls()[1];
+    expect(call.url).toBe(
+      `https://api.boosty.to/v1/blog/${FEED_BLOG}/post/${POST}?comments_limit=0&reply_limit=0`,
+    );
+    expect(call.headers['X-App']).toBeUndefined();
+    expect(call.headers.Referer).toBeUndefined();
+    // The engine gets the HLS source and nothing else (no headers: the
+    // player sends only its own UA; the CDN log is a device check).
+    expect(engine.props?.source).toEqual({ uri: URL, format: 'hls' });
+    expect(Object.keys(engine.props?.source ?? {}).sort()).toEqual(['format', 'uri']);
+    expect(engine.props?.paused).toBe(false);
+    expect(lastFocusTarget()).toBe(SURFACE);
+    // No sidebar on the player.
+    expect(visible(root, 'player/sidebar')).toBe(false);
+    expect(byTestId(root, 'player').length).toBeGreaterThan(0);
+    // The query key holds ids only.
+    expect(JSON.stringify(queryKeys.mediaSource(FEED_BLOG, POST, 'v2'))).not.toMatch(/example|http/);
+    await unmount(root);
+  });
+
+  it('only DASH + 720p/1080p progressive → DASH', async () => {
+    withData([okVideo('v1', [{ type: 'high', url: URL }, { type: 'dash', url: URL }, { type: 'full_hd', url: URL }])]);
+    const root = await openPlayer(VIDEO('v1'), { load: false });
+    expect(engine.props?.source).toEqual({ uri: URL, format: 'dash' });
+    await unmount(root);
+  });
+
+  it('progressive only (360p, 720p, 1080p) → 1080p', async () => {
+    withData([
+      okVideo('v1', [
+        { type: 'low', url: `${URL}-360` },
+        { type: 'full_hd', url: `${URL}-hd` },
+        { type: 'high', url: `${URL}-720` },
+      ]),
+    ]);
+    const root = await openPlayer(VIDEO('v1'), { load: false });
+    expect(engine.props?.source).toEqual({ uri: `${URL}-hd`, format: 'progressive' });
+    await unmount(root);
+  });
+
+  it('while the fresh E8 runs: a spinner, the surface focused, nothing else focusable', async () => {
+    const pending = deferred();
+    const root = await openPost();
+    e8 = () => pending.promise;
+    focusMock.mockClear();
+    await press(root, VIDEO('v1'));
+    expect(currentRoute()).toBe('Player');
+    expect(visible(root, 'player/spinner')).toBe(true);
+    expect(engine.props).toBeNull();
+    const page = byTestId(root, 'player/page')[0];
+    expect(page.queryAll(n => n.props.focusable === true).map(n => n.props.testID)).toEqual([SURFACE]);
+    expect(lastFocusTarget()).toBe(SURFACE);
+    pending.resolve({ status: 200, body: postDetail(FEED_BLOG, POST, ONE) });
+    await settle();
+    expect(engine.props?.source.format).toBe('hls');
+    await unmount(root);
+  });
+});
+
+describe('error states (matrix «No usable URL», «Locked on fresh E8», «E8 fails»)', () => {
+  it('no usable URL: «Не удалось воспроизвести видео», «Повторить» focused / «Назад»; Повторить → exactly one fresh E8', async () => {
+    const root = await openPost();
+    e8 = () => ({
+      status: 200,
+      body: postDetail(FEED_BLOG, POST, [okVideo('v1', [{ type: 'hls', url: '' }, { type: 'mp4', url: URL }])]),
+    });
+    await press(root, VIDEO('v1'));
+    expect(playerText(root)).toContain('Не удалось воспроизвести видео');
+    expect(engine.props).toBeNull();
+    expect(byTestId(root, 'player/page')[0].queryAll(n => n.props.focusable === true).map(n => n.props.testID)).toEqual([
+      RETRY,
+      BACK,
+    ]);
+    expect(lastFocusTarget()).toBe(RETRY);
+    const before = e8Calls().length;
+    withData(ONE);
+    await press(root, RETRY);
+    expect(e8Calls()).toHaveLength(before + 1);
+    expect(engine.props?.source.format).toBe('hls');
+    expect(lastFocusTarget()).toBe(SURFACE);
+    await unmount(root);
+  });
+
+  it('locked on the fresh E8: «Нет доступа к этому видео», only «Назад» (focused, no retry); OK → Пост, focus on the row', async () => {
+    const root = await openPost();
+    e8 = () => ({ status: 200, body: { ...e8Locked(), id: POST, user: { ...(e8Locked().user as object), blogUrl: FEED_BLOG } } });
+    await focusOn(root, VIDEO('v1'));
+    await press(root, VIDEO('v1'));
+    expect(playerText(root)).toContain('Нет доступа к этому видео');
+    expect(visible(root, RETRY)).toBe(false);
+    expect(lastFocusTarget()).toBe(BACK);
+    const before = e8Calls().length;
+    focusMock.mockClear();
+    await press(root, BACK);
+    expect(currentRoute()).toBe('Post');
+    expect(e8Calls()).toHaveLength(before);
+    expect(lastFocusTarget()).toBe(VIDEO('v1'));
+    await unmount(root);
+  });
+
+  it('E8 404 or the video gone: «Видео недоступно» + «Назад»', async () => {
+    const root = await openPost();
+    e8 = () => e8MissingReply();
+    await press(root, VIDEO('v1'));
+    expect(playerText(root)).toContain('Видео недоступно');
+    expect(visible(root, RETRY)).toBe(false);
+    await back();
+    expect(currentRoute()).toBe('Post');
+    withData([okVideo('other', ALL)]);
+    // The Пост still shows v1 (its own cache); the player's E8 no longer has it.
+    await press(root, VIDEO('v1'));
+    expect(playerText(root)).toContain('Видео недоступно');
+    await unmount(root);
+  });
+
+  it('E8 fails (Server): the error with «Повторить» (busy while it runs) / «Назад»; Повторить → E8 again → plays', async () => {
+    const root = await openPost();
+    e8 = () => ({ status: 503, body: {} });
+    await press(root, VIDEO('v1'), { settle: { timerRounds: 30 } });
+    expect(playerText(root)).toContain('Не удалось воспроизвести видео');
+    expect(playerText(root)).toContain('Boosty сейчас не отвечает');
+    expect(lastFocusTarget()).toBe(RETRY);
+    const pending = deferred();
+    e8 = () => pending.promise;
+    await press(root, RETRY);
+    expect(one(root, RETRY).props.accessibilityState).toMatchObject({ busy: true });
+    pending.resolve({ status: 200, body: postDetail(FEED_BLOG, POST, ONE) });
+    await settle();
+    expect(engine.props?.source.format).toBe('hls');
+    await unmount(root);
+  });
+
+  it('a start failure (engine error): the error state; Повторить → one fresh E8 and a new engine; Back exits', async () => {
+    const root = await openPlayer();
+    expect(engine.mounts).toBe(1);
+    const before = e8Calls().length;
+    await fire('onError', '22004');
+    expect(engine.props).toBeNull();
+    expect(playerText(root)).toContain('Не удалось воспроизвести видео');
+    expect(lastFocusTarget()).toBe(RETRY);
+    await press(root, RETRY);
+    expect(e8Calls()).toHaveLength(before + 1);
+    expect(engine.mounts).toBe(2);
+    expect(engine.props?.paused).toBe(false);
+    await fire('onError', null);
+    await back();
+    expect(currentRoute()).toBe('Post');
+    await unmount(root);
+  });
+});
+
+describe('overlay, keys and seeking (matrix «Seek», «Auto-hide», «Back», «Buffering»)', () => {
+  it('OK on the surface: pause and the overlay (author, titles, timeline, elapsed/remaining, play/pause); focus on the timeline', async () => {
+    withData([okVideo('v1', ALL, { title: 'Видео часть' }), ...paragraph('Body')]);
+    const root = await openPlayer();
+    expect(visible(root, 'player/overlay')).toBe(false);
+    focusMock.mockClear();
+    await press(root, SURFACE);
+    expect(engine.props?.paused).toBe(true);
+    expect(visible(root, 'player/overlay')).toBe(true);
+    expect(lastFocusTarget()).toBe(TIMELINE);
+    const overlay = text(byTestId(root, 'player/overlay')[0]);
+    expect(overlay).toContain('redacted'); // the author
+    expect(overlay).toContain(`Title of ${POST}`);
+    expect(overlay).toContain('Видео часть');
+    expect(text(byTestId(root, 'player/elapsed')[0])).toContain('0:00');
+    expect(text(byTestId(root, 'player/remaining')[0])).toContain('−10:00');
+    expect(one(root, PLAYPAUSE).props.accessibilityLabel).toBe('Воспроизвести');
+    expect(one(root, TIMELINE).props.accessibilityLabel).toBe('Позиция 0:00 из 10:00');
+    // The surface is not focusable behind the overlay; no «Настройки» yet.
+    expect(byTestId(root, 'player/page')[0].queryAll(n => n.props.focusable === true).map(n => n.props.testID)).toEqual([
+      TIMELINE,
+      PLAYPAUSE,
+    ]);
+    expect(overlay).not.toContain('Настройки');
+    // OK on the timeline and on play/pause toggle.
+    await press(root, TIMELINE);
+    expect(engine.props?.paused).toBe(false);
+    await press(root, PLAYPAUSE);
+    expect(engine.props?.paused).toBe(true);
+    expect(one(root, PLAYPAUSE).props.accessibilityLabel).toBe('Воспроизвести');
+    await unmount(root);
+  });
+
+  it.each(['Video', 'Видео 1'])('a generic video title %p is hidden: only the post title', async title => {
+    withData([okVideo('v1', ALL, { title })]);
+    const root = await openPlayer();
+    await key('up');
+    expect(visible(root, 'player/video-title')).toBe(false);
+    expect(text(byTestId(root, 'player/title')[0])).toContain(`Title of ${POST}`);
+    await unmount(root);
+  });
+
+  it('the bubble time never wraps: one line in a box wide enough for «1:11:21»', async () => {
+    withData([okVideo('v1', ALL, { duration: 7200 })]);
+    const root = await openPlayer();
+    await fire('onLoad', { durationSec: 7200 });
+    await fire('onProgress', 4276);
+    await key('right');
+    const time = byTestId(root, 'player/bubble/time')[0];
+    expect(text(time)).toContain('1:11:21');
+    expect(time.props.numberOfLines).toBe(1);
+    const box = StyleSheet.flatten(byTestId(root, 'player/bubble')[0].props.style);
+    expect(box.width).toBeGreaterThanOrEqual(100);
+    expect(box).toMatchObject({ alignItems: 'center', marginLeft: -(box.width as number) / 2 });
+    await unmount(root);
+  });
+
+  it('the video title is not repeated when it equals the post title or is empty', async () => {
+    withData([okVideo('v1', ALL, { title: `Title of ${POST}` })]);
+    const root = await openPlayer();
+    await key('up');
+    expect(visible(root, 'player/video-title')).toBe(false);
+    await unmount(root);
+  });
+
+  it('matrix «Seek»: → ×3 quickly → bubble +5, +10, +20 (accelerated), one engine seek 600 ms after the last; presses build on the in-flight target', async () => {
+    const root = await openPlayer();
+    await fire('onProgress', 100);
+    await key('right');
+    expect(visible(root, 'player/overlay')).toBe(true);
+    expect(text(byTestId(root, 'player/bubble')[0])).toContain('1:45');
+    expect(StyleSheet.flatten(byTestId(root, 'player/bubble')[0].props.style)).toMatchObject({
+      left: `${(105 / 600) * 100}%`,
+      alignItems: 'center',
+    });
+    // The thumb and the fill follow the target (owner decision 2026-10-27).
+    expect(StyleSheet.flatten(byTestId(root, 'player/thumb')[0].props.style)).toMatchObject({
+      left: `${(105 / 600) * 100}%`,
+    });
+    expect(StyleSheet.flatten(byTestId(root, 'player/progress')[0].props.style)).toMatchObject({
+      width: `${(105 / 600) * 100}%`,
+    });
+    await advance(200);
+    await key('right');
+    expect(text(byTestId(root, 'player/bubble')[0])).toContain('1:50');
+    await advance(200);
+    await key('right');
+    expect(text(byTestId(root, 'player/bubble')[0])).toContain('2:00');
+    expect(engine.seek).not.toHaveBeenCalled();
+    await advance(599);
+    expect(engine.seek).not.toHaveBeenCalled();
+    await advance(1);
+    expect(engine.seek).toHaveBeenCalledTimes(1);
+    expect(engine.seek).toHaveBeenCalledWith(120);
+    // In flight (the engine still reports 100): ← builds on 120.
+    await key('left');
+    expect(text(byTestId(root, 'player/bubble')[0])).toContain('1:55');
+    await advance(600);
+    expect(engine.seek).toHaveBeenLastCalledWith(115);
+    await fire('onSeekDone', 115);
+    expect(visible(root, 'player/bubble')).toBe(false);
+    await fire('onProgress', 115);
+    expect(StyleSheet.flatten(byTestId(root, 'player/thumb')[0].props.style)).toMatchObject({
+      left: `${(115 / 600) * 100}%`,
+    });
+    expect(text(byTestId(root, 'player/elapsed')[0])).toContain('1:55');
+    await unmount(root);
+  });
+
+  it('matrix «OK during a pending seek»: → ×3 then OK before 600 ms → one seek to the pending target at once, still playing; OK with no pending seek → pause', async () => {
+    const root = await openPlayer();
+    await fire('onProgress', 100);
+    await key('right');
+    await key('right');
+    await key('right');
+    expect(engine.seek).not.toHaveBeenCalled();
+    await focusOn(root, TIMELINE);
+    await press(root, TIMELINE);
+    expect(engine.seek).toHaveBeenCalledTimes(1);
+    expect(engine.seek).toHaveBeenCalledWith(120);
+    expect(engine.props?.paused).toBe(false);
+    await advance(600);
+    expect(engine.seek).toHaveBeenCalledTimes(1);
+    await fire('onSeekDone', 120);
+    await press(root, TIMELINE);
+    expect(engine.props?.paused).toBe(true);
+    await unmount(root);
+  });
+
+  it('Play/Pause key during a pending seek: commits it first, then toggles', async () => {
+    const root = await openPlayer();
+    await fire('onProgress', 100);
+    await key('right');
+    await key('playPause');
+    expect(engine.seek).toHaveBeenCalledWith(105);
+    expect(engine.props?.paused).toBe(true);
+    await unmount(root);
+  });
+
+  it('the controls row is centered under the timeline', async () => {
+    const root = await openPlayer();
+    await key('up');
+    expect(StyleSheet.flatten(byTestId(root, 'player/controls')[0].props.style)).toMatchObject({
+      justifyContent: 'center',
+    });
+    await unmount(root);
+  });
+
+  it('the entry guard also ignores OK on the surface inside the window', async () => {
+    const root = await openPlayer(VIDEO('v1'), { load: false });
+    await fire('onLoad', { durationSec: 600 });
+    await focusOn(root, SURFACE);
+    await press(root, SURFACE, { focus: false });
+    expect(engine.props?.paused).toBe(false);
+    expect(visible(root, 'player/overlay')).toBe(false);
+    await press(root, SURFACE, { focus: false });
+    expect(engine.props?.paused).toBe(true);
+    await unmount(root);
+  });
+
+  it('seek presses before the duration is known only show the overlay', async () => {
+    const root = await openPlayer(VIDEO('v1'), { load: false });
+    await advance(600);
+    await key('right');
+    expect(visible(root, 'player/overlay')).toBe(true);
+    expect(visible(root, 'player/bubble')).toBe(false);
+    await advance(700);
+    expect(engine.seek).not.toHaveBeenCalled();
+    await fire('onLoad', { durationSec: 600 });
+    await key('right');
+    expect(visible(root, 'player/bubble')).toBe(true);
+    await unmount(root);
+  });
+
+  it('media keys play/pause commit a pending seek first', async () => {
+    const root = await openPlayer();
+    await fire('onProgress', 100);
+    await key('right');
+    await key('pause');
+    expect(engine.seek).toHaveBeenCalledWith(105);
+    expect(engine.props?.paused).toBe(true);
+    await fire('onSeekDone', 105);
+    await key('right');
+    await key('play');
+    expect(engine.seek).toHaveBeenLastCalledWith(110);
+    expect(engine.props?.paused).toBe(false);
+    await unmount(root);
+  });
+
+  it('a late seek report of an earlier seek does not end the newer seek (the bubble stays)', async () => {
+    const root = await openPlayer();
+    await fire('onProgress', 100);
+    await key('right');
+    await advance(600); // 105 in flight
+    await fire('onSeekDone', 105);
+    await key('right');
+    await advance(600); // 110 in flight
+    await fire('onSeekDone', 105);
+    expect(text(byTestId(root, 'player/bubble')[0])).toContain('1:50');
+    await fire('onSeekDone', 110);
+    expect(visible(root, 'player/bubble')).toBe(false);
+    await unmount(root);
+  });
+
+  describe('hold-to-seek (native seek keys)', () => {
+    const setEnabled = jest.fn();
+    const native = async (dpad: 'left' | 'right', action: 'down' | 'up', repeat = 0) => {
+      await act(async () => {
+        DeviceEventEmitter.emit('seekKey', { key: dpad, action, repeat });
+      });
+      await settle();
+    };
+    beforeEach(() => {
+      setEnabled.mockClear();
+      installNativeModules({ SeekKeys: { setEnabled } });
+    });
+
+    /** Hold → from 100 s: down, 8 repeats 50 ms apart, release, React Native's key up → target 120. */
+    const holdRight = async () => {
+      await native('right', 'down', 0);
+      for (let i = 1; i <= 8; i += 1) {
+        await advance(50);
+        await native('right', 'down', i);
+      }
+      await native('right', 'up');
+      await key('right'); // React Native's key up of the same press: not another press
+    };
+    const leftOf = (root: Root, id: string) =>
+      StyleSheet.flatten(byTestId(root, id)[0].props.style) as { left?: string; width?: string };
+
+    it('enabled only while the player shows; a hold seeks with a growing step and pauses; the release does not commit (owner decisions 2026-10-27)', async () => {
+      const root = await openPlayer();
+      expect(setEnabled).toHaveBeenLastCalledWith(true);
+      await fire('onProgress', 100);
+      await native('right', 'down', 0);
+      expect(text(byTestId(root, 'player/bubble')[0])).toContain('1:45');
+      await holdRightRest();
+      // 400 ms of repeats at most every 200 ms: two more presses (+5, +10).
+      expect(text(byTestId(root, 'player/bubble')[0])).toContain('2:00');
+      await advance(4_000);
+      expect(engine.seek).not.toHaveBeenCalled();
+      // The hold-scrub paused playback (owner decision 2026-10-27).
+      expect(engine.props?.paused).toBe(true);
+      expect(visible(root, 'player/overlay')).toBe(true);
+      await back(); // cancels the held target
+      await back(); // hides the overlay
+      await back(); // exits
+      await advance(1_000);
+      expect(setEnabled).toHaveBeenLastCalledWith(false);
+      await unmount(root);
+
+      async function holdRightRest() {
+        for (let i = 1; i <= 8; i += 1) {
+          await advance(50);
+          await native('right', 'down', i);
+        }
+        await native('right', 'up');
+        await key('right');
+      }
+    });
+
+    it('a held target: OK commits exactly one seek to it and playback continues', async () => {
+      const root = await openPlayer();
+      await fire('onProgress', 100);
+      await holdRight();
+      expect(engine.seek).not.toHaveBeenCalled();
+      await focusOn(root, TIMELINE);
+      await press(root, TIMELINE);
+      expect(engine.seek).toHaveBeenCalledTimes(1);
+      expect(engine.seek).toHaveBeenCalledWith(120);
+      expect(engine.props?.paused).toBe(false);
+      await advance(6_000);
+      expect(engine.seek).toHaveBeenCalledTimes(1);
+      await unmount(root);
+    });
+
+    it('a held target: the Play/Pause key acts like OK (commit, keep playing)', async () => {
+      const root = await openPlayer();
+      await fire('onProgress', 100);
+      await holdRight();
+      await key('playPause');
+      expect(engine.seek).toHaveBeenCalledWith(120);
+      expect(engine.props?.paused).toBe(false);
+      await unmount(root);
+    });
+
+    it('a held target: 5 s without input cancels it (no seek; thumb and fill back at the position)', async () => {
+      const root = await openPlayer();
+      await fire('onProgress', 300);
+      await holdRight();
+      expect(leftOf(root, 'player/thumb').left).toBe(`${(320 / 600) * 100}%`);
+      await advance(4_999);
+      expect(visible(root, 'player/bubble')).toBe(true);
+      await advance(1);
+      expect(visible(root, 'player/bubble')).toBe(false);
+      expect(engine.seek).not.toHaveBeenCalled();
+      expect(leftOf(root, 'player/thumb').left).toBe('50%');
+      expect(leftOf(root, 'player/progress').width).toBe('50%');
+      await unmount(root);
+    });
+
+    it('a held target: Back cancels it, the player and the overlay stay', async () => {
+      const root = await openPlayer();
+      await fire('onProgress', 100);
+      await holdRight();
+      await back();
+      expect(currentRoute()).toBe('Player');
+      expect(visible(root, 'player/bubble')).toBe(false);
+      expect(visible(root, 'player/overlay')).toBe(true);
+      await advance(6_000);
+      expect(engine.seek).not.toHaveBeenCalled();
+      await unmount(root);
+    });
+
+    it('a held target: a ← press builds on it and restarts the 5 s timeout', async () => {
+      const root = await openPlayer();
+      await fire('onProgress', 100);
+      await holdRight();
+      await advance(4_000);
+      await native('left', 'down', 0);
+      await native('left', 'up');
+      await key('left');
+      expect(text(byTestId(root, 'player/bubble')[0])).toContain('1:55');
+      await advance(4_000); // 8 s after the hold, 4 s after the press
+      expect(visible(root, 'player/bubble')).toBe(true);
+      expect(engine.seek).not.toHaveBeenCalled();
+      await advance(1_000);
+      expect(visible(root, 'player/bubble')).toBe(false);
+      expect(engine.seek).not.toHaveBeenCalled();
+      await unmount(root);
+    });
+
+    it('hold-scrub pauses playback; OK commits and resumes at the target (owner decision 2026-10-27)', async () => {
+      const root = await openPlayer();
+      await fire('onProgress', 100);
+      await native('right', 'down', 0);
+      expect(engine.props?.paused).toBe(false);
+      await advance(50);
+      await native('right', 'down', 1); // the hold starts
+      expect(engine.props?.paused).toBe(true);
+      expect(one(root, PLAYPAUSE).props.accessibilityLabel).toBe('Воспроизвести');
+      await native('right', 'up');
+      await key('right');
+      await advance(4_999);
+      expect(engine.props?.paused).toBe(true);
+      // Never auto-hides while the scrub is pending.
+      expect(visible(root, 'player/overlay')).toBe(true);
+      await unmount(root);
+    });
+
+    it('hold-scrub: OK commits and resumes; Back or the timeout cancel and resume without a seek', async () => {
+      const root = await openPlayer();
+      await fire('onProgress', 100);
+      await holdRight();
+      expect(engine.props?.paused).toBe(true);
+      expect(visible(root, 'player/overlay')).toBe(true);
+      await focusOn(root, TIMELINE);
+      await press(root, TIMELINE);
+      expect(engine.seek).toHaveBeenCalledWith(120);
+      expect(engine.props?.paused).toBe(false);
+      await fire('onSeekDone', 120);
+      await fire('onProgress', 120);
+      // Back cancels: no seek, playback resumes.
+      await holdRight();
+      expect(engine.props?.paused).toBe(true);
+      await back();
+      expect(engine.props?.paused).toBe(false);
+      expect(currentRoute()).toBe('Player');
+      // The 5 s idle cancels the same way.
+      await holdRight();
+      expect(engine.props?.paused).toBe(true);
+      await advance(5_000);
+      expect(engine.props?.paused).toBe(false);
+      expect(engine.seek).toHaveBeenCalledTimes(1);
+      await unmount(root);
+    });
+
+    it('hold-scrub: paused before the hold stays paused after a commit and after a cancel', async () => {
+      const root = await openPlayer();
+      await fire('onProgress', 100);
+      await key('playPause');
+      expect(engine.props?.paused).toBe(true);
+      await holdRight();
+      await key('playPause'); // acts like OK on a held target
+      expect(engine.seek).toHaveBeenCalledWith(120);
+      expect(engine.props?.paused).toBe(true);
+      await fire('onSeekDone', 120);
+      await holdRight();
+      await back();
+      expect(engine.props?.paused).toBe(true);
+      expect(engine.seek).toHaveBeenCalledTimes(1);
+      await unmount(root);
+    });
+
+    it('a hold that starts during a quick-press target becomes a held scrub (pauses, no auto-commit)', async () => {
+      const root = await openPlayer();
+      await fire('onProgress', 100);
+      await native('right', 'down', 0);
+      await native('right', 'up');
+      await key('right');
+      await advance(300);
+      await native('right', 'down', 0);
+      await advance(50);
+      await native('right', 'down', 1);
+      expect(engine.props?.paused).toBe(true);
+      await native('right', 'up');
+      await key('right');
+      await advance(1_000);
+      expect(engine.seek).not.toHaveBeenCalled();
+      await unmount(root);
+    });
+
+    it('quick presses never pause', async () => {
+      const root = await openPlayer();
+      await fire('onProgress', 100);
+      for (let i = 0; i < 3; i += 1) {
+        await native('right', 'down', 0);
+        expect(engine.props?.paused).toBe(false);
+        await native('right', 'up');
+        await key('right');
+      }
+      await advance(600);
+      expect(engine.seek).toHaveBeenCalledWith(120);
+      expect(engine.props?.paused).toBe(false);
+      await unmount(root);
+    });
+
+    it('the accent fill follows the pending target, like the thumb', async () => {
+      const root = await openPlayer();
+      await fire('onProgress', 300);
+      await key('right');
+      expect(leftOf(root, 'player/progress').width).toBe(`${(305 / 600) * 100}%`);
+      expect(leftOf(root, 'player/thumb').left).toBe(`${(305 / 600) * 100}%`);
+      await advance(600);
+      await fire('onSeekDone', 305);
+      expect(leftOf(root, 'player/progress').width).toBe(`${(305 / 600) * 100}%`);
+      await fire('onProgress', 306);
+      expect(leftOf(root, 'player/progress').width).toBe(`${(306 / 600) * 100}%`);
+      await unmount(root);
+    });
+
+    it('quick presses (down/up, no repeats) keep the 600 ms bubble window', async () => {
+      const root = await openPlayer();
+      await fire('onProgress', 100);
+      for (let i = 0; i < 3; i += 1) {
+        await native('right', 'down', 0);
+        await native('right', 'up');
+        await key('right');
+      }
+      expect(text(byTestId(root, 'player/bubble')[0])).toContain('2:00');
+      expect(engine.seek).not.toHaveBeenCalled();
+      await advance(600);
+      expect(engine.seek).toHaveBeenCalledTimes(1);
+      expect(engine.seek).toHaveBeenCalledWith(120);
+      await unmount(root);
+    });
+  });
+
+  it('keys act on key up only; ← → on play/pause do not seek; ↑ ↓ show the overlay', async () => {
+    const root = await openPlayer();
+    await key('right', 0);
+    expect(visible(root, 'player/overlay')).toBe(false);
+    await key('down');
+    expect(visible(root, 'player/overlay')).toBe(true);
+    await focusOn(root, PLAYPAUSE);
+    await key('right');
+    await advance(700);
+    expect(engine.seek).not.toHaveBeenCalled();
+    expect(visible(root, 'player/bubble')).toBe(false);
+    await focusOn(root, TIMELINE);
+    await key('right');
+    await advance(600);
+    expect(engine.seek).toHaveBeenCalledWith(5);
+    await unmount(root);
+  });
+
+  it('the entry guard: the first key up right after focus lands on the player is ignored', async () => {
+    const root = await openPlayer(VIDEO('v1'), { load: false });
+    await fire('onLoad', { durationSec: 600 });
+    await focusOn(root, SURFACE);
+    await key('right');
+    expect(visible(root, 'player/overlay')).toBe(false);
+    await key('right');
+    expect(visible(root, 'player/overlay')).toBe(true);
+    expect(visible(root, 'player/bubble')).toBe(true);
+    // Near the start the bubble aligns with the track's start (never past the safe area).
+    expect(StyleSheet.flatten(byTestId(root, 'player/bubble')[0].props.style)).toMatchObject({
+      left: 0,
+      alignItems: 'flex-start',
+    });
+    await unmount(root);
+  });
+
+  it('media keys: Play/Pause, Play, Pause toggle; FF/Next forward, Rew/Prev back; Stop exits', async () => {
+    const root = await openPlayer();
+    await key('playPause');
+    expect(engine.props?.paused).toBe(true);
+    expect(visible(root, 'player/overlay')).toBe(true);
+    await key('play');
+    expect(engine.props?.paused).toBe(false);
+    await key('pause');
+    expect(engine.props?.paused).toBe(true);
+    await fire('onProgress', 200);
+    for (const [k, target] of [
+      ['fastForward', 205],
+      ['next', 205],
+      ['rewind', 195],
+      ['previous', 195],
+    ] as const) {
+      await key(k);
+      await advance(600);
+      expect(engine.seek).toHaveBeenLastCalledWith(target);
+      await fire('onSeekDone', target);
+      await fire('onProgress', 200);
+    }
+    focusMock.mockClear();
+    await key('stop');
+    expect(currentRoute()).toBe('Post');
+    // The stack's pop transition runs on timers; then the player is gone.
+    await advance(1_000);
+    expect(engine.props).toBeNull();
+    expect(lastFocusTarget()).toBe(VIDEO('v1'));
+    await unmount(root);
+  });
+
+  it('matrix «Auto-hide»: playing, 5 s idle → hides (focus → the surface); never while paused or seeking', async () => {
+    const root = await openPlayer();
+    await key('up');
+    expect(visible(root, 'player/overlay')).toBe(true);
+    await advance(4999);
+    expect(visible(root, 'player/overlay')).toBe(true);
+    focusMock.mockClear();
+    await advance(1);
+    expect(visible(root, 'player/overlay')).toBe(false);
+    expect(lastFocusTarget()).toBe(SURFACE);
+    // Input restarts the timer.
+    await key('up');
+    await advance(4000);
+    await key('down');
+    await advance(4000);
+    expect(visible(root, 'player/overlay')).toBe(true);
+    // Paused: never.
+    await key('playPause');
+    await advance(20_000);
+    expect(visible(root, 'player/overlay')).toBe(true);
+    // Seeking (in flight, not reported done): never.
+    await key('playPause');
+    await key('right');
+    await advance(600);
+    await advance(4_000);
+    expect(visible(root, 'player/overlay')).toBe(true);
+    await fire('onSeekDone', 5);
+    await advance(5_000);
+    expect(visible(root, 'player/overlay')).toBe(false);
+    await unmount(root);
+  });
+
+  it('matrix «Back»: overlay shown → hide it (focus → the surface); hidden → exit, focus on the origin element', async () => {
+    withData(TWO);
+    const root = await openPost();
+    await focusOn(root, VIDEO('v2'));
+    await press(root, VIDEO('v2'));
+    await fire('onLoad', { durationSec: 600 });
+    await advance(600);
+    await key('up');
+    focusMock.mockClear();
+    await back();
+    expect(currentRoute()).toBe('Player');
+    expect(visible(root, 'player/overlay')).toBe(false);
+    expect(lastFocusTarget()).toBe(SURFACE);
+    focusMock.mockClear();
+    await back();
+    expect(currentRoute()).toBe('Post');
+    expect(routeNames()).toEqual(['Shell', 'Post']);
+    expect(lastFocusTarget()).toBe(VIDEO('v2'));
+    // After the pop transition the engine is released; the player's E8
+    // entry is dropped soon after.
+    await advance(1_000);
+    expect(engine.props).toBeNull();
+    expect(engine.unmounts).toBe(1);
+    await advance(2_000);
+    expect(queryClient.getQueryData(queryKeys.mediaSource(FEED_BLOG, POST, 'v2'))).toBeUndefined();
+    await unmount(root);
+  });
+
+  it('exit from «Смотреть» returns focus to «Смотреть»', async () => {
+    const root = await openPlayer(PRIMARY);
+    focusMock.mockClear();
+    await back();
+    expect(currentRoute()).toBe('Post');
+    expect(lastFocusTarget()).toBe(PRIMARY);
+    await unmount(root);
+  });
+
+  it('matrix «Buffering»: the spinner only after 500 ms', async () => {
+    const root = await openPlayer();
+    expect(visible(root, 'player/spinner')).toBe(false);
+    await fire('onBuffering', true);
+    await advance(499);
+    expect(visible(root, 'player/spinner')).toBe(false);
+    await advance(1);
+    expect(visible(root, 'player/spinner')).toBe(true);
+    await fire('onBuffering', false);
+    expect(visible(root, 'player/spinner')).toBe(false);
+    // A short stall never shows it.
+    await fire('onBuffering', true);
+    await advance(300);
+    await fire('onBuffering', false);
+    await advance(1_000);
+    expect(visible(root, 'player/spinner')).toBe(false);
+    await unmount(root);
+  });
+
+  it('the end of the video: paused with the overlay, no autoplay of the next video', async () => {
+    withData(TWO);
+    const root = await openPlayer();
+    await fire('onEnd');
+    expect(engine.props?.paused).toBe(true);
+    expect(visible(root, 'player/overlay')).toBe(true);
+    expect(currentRoute()).toBe('Player');
+    expect(navigationRef.getCurrentRoute()?.params).toMatchObject({ ref: { mediaId: 'v1' } });
+    await unmount(root);
+  });
+});
+
+describe('PlaybackArbiter and logs (matrix «Arbiter», «CDN headers»)', () => {
+  it('another playback holding the slot is stopped when the player starts; exit releases the slot', async () => {
+    const other = { stop: jest.fn() };
+    const release = playbackArbiter.claim(other);
+    const root = await openPlayer();
+    expect(other.stop).toHaveBeenCalledTimes(1);
+    expect(playbackArbiter.current()).not.toBe(other);
+    // Someone else takes the slot: the player pauses.
+    const third = { stop: jest.fn() };
+    let releaseThird = () => {};
+    await act(async () => {
+      releaseThird = playbackArbiter.claim(third);
+    });
+    await settle();
+    expect(third.stop).not.toHaveBeenCalled();
+    expect(engine.props?.paused).toBe(true);
+    releaseThird();
+    await back();
+    expect(currentRoute()).toBe('Post');
+    await advance(1_000);
+    expect(playbackArbiter.current()).toBeNull();
+    release();
+    await unmount(root);
+  });
+
+  it('no signed URL in the log ring, the player route or the post query', async () => {
+    const root = await openPlayer();
+    await fire('onError', 'x'.repeat(40));
+    const all = JSON.stringify(logger.entries());
+    expect(all).not.toMatch(/example\.invalid\/player/);
+    const post = queryClient.getQueryData(queryKeys.post(FEED_BLOG, POST));
+    expect(JSON.stringify(post)).not.toMatch(/example\.invalid\/player|playerUrls/);
+    await unmount(root);
+  });
+
+  it('the live E8 shape plays its HLS entry', async () => {
+    e8 = (_req, blogUrl, postId) => {
+      const body = e8Accessible();
+      return { status: 200, body: { ...body, id: postId, user: { ...(body.user as object), blogUrl } } };
+    };
+    const root = await openPost();
+    await press(root, VIDEO('synthetic-id-7'));
+    expect(engine.props?.source).toEqual({ uri: URL, format: 'hls' });
+    expect(focusTargets()).toContain(SURFACE);
+    await unmount(root);
+  });
+});
+
+describe('review fixes (Story 4.1)', () => {
+  it('play after the end starts over from 0 (the ended engine is sought to 0)', async () => {
+    const root = await openPlayer();
+    await fire('onProgress', 599);
+    await fire('onEnd');
+    expect(engine.props?.paused).toBe(true);
+    await focusOn(root, PLAYPAUSE);
+    await press(root, PLAYPAUSE);
+    expect(engine.seek).toHaveBeenCalledWith(0);
+    expect(engine.props?.paused).toBe(false);
+    expect(text(byTestId(root, 'player/elapsed')[0])).toContain('0:00');
+    await unmount(root);
+  });
+
+  it('reopen of the same video within gcTime: no play of the cached URL; one more E8; the engine starts once with the new source', async () => {
+    let n = 0;
+    e8 = (_req, blogUrl, postId) => {
+      n += 1;
+      return {
+        status: 200,
+        body: postDetail(blogUrl, postId, [okVideo('v1', [{ type: 'hls', url: `${URL}-${n}` }])]),
+      };
+    };
+    const root = await openPlayer();
+    expect(engine.props?.source.uri).toBe(`${URL}-2`); // E8 #1 Пост, #2 player
+    await back();
+    for (let i = 0; i < 10 && engine.props !== null; i += 1) {
+      await advance(50);
+    }
+    expect(engine.props).toBeNull();
+    expect(queryClient.getQueryData(queryKeys.mediaSource(FEED_BLOG, POST, 'v1'))).toBeDefined();
+    const mountsBefore = engine.mounts;
+    const pending = deferred();
+    e8 = () => pending.promise;
+    await press(root, VIDEO('v1'));
+    expect(currentRoute()).toBe('Player');
+    expect(engine.props).toBeNull();
+    expect(visible(root, 'player/spinner')).toBe(true);
+    pending.resolve({
+      status: 200,
+      body: postDetail(FEED_BLOG, POST, [okVideo('v1', [{ type: 'hls', url: `${URL}-fresh` }])]),
+    });
+    await settle();
+    expect(engine.mounts).toBe(mountsBefore + 1);
+    expect(engine.props?.source.uri).toBe(`${URL}-fresh`);
+    await unmount(root);
+  });
+
+  it('a retry whose fresh E8 fails shows that error kind (not the generic copy)', async () => {
+    const root = await openPlayer();
+    await fire('onError', null);
+    expect(playerText(root)).toContain('Попробуйте ещё раз или вернитесь к посту.');
+    e8 = () => ({ status: 503, body: {} });
+    await press(root, RETRY, { settle: { timerRounds: 30 } });
+    expect(playerText(root)).toContain('Не удалось воспроизвести видео');
+    expect(playerText(root)).toContain('Boosty сейчас не отвечает');
+    expect(visible(root, RETRY)).toBe(true);
+    await unmount(root);
+  });
+
+  it('exit keeps the origin route\'s remembered scroll offset and index, pointing it at the origin element', async () => {
+    const root = await openPlayer();
+    const { origin } = navigationRef.getCurrentRoute()?.params as { origin: { routeKey: string; focusId: string } };
+    // What Пост remembered for a row below the first screen.
+    focusRestoration.remember(origin.routeKey, 'main', `post/${POST}/block/text@1`, 345, 2);
+    await back();
+    expect(currentRoute()).toBe('Post');
+    expect(focusRestoration.peek(origin.routeKey, 'main')).toEqual({
+      focusId: VIDEO('v1'),
+      scrollOffset: 345,
+      index: 2,
+    });
+    await unmount(root);
+  });
+
+  it('the origin is remembered when the route is removed by any path (not only the player\'s exit)', async () => {
+    const root = await openPlayer();
+    const { origin } = navigationRef.getCurrentRoute()?.params as { origin: { routeKey: string; focusId: string } };
+    focusRestoration.remember(origin.routeKey, 'main', `post/${POST}/author`, 0);
+    await act(async () => {
+      navigationRef.goBack();
+    });
+    await settle();
+    expect(currentRoute()).toBe('Post');
+    expect(focusRestoration.peek(origin.routeKey, 'main')?.focusId).toBe(VIDEO('v1'));
+    await unmount(root);
+  });
+
+  it('a double OK on «Смотреть»: one Player, one player E8', async () => {
+    const root = await openPost();
+    const before = e8Calls().length;
+    const node = one(root, PRIMARY);
+    await act(async () => {
+      node.props.onClick({ nativeEvent: {} });
+      node.props.onClick({ nativeEvent: {} });
+    });
+    await settle();
+    expect(routeNames()).toEqual(['Shell', 'Post', 'Player']);
+    expect(e8Calls()).toHaveLength(before + 1);
+    await unmount(root);
+  });
+
+  it('a Пост refetch that removes the videos while «Смотреть» is focused: focus to the new initial target', async () => {
+    const root = await openPost();
+    await focusOn(root, PRIMARY);
+    withData(paragraph('Only text'));
+    focusMock.mockClear();
+    await act(async () => {
+      await queryClient.refetchQueries({ queryKey: queryKeys.post(FEED_BLOG, POST) });
+    });
+    await settle();
+    expect(visible(root, PRIMARY)).toBe(false);
+    expect(lastFocusTarget()).toBe(`post/${POST}/block/text@0`);
+    await unmount(root);
+  });
+});

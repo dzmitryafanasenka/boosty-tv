@@ -20,10 +20,10 @@ function row(overrides: Partial<VideoRow> = {}): VideoRow {
   };
 }
 
-async function render(value: VideoRow, playable = false): Promise<Root> {
+async function render(value: VideoRow, playable = false, onPress?: () => void): Promise<Root> {
   const root = createRoot();
   await act(async () => {
-    root.render(<MediaRow row={value} playable={playable} testID={ID} />);
+    root.render(<MediaRow row={value} playable={playable} onPress={onPress} testID={ID} />);
   });
   return root;
 }
@@ -118,16 +118,19 @@ describe('MediaRow (Story 3.5)', () => {
     await act(async () => root.unmount());
   });
 
-  it('player off (`playable` false): the text role, no action; on: the button role, still no action in Story 3.5', async () => {
-    const off = await render(row());
+  it('player off (`playable` false): the text role, OK does nothing; on: the button role, OK calls onPress (Story 4.1)', async () => {
+    const onPress = jest.fn();
+    const off = await render(row(), false, onPress);
     expect(host(off).props.accessibilityRole).toBe('text');
-    expect(host(off).props.onPress).toBeUndefined();
+    await act(async () => host(off).props.onClick(evt));
+    expect(onPress).not.toHaveBeenCalled();
     expect(host(off).props.accessibilityLabel).toBe('Видео 1. Первая часть. 12:34');
     expect(json(off)).not.toContain('Смотреть');
     await act(async () => off.unmount());
-    const on = await render(row(), true);
+    const on = await render(row(), true, onPress);
     expect(host(on).props.accessibilityRole).toBe('button');
-    expect(host(on).props.onPress).toBeUndefined();
+    await act(async () => host(on).props.onClick(evt));
+    expect(onPress).toHaveBeenCalledTimes(1);
     expect(json(on)).not.toContain('Смотреть');
     await act(async () => on.unmount());
   });

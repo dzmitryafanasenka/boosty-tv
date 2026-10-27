@@ -12,6 +12,7 @@ import type { HttpClient } from '../../shared/api';
 import {
   postBodyItems,
   videoRowsOf,
+  type MediaRef,
   type PostBodyItem,
   type VideoRow,
 } from '../../shared/entities/post';
@@ -23,7 +24,13 @@ import {
 } from '../../shared/focus';
 import { t } from '../../shared/i18n';
 import { StateView, requestHostFocus, spacing, type HostView } from '../../shared/ui';
-import { PostBody, PostBodySkeleton, PostVideoRows, TEASER_IMAGE_GAP } from './PostBody';
+import {
+  PostBody,
+  PostBodySkeleton,
+  PostPrimaryAction,
+  PostVideoRows,
+  TEASER_IMAGE_GAP,
+} from './PostBody';
 import { LOCKED_NOTICE_GAP, LockedNotice } from './LockedNotice';
 import { PostHeader, PostHeaderSkeleton } from './PostHeader';
 import { usePost } from './usePost';
@@ -38,6 +45,8 @@ export const postBlockId = (postId: string, blockKey: string) =>
 export const postVideoPrefix = (postId: string) => `post/${postId}/video/`;
 export const postVideoId = (postId: string, mediaId: string) =>
   `${postVideoPrefix(postId)}${mediaId}`;
+/** «Смотреть» under the header (Story 4.1). */
+export const postPrimaryId = (postId: string) => `post/${postId}/primary`;
 
 const NO_DESTINATIONS: HostView[] = [];
 
@@ -96,8 +105,13 @@ export type PostScreenProps = {
   /** OK on the author row: open Автор for this blog. */
   onOpenAuthor: (blogUrl: string) => void;
   /**
-   * `phaseFlags.player` (AD-20), passed by the route: off → the MediaRows
-   * have no action. Epic 4 adds the action when it is on.
+   * OK on «Смотреть» or a MediaRow (Story 4.1): open the Player for `ref`;
+   * `focusId` is the element that opened it (exit returns focus there).
+   */
+  onOpenPlayer: (ref: MediaRef, focusId: string) => void;
+  /**
+   * `phaseFlags.player` (AD-20), passed by the route: off → no «Смотреть»
+   * and the MediaRows have no action.
    */
   playerEnabled: boolean;
 };
@@ -111,9 +125,11 @@ type Phase = 'unavailable' | 'error' | 'loading' | 'ready';
  * it scrolls away with the content (never pinned). Then one MediaRow per
  * video (Story 3.5, in block order), then the blocks as plain paragraphs
  * (each a ParagraphStop) and neutral non-focusable placeholders, the text
- * capped at `spacing['text-measure']`. Not here yet:
- * «Смотреть» and progress (Epic 4), styles, collapse and real blocks (Epic
- * 6). A locked post (Story 3.6) shows its header, the no-access copy
+ * capped at `spacing['text-measure']`. With the player on (Story 4.1), a
+ * post with videos shows «Смотреть» right under the header (before the
+ * rows) and OK on it or on a row opens the Player. Not here yet: progress,
+ * «Продолжить» / «С начала» (Story 4.2), styles, collapse and real blocks
+ * (Epic 6). A locked post (Story 3.6) shows its header, the no-access copy
  * (`LockedNotice`, with the level name when known; never a price or a
  * subscribe action), then its teaser: images, paragraphs and placeholders
  * (no rows). A locked post is never an error or a session problem.
@@ -121,8 +137,9 @@ type Phase = 'unavailable' | 'error' | 'loading' | 'ready';
  * Focus:
  * - Skeleton: nothing focusable in content; focus goes to the sidebar's
  *   current item explicitly (it must leave the covered screen below).
- * - When the post arrives, the first MediaRow takes focus, else the first
- *   paragraph (a locked post or one with neither: the author) only if the user has not moved (focus
+ * - When the post arrives, «Смотреть» takes focus, else the first MediaRow,
+ *   else the first paragraph (a locked post or one with neither: the
+ *   author) only if the user has not moved (focus
  *   still on the sidebar's current item, nothing yet, or the StateView
  *   action just pressed). A StateView action takes focus the same way, or
  *   when the focused content it replaces is gone.
@@ -144,6 +161,7 @@ export function PostScreen({
   focus,
   onBack,
   onOpenAuthor,
+  onOpenPlayer,
   playerEnabled,
 }: PostScreenProps) {
   const state = usePost(http, blogUrl, postId);
@@ -160,6 +178,7 @@ export function PostScreen({
   const blockPrefix = postBlockPrefix(postId);
   const videoPrefix = postVideoPrefix(postId);
   const contentPrefix = postIdPrefix(postId);
+  const primaryId = postPrimaryId(postId);
 
   // The MediaRows (an accessible post's videos with an id, deduped) and the
   // body: the other blocks of an accessible post, the teaser of a locked one
@@ -174,14 +193,22 @@ export function PostScreen({
           : postBodyItems(post.teaser, { images: true }),
     [post],
   );
-  /** The first stop below the header: the first MediaRow, else the first paragraph. */
+  /** «Смотреть» (Story 4.1): an accessible post with a video, while the player is on. */
+  const showPrimary = playerEnabled && rows.length > 0;
+  /**
+   * The first stop below the header: «Смотреть», else the first MediaRow,
+   * else the first paragraph.
+   */
   const firstStopId = useMemo(() => {
+    if (showPrimary) {
+      return primaryId;
+    }
     if (rows.length > 0) {
       return `${videoPrefix}${rows[0].ref.mediaId}`;
     }
     const first = items.find(item => item.kind === 'paragraph');
     return first ? `${blockPrefix}${first.key}` : null;
-  }, [rows, items, videoPrefix, blockPrefix]);
+  }, [showPrimary, primaryId, rows, items, videoPrefix, blockPrefix]);
   // The column's measured viewport and content height (the ScrollView's
   // layout and content size).
   const [viewport, setViewport] = useState<{ width: number; height: number } | null>(null);
@@ -223,7 +250,10 @@ export function PostScreen({
     }
   }, [scrollEnabled]);
 
-  /** The first row or paragraph; a locked post or one with neither: the author. */
+  /**
+   * «Смотреть», else the first row or paragraph; a locked post or one with
+   * neither: the author.
+   */
   const initialId = post !== null && post.hasAccess && firstStopId !== null ? firstStopId : authorId;
 
   const focusRef = useRef(focus);
@@ -277,7 +307,7 @@ export function PostScreen({
   }, [authorZone, authorId, onStopFocus]);
   useEffect(() => {
     refreshColumnTarget();
-  }, [rows, items, initialId, refreshColumnTarget]);
+  }, [rows, items, showPrimary, initialId, refreshColumnTarget]);
 
   const stateAction = useZoneItem(POST_STATE_ACTION_ID);
   const stateActionView = useRef<HostView | null>(null);
@@ -367,7 +397,7 @@ export function PostScreen({
       phaseRef.current === 'ready' &&
       info.isActive() &&
       current !== null &&
-      (current.startsWith(blockPrefix) || current.startsWith(videoPrefix)) &&
+      (current.startsWith(blockPrefix) || current.startsWith(videoPrefix) || current === primaryId) &&
       !views.current.has(current)
     ) {
       if (lastFocused.current === current) {
@@ -375,7 +405,7 @@ export function PostScreen({
       }
       focusInitial();
     }
-  }, [rows, items, blockPrefix, videoPrefix, focusInitial, phaseRef]);
+  }, [rows, items, showPrimary, blockPrefix, videoPrefix, primaryId, focusInitial, phaseRef]);
 
   const authorBlogUrl = post?.author.blogUrl ?? null;
   const onAuthorPress = useCallback(() => {
@@ -436,12 +466,22 @@ export function PostScreen({
             {post.hasAccess ? null : (
               <LockedNotice levelName={post.levelName} onLayout={onCopyLayout} />
             )}
+            {showPrimary ? (
+              <PostPrimaryAction
+                id={primaryId}
+                rows={rows}
+                onView={onStopView}
+                onFocus={onStopFocus}
+                onOpenPlayer={onOpenPlayer}
+              />
+            ) : null}
             <PostVideoRows
               rows={rows}
               idPrefix={videoPrefix}
               playable={playerEnabled}
               onRowView={onStopView}
               onRowFocus={onStopFocus}
+              onOpenPlayer={onOpenPlayer}
             />
             <PostBody
               items={items}

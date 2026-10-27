@@ -11,12 +11,12 @@ import { colors, components, spacing } from './tokens';
 /**
  * DESIGN.md MediaRow (Story 3.5): one row per video of a post: a 96×54
  * thumbnail, «Видео N», the title (when it has one) and the duration (when
- * the API gives it). Focusable for reading; no status, progress line or
- * action yet: progress is Epic 4's ProgressRepository, and «Смотреть» comes
- * with the player behind `phaseFlags.player` (off), passed down as
- * `playable`. While it is false the row has no `onPress`, no action label
- * and the text role (a button role with no action would be a TalkBack dead
- * end). Never a fake «Не начато».
+ * the API gives it). No status or progress line yet: progress is Story
+ * 4.2's ProgressRepository; never a fake «Не начато». The action (Story
+ * 4.1: OK → the Player for this video) exists only while `playable`
+ * (`phaseFlags.player`): then the row has the button role and `onPress`.
+ * Not playable: no `onPress` and the text role (a button role with no
+ * action would be a TalkBack dead end).
  *
  * The thumbnail is the video's preview URL with no auth headers (a plain
  * `Image`), `resizeMethod="resize"` and `fadeDuration={0}`; a missing or
@@ -49,10 +49,11 @@ export type MediaRowProps = {
   row: VideoRow;
   /**
    * `phaseFlags.player` from the app. False: no action, text role. True:
-   * the button role; the action itself (OK → Player) is Epic 4's, so there
-   * is still nothing to call in Story 3.5.
+   * the button role and `onPress`.
    */
   playable: boolean;
+  /** OK on the row (only while `playable`): open the Player for this video. */
+  onPress?: () => void;
   testID?: string;
   onFocus?: FocusableSurfaceProps['onFocus'];
   style?: StyleProp<ViewStyle>;
@@ -61,7 +62,7 @@ export type MediaRowProps = {
 
 const surfaceStyle = ({ focused }: SurfaceState) => [styles.row, focused ? styles.rowFocused : null];
 
-export function MediaRowView({ row, playable, testID, onFocus, style, ref }: MediaRowProps) {
+export function MediaRowView({ row, playable, onPress, testID, onFocus, style, ref }: MediaRowProps) {
   // A failure belongs to one preview URL only.
   const [failed, setFailed] = useItemState(false, row.previewUrl ?? undefined);
   const preview = row.previewUrl && !failed ? row.previewUrl : null;
@@ -73,6 +74,7 @@ export function MediaRowView({ row, playable, testID, onFocus, style, ref }: Med
       scaleFocus={TOKENS.scaleFocus}
       accessibilityRole={playable ? 'button' : 'text'}
       accessibilityLabel={mediaRowA11yLabel(row)}
+      onPress={playable ? onPress : undefined}
       onFocus={onFocus}
       style={style}
       surfaceStyle={surfaceStyle}

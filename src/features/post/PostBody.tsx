@@ -1,12 +1,14 @@
 import { memo, useCallback, useState } from 'react';
 import { Image, StyleSheet, View, type ImageLoadEvent } from 'react-native';
-import type { PlaceholderKind, PostBodyItem, VideoRow } from '../../shared/entities/post';
+import type { MediaRef, PlaceholderKind, PostBodyItem, VideoRow } from '../../shared/entities/post';
 import { useZoneItem } from '../../shared/focus';
-import { t } from '../../shared/i18n';
+import { t, tf } from '../../shared/i18n';
 import {
+  Button,
   FocusableSurface,
   MediaRow,
   Text,
+  mediaRowLabel,
   colors,
   rounded,
   spacing,
@@ -235,12 +237,15 @@ type VideoRowStopProps = {
   playable: boolean;
   onView: (id: string, view: HostView | null) => void;
   onFocus: (id: string) => void;
+  /** OK (only while playable): the Player for `ref`, opened from the focus id `id`. */
+  onOpen: (ref: MediaRef, focusId: string) => void;
 };
 
 /**
  * One MediaRow as a focus stop of the Post column (Story 3.5): a content
- * zone item, its host view reported by focus id. OK does nothing until the
- * player (Epic 4, `phaseFlags.player`).
+ * zone item, its host view reported by focus id. OK opens the Player for
+ * this video (Story 4.1) while `phaseFlags.player` is on; otherwise it does
+ * nothing.
  */
 const VideoRowStop = memo(function VideoRowStopView({
   id,
@@ -248,6 +253,7 @@ const VideoRowStop = memo(function VideoRowStopView({
   playable,
   onView,
   onFocus,
+  onOpen,
 }: VideoRowStopProps) {
   const zone = useZoneItem(id);
   const zoneRef = zone.ref;
@@ -262,12 +268,15 @@ const VideoRowStop = memo(function VideoRowStopView({
     zone.onFocus();
     onFocus(id);
   }, [zone, onFocus, id]);
+  const mediaRef = row.ref;
+  const handlePress = useCallback(() => onOpen(mediaRef, id), [onOpen, mediaRef, id]);
   return (
     <MediaRow
       ref={ref}
       testID={id}
       row={row}
       playable={playable}
+      onPress={handlePress}
       onFocus={handleFocus}
       style={styles.gap}
     />
@@ -282,6 +291,8 @@ export type PostVideoRowsProps = {
   playable: boolean;
   onRowView: (id: string, view: HostView | null) => void;
   onRowFocus: (id: string) => void;
+  /** OK on a row (while playable): the Player for that video. */
+  onOpenPlayer: (ref: MediaRef, focusId: string) => void;
 };
 
 /**
@@ -289,7 +300,14 @@ export type PostVideoRowsProps = {
  * width (DESIGN.md Post screen). Keys and ids use the media id
  * (`post/<postId>/video/<mediaId>`), never the index or a URL.
  */
-export function PostVideoRows({ rows, idPrefix, playable, onRowView, onRowFocus }: PostVideoRowsProps) {
+export function PostVideoRows({
+  rows,
+  idPrefix,
+  playable,
+  onRowView,
+  onRowFocus,
+  onOpenPlayer,
+}: PostVideoRowsProps) {
   return (
     <>
       {rows.map(row => (
@@ -300,9 +318,60 @@ export function PostVideoRows({ rows, idPrefix, playable, onRowView, onRowFocus 
           playable={playable}
           onView={onRowView}
           onFocus={onRowFocus}
+          onOpen={onOpenPlayer}
         />
       ))}
     </>
+  );
+}
+
+export type PostPrimaryActionProps = {
+  /** `post/<postId>/primary` */
+  id: string;
+  /** The post's MediaRows; the button targets the first (Story 4.1). */
+  rows: readonly VideoRow[];
+  onView: (id: string, view: HostView | null) => void;
+  onFocus: (id: string) => void;
+  onOpenPlayer: (ref: MediaRef, focusId: string) => void;
+};
+
+/**
+ * The primary «Смотреть» under the header (Story 4.1, owner decision
+ * 2026-10-27, option A): a primary Button in its own row, before the
+ * MediaRows. It opens the first video (Story 4.2 makes it target the first
+ * unfinished one and adds «Продолжить» / «С начала»); a post with several
+ * videos names it («Смотреть · Видео 1»). A content zone item and a column
+ * stop like the rows.
+ */
+export function PostPrimaryAction({ id, rows, onView, onFocus, onOpenPlayer }: PostPrimaryActionProps) {
+  const zone = useZoneItem(id);
+  const zoneRef = zone.ref;
+  const ref = useCallback(
+    (view: HostView | null) => {
+      zoneRef?.(view);
+      onView(id, view);
+    },
+    [zoneRef, onView, id],
+  );
+  const handleFocus = useCallback(() => {
+    zone.onFocus();
+    onFocus(id);
+  }, [zone, onFocus, id]);
+  const target = rows[0];
+  const onPress = useCallback(() => {
+    if (target) {
+      onOpenPlayer(target.ref, id);
+    }
+  }, [target, onOpenPlayer, id]);
+  if (!target) {
+    return null;
+  }
+  const label =
+    rows.length > 1 ? tf('post.watchVideo', { label: mediaRowLabel(target) }) : t('post.watch');
+  return (
+    <View testID={`${id}-row`} style={styles.primaryRow}>
+      <Button ref={ref} testID={id} kind="primary" label={label} onPress={onPress} onFocus={handleFocus} />
+    </View>
   );
 }
 
@@ -322,6 +391,11 @@ export function PostBodySkeleton() {
 }
 
 const styles = StyleSheet.create({
+  // The primary button's own row, left-aligned, above the MediaRows.
+  primaryRow: {
+    flexDirection: 'row',
+    marginBottom: spacing['8'],
+  },
   gap: {
     marginBottom: spacing['6'],
   },

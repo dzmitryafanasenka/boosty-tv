@@ -1,5 +1,6 @@
 package io.github.dzmitryafanasenka.boostytv
 
+import android.view.KeyEvent
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
@@ -19,4 +20,14 @@ class MainActivity : ReactActivity() {
    */
   override fun createReactActivityDelegate(): ReactActivityDelegate =
       DefaultReactActivityDelegate(this, mainComponentName, fabricEnabled)
+
+  /**
+   * Hold-to-seek (Story 4.1): D-pad left/right key down (with repeats) and
+   * key up go to the player first when it enabled `SeekKeysModule`; the event
+   * is never consumed here.
+   */
+  override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+    SeekKeysModule.onKeyEvent(event)
+    return super.dispatchKeyEvent(event)
+  }
 }
