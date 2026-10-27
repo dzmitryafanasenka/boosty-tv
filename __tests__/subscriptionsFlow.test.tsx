@@ -33,11 +33,16 @@ import {
   byTestId,
   clearNativeModules,
   createFlow,
+  deferred,
+  destinationIds,
   focusableIds,
+  focusTargets,
   installFixtureTransport,
   installNativeModules,
   lastFocusTarget,
+  lists,
   resetKeychain,
+  resetRecorders,
   text,
   unmount,
   visible,
@@ -51,54 +56,12 @@ jest.mock('react-native/Libraries/Utilities/BackHandler', () =>
   require('../src/test/backHandlerMock'),
 );
 
-/** The last `destinations` each focus guide received, by testID. */
-const mockGuideDestinations = new Map<string, unknown[] | undefined>();
-jest.mock('react-native/Libraries/Components/TV/TVFocusGuideView', () => {
-  const actual = jest.requireActual('react-native/Libraries/Components/TV/TVFocusGuideView');
-  const React = jest.requireActual('react');
-  const Real = actual.default;
-  function RecordingGuide(props: { testID?: string; destinations?: unknown[] }) {
-    if (props.testID) {
-      mockGuideDestinations.set(props.testID, props.destinations);
-    }
-    return React.createElement(Real, props);
-  }
-  return { __esModule: true, default: RecordingGuide };
-});
+jest.mock('react-native/Libraries/Components/TV/TVFocusGuideView', () =>
+  require('../src/test/flow').recordingFocusGuideModule(),
+);
 
-/**
- * The real FlashList behind a recorder: the test reads the last props of
- * each list (by testID) and the scroll calls made through its ref.
- */
-const mockLists: {
-  props: Map<string, Record<string, any>>;
-  scrollToOffset: jest.Mock;
-  scrollToIndex: jest.Mock;
-} = { props: new Map(), scrollToOffset: jest.fn(), scrollToIndex: jest.fn() };
-jest.mock('@shopify/flash-list', () => {
-  const actual = jest.requireActual('@shopify/flash-list');
-  const React = jest.requireActual('react');
-  function RecordingFlashList(props: Record<string, any>) {
-    mockLists.props.set(props.testID, props);
-    const inner = React.useRef(null);
-    React.useImperativeHandle(
-      props.ref,
-      () => ({
-        scrollToOffset: (params: unknown) => {
-          mockLists.scrollToOffset(params);
-          return inner.current?.scrollToOffset(params);
-        },
-        scrollToIndex: (params: unknown) => {
-          mockLists.scrollToIndex(params);
-          return inner.current?.scrollToIndex(params) ?? Promise.resolve();
-        },
-      }),
-      [],
-    );
-    return React.createElement(actual.FlashList, { ...props, ref: inner, onEndReached: undefined });
-  }
-  return { ...actual, FlashList: RecordingFlashList };
-});
+/** The real FlashList behind the recorder `lists` (`src/test/flow`; `onEndReached` held back). */
+jest.mock('@shopify/flash-list', () => require('../src/test/flow').recordingFlashListModule());
 
 const focusMock = requestHostFocus as jest.Mock;
 
@@ -125,14 +88,6 @@ type Reply = FixtureReply | Promise<FixtureReply> | undefined;
 let subs: (req: FixtureRequest) => Reply;
 let transport: FixtureTransport;
 
-function deferred() {
-  let resolve!: (reply: FixtureReply) => void;
-  const promise = new Promise<FixtureReply>(r => {
-    resolve = r;
-  });
-  return { promise, resolve };
-}
-
 beforeAll(() => {
   jest.useFakeTimers();
   notifyManager.setScheduler(callback => {
@@ -151,9 +106,7 @@ beforeEach(() => {
   jest.spyOn(console, 'error').mockImplementation(() => {});
   focusMock.mockClear();
   backHandler.reset();
-  mockLists.props.clear();
-  mockLists.scrollToIndex.mockClear();
-  mockLists.scrollToOffset.mockClear();
+  resetRecorders();
   resetKeychain({ 'boostytv.session': STORED });
   installNativeModules({ AppInfo: { versionName: '1.0' } });
   subs = () => ({ status: 200, body: subscriptionsBody(3) });
@@ -183,16 +136,9 @@ type Root = Awaited<ReturnType<typeof render>>;
 
 const subsCalls = () => transport.callsTo(E2_PATH);
 const tileIds = (root: Root) => focusableIds(root).filter(id => id.startsWith('subs/tile/'));
-const focusTargets = () =>
-  focusMock.mock.calls.map(c => (c[0] as { props?: { testID?: string } } | null)?.props?.testID);
-function destinationIds(guide: string): string[] {
-  return (mockGuideDestinations.get(guide) ?? []).map(
-    view => (view as { props?: { testID?: string } }).props?.testID as string,
-  );
-}
 /** The Подписки grid's FlashList props (last render). */
 function grid(): Record<string, any> {
-  const props = mockLists.props.get('subs/list');
+  const props = lists.props.get('subs/list');
   if (!props) {
     throw new Error('no Подписки grid rendered');
   }
@@ -516,7 +462,7 @@ describe('focus (focus-map §3 C, §1.6)', () => {
       return [...rest.slice(0, 7), authors[1], ...rest.slice(7)];
     });
     expect(gridBlogs()[7]).toBe(blogUrlOf(2));
-    expect(mockLists.scrollToIndex).toHaveBeenLastCalledWith(
+    expect(lists.scrollToIndex).toHaveBeenLastCalledWith(
       expect.objectContaining({ index: Math.floor(7 / 3) }),
     );
     expect(lastFocusTarget()).toBe(TILE(2));
@@ -623,7 +569,7 @@ describe('55 authors: restoration of a deep tile', () => {
     focusMock.mockClear();
     await press(root, 'nav/subs');
     expect(grid().initialScrollIndex).toBe(Math.floor(54 / 3));
-    expect(mockLists.scrollToOffset).toHaveBeenCalledWith(
+    expect(lists.scrollToOffset).toHaveBeenCalledWith(
       expect.objectContaining({ offset: 1600 }),
     );
     expect(lastFocusTarget()).toBe(TILE(55));
@@ -635,10 +581,10 @@ describe('55 authors: restoration of a deep tile', () => {
     const root = await leaveFrom(55);
     await changeAuthors(authors => authors.filter(a => a.blogUrl !== blogUrlOf(55)));
     focusMock.mockClear();
-    mockLists.scrollToIndex.mockClear();
+    lists.scrollToIndex.mockClear();
     await press(root, 'nav/subs');
     // The neighbor sits at index 53 (the remembered index 54 no longer exists).
-    expect(mockLists.scrollToIndex).toHaveBeenCalledWith(
+    expect(lists.scrollToIndex).toHaveBeenCalledWith(
       expect.objectContaining({ index: Math.floor(53 / 3) }),
     );
     expect(lastFocusTarget()).toBe(TILE(54));

@@ -25,3 +25,4 @@ export {
 } from './sessionManager';
 export type { Transport } from './transport';
 export { QUERY_STALE_TIME_MS, queryKeys } from './queryKeys';
+export { useHeldError, type HeldErrorInput } from './useHeldError';

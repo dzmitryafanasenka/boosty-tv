@@ -12,8 +12,10 @@
  * capture, call-order trackers) stay in the test files.
  *
  * Files that call `back()` must mock BackHandler with `./backHandlerMock`;
- * files that call `lastFocusTarget()` must mock `shared/ui/requestHostFocus`
- * with a `jest.fn()`.
+ * files that call `lastFocusTarget()` or `focusTargets()` must mock
+ * `shared/ui/requestHostFocus` with a `jest.fn()`. Files that read
+ * `destinationIds()` or `lists` install the recorders (see «Recorders») and
+ * call `resetRecorders()` in `beforeEach`.
  */
 import type { ReactElement } from 'react';
 import { act } from 'react';
@@ -22,6 +24,7 @@ import { createRoot, type Root } from 'test-renderer';
 import {
   createFixtureTransport,
   type FixtureHandler,
+  type FixtureReply,
   type FixtureTransport,
 } from '../shared/api/fixtureTransport';
 import { requestHostFocus } from '../shared/ui/requestHostFocus';
@@ -110,6 +113,114 @@ export function lastFocusTarget(): string | undefined {
   const calls = (requestHostFocus as jest.Mock).mock.calls;
   const view = calls[calls.length - 1]?.[0] as { props?: { testID?: string } } | undefined;
   return view?.props?.testID;
+}
+
+/** testIDs of every view that `requestHostFocus` (mocked) targeted, in call order. */
+export function focusTargets(): Array<string | undefined> {
+  return (requestHostFocus as jest.Mock).mock.calls.map(
+    call => (call[0] as { props?: { testID?: string } } | null)?.props?.testID,
+  );
+}
+
+/** A promise with its resolver, for a reply the test releases later. */
+export function deferred<T = FixtureReply>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>(r => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
+
+// ---------------------------------------------------------------------------
+// Recorders (installed per file through `jest.mock` factories)
+
+/**
+ * The last `destinations` each focus guide received, by testID. Recorded
+ * by `recordingFocusGuideModule()`; clear it in `beforeEach` where needed.
+ */
+export const guideDestinations = new Map<string, unknown[] | undefined>();
+
+/**
+ * A `TVFocusGuideView` module whose guide records its `destinations` (the
+ * real guide passes them to a native command only, not to its host view):
+ *
+ *   jest.mock('react-native/Libraries/Components/TV/TVFocusGuideView', () =>
+ *     require('../src/test/flow').recordingFocusGuideModule(),
+ *   );
+ */
+export function recordingFocusGuideModule() {
+  const actual = jest.requireActual('react-native/Libraries/Components/TV/TVFocusGuideView');
+  const React = jest.requireActual('react');
+  const Real = actual.default;
+  function RecordingGuide(props: { testID?: string; destinations?: unknown[] }) {
+    if (props.testID) {
+      guideDestinations.set(props.testID, props.destinations);
+    }
+    return React.createElement(Real, props);
+  }
+  return { __esModule: true, default: RecordingGuide };
+}
+
+/** testIDs of the last `destinations` of the focus guide `guide`. */
+export function destinationIds(guide: string): string[] {
+  return (guideDestinations.get(guide) ?? []).map(
+    view => (view as { props?: { testID?: string } }).props?.testID as string,
+  );
+}
+
+/**
+ * What `recordingFlashListModule()` records: the last props of each list
+ * with a testID (by testID), and the scroll calls made through a list's ref.
+ */
+export const lists: {
+  props: Map<string, Record<string, any>>;
+  scrollToOffset: jest.Mock;
+  scrollToIndex: jest.Mock;
+} = { props: new Map(), scrollToOffset: jest.fn(), scrollToIndex: jest.fn() };
+
+/** Empties every recorder (list props, both scroll mocks, guide destinations); call in `beforeEach`. */
+export function resetRecorders(): void {
+  lists.props.clear();
+  lists.scrollToOffset.mockClear();
+  lists.scrollToIndex.mockClear();
+  guideDestinations.clear();
+}
+
+/**
+ * The `@shopify/flash-list` module with the real FlashList behind a
+ * recorder (`lists`). `onEndReached` is held back from the real list and
+ * called by the test: FlashList's Jest setup measures every item 100 × 100
+ * in a 400 × 900 parent, so the end would always be "reached" and every
+ * page would load at once (the device measures the real rows). Paging by
+ * focus is unchanged.
+ *
+ *   jest.mock('@shopify/flash-list', () => require('../src/test/flow').recordingFlashListModule());
+ */
+export function recordingFlashListModule() {
+  const actual = jest.requireActual('@shopify/flash-list');
+  const React = jest.requireActual('react');
+  function RecordingFlashList(props: Record<string, any>) {
+    if (typeof props.testID === 'string') {
+      lists.props.set(props.testID, props);
+    }
+    const inner = React.useRef(null);
+    React.useImperativeHandle(
+      props.ref,
+      () => ({
+        scrollToOffset: (params: unknown) => {
+          lists.scrollToOffset(params);
+          return inner.current?.scrollToOffset(params);
+        },
+        scrollToIndex: (params: unknown) => {
+          lists.scrollToIndex(params);
+          return inner.current?.scrollToIndex(params) ?? Promise.resolve();
+        },
+      }),
+      [],
+    );
+    return React.createElement(actual.FlashList, { ...props, ref: inner, onEndReached: undefined });
+  }
+  return { ...actual, FlashList: RecordingFlashList };
 }
 
 // ---------------------------------------------------------------------------

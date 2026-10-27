@@ -21,10 +21,12 @@ import {
   byTestId,
   clearNativeModules,
   createFlow,
+  destinationIds,
   focusableIds,
   installNativeModules,
   lastFocusTarget,
   resetKeychain,
+  resetRecorders,
   text,
   topScreen as topScreenOf,
   unmount,
@@ -33,28 +35,9 @@ import {
 
 jest.mock('react-native-keychain');
 
-/** The last `destinations` each focus guide received, by testID. */
-const mockGuideDestinations = new Map<string, unknown[] | undefined>();
-
-// A thin wrapper that records the destinations (the real guide passes them
-// to a native command only, not to its host view).
-jest.mock('react-native/Libraries/Components/TV/TVFocusGuideView', () => {
-  const actual = jest.requireActual(
-    'react-native/Libraries/Components/TV/TVFocusGuideView',
-  );
-  const React = jest.requireActual('react');
-  const Real = actual.default;
-  function RecordingGuide(props: {
-    testID?: string;
-    destinations?: unknown[];
-  }) {
-    if (props.testID) {
-      mockGuideDestinations.set(props.testID, props.destinations);
-    }
-    return React.createElement(Real, props);
-  }
-  return { __esModule: true, default: RecordingGuide };
-});
+jest.mock('react-native/Libraries/Components/TV/TVFocusGuideView', () =>
+  require('../src/test/flow').recordingFocusGuideModule(),
+);
 
 jest.mock('../src/shared/ui/requestHostFocus', () => ({
   requestHostFocus: jest.fn(),
@@ -96,6 +79,7 @@ beforeEach(() => {
   jest.spyOn(console, 'warn').mockImplementation(() => {});
   focusMock.mockClear();
   backHandler.reset();
+  resetRecorders();
   resetKeychain({ 'boostytv.session': STORED });
   installNativeModules({ AppInfo: { versionName: '1.0' } });
   // Story 2.5: the background E1 after the boot succeeds; Story 3.1: E5
@@ -124,13 +108,6 @@ afterEach(async () => {
 });
 
 const renderApp = () => render(<App />);
-
-/** testIDs of the host views a guide currently routes to. */
-function destinationIds(guide: string): string[] {
-  return (mockGuideDestinations.get(guide) ?? []).map(
-    view => (view as { props?: { testID?: string } }).props?.testID as string,
-  );
-}
 
 function topScreen(root: Root): string | undefined {
   return topScreenOf(root, ['shell', 'dev/focus', 'dev/focus/detail']);

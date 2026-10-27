@@ -1,6 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { useRef } from 'react';
-import { isAppError, queryKeys, type AppErrorKind, type HttpClient } from '../../shared/api';
+import {
+  queryKeys,
+  useHeldError,
+  type AppErrorKind,
+  type HttpClient,
+} from '../../shared/api';
 import {
   AuthorRepository,
   SUBSCRIPTIONS_LIMIT,
@@ -42,17 +46,8 @@ export function useSubscriptions(http: HttpClient): Subscriptions {
   const { data, error, status, isFetching, refetch } = query;
   const authors = data?.authors ?? EMPTY;
 
-  // A retry of a failed load without data puts the query back to `pending`:
-  // keep reporting the last error meanwhile, so the error StateView stays
-  // with its busy «Повторить» (focus kept) instead of the skeleton.
-  const lastError = useRef<AppErrorKind | null>(null);
-  if (status === 'error' && data === undefined) {
-    lastError.current = isAppError(error) ? error.kind : 'Client';
-  } else if (data !== undefined || !isFetching) {
-    lastError.current = null;
-  }
-  const shownError: AppErrorKind | null =
-    data === undefined && (status === 'error' || isFetching) ? lastError.current : null;
+  // The error StateView keeps its busy «Повторить» during a retry.
+  const shownError = useHeldError({ empty: data === undefined, status, error, isFetching });
 
   return {
     authors,

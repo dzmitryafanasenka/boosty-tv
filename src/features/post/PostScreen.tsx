@@ -15,7 +15,12 @@ import {
   type PostBodyItem,
   type VideoRow,
 } from '../../shared/entities/post';
-import { useZoneItem } from '../../shared/focus';
+import {
+  mayTakeScreenFocus,
+  useLatestRef,
+  usePhaseChange,
+  useZoneItem,
+} from '../../shared/focus';
 import { t } from '../../shared/i18n';
 import { StateView, requestHostFocus, spacing, type HostView } from '../../shared/ui';
 import { PostBody, PostBodySkeleton, PostVideoRows, TEASER_IMAGE_GAP } from './PostBody';
@@ -295,14 +300,10 @@ export function PostScreen({
   }, []);
 
   /** The user has not moved focus away from where the page may take it. */
-  const mayTakeFocus = useCallback(() => {
-    const info = focusRef.current;
-    if (!info.isActive()) {
-      return false;
-    }
-    const current = info.current();
-    return current === null || current === info.sectionItemId || current === POST_STATE_ACTION_ID;
-  }, []);
+  const mayTakeFocus = useCallback(
+    () => mayTakeScreenFocus(focusRef.current, POST_STATE_ACTION_ID),
+    [],
+  );
   /** Focus was on this page's content (now replaced or gone). */
   const contentFocused = useCallback(() => {
     const info = focusRef.current;
@@ -314,8 +315,7 @@ export function PostScreen({
     );
   }, [contentPrefix]);
 
-  const phaseRef = useRef(phase);
-  phaseRef.current = phase;
+  const phaseRef = useLatestRef(phase);
 
   // First focus of the route and every return to it (Автор on top popped).
   // Declared before the phase effect: on the first focus it only covers the
@@ -335,16 +335,10 @@ export function PostScreen({
       if (!(current !== null && current !== info.sectionItemId && info.focusZoneTarget())) {
         info.focusSidebar();
       }
-    }, []),
+    }, [phaseRef]),
   );
 
-  const lastPhase = useRef<Phase | null>(null);
-  useEffect(() => {
-    const previous = lastPhase.current;
-    lastPhase.current = phase;
-    if (previous === phase) {
-      return;
-    }
+  usePhaseChange(phase, () => {
     if (phase !== 'ready') {
       // The column is gone (skeleton or StateView): forget its remembered element.
       lastFocused.current = null;
@@ -362,7 +356,7 @@ export function PostScreen({
       // A StateView with its one action (Повторить / Назад).
       focusAction();
     }
-  }, [phase, mayTakeFocus, contentFocused, focusInitial, focusAction]);
+  });
 
   // A refetch changed the blocks and the focused row or paragraph is gone:
   // the initial target (its view is already unmounted when this runs).
@@ -381,7 +375,7 @@ export function PostScreen({
       }
       focusInitial();
     }
-  }, [rows, items, blockPrefix, videoPrefix, focusInitial]);
+  }, [rows, items, blockPrefix, videoPrefix, focusInitial, phaseRef]);
 
   const authorBlogUrl = post?.author.blogUrl ?? null;
   const onAuthorPress = useCallback(() => {

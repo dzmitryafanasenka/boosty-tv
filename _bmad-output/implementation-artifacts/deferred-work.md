@@ -206,3 +206,6 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-epic-3-retro-a3-home-head-refresh.md`
   summary: Главная: an empty last page 1 from a resume refresh while a card has focus empties the feed and leaves focus nowhere (the StateView does not take focus by itself); move focus to `nav/home` or the StateView action.
   evidence: Documented as a known edge in focus-map §3 B (A3 note); pre-existing before A3. Review of spec-epic-3-retro-a3.
+- source_spec: `_bmad-output/implementation-artifacts/spec-epic-3-retro-a7-screen-focus-and-stack-routes.md`
+  summary: `useHeldError` drops the held error when a retry is paused offline (status pending, fetchStatus paused, isFetching false), so the skeleton replaces the error StateView and its focused «Повторить».
+  evidence: Inherited verbatim from the four pre-A7 copies (usePost, useAuthor, useSubscriptions, usePagedPosts); now in one place, `src/shared/api/useHeldError.ts`.

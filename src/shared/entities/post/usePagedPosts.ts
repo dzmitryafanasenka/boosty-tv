@@ -1,6 +1,6 @@
 import { useInfiniteQuery, type QueryKey } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { isAppError, type AppErrorKind } from '../../api/appError';
+import { useHeldError, type AppErrorKind } from '../../api';
 import { mergePosts } from './postRepository';
 import type { Post, PostPage } from './types';
 
@@ -97,19 +97,15 @@ export function usePagedPosts({
   );
 
   // A failure while no card is loaded is the full error (also a failed
-  // «Обновить» on an empty list). A retry of a failed first page puts the
-  // query back to `pending`: keep reporting the last error meanwhile, so the
-  // error StateView stays with its busy «Повторить» (focus kept) instead of
-  // the skeleton.
+  // «Обновить» on an empty list); held during a retry of a failed first page
+  // (`useHeldError`), so the error StateView keeps its busy «Повторить».
   const noCards = posts.length === 0;
-  const lastError = useRef<AppErrorKind | null>(null);
-  if (status === 'error' && noCards) {
-    lastError.current = isAppError(error) ? error.kind : 'Client';
-  } else if (!noCards || !query.isFetching) {
-    lastError.current = null;
-  }
-  const firstPageError: AppErrorKind | null =
-    noCards && (status === 'error' || query.isFetching) ? lastError.current : null;
+  const firstPageError = useHeldError({
+    empty: noCards,
+    status,
+    error,
+    isFetching: query.isFetching,
+  });
 
   // A page that added no new card (all dropped or duplicates) but has a next
   // cursor: fetch the next one, or paging would stall (nothing new to focus

@@ -16,6 +16,7 @@ import { StyleSheet, TVFocusGuideView, View } from 'react-native';
 import { FlashList, type FlashListRef, type ListRenderItemInfo } from '@shopify/flash-list';
 import type { Post } from '../entities/post';
 import {
+  restoreElseFirst,
   useZoneItem,
   type ListRestoration,
   type RestorableList,
@@ -279,9 +280,7 @@ export function useHeadChangeRefocus({
     }
     const index = ids.indexOf(current);
     if (index < 0) {
-      if (restoration.restore().kind === 'none') {
-        restoration.focusInitial();
-      }
+      restoreElseFirst(restoration);
       return;
     }
     const before = previous.indexOf(current);

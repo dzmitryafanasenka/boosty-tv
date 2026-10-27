@@ -41,11 +41,16 @@ import {
   byTestId,
   clearNativeModules,
   createFlow,
+  deferred,
+  destinationIds,
   focusableIds,
+  focusTargets,
   installFixtureTransport,
   installNativeModules,
   lastFocusTarget,
+  lists,
   resetKeychain,
+  resetRecorders,
   text,
   unmount,
   visible,
@@ -59,57 +64,12 @@ jest.mock('react-native/Libraries/Utilities/BackHandler', () =>
   require('../src/test/backHandlerMock'),
 );
 
-/** The last `destinations` each focus guide received, by testID. */
-const mockGuideDestinations = new Map<string, unknown[] | undefined>();
-jest.mock('react-native/Libraries/Components/TV/TVFocusGuideView', () => {
-  const actual = jest.requireActual('react-native/Libraries/Components/TV/TVFocusGuideView');
-  const React = jest.requireActual('react');
-  const Real = actual.default;
-  function RecordingGuide(props: { testID?: string; destinations?: unknown[] }) {
-    if (props.testID) {
-      mockGuideDestinations.set(props.testID, props.destinations);
-    }
-    return React.createElement(Real, props);
-  }
-  return { __esModule: true, default: RecordingGuide };
-});
+jest.mock('react-native/Libraries/Components/TV/TVFocusGuideView', () =>
+  require('../src/test/flow').recordingFocusGuideModule(),
+);
 
-/**
- * The real FlashList behind a recorder: the test reads the last props of
- * each list (by testID) and the scroll calls made through its ref.
- * `onEndReached` is held back from the real list and called by the test
- * (FlashList's Jest setup measures every item 100 × 100, so the end would
- * always be "reached"; as homeFeedFlow).
- */
-const mockLists: {
-  props: Map<string, Record<string, any>>;
-  scrollToOffset: jest.Mock;
-  scrollToIndex: jest.Mock;
-} = { props: new Map(), scrollToOffset: jest.fn(), scrollToIndex: jest.fn() };
-jest.mock('@shopify/flash-list', () => {
-  const actual = jest.requireActual('@shopify/flash-list');
-  const React = jest.requireActual('react');
-  function RecordingFlashList(props: Record<string, any>) {
-    mockLists.props.set(props.testID, props);
-    const inner = React.useRef(null);
-    React.useImperativeHandle(
-      props.ref,
-      () => ({
-        scrollToOffset: (params: unknown) => {
-          mockLists.scrollToOffset(params);
-          return inner.current?.scrollToOffset(params);
-        },
-        scrollToIndex: (params: unknown) => {
-          mockLists.scrollToIndex(params);
-          return inner.current?.scrollToIndex(params) ?? Promise.resolve();
-        },
-      }),
-      [],
-    );
-    return React.createElement(actual.FlashList, { ...props, ref: inner, onEndReached: undefined });
-  }
-  return { ...actual, FlashList: RecordingFlashList };
-});
+/** The real FlashList behind the recorder `lists` (`src/test/flow`; `onEndReached` held back). */
+jest.mock('@shopify/flash-list', () => require('../src/test/flow').recordingFlashListModule());
 
 const focusMock = requestHostFocus as jest.Mock;
 
@@ -143,14 +103,6 @@ let e3: (req: FixtureRequest) => Reply;
 let e4: (req: FixtureRequest) => Reply;
 let transport: FixtureTransport;
 
-function deferred() {
-  let resolve!: (reply: FixtureReply) => void;
-  const promise = new Promise<FixtureReply>(r => {
-    resolve = r;
-  });
-  return { promise, resolve };
-}
-
 beforeAll(() => {
   jest.useFakeTimers();
   notifyManager.setScheduler(callback => {
@@ -169,10 +121,7 @@ beforeEach(() => {
   jest.spyOn(console, 'error').mockImplementation(() => {});
   focusMock.mockClear();
   backHandler.reset();
-  mockLists.props.clear();
-  mockLists.scrollToIndex.mockClear();
-  mockLists.scrollToOffset.mockClear();
-  mockGuideDestinations.clear();
+  resetRecorders();
   resetKeychain({ 'boostytv.session': STORED });
   installNativeModules({ AppInfo: { versionName: '1.0' } });
   e3 = req => ({
@@ -218,16 +167,9 @@ const e3Calls = (blogUrl: string = BLOG) => transport.callsTo(e3Path(blogUrl));
 const e4Calls = (blogUrl: string = BLOG) => transport.callsTo(e4Path(blogUrl));
 const authorCards = (root: Root) =>
   focusableIds(root).filter(id => id.startsWith(`author/${BLOG}/post/`));
-const focusTargets = () =>
-  focusMock.mock.calls.map(c => (c[0] as { props?: { testID?: string } } | null)?.props?.testID);
-function destinationIds(guide: string): string[] {
-  return (mockGuideDestinations.get(guide) ?? []).map(
-    view => (view as { props?: { testID?: string } }).props?.testID as string,
-  );
-}
 /** The Author grid's FlashList props (last render). */
 function grid(): Record<string, any> {
-  const props = mockLists.props.get('author/posts/list');
+  const props = lists.props.get('author/posts/list');
   if (!props) {
     throw new Error('no Author grid rendered');
   }
@@ -651,12 +593,12 @@ describe('focus (focus-map §4 D, §1.6)', () => {
     const root = await openAuthor(5);
     await focusOn(root, CARD('blog-post-2', blogUrlOf(5)));
     focusMock.mockClear();
-    mockLists.scrollToIndex.mockClear();
+    lists.scrollToIndex.mockClear();
     await back();
     expect(currentRoute()).toBe('Shell');
     expect(lastFocusTarget()).toBe(TILE(5));
     // Same index: no scroll by index.
-    expect(mockLists.scrollToIndex).not.toHaveBeenCalled();
+    expect(lists.scrollToIndex).not.toHaveBeenCalled();
     expect(backHandler.exitApp).not.toHaveBeenCalled();
     // Подписки was not requested again.
     expect(transport.callsTo(E2_PATH)).toHaveLength(1);
@@ -926,7 +868,7 @@ describe('head refresh on reopen and resume (spec-author-posts-refresh)', () => 
     expect(e4Calls()).toHaveLength(2);
     await focusOn(root, SYN(13));
     focusMock.mockClear();
-    mockLists.scrollToIndex.mockClear();
+    lists.scrollToIndex.mockClear();
     return root;
   }
 
@@ -943,8 +885,8 @@ describe('head refresh on reopen and resume (spec-author-posts-refresh)', () => 
       reopen: async () => {
         jest.setSystemTime(Date.now() + ms);
         focusMock.mockClear();
-        mockLists.scrollToOffset.mockClear();
-        mockLists.scrollToIndex.mockClear();
+        lists.scrollToOffset.mockClear();
+        lists.scrollToIndex.mockClear();
         await press(root, TILE(1));
         expect(currentRoute()).toBe('Author');
       },
@@ -981,7 +923,7 @@ describe('head refresh on reopen and resume (spec-author-posts-refresh)', () => 
     // Reopen focus (owner decision 2026-10-27, review loop 1, option 1).
     const twoNew = () => headPage([newPost(0), newPost(1), ...known(0, 18)], 18);
     const scrolledToTop = () =>
-      mockLists.scrollToOffset.mock.calls.some(
+      lists.scrollToOffset.mock.calls.some(
         ([params]) => (params as { offset: number }).offset === 0,
       );
 
@@ -993,7 +935,7 @@ describe('head refresh on reopen and resume (spec-author-posts-refresh)', () => 
       // The automatic focus of the first cached post had not reached JS.
       expect(lastFocusTarget()).toBe(CARD('new-0'));
       expect(scrolledToTop()).toBe(true);
-      expect(mockLists.scrollToIndex).not.toHaveBeenCalled();
+      expect(lists.scrollToIndex).not.toHaveBeenCalled();
       // The native events of both automatic focus requests arrive late, in
       // order: neither is a user move, so the next head change (a resume
       // refresh on the same page) still follows the head.
@@ -1015,13 +957,13 @@ describe('head refresh on reopen and resume (spec-author-posts-refresh)', () => 
       expect(lastFocusTarget()).toBe(SYN(0));
       await focusOn(root, SYN(0));
       focusMock.mockClear();
-      mockLists.scrollToOffset.mockClear();
+      lists.scrollToOffset.mockClear();
       reply.resolve(twoNew());
       await settle();
       expect(gridPosts().slice(0, 3)).toEqual(['new-0', 'new-1', 'blog-post-0']);
       expect(focusTargets()).toEqual([CARD('new-0')]);
       expect(scrolledToTop()).toBe(true);
-      expect(mockLists.scrollToIndex).not.toHaveBeenCalled();
+      expect(lists.scrollToIndex).not.toHaveBeenCalled();
       await unmount(root);
     });
 
@@ -1046,13 +988,13 @@ describe('head refresh on reopen and resume (spec-author-posts-refresh)', () => 
         await focusOn(root, SYN(0));
         await move(root);
         focusMock.mockClear();
-        mockLists.scrollToOffset.mockClear();
+        lists.scrollToOffset.mockClear();
         reply.resolve(twoNew());
         await settle();
         expect(gridPosts().indexOf(target.slice(CARD('').length))).toBe(index);
         expect(focusTargets()).toEqual([target]);
         // The grid scrolls by row (3 cards each).
-        expect(mockLists.scrollToIndex).toHaveBeenCalledWith(
+        expect(lists.scrollToIndex).toHaveBeenCalledWith(
           expect.objectContaining({ index: Math.floor(index / 3), animated: false }),
         );
         expect(scrolledToTop()).toBe(false);
@@ -1092,11 +1034,11 @@ describe('head refresh on reopen and resume (spec-author-posts-refresh)', () => 
       await settle();
       expect(gridPosts().indexOf('blog-post-0')).toBe(2);
       expect(focusTargets().filter(id => id?.startsWith('author/'))).toEqual([]);
-      mockLists.scrollToIndex.mockClear();
+      lists.scrollToIndex.mockClear();
       await back();
       expect(currentRoute()).toBe('Author');
       expect(lastFocusTarget()).toBe(SYN(0));
-      expect(mockLists.scrollToIndex).toHaveBeenCalledWith(
+      expect(lists.scrollToIndex).toHaveBeenCalledWith(
         expect.objectContaining({ index: 0, animated: false }),
       );
       await unmount(root);
@@ -1241,7 +1183,7 @@ describe('head refresh on reopen and resume (spec-author-posts-refresh)', () => 
       expect(ids).toContain('blog-post-39');
       // Post 13 moved from row 4 to row 5: scrolled into view, focused again.
       expect(ids.indexOf('blog-post-13')).toBe(15);
-      expect(mockLists.scrollToIndex).toHaveBeenCalledWith(
+      expect(lists.scrollToIndex).toHaveBeenCalledWith(
         expect.objectContaining({ index: 5, animated: false }),
       );
       expect(focusTargets()).toEqual([SYN(13)]);
@@ -1268,7 +1210,7 @@ describe('head refresh on reopen and resume (spec-author-posts-refresh)', () => 
       expect(gridPosts()).toHaveLength(18);
       const calls = e4Calls().length;
       focusMock.mockClear();
-      mockLists.scrollToIndex.mockClear();
+      lists.scrollToIndex.mockClear();
       head = () => headPage([newPost(0), ...known(0, 18)], 18);
       await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
       expect(e4Calls()).toHaveLength(calls + 1);
@@ -1276,7 +1218,7 @@ describe('head refresh on reopen and resume (spec-author-posts-refresh)', () => 
       const ids = gridPosts();
       expect(ids).toHaveLength(19);
       expect(ids[18]).toBe('blog-post-17');
-      expect(mockLists.scrollToIndex).toHaveBeenCalledWith(
+      expect(lists.scrollToIndex).toHaveBeenCalledWith(
         expect.objectContaining({ index: 6, animated: false }),
       );
       expect(focusTargets()).toEqual([SYN(17)]);
@@ -1414,12 +1356,12 @@ describe('head refresh on reopen and resume (spec-author-posts-refresh)', () => 
       }
       await focusOn(root, SYN(0));
       focusMock.mockClear();
-      mockLists.scrollToOffset.mockClear();
-      mockLists.scrollToIndex.mockClear();
+      lists.scrollToOffset.mockClear();
+      lists.scrollToIndex.mockClear();
       return root;
     }
     const scrolledToTopOnResume = () =>
-      mockLists.scrollToOffset.mock.calls.some(
+      lists.scrollToOffset.mock.calls.some(
         ([params]) => (params as { offset: number }).offset === 0,
       );
 
@@ -1435,7 +1377,7 @@ describe('head refresh on reopen and resume (spec-author-posts-refresh)', () => 
         expect(gridPosts().slice(0, 3)).toEqual(['new-0', 'new-1', 'blog-post-0']);
         expect(focusTargets()).toEqual([CARD('new-0')]);
         expect(scrolledToTopOnResume()).toBe(true);
-        expect(mockLists.scrollToIndex).not.toHaveBeenCalled();
+        expect(lists.scrollToIndex).not.toHaveBeenCalled();
         await unmount(root);
       },
     );

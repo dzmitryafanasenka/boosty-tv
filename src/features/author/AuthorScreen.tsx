@@ -1,9 +1,17 @@
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import type { FlashListRef } from '@shopify/flash-list';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import type { HttpClient } from '../../shared/api';
-import { MAIN_SECTION, useFocusRestoration, useZoneItem } from '../../shared/focus';
+import {
+  MAIN_SECTION,
+  mayTakeScreenFocus,
+  restoreElseFirst,
+  useFocusRestoration,
+  useLatestRef,
+  usePhaseChange,
+  useZoneItem,
+} from '../../shared/focus';
 import { t } from '../../shared/i18n';
 import {
   POST_GRID_CARD_WIDTH,
@@ -211,20 +219,13 @@ export function AuthorScreen({
           : posts.posts.length === 0
             ? 'empty'
             : 'grid';
-  const phaseRef = useRef(phase);
-  phaseRef.current = phase;
+  const phaseRef = useLatestRef(phase);
 
   /** The user has not moved focus away from where the page may take it. */
-  const mayTakeFocus = useCallback(() => {
-    const info = focusRef.current;
-    if (!info.isActive()) {
-      return false;
-    }
-    const current = info.current();
-    return (
-      current === null || current === info.sectionItemId || current === AUTHOR_STATE_ACTION_ID
-    );
-  }, []);
+  const mayTakeFocus = useCallback(
+    () => mayTakeScreenFocus(focusRef.current, AUTHOR_STATE_ACTION_ID),
+    [],
+  );
 
   const idsRef = useRef(ids);
   idsRef.current = ids;
@@ -245,10 +246,7 @@ export function AuthorScreen({
   );
 
   const restoreOrFirst = useCallback(() => {
-    if (restoration.restore().kind === 'none') {
-      latch.auto(idsRef.current[0]);
-      restoration.focusInitial();
-    }
+    restoreElseFirst(restoration, () => latch.auto(idsRef.current[0]));
   }, [restoration, latch]);
 
   // First focus of the route and every return to it (a screen on top
@@ -272,16 +270,10 @@ export function AuthorScreen({
         }
       }
       return restoration.cancel;
-    }, [cardPrefix, restoreOrFirst, restoration, autoFocusSidebar]),
+    }, [cardPrefix, restoreOrFirst, restoration, autoFocusSidebar, phaseRef]),
   );
 
-  const lastPhase = useRef<Phase | null>(null);
-  useEffect(() => {
-    const previous = lastPhase.current;
-    lastPhase.current = phase;
-    if (previous === phase) {
-      return;
-    }
+  usePhaseChange(phase, () => {
     const info = focusRef.current;
     const current = info.current();
     const contentLost =
@@ -307,7 +299,7 @@ export function AuthorScreen({
       // A StateView with its one action (Повторить / Назад).
       autoFocusAction();
     }
-  }, [phase, mayTakeFocus, restoreOrFirst, cardPrefix, retryId, autoFocusSidebar, autoFocusAction]);
+  });
 
   // A head refresh (reopen or resume, spec-author-posts-refresh) changed the
   // shown cards other than by an append: the new first post while the user

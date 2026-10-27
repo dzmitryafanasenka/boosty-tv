@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 10-25-2026 14:34
-last_updated: 10-27-2026 16:39
+last_updated: 10-27-2026 17:36
 project: Boosty TV
 project_key: NOKEY
 tracking_system: file-system
@@ -192,7 +192,7 @@ action_items:
       (owner decision), keep a focused Повторить, empty page 1 with more pages keeps
       the cache"
     owner: "dev"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-10-27.md"
   - id: "epic-3-retro-item-12-device-check-of-sidebar-ok-from-автор-по"
     epic: 3

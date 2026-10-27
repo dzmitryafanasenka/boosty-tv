@@ -2,7 +2,15 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { FlashListRef } from '@shopify/flash-list';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import type { HttpClient } from '../../shared/api';
-import { focusRestoration, useFocusRestoration, useZoneItem } from '../../shared/focus';
+import {
+  focusRestoration,
+  mayTakeScreenFocus,
+  restoreElseFirst,
+  useFocusRestoration,
+  useLatestRef,
+  usePhaseChange,
+  useZoneItem,
+} from '../../shared/focus';
 import { t, tf } from '../../shared/i18n';
 import {
   AuthorCardSkeleton,
@@ -179,9 +187,7 @@ export function SubscriptionsScreen({
   );
   const restoreOrFirst = useCallback(() => {
     focusPending.current = true;
-    if (restoration.restore().kind === 'none') {
-      restoration.focusInitial();
-    }
+    restoreElseFirst(restoration);
   }, [restoration]);
 
   const phase: Phase = subs.isPending
@@ -194,22 +200,13 @@ export function SubscriptionsScreen({
 
   const pendingMountFocus = useRef(focusOnMount);
   /** The user has not moved focus away from where Подписки may take it. */
-  const mayTakeFocus = useCallback(() => {
-    const info = focusRef.current;
-    if (!info.isActive()) {
-      return false;
-    }
-    const current = info.current();
-    return (
-      current === null || current === info.sectionItemId || current === SUBS_STATE_ACTION_ID
-    );
-  }, []);
+  const mayTakeFocus = useCallback(
+    () => mayTakeScreenFocus(focusRef.current, SUBS_STATE_ACTION_ID),
+    [],
+  );
 
-  const lastPhase = useRef<Phase | null>(null);
-  useEffect(() => {
-    const previous = lastPhase.current;
-    lastPhase.current = phase;
-    if (previous === phase || phase === 'loading') {
+  usePhaseChange(phase, (_phase, previous) => {
+    if (phase === 'loading') {
       return;
     }
     const mountFocus = pendingMountFocus.current;
@@ -246,7 +243,7 @@ export function SubscriptionsScreen({
         info.focusSidebar();
       }
     }
-  }, [phase, mayTakeFocus, restoration, restoreOrFirst, routeKey]);
+  });
 
   // Blur or unmount: stop a pending restore focus.
   useEffect(() => restoration.cancel, [restoration]);
@@ -254,8 +251,7 @@ export function SubscriptionsScreen({
   // Return from Автор (the Shell is focused again with focus in content):
   // the remembered tile by `blogUrl`, else the fallback chain. Only the grid
   // restores this way; the error action and the sidebar use the zone.
-  const phaseRef = useRef(phase);
-  phaseRef.current = phase;
+  const phaseRef = useLatestRef(phase);
   useEffect(() => {
     const info = focusRef.current;
     const unregister = info.setReturnFocus?.(() => {
@@ -266,7 +262,7 @@ export function SubscriptionsScreen({
       return true;
     });
     return () => unregister?.();
-  }, [restoreOrFirst]);
+  }, [restoreOrFirst, phaseRef]);
 
   const onOpenRef = useRef(onOpenAuthor);
   onOpenRef.current = onOpenAuthor;
