@@ -148,6 +148,47 @@ describe('postBodyItems (Story 3.4)', () => {
   });
 });
 
+describe('postBodyItems: teaser images (Story 3.6)', () => {
+  const teaser = (blocks: unknown[]) =>
+    postBodyItems(mapped({ ...e8Locked(), teaser: blocks }).teaser, { images: true });
+
+  it('the live locked teaser: one image item with its URL and size', () => {
+    expect(postBodyItems(mapped(e8Locked()).teaser, { images: true })).toEqual([
+      {
+        kind: 'image',
+        key: 'image:synthetic-id-107',
+        url: 'https://example.invalid/image',
+        width: 1111,
+        height: 625,
+      },
+    ]);
+  });
+
+  it('no URL → placeholder; a missing or non-positive size is null; text and videos as without the option', () => {
+    expect(
+      teaser([
+        { type: 'image', id: 'a' },
+        { type: 'image', id: 'b', url: 'https://example.invalid/b', width: 0, height: -1 },
+        { type: 'image', url: 'https://example.invalid/c' },
+        ...paragraph('T'),
+        { type: 'ok_video', id: 'v' },
+      ]),
+    ).toEqual([
+      { kind: 'placeholder', key: 'image:a', block: 'image' },
+      { kind: 'image', key: 'image:b', url: 'https://example.invalid/b', width: null, height: null },
+      { kind: 'image', key: 'image@2', url: 'https://example.invalid/c', width: null, height: null },
+      { kind: 'paragraph', key: 'text@3', text: 'T' },
+      { kind: 'placeholder', key: 'ok_video:v', block: 'video' },
+    ]);
+  });
+
+  it('off by default: images stay placeholders (accessible posts, Story 6.2)', () => {
+    expect(body([{ type: 'image', id: 'i', url: 'https://example.invalid/i' }])).toEqual([
+      { kind: 'placeholder', key: 'image:i', block: 'image' },
+    ]);
+  });
+});
+
 describe('postBodyItems: videos (Story 3.5)', () => {
   it('videos with an id leave the body (also duplicates); the text keeps its paragraphs and keys', () => {
     expect(

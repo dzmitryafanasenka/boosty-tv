@@ -67,6 +67,16 @@ describe('mapPost: the live E5 posts', () => {
     expect(mapped(e5Posts()[2]).levelName).toBe('redacted');
     expect(mapped(e5Posts()[0]).levelName).toBeNull();
   });
+
+  it('the level name is trimmed; a blank or malformed one is no level (Story 3.6)', () => {
+    const withLevel = (level: unknown) => mapped({ ...e5Posts()[2], subscriptionLevel: level });
+    expect(withLevel({ name: '  Базовый ' }).levelName).toBe('Базовый');
+    expect(withLevel({ name: '   ' }).levelName).toBeNull();
+    expect(withLevel({ name: '' }).levelName).toBeNull();
+    expect(withLevel({ name: 5 }).levelName).toBeNull();
+    expect(withLevel(null).levelName).toBeNull();
+    expect(withLevel('junk').levelName).toBeNull();
+  });
 });
 
 describe('mapPost: defensive parsing (matrix «Malformed post»)', () => {

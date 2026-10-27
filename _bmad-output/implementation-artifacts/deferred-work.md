@@ -197,3 +197,6 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-post-header-layout.md`
   summary: Mark `Post Screen.dc.html` (Claude Design) as superseded by the header-on-top layout in the UX folder, or regenerate it.
   evidence: DESIGN.md records the owner decision; the mock still shows two columns.
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-6-locked-posts.md`
+  summary: Demo mode: a demoFlow test for the locked demo posts (with and without a level name) and a demo teaser with an image URL.
+  evidence: Dev-only; demo teasers have no URL, so only the placeholder path runs in demo. Review 3.6, finding 10.

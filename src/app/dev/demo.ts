@@ -19,7 +19,9 @@ import type { ReadResult, SecureStore } from '../../shared/platform/secureStore'
  * `demo-blog-3` no posts, the last demo blog missing), E8 (Пост, Story 3.4:
  * every demo post with several paragraphs and a like count, every fourth
  * one also with image, file, audio, poll and unknown blocks and an inline link;
- * `demo-post-9` answers 404 `not_found`), every other request a 404. The
+ * `demo-post-9` answers 404 `not_found`; locked posts (every seventh) have a
+ * teaser image without a URL, and `demo-post-6`/`-20` a level name while
+ * `demo-post-13`/`-27` have none, Story 3.6), every other request a 404. The
  * keychain is never touched, so the owner's stored session survives a demo
  * run.
  *
@@ -66,6 +68,9 @@ function demoPost(n: number, blog?: { blogUrl: string; index: number }) {
     user: { name: `Демо-автор ${authorIndex + 1}`, blogUrl },
     data,
     teaser: [],
+    // Story 3.6: every other locked post names its level (only `name`; no
+    // price fields in the demo), the rest show the copy without a level.
+    ...(locked && n % 14 === 6 ? { subscriptionLevel: { name: 'Демо-уровень' } } : {}),
   };
 }
 

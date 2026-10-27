@@ -140,6 +140,15 @@ export const ru = {
     likes: ['{n} лайк', '{n} лайка', '{n} лайков'] as RuPluralForms,
     meta: '{date} · {likes}',
     a11yAuthor: 'Автор: {name}. Открыть страницу автора',
+    // Locked post (Story 3.6, EXPERIENCE.md «Honest limits»): plain text,
+    // never a price, a subscribe button or a payment link. `{level}` is the
+    // post's subscription level name.
+    locked: {
+      withLevel:
+        'Нет доступа. Этот пост доступен подписчикам уровня «{level}». Оформить подписку можно на сайте или в приложении Boosty.',
+      noLevel:
+        'Нет доступа. Этот пост доступен подписчикам автора. Оформить подписку можно на сайте или в приложении Boosty.',
+    },
     block: {
       video: 'Видео',
       image: 'Изображение',
