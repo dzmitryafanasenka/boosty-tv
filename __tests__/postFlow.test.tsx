@@ -1181,26 +1181,27 @@ describe('media rows (Story 3.5, focus-map §4 F)', () => {
     await unmount(root);
   });
 
-  it('`phaseFlags.player` reaches the rows: off → the text role and no action; on → the button role, still no action', async () => {
+  it('`phaseFlags.player` reaches the rows: off → the text role, no «Смотреть»; on → the button role and «Смотреть» (Story 4.1, playerFlow)', async () => {
     withData(TWO);
     const root = await openFromHome();
     const id = FEED_ID(0);
     expect(one(root, VIDEO(id, 'v1')).props.accessibilityRole).toBe('text');
     expect(one(root, VIDEO(id, 'v1')).props.onPress).toBeUndefined();
+    expect(pageText(root)).not.toContain('Смотреть');
+    expect(visible(root, `post/${id}/primary`)).toBe(false);
     await unmount(root);
     mockPlayerFlag.on = true;
     try {
       const on = await openFromHome();
       expect(one(on, VIDEO(id, 'v1')).props.accessibilityRole).toBe('button');
-      expect(one(on, VIDEO(id, 'v1')).props.onPress).toBeUndefined();
-      expect(pageText(on)).not.toContain('Смотреть');
+      expect(one(on, `post/${id}/primary`).props.accessibilityLabel).toBe('Смотреть · Видео 1');
       await unmount(on);
     } finally {
       mockPlayerFlag.on = false;
     }
   });
 
-  it('OK on a row does nothing (no player before Epic 4): no request, no route, no focus move', async () => {
+  it('player off: OK on a row does nothing: no request, no route, no focus move', async () => {
     withData(TWO);
     const root = await openFromHome();
     const id = FEED_ID(0);

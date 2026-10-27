@@ -6,8 +6,8 @@
  *
  * `player` is a capability, not a sidebar section (`enabledSections` lists
  * sections only): while it is off, a MediaRow shows no «Смотреть» /
- * «Продолжить» / «С начала» and OK on it does nothing (Story 3.5). Epic 4
- * turns it on with the player.
+ * «Продолжить» / «С начала» and OK on it does nothing (Story 3.5). Story
+ * 4.1 turns it on: «Смотреть» and OK on a MediaRow open the Player.
  */
 export const phaseFlags = {
   home: true,
@@ -15,7 +15,7 @@ export const phaseFlags = {
   subs: true,
   events: false,
   settings: true,
-  player: false,
+  player: true,
 } as const satisfies Record<string, boolean>;
 
 export type Capability = keyof typeof phaseFlags;

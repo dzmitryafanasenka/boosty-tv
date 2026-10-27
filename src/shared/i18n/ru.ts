@@ -166,6 +166,30 @@ export const ru = {
       a11yNoDuration: '{label}. {title}',
       a11yLabelOnly: '{label}',
     },
+    // The primary button under the header (Story 4.1, owner decision
+    // 2026-10-27, option A). A multi-video post names the target video.
+    watch: 'Смотреть',
+    watchVideo: 'Смотреть · {label}',
+  },
+  // G Плеер (Story 4.1, docs/focus-map.md §4 G). No «Настройки» before
+  // Story 4.3; no resume or progress before Story 4.2. Times are
+  // `formatDuration`; `{remaining}` already carries no sign.
+  player: {
+    loading: 'Загружаем видео',
+    buffering: 'Загрузка',
+    surface: 'Видео. OK — пауза, влево и вправо — перемотка',
+    timeline: 'Позиция {elapsed} из {duration}',
+    timelineNoDuration: 'Позиция {elapsed}',
+    remaining: '−{remaining}',
+    seekTarget: 'Перемотка к {time}',
+    play: 'Воспроизвести',
+    pause: 'Пауза',
+    errorTitle: 'Не удалось воспроизвести видео',
+    errorBody: 'Попробуйте ещё раз или вернитесь к посту.',
+    noAccessTitle: 'Нет доступа к этому видео',
+    noAccessBody: 'Этот пост сейчас недоступен для вашей подписки.',
+    unavailableTitle: 'Видео недоступно',
+    unavailableBody: 'Этого видео больше нет в посте.',
   },
   common: {
     retry: 'Повторить',

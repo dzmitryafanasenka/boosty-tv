@@ -21,6 +21,9 @@ class MainApplication : Application(), ReactApplication {
 
   override fun onCreate() {
     super.onCreate()
+    // Debug builds: log host + Authorization yes/no per request (Story 4.1,
+    // the CDN header check). Release: a no-op (src/release).
+    DebugNetLog.install()
     loadReactNative(this)
   }
 }

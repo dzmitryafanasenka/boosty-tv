@@ -39,6 +39,12 @@ export type FocusableSurfaceProps = Omit<
   radius: number;
   /** Component focus scale from DESIGN.md (`focus.scale-*`). */
   scaleFocus: number;
+  /**
+   * Pressed scale; default `focus.pressed-scale`. 1 for a control whose
+   * press is not a «click» of the surface (the player timeline: OK commits
+   * a seek, owner device check, Story 4.1).
+   */
+  scalePressed?: number;
   disabled?: boolean;
   /** Outer layout style (margins, alignment). Never scaled. */
   style?: StyleProp<ViewStyle>;
@@ -82,6 +88,7 @@ const RING_INSET = -(focus['ring-offset'] + focus['ring-width']);
 export function FocusableSurface({
   radius,
   scaleFocus,
+  scalePressed = focus['pressed-scale'],
   disabled = false,
   style,
   surfaceStyle,
@@ -108,7 +115,7 @@ export function FocusableSurface({
     disabled,
   };
   const target = state.pressed
-    ? focus['pressed-scale']
+    ? scalePressed
     : state.focused
       ? scaleFocus
       : 1;

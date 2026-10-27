@@ -26,6 +26,13 @@ export {
 } from './postBody';
 export { mediaRefsOf, videoRowsOf } from './mediaRows';
 export {
+  videoSourceOf,
+  videoSourcesOf,
+  type VideoSource,
+  type VideoSourceFormat,
+  type VideoSourcesResult,
+} from './videoSources';
+export {
   mergePostsHead,
   refreshPostsHead,
   type PostsData,
