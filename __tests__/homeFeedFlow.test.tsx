@@ -38,6 +38,7 @@ import {
 import e1Ok from '../src/test/fixtures/boosty/e1-user-current.json';
 import e1Unauthorized from '../src/test/fixtures/boosty/e1-no-token.json';
 import refreshRejected from '../src/test/fixtures/boosty/refresh-invalid-grant.json';
+import refreshOk from '../src/test/fixtures/boosty/refresh-ok.json';
 import {
   byTestId,
   clearNativeModules,
@@ -584,6 +585,181 @@ describe('content (matrix «Malformed post», «Unknown block», «Locked post»
       postId: post.id,
       section: 'home',
     });
+    await unmount(root);
+  });
+});
+
+describe('page 1 all locked checks the session first (Epic 3 retro A6)', () => {
+  const TOKEN = '/oauth/token/';
+  const REFRESHED = `Bearer ${refreshOk.body.access_token}`;
+  const locked = (n: number) => ({ ...lockedPost(), id: `locked-${n}` });
+  /** The token died after the cold-start E1: E1 401 (or `e1Reply`). */
+  let dead: boolean;
+  let e1Reply: () => FixtureReply | Promise<FixtureReply>;
+  let firstPage: { promise: Promise<FixtureReply>; resolve: (reply: FixtureReply) => void };
+  /** Page 1 for the refreshed token (default: the live page). */
+  let refreshedPage: () => unknown;
+
+  function install(refresh: FixtureReply) {
+    dead = false;
+    e1Reply = () => ({ status: e1Unauthorized.status, body: e1Unauthorized.body });
+    firstPage = deferred();
+    refreshedPage = () => e5Page();
+    installNativeModules({
+      InstallId: { getOrCreate: jest.fn().mockResolvedValue('0f8fad5b-d9cb-469f-a165-70867728950e') },
+    });
+    transport = installFixtureTransport(req => {
+      const refreshed = req.headers.Authorization === REFRESHED;
+      if (req.path === TOKEN) {
+        return refresh;
+      }
+      if (req.path === E1) {
+        return dead && !refreshed ? e1Reply() : { status: 200, body: e1Ok.body };
+      }
+      if (req.path === E5_PATH) {
+        // Page 1 is held until the test releases it (after the cold-start E1).
+        return refreshed ? { status: 200, body: refreshedPage() } : firstPage.promise;
+      }
+      return undefined;
+    });
+  }
+
+  /** Cold start (E1 200); then the token dies and page 1 arrives with `posts`. */
+  async function loadDead(posts: unknown[]) {
+    const root = await renderApp();
+    expect(transport.callsTo(E1)).toHaveLength(1);
+    dead = true;
+    firstPage.resolve({ status: 200, body: { data: { posts }, extra: { isLast: true } } });
+    await settle();
+    return root;
+  }
+
+  it('dead session (E1 401 → refresh invalid_grant): A11, the locked feed gone', async () => {
+    install({ status: refreshRejected.status, body: refreshRejected.body });
+    const root = await loadDead([locked(0), locked(1)]);
+    expect(transport.callsTo(E1)).toHaveLength(2);
+    expect(transport.callsTo(TOKEN)).toHaveLength(1);
+    expect(feedCalls()).toHaveLength(1);
+    // The reset's transition (timers) unmounts the Shell.
+    await settle(WITH_TIMERS);
+    expect(navigationRef.getRootState()?.routes.map(r => r.name)).toEqual(['Expired']);
+    expect(visible(root, 'shell')).toBe(false);
+    expect(lastFocusTarget()).toBe('auth/expired/relogin');
+    await unmount(root);
+  });
+
+  it('silent refresh (E1 401 → refresh ok → 200): one feed refetch with the new token; the cards are open', async () => {
+    install({ status: refreshOk.status, body: refreshOk.body });
+    const root = await loadDead([locked(0), locked(1)]);
+    expect(transport.callsTo(TOKEN)).toHaveLength(1);
+    expect(feedCalls()).toHaveLength(2);
+    expect(feedCalls()[1].headers.Authorization).toBe(REFRESHED);
+    expect(cardIds(root)).toHaveLength(10);
+    expect(visible(root, 'home/feed/locked-0')).toBe(false);
+    expect(visible(root, `home/feed/${e5Posts()[0].id}/lock`)).toBe(false);
+    expect(visible(root, 'auth/expired')).toBe(false);
+    await unmount(root);
+  });
+
+  it('truly locked (E1 200): one refetch, the locked cards stay; no loop', async () => {
+    install({ status: refreshOk.status, body: refreshOk.body });
+    e1Reply = () => ({ status: 200, body: e1Ok.body });
+    const root = await loadDead([locked(0), locked(1)]);
+    expect(transport.callsTo(E1)).toHaveLength(2);
+    expect(transport.callsTo(TOKEN)).toHaveLength(0);
+    expect(feedCalls()).toHaveLength(2);
+    expect(visible(root, 'home/feed/locked-0/lock')).toBe(true);
+    expect(visible(root, 'home/feed/locked-1/lock')).toBe(true);
+    await settle();
+    expect(transport.callsTo(E1)).toHaveLength(2);
+    expect(feedCalls()).toHaveLength(2);
+    await unmount(root);
+  });
+
+  it('silent refresh: focus stays on the same card id across the feed refetch', async () => {
+    install({ status: refreshOk.status, body: refreshOk.body });
+    // The same posts: locked for the dead token, open for the refreshed one.
+    const ids = [0, 1, 2, 3, 4, 5];
+    refreshedPage = () => ({ data: { posts: ids.map(n => feedPost(n)) }, extra: { isLast: true } });
+    const e1 = deferred();
+    e1Reply = () => e1.promise;
+    const root = await loadDead(ids.map(n => feedPost(n, { hasAccess: false, data: [] })));
+    expect(visible(root, 'home/feed/feed-post-4/lock')).toBe(true);
+    await focusOn(root, 'home/feed/feed-post-4');
+    focusMock.mockClear();
+    e1.resolve({ status: e1Unauthorized.status, body: e1Unauthorized.body });
+    await settle();
+    expect(transport.callsTo(TOKEN)).toHaveLength(1);
+    expect(feedCalls()).toHaveLength(2);
+    expect(visible(root, 'home/feed/feed-post-4')).toBe(true);
+    expect(visible(root, 'home/feed/feed-post-4/lock')).toBe(false);
+    // No focus request: native focus stays on the same card (same id, same view).
+    expect(focusMock).not.toHaveBeenCalled();
+    await unmount(root);
+  });
+
+  it.each([
+    ['E1 200: one feed refetch, the cards stay locked', 200],
+    ['E1 401 → refresh invalid_grant: A11', 401],
+  ])('page 1 all locked while the cold-start E1 runs: one E1 shared — %s', async (_name, status) => {
+    install({ status: refreshRejected.status, body: refreshRejected.body });
+    const e1 = deferred();
+    e1Reply = () => e1.promise;
+    // Dead from the start: the cold-start E1 is the held one.
+    dead = true;
+    firstPage.resolve({ status: 200, body: { data: { posts: [locked(0), locked(1)] }, extra: { isLast: true } } });
+    const root = await renderApp();
+    expect(transport.callsTo(E1)).toHaveLength(1);
+    expect(feedCalls()).toHaveLength(1);
+    e1.resolve(
+      status === 200
+        ? { status: 200, body: e1Ok.body }
+        : { status: e1Unauthorized.status, body: e1Unauthorized.body },
+    );
+    await settle();
+    expect(transport.callsTo(E1)).toHaveLength(1);
+    if (status === 200) {
+      expect(feedCalls()).toHaveLength(2);
+      expect(visible(root, 'home/feed/locked-0/lock')).toBe(true);
+      expect(visible(root, 'auth/expired')).toBe(false);
+    } else {
+      expect(transport.callsTo(TOKEN)).toHaveLength(1);
+      expect(feedCalls()).toHaveLength(1);
+      await settle(WITH_TIMERS);
+      expect(navigationRef.getRootState()?.routes.map(r => r.name)).toEqual(['Expired']);
+    }
+    await unmount(root);
+  });
+
+  it('page 1 accessible with a next cursor, page 2 all locked: no E1, exactly 2 feed calls', async () => {
+    feed = req =>
+      cursorOf(req.url) === null
+        ? {
+            status: 200,
+            body: {
+              data: { posts: [0, 1, 2, 3, 4, 5, 6, 7, 8].map(n => feedPost(n)) },
+              extra: { offset: cursorFor(9), isLast: false },
+            },
+          }
+        : { status: 200, body: { data: { posts: [locked(0), locked(1), locked(2)] }, extra: { isLast: true } } };
+    const root = await renderApp();
+    expect(feedCalls()).toHaveLength(1);
+    await focusOn(root, 'home/feed/feed-post-8');
+    await settle();
+    expect(feedCalls()).toHaveLength(2);
+    expect(visible(root, 'home/feed/locked-2/lock')).toBe(true);
+    expect(transport.callsTo(E1)).toHaveLength(1);
+    await unmount(root);
+  });
+
+  it('page 1 partly locked (one accessible post): no E1, no refetch', async () => {
+    install({ status: refreshRejected.status, body: refreshRejected.body });
+    const root = await loadDead([locked(0), feedPost(1)]);
+    expect(transport.callsTo(E1)).toHaveLength(1);
+    expect(transport.callsTo(TOKEN)).toHaveLength(0);
+    expect(feedCalls()).toHaveLength(1);
+    expect(visible(root, 'home/feed/locked-0/lock')).toBe(true);
+    expect(visible(root, 'auth/expired')).toBe(false);
     await unmount(root);
   });
 });

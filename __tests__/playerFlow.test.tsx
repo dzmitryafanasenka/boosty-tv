@@ -24,6 +24,10 @@ import { engine } from '../src/test/playerEngineMock';
 import { tvEvents } from '../src/test/tvEventMock';
 import { E5_PATH, syntheticFeed } from '../src/test/feedFixtures';
 import e1Ok from '../src/test/fixtures/boosty/e1-user-current.json';
+import e1Unauthorized from '../src/test/fixtures/boosty/e1-no-token.json';
+import e8NoToken from '../src/test/fixtures/boosty/e8-no-token.json';
+import refreshRejected from '../src/test/fixtures/boosty/refresh-invalid-grant.json';
+import refreshOk from '../src/test/fixtures/boosty/refresh-ok.json';
 import { e8Accessible, e8Locked, e8MissingReply, paragraph, postDetail } from '../src/test/postFixtures';
 import {
   byTestId,
@@ -330,6 +334,137 @@ describe('open the player (matrix «Open from a row», «Source order», «Progr
     pending.resolve({ status: 200, body: postDetail(FEED_BLOG, POST, ONE) });
     await settle();
     expect(engine.props?.source.format).toBe('hls');
+    await unmount(root);
+  });
+});
+
+describe('a locked fresh E8 checks the session first (Epic 3 retro A6)', () => {
+  const TOKEN = '/oauth/token/';
+  const REFRESHED = `Bearer ${refreshOk.body.access_token}`;
+  /** The stored token died after Пост opened: E1 401, E8 anonymous (locked). */
+  let dead: boolean;
+  let e1Reply: () => FixtureReply;
+  /** E8 with the stale token (default: the anonymous locked post). */
+  let staleE8: () => FixtureReply;
+  const anonymous = (): FixtureReply => ({
+    status: e8NoToken.status,
+    body: { ...e8NoToken.body, id: POST, user: { ...(e8NoToken.body.user as object), blogUrl: FEED_BLOG } },
+  });
+
+  function install(refresh: FixtureReply) {
+    dead = false;
+    e1Reply = () => ({ status: e1Unauthorized.status, body: e1Unauthorized.body });
+    staleE8 = anonymous;
+    installNativeModules({
+      InstallId: { getOrCreate: jest.fn().mockResolvedValue('0f8fad5b-d9cb-469f-a165-70867728950e') },
+    });
+    const feed = syntheticFeed({ total: 3 });
+    transport = installFixtureTransport((req: FixtureRequest): Reply => {
+      const stale = dead && req.headers.Authorization !== REFRESHED;
+      if (req.path === TOKEN) {
+        return refresh;
+      }
+      if (req.path === E1) {
+        return stale ? e1Reply() : { status: 200, body: e1Ok.body };
+      }
+      if (req.path === E5_PATH) {
+        return feed(req);
+      }
+      const single = E8_RE.exec(req.path);
+      if (single) {
+        return stale ? staleE8() : e8(req, decodeURIComponent(single[1]), decodeURIComponent(single[2]));
+      }
+      return undefined;
+    });
+  }
+
+  /**
+   * Пост opened alive; then the token dies and OK on the row opens the
+   * player. `timers` only for the AD-6 backoff and the reset to A11.
+   */
+  async function playDead({ timers = false } = {}): Promise<Root> {
+    const root = await openPost();
+    expect(transport.callsTo(E1)).toHaveLength(1);
+    dead = true;
+    focusMock.mockClear();
+    await press(root, VIDEO('v1'), timers ? { settle: { timerRounds: 30 } } : undefined);
+    return root;
+  }
+
+  it('dead session (E1 401 → refresh invalid_grant): A11, no player and no «Нет доступа» behind it', async () => {
+    install({ status: refreshRejected.status, body: refreshRejected.body });
+    const root = await playDead({ timers: true });
+    expect(transport.callsTo(E1)).toHaveLength(2);
+    expect(transport.callsTo(TOKEN)).toHaveLength(1);
+    expect(e8Calls()).toHaveLength(2);
+    expect(routeNames()).toEqual(['Expired']);
+    expect(visible(root, 'player')).toBe(false);
+    expect(engine.props).toBeNull();
+    // The player's late focus retry does not pull focus back from A11.
+    expect(lastFocusTarget()).toBe('auth/expired/relogin');
+    await unmount(root);
+  });
+
+  it('silent refresh (E1 401 → refresh ok → 200): one refetch of the E8 with the new token → plays', async () => {
+    install({ status: refreshOk.status, body: refreshOk.body });
+    const root = await playDead();
+    expect(transport.callsTo(TOKEN)).toHaveLength(1);
+    expect(e8Calls()).toHaveLength(3);
+    expect(e8Calls()[2].headers.Authorization).toBe(REFRESHED);
+    expect(currentRoute()).toBe('Player');
+    expect(engine.props?.source.format).toBe('hls');
+    expect(playerText(root)).not.toContain('Нет доступа к этому видео');
+    expect(lastFocusTarget()).toBe(SURFACE);
+    await unmount(root);
+  });
+
+  it('truly locked (E1 200): one refetch, still locked, no loop; reopening within 5 min sends no E1', async () => {
+    install({ status: refreshOk.status, body: refreshOk.body });
+    e1Reply = () => ({ status: 200, body: e1Ok.body });
+    const root = await playDead();
+    expect(transport.callsTo(E1)).toHaveLength(2);
+    expect(transport.callsTo(TOKEN)).toHaveLength(0);
+    expect(e8Calls()).toHaveLength(3);
+    expect(playerText(root)).toContain('Нет доступа к этому видео');
+    expect(lastFocusTarget()).toBe(BACK);
+    await press(root, BACK);
+    expect(currentRoute()).toBe('Post');
+    await press(root, VIDEO('v1'));
+    expect(playerText(root)).toContain('Нет доступа к этому видео');
+    expect(transport.callsTo(E1)).toHaveLength(2);
+    expect(e8Calls()).toHaveLength(4);
+    await unmount(root);
+  });
+
+  it('E1 200, the one refetch fails: «Нет доступа к этому видео» stays (no error copy, no retry)', async () => {
+    install({ status: refreshOk.status, body: refreshOk.body });
+    e1Reply = () => ({ status: 200, body: e1Ok.body });
+    let n = 0;
+    staleE8 = () => {
+      n += 1;
+      return n === 1 ? anonymous() : { status: 400, body: { error: 'bad_request' } };
+    };
+    const root = await playDead();
+    expect(transport.callsTo(E1)).toHaveLength(2);
+    expect(e8Calls()).toHaveLength(3);
+    expect(playerText(root)).toContain('Нет доступа к этому видео');
+    expect(playerText(root)).not.toContain('Не удалось воспроизвести видео');
+    expect(visible(root, RETRY)).toBe(false);
+    expect(lastFocusTarget()).toBe(BACK);
+    await unmount(root);
+  });
+
+  it('offline (E1 Network): «Нет доступа к этому видео» as today, no refetch, no A11', async () => {
+    install({ status: refreshOk.status, body: refreshOk.body });
+    e1Reply = () => ({ network: true });
+    const root = await playDead({ timers: true });
+    // The cold-start E1, then the check's E1 with its AD-6 retries (3 attempts).
+    expect(transport.callsTo(E1)).toHaveLength(4);
+    expect(transport.callsTo(TOKEN)).toHaveLength(0);
+    expect(e8Calls()).toHaveLength(2);
+    expect(currentRoute()).toBe('Player');
+    expect(playerText(root)).toContain('Нет доступа к этому видео');
+    expect(lastFocusTarget()).toBe(BACK);
     await unmount(root);
   });
 });
