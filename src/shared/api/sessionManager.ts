@@ -4,30 +4,20 @@ import {
   type SecureStore,
 } from '../platform/secureStore';
 import { logger as appLogger, type Logger } from '../services/logger';
-import { isAppError } from './appError';
 import { authApiClient, type AuthApiClient } from './authApiClient';
-import { AuthError, isAuthError } from './authError';
-import { userCurrentSchema } from './dto/userCurrent';
 import {
   createHttpClient,
-  fixedAccessToken,
   type AccessTokenSource,
   type HttpClient,
 } from './httpClient';
 import { createRefreshCoordinator } from './refreshCoordinator';
-import { encode, type StoredSession } from './session/codec';
 import { createSessionCore } from './session/core';
 import { createLifecycle } from './session/lifecycle';
 import { createRefreshHost } from './session/refreshHost';
 import { createRestore } from './session/restore';
+import { createSignIn } from './session/signIn';
 import { createSignOut } from './session/signOut';
-import {
-  CURRENT_USER_PATH,
-  type AccountSwitchHook,
-  type SessionManager,
-  type SignInArgs,
-  type SignInResult,
-} from './session/types';
+import type { AccountSwitchHook, SessionManager } from './session/types';
 
 export {
   CURRENT_USER_PATH,
@@ -103,9 +93,7 @@ export function createSessionManager({
   logger = appLogger,
   onAccountSwitch,
 }: SessionManagerDeps = {}): SessionManager {
-  let accountSwitchHook: AccountSwitchHook | null = onAccountSwitch ?? null;
   const core = createSessionCore({ sessionStore, phoneStore, logger });
-  let signingIn: { key: string; promise: Promise<SignInResult> } | null = null;
 
   const host = createRefreshHost(core, logger);
 
@@ -119,98 +107,14 @@ export function createSessionManager({
 
   const { restore, getExpiredPhone } = createRestore(core, logger);
 
-  /** E1 with a token that is not adopted yet (sign-in). */
-  async function validateWithE1(accessToken: string): Promise<string> {
-    try {
-      // Sent once, as in Story 2.3 (api-contract §2.2): no AD-6 retries.
-      const response = await createHttp(fixedAccessToken(accessToken)).request({
-        path: CURRENT_USER_PATH,
-        schema: userCurrentSchema,
-        retry: false,
-      });
-      return String(response.body.id);
-    } catch (error) {
-      logger.warn('session', 'E1 failed', {
-        kind: isAppError(error) ? error.kind : 'unknown',
-        status: isAppError(error) ? error.status : undefined,
-      });
-      throw new AuthError('Unknown');
-    }
-  }
-
-  async function discardSaved(): Promise<void> {
-    for (const clear of [core.clearSession, core.clearPhone]) {
-      try {
-        await clear();
-      } catch {
-        // Logged by the store.
-      }
-    }
-  }
-
-  async function doSignIn({ phone, challenge, smsCode }: SignInArgs): Promise<SignInResult> {
-    const tokens = await authApi.confirmCode(phone, challenge, smsCode);
-    // From here on the challenge is spent: any failure says so.
-    const spent = () => new AuthError('Unknown', { challengeSpent: true });
-    const confirmedAt = now();
-    let accountId: string;
-    try {
-      accountId = await validateWithE1(tokens.accessToken);
-    } catch {
-      throw spent();
-    }
-    const next: StoredSession = {
-      v: 1,
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-      expiresAt: confirmedAt + tokens.expiresIn * 1000,
-      accountId,
-    };
-    // The previous account: the in-memory session, else the expiry marker.
-    const previous = core.current()?.accountId ?? core.previousAccountId();
-    const accountChanged = previous === null || previous !== accountId;
-    if (accountChanged) {
-      // Story 2.8: wipe the previous account before anything of this one is
-      // written. The hook's gate is `signOut()` (old phone, marker, memory);
-      // it bumps the generation and emits `signedOut`, which navigates
-      // nowhere. A failed gate keeps the old data; nothing of this account is
-      // stored and the tokens are dropped with this frame. No hook set is
-      // a wiring bug: fail closed rather than store B next to A's data.
-      if (!accountSwitchHook) {
-        logger.error('session', 'no account-switch hook set; nothing kept');
-        throw spent();
-      }
-      try {
-        await accountSwitchHook();
-      } catch {
-        logger.error('session', 'account switch failed; nothing kept');
-        throw spent();
-      }
-      // After the hook: its reset cleared the log ring.
-      logger.info('session', 'accountChanged');
-    }
-    // A new session: any refresh still running for an older one is dropped.
-    core.bumpGeneration();
-    // The phone first and non-fatal (it only prefills re-login): its ADR
-    // 0006 recovery may delete the shared keychain file, which must happen
-    // before the session is written, never after.
-    try {
-      await core.writePhone(phone);
-    } catch {
-      logger.warn('session', 'phone not saved');
-    }
-    // Overwrites the expiry marker, if any.
-    try {
-      await core.writeSession(encode(next));
-    } catch {
-      logger.error('session', 'save failed; nothing kept');
-      await discardSaved();
-      throw spent();
-    }
-    logger.info('session', 'signed in', { accountChanged });
-    core.adoptSignedIn(next);
-    return { accountChanged };
-  }
+  const { signIn, setAccountSwitchHook } = createSignIn({
+    core,
+    authApi,
+    createHttp,
+    now,
+    logger,
+    onAccountSwitch,
+  });
 
   const { validate, onAppStateChange } = createLifecycle({ core, http, logger });
 
@@ -226,30 +130,10 @@ export function createSessionManager({
     getStatus: core.getStatus,
     subscribe: core.subscribe,
     restore,
-    signIn(args) {
-      const key = `${args.phone}\n${args.challenge}\n${args.smsCode}`;
-      if (signingIn) {
-        if (signingIn.key === key) {
-          return signingIn.promise;
-        }
-        logger.warn('session', 'signIn rejected: another sign-in in flight');
-        return Promise.reject(new AuthError('Unknown'));
-      }
-      const promise = doSignIn(args)
-        .catch((error: unknown) => {
-          throw isAuthError(error) ? error : new AuthError('Unknown');
-        })
-        .finally(() => {
-          signingIn = null;
-        });
-      signingIn = { key, promise };
-      return promise;
-    },
+    signIn,
     getExpiredPhone,
     signOut,
-    setAccountSwitchHook(hook) {
-      accountSwitchHook = hook;
-    },
+    setAccountSwitchHook,
     validate,
     onAppStateChange,
     http,
