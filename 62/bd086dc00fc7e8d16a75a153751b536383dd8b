@@ -1,0 +1,41 @@
+__tests__/postFlow.test.tsx
+  s_06dd4e6f3c24d0::t_9f2596d7ced3cf 5,27,249-251,276,412-415,494,578-581,618-620,662-665,687,690-707,710,712,738-776,1057-1061,1067,1091-1098,1106,1136,1145,1181,1204,1208-1217,1220,1223,1225-1226,1276-1277
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_06dd4e6f3c24d0::t_29bce1f576a9a3 194-199
+_bmad-output/implementation-artifacts/spec-post-header-layout.md
+  s_06dd4e6f3c24d0::t_6374404d893993 1-95
+_bmad-output/planning-artifacts/ux-designs/ux-boosty-tv-2026-10-25/DESIGN.md
+  s_06dd4e6f3c24d0::t_2b72da09767add 95,193-198
+docs/focus-map.md
+  s_06dd4e6f3c24d0::t_c094c6bfbd7d46 221,228,231,233,240,243,246-251,281
+docs/testing.md
+  s_06dd4e6f3c24d0::t_ef6be20c91d4fd 757-777
+src/features/post/PostBody.tsx
+  s_06dd4e6f3c24d0::t_5046b50924a959 64,80,97-101,131,178-179,199,202,218-225
+src/features/post/PostHeader.tsx
+  s_06dd4e6f3c24d0::t_4204a0aad67d26 44-47,64,86-89,103,127,130,143-150,182,186,190,194
+src/features/post/PostScreen.tsx
+  s_06dd4e6f3c24d0::t_78b5278c2f10fa 66-72,85-90,132-133,141,149-160,163-164,171,173-184,186,188-191,193-194,267-270,298-299,338-340,350-356,361-362,367-368,377,390,396-397
+src/shared/entities/post/__tests__/postBody.test.ts
+  s_06dd4e6f3c24d0::t_19283dc3ef5d2c 4,218-230,235
+src/shared/entities/post/postBody.ts
+  s_06dd4e6f3c24d0::t_3d7c52ed1f74f1 37-45,47
+src/shared/ui/tokens.ts
+  s_06dd4e6f3c24d0::t_70647446c004b3 107-108
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "62bd086dc00fc7e8d16a75a153751b536383dd8b",
+  "prompts": {},
+  "sessions": {
+    "s_06dd4e6f3c24d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b17b1d18-d247-4604-86f0-d38f6644be98",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
