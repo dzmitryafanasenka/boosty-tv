@@ -200,3 +200,6 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-6-locked-posts.md`
   summary: Demo mode: a demoFlow test for the locked demo posts (with and without a level name) and a demo teaser with an image URL.
   evidence: Dev-only; demo teasers have no URL, so only the placeholder path runs in demo. Review 3.6, finding 10.
+- source_spec: `_bmad-output/implementation-artifacts/spec-epic-3-retro-a1-pinned-head-refresh.md`
+  summary: A head post deleted or hidden by the author stays in the cached head after a head refresh (the merge keeps cached copies) until a gap or the cache is collected (Epic 3 retro F2, second half).
+  evidence: `mergePostsHead` → `mergePosts(fresh.posts, first.posts)`; opening such a post gives «Пост недоступен». Applies to Главная and Автор.
