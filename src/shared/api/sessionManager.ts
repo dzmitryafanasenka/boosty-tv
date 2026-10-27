@@ -18,6 +18,7 @@ import { createRefreshCoordinator } from './refreshCoordinator';
 import { decodeSession, encode, type StoredSession } from './session/codec';
 import { createSessionCore } from './session/core';
 import { createRefreshHost } from './session/refreshHost';
+import { createSignOut } from './session/signOut';
 import {
   CURRENT_USER_PATH,
   type AccountSwitchHook,
@@ -277,22 +278,7 @@ export function createSessionManager({
     return validating;
   }
 
-  async function signOut(): Promise<void> {
-    core.bumpGeneration();
-    core.beginSignOut();
-    // SecureStore first, then memory (api-contract §2.3 «Logout order»).
-    // The phone before the session entry: a phone failure then leaves the
-    // stored session and memory exactly as they were.
-    try {
-      await core.clearPhone();
-      await core.clearSession();
-    } finally {
-      core.endSignOut();
-    }
-    core.clearMemory();
-    logger.info('session', 'signed out');
-    core.setStatus('signedOut');
-  }
+  const signOut = createSignOut(core, logger);
 
   function corrupt(token: string): string {
     return token.replace(/[A-Za-z0-9]/g, c =>
