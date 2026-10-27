@@ -823,3 +823,11 @@ Device (agent, adb injected keys + uiautomator, release-like build, owner's sess
 | Sidebar OK from Пост opened from Главная («Подписки») | Pops to the Shell; Подписки opens (`shell/content/subs`) with focus on the remembered tile; Back → `nav/subs` → `nav/home` |
 
 Animations were left at the device default, so the A4 check (sidebar OK with animations off) is still open. Host: lint (`--max-warnings 0`), typecheck, check:fixtures clean; `npm test` ×3: 1198 passed each; every `*Flow.test.tsx` suite (12 suites, 384 tests) 30/30. Not checked with the physical remote.
+
+### ADR 0009 — SessionManager split, 2026-10-27
+
+Refactor, no behaviour change (`spec-session-manager-split.md`): `src/shared/api/sessionManager.ts` is a facade over `src/shared/api/session/` (`types`, `codec`, `core`, `refreshHost`, `restore`, `signIn`, `signOut`, `lifecycle`, `debug`).
+
+**Build:** `./gradlew assembleRelease -PreactNativeArchitectures=armeabi-v7a` (JDK 17, `ANDROID_HOME=/opt/homebrew/share/android-commandlinetools`) BUILD SUCCESSFUL. The shipped Hermes bundle: `debug: expired in memory` 0, `access token corrupted` 0, `createDemoSessionManager` 0, `late rejection dropped` 1, `expiry marker not saved` 1. Release-like (`zipalign -p 4` + `apksigner`, SDK debug key outside the repo), installed with `adb install -r`. Nothing uninstalled or cleared; no sign-in, no sign-out.
+
+Smoke check (agent, adb injected keys + uiautomator + screencap, release-like build, owner's stored session, Chromecast with Google TV 4K): cold start (force-stop, launch) → Shell, Главная with the feed, focus on the first feed card: the stored session was restored as `signedIn`, no A11, no error. → to the second card → Home key, 10 s, relaunch (same process) → the feed, focus on the same second card, no A11, no error. The resume E1 request itself is not visible in a release build (no JS logs), so only its absence of effect was observed. Host: lint (`--max-warnings 0`), typecheck clean; `npm test` ×3: 1236 passed each; `core.test.ts` + `refreshHost.test.ts` 30/30 in isolation; `__tests__/releaseBundle.test.js` green. Not checked with the physical remote.

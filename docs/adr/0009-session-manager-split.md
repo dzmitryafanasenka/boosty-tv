@@ -1,6 +1,7 @@
 # ADR 0009: Split SessionManager into modules behind an unchanged facade
 
 - Status: accepted (owner, 2026-10-26; Epic 2 retro action item 5; the split itself is a later, separate change)
+- Executed 2026-10-27 (`_bmad-output/implementation-artifacts/spec-session-manager-split.md`), steps 1–9 one commit each: `2195e1f` types, `92589c8` codec, `9029355` core (+ `core.test.ts`), `bf47814` refreshHost (+ `refreshHost.test.ts`), `f708a90` signOut, `9b39f29` lifecycle, `1a5afa3` restore, `af663d9` signIn, `b8e2426` debug; `23fd74c` adds `codec.test.ts`. `sessionManager.test.ts` and `sessionRefresh.test.ts` were not edited. Line references below are to `697de1f`, before the split.
 - Date: 2026-10-26
 - Relates to: architecture spine AD-3 (session ownership), AD-4 (account scope); `docs/api-contract.md` §2.3 «Production refresh-coordinator requirements»; Epic 2 retro findings A2, A3, F7 (`_bmad-output/implementation-artifacts/epic-2-retro-2026-10-26.md`)
 - Code references are to `main` at `697de1f`.
