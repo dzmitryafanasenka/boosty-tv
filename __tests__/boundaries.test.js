@@ -107,3 +107,70 @@ describe('architecture boundaries lint rules', () => {
     expect(await boundaryErrors(fromFile, importPath)).toHaveLength(0);
   });
 });
+
+/** The project's no-restricted-imports overrides (ADR 0009 session rules). */
+const sessionOverrides = projectConfig.overrides.filter(
+  o => o.rules && o.rules['no-restricted-imports'],
+);
+
+const sessionEslint = new ESLint({
+  cwd: fixtureRoot,
+  useEslintrc: false,
+  ignore: false,
+  overrideConfig: {
+    root: true,
+    parser: '@typescript-eslint/parser',
+    parserOptions: { ecmaVersion: 'latest', sourceType: 'module' },
+    overrides: sessionOverrides,
+  },
+});
+
+async function sessionImportErrors(fromFile, importPath) {
+  const [result] = await sessionEslint.lintText(
+    `import * as target from '${importPath}';\nexport const used = target;\n`,
+    { filePath: path.join(fixtureRoot, fromFile) },
+  );
+  const fatal = result.messages.filter(m => m.fatal);
+  if (fatal.length > 0) {
+    throw new Error(`Lint parse failure: ${fatal[0].message}`);
+  }
+  return result.messages.filter(m => m.ruleId === 'no-restricted-imports');
+}
+
+describe('session module import rules (ADR 0009)', () => {
+  test('the session overrides are present', () => {
+    expect(sessionOverrides.length).toBeGreaterThan(0);
+  });
+
+  it.each([
+    ['feature -> session/core', 'src/features/a/screen.tsx', '../../shared/api/session/core'],
+    ['app -> session/types', 'src/app/Shell.tsx', '../shared/api/session/types'],
+    ['shared/api index -> ./session/types', 'src/shared/api/index.ts', './session/types'],
+    ['shared/api test -> ../session/core', 'src/shared/api/__tests__/x.test.ts', '../session/core'],
+    ['other shared module -> session', 'src/shared/ui/Button.tsx', '../api/session/core'],
+    ['signIn -> signOut', 'src/shared/api/session/signIn.ts', './signOut'],
+    ['session module -> the facade', 'src/shared/api/session/signIn.ts', '../sessionManager'],
+    ['session module -> the shared/api index', 'src/shared/api/session/signIn.ts', '..'],
+    ['signIn -> ../session/signOut', 'src/shared/api/session/signIn.ts', '../session/signOut'],
+    ['signIn -> ../../api/session/signOut', 'src/shared/api/session/signIn.ts', '../../api/session/signOut'],
+    ['signIn -> ../session/core (up and back)', 'src/shared/api/session/signIn.ts', '../session/core'],
+  ])('fails: %s', async (_name, fromFile, importPath) => {
+    expect(await sessionImportErrors(fromFile, importPath)).not.toHaveLength(0);
+  });
+
+  it.each([
+    ['facade -> session/core', 'src/shared/api/sessionManager.ts', './session/core'],
+    ['signIn -> ./core', 'src/shared/api/session/signIn.ts', './core'],
+    ['signIn -> ./codec', 'src/shared/api/session/signIn.ts', './codec'],
+    ['signIn -> ./types', 'src/shared/api/session/signIn.ts', './types'],
+    ['session module -> other shared/api code', 'src/shared/api/session/signIn.ts', '../httpClient'],
+    ['session test -> any session module', 'src/shared/api/session/__tests__/signIn.test.ts', '../signIn'],
+    ['feature -> shared/api', 'src/features/a/screen.tsx', '../../shared/api'],
+    ['app -> its own session.ts', 'src/app/Shell.tsx', './session'],
+    ['shared/api/x -> ./dto/session', 'src/shared/api/x.ts', './dto/session'],
+    ['shared/api test -> ../dto/session', 'src/shared/api/__tests__/x.test.ts', '../dto/session'],
+    ['feature -> its own session module', 'src/features/a/screen.tsx', './session/state'],
+  ])('passes: %s', async (_name, fromFile, importPath) => {
+    expect(await sessionImportErrors(fromFile, importPath)).toHaveLength(0);
+  });
+});

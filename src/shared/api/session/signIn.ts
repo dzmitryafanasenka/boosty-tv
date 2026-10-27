@@ -4,7 +4,7 @@ import type { AuthApiClient } from '../authApiClient';
 import { AuthError, isAuthError } from '../authError';
 import { userCurrentSchema } from '../dto/userCurrent';
 import { fixedAccessToken, type AccessTokenSource, type HttpClient } from '../httpClient';
-import { encode, type StoredSession } from './codec';
+import { encode, type ExpiryMarker, type StoredSession } from './codec';
 import type { SessionCore } from './core';
 import {
   CURRENT_USER_PATH,
@@ -77,6 +77,23 @@ export function createSignIn({
     }
   }
 
+  /**
+   * A failed session write on a same-account re-login from `expired`: the
+   * account is unchanged, so its data stays (no hook ran). Best effort: the
+   * phone is not cleared (an ADR 0006 recovery may still have deleted it
+   * with the shared keychain file) and that account's expiry marker is
+   * re-written (the failed write may have taken it), so a restart opens A11
+   * for the same account instead of Welcome.
+   */
+  async function keepExpired(accountId: string): Promise<void> {
+    const marker: ExpiryMarker = { v: 1, expired: true, accountId };
+    try {
+      await core.writeSession(encode(marker));
+    } catch {
+      logger.error('session', 'expiry marker not saved');
+    }
+  }
+
   async function doSignIn({ phone, challenge, smsCode }: SignInArgs): Promise<SignInResult> {
     const tokens = await authApi.confirmCode(phone, challenge, smsCode);
     // From here on the challenge is spent: any failure says so.
@@ -119,6 +136,9 @@ export function createSignIn({
       logger.info('session', 'accountChanged');
     }
     // A new session: any refresh still running for an older one is dropped.
+    // On a same-account re-login from `expired` the status stays `expired`
+    // between this bump and `adoptSignedIn` below: harmless, the
+    // coordinator sees no session and requests throw `SessionExpired`.
     core.bumpGeneration();
     // The phone first and non-fatal (it only prefills re-login): its ADR
     // 0006 recovery may delete the shared keychain file, which must happen
@@ -132,8 +152,14 @@ export function createSignIn({
     try {
       await core.writeSession(encode(next));
     } catch {
-      logger.error('session', 'save failed; nothing kept');
-      await discardSaved();
+      if (core.getStatus() === 'expired' && core.previousAccountId() === accountId) {
+        // The same account re-login from `expired`: keep its marker and phone.
+        logger.error('session', 'save failed; the expired state kept');
+        await keepExpired(accountId);
+      } else {
+        logger.error('session', 'save failed; nothing kept');
+        await discardSaved();
+      }
       throw spent();
     }
     logger.info('session', 'signed in', { accountChanged });

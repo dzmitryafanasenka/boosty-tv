@@ -140,6 +140,16 @@ Smallest and pure seams first; one commit per step; `sessionManager.test.ts` and
 
 Owner decision (2026-10-26): the split runs between Epic 3 and Epic 4, as its own change right before Story 4.2, the first story with a session concern. Epic 3 starts now without it, because no Epic 3 story adds a session concern (see above). The split is tracked in `_bmad-output/implementation-artifacts/deferred-work.md` (entry "split SessionManager per ADR 0009 before Story 4.2").
 
+## Robustness pass (2026-10-27)
+
+`_bmad-output/implementation-artifacts/spec-session-robustness.md` closed the races the split review found (all pre-existing in the closure), each in its owning module; the facade's API and `createSessionManager(deps)` did not change, and the two generation counters stay separate.
+
+- `core.ts`: `signingOut` is a depth counter, so overlapping sign-outs do not end each other's guard (a failed one no longer lets a refresh write tokens while another clears); `subscribe` registers one entry per call (the same function twice is notified twice, an unsubscribe removes only its own entry); `markExpired()` is a no-op returning null without a session.
+- `restore.ts`: the generation is captured after `resetForRestore()`; if the generation moved while the read ran (a sign-in or a sign-out; the debug expiry also bumps it, a refresh 400 `invalid_grant` does not), restore writes no state and reports the current status. `restore()` is cold-start only (App mount, the UI gated on `boot`); it is deliberately not blocked while `signedIn` (a reload during a refresh drops the late result through the generation) — harmless at cold start.
+- `lifecycle.ts`: the `validate()` single-flight is keyed by the generation; a validate after a sign-in, a sign-out or a restore (the debug expiry also bumps the generation; a refresh 400 `invalid_grant` does not) sends a new E1.
+- `signIn.ts`: a failed session write on a same-account re-login from `expired` (status `expired`, `previousAccountId()` equal to the E1 id) does not clear the phone and re-writes that account's expiry marker, both best effort (an ADR 0006 recovery may still have deleted the shared keychain file), so a restart opens A11, not Welcome; every other write failure discards as before. The window between `bumpGeneration()` and `adoptSignedIn()` on a re-login from `expired` is harmless: the status is still `expired`, the coordinator sees no session and requests throw `SessionExpired`.
+- `.eslintrc.js`: `no-restricted-imports` overrides enforce the module rules above (eslint-plugin-boundaries sees `shared/api` as one element): outside the facade and `session/**`, nothing imports `session/`; among the session modules, a session module imports only `./core`, `./codec`, `./types` (not up and back through `../session/…`) and never the facade; the outside patterns are limited to the `shared/api/session` folder; `session/__tests__` may import any module. `__tests__/boundaries.test.js` asserts them.
+
 ## Consequences
 
 - Story 4.2's expiry and re-login handling lands in a small module (or in ProgressRepository through `subscribe`), not in a 600-line closure.

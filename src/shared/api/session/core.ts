@@ -5,7 +5,7 @@ import type { SessionStatus } from './types';
 
 /**
  * SessionCore (ADR 0009, C4): the only holder of session state (`status`,
- * `session`, `previousAccountId`, `generation`, `signingOut`, the listeners)
+ * `session`, `previousAccountId`, `generation`, the sign-out depth, the listeners)
  * and the only module that touches a `SecureStore`. Every state change is a
  * named transition; the other session modules call these methods and keep
  * no copy of these values.
@@ -18,7 +18,11 @@ import type { SessionStatus } from './types';
  */
 export type SessionCore = {
   getStatus(): SessionStatus;
-  /** Called on every status change. Returns the unsubscribe function. */
+  /**
+   * Called on every status change. Each call registers its own entry, so the
+   * same function subscribed twice is notified twice; the returned function
+   * removes only this call's entry.
+   */
   subscribe(listener: (status: SessionStatus) => void): () => void;
   /** The signed-in session in memory, or null. */
   current(): StoredSession | null;
@@ -29,7 +33,10 @@ export type SessionCore = {
   previousAccountId(): string | null;
   generation(): number;
   isCurrent(generation: number): boolean;
-  /** Sign-out has started: the coordinator sees no session. */
+  /**
+   * A sign-out is running (any of overlapping ones): the coordinator sees no
+   * session.
+   */
   isSigningOut(): boolean;
 
   /** Deduped; notifies a snapshot of the listeners and logs the status. */
@@ -51,11 +58,16 @@ export type SessionCore = {
   adoptRefreshed(next: StoredSession, generation: number): boolean;
   /**
    * Drops the session, keeps its account id as the previous one and sets
-   * `expired`. Returns that account id (null when there was no session).
+   * `expired`. Returns that account id. Without a session it is a no-op and
+   * returns null.
    */
   markExpired(): string | null;
   /** No session and no previous account id; the status is not changed. */
   clearMemory(): void;
+  /**
+   * Counted: overlapping sign-outs each call `beginSignOut` and
+   * `endSignOut`; `isSigningOut()` stays true until the last one ends.
+   */
   beginSignOut(): void;
   endSignOut(): void;
   /** Rewrites the in-memory access token (debug only); storage is untouched. */
@@ -98,8 +110,10 @@ export function createSessionCore({
   let previousAccountId: string | null = null;
   /** Bumped by restore, sign-in and sign-out. */
   let generation = 0;
+  /** One entry per `subscribe` call (a wrapper), not per function. */
   const listeners = new Set<(next: SessionStatus) => void>();
-  let signingOut = false;
+  /** Running sign-outs; overlapping ones must not end each other's guard. */
+  let signOutDepth = 0;
   /** Serializes every SecureStore write and clear of this manager. */
   let storeQueue: Promise<unknown> = Promise.resolve();
 
@@ -123,16 +137,17 @@ export function createSessionCore({
   return {
     getStatus: () => status,
     subscribe(listener) {
-      listeners.add(listener);
+      const entry = (next: SessionStatus) => listener(next);
+      listeners.add(entry);
       return () => {
-        listeners.delete(listener);
+        listeners.delete(entry);
       };
     },
     current: () => session,
     previousAccountId: () => previousAccountId,
     generation: () => generation,
     isCurrent: g => g === generation,
-    isSigningOut: () => signingOut,
+    isSigningOut: () => signOutDepth > 0,
 
     setStatus,
     bumpGeneration() {
@@ -157,14 +172,17 @@ export function createSessionCore({
       setStatus('expired');
     },
     adoptRefreshed(next, g) {
-      if (g !== generation || status !== 'signedIn' || signingOut) {
+      if (g !== generation || status !== 'signedIn' || signOutDepth > 0) {
         return false;
       }
       session = next;
       return true;
     },
     markExpired() {
-      const accountId = session?.accountId ?? null;
+      if (!session) {
+        return null;
+      }
+      const accountId = session.accountId;
       previousAccountId = accountId;
       session = null;
       setStatus('expired');
@@ -175,10 +193,10 @@ export function createSessionCore({
       previousAccountId = null;
     },
     beginSignOut() {
-      signingOut = true;
+      signOutDepth += 1;
     },
     endSignOut() {
-      signingOut = false;
+      signOutDepth = Math.max(0, signOutDepth - 1);
     },
     replaceAccessToken(token) {
       if (session) {
