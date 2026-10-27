@@ -1,0 +1,21 @@
+src/shared/api/session/codec.ts
+  s_06dd4e6f3c24d0::t_f56007e20fe3af 1-56
+src/shared/api/sessionManager.ts
+  s_06dd4e6f3c24d0::t_5cf5bd7b2f0ebf 18,152,176,319
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "92589c8805bebc33603e47c6a1107f196aaaf900",
+  "prompts": {},
+  "sessions": {
+    "s_06dd4e6f3c24d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b17b1d18-d247-4604-86f0-d38f6644be98",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
