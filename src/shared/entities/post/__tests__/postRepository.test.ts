@@ -6,7 +6,9 @@ import { createLogger } from '../../../services/logger';
 import { cursorFor, e5Page, feedPost, syntheticFeed } from '../../../../test/feedFixtures';
 // eslint-disable-next-line boundaries/dependencies -- test-only fixtures
 import { blogPost, e4Page, syntheticBlogPosts } from '../../../../test/authorFixtures';
-import { PostRepository, blogPostsPath, feedPath, mergePosts } from '../postRepository';
+// eslint-disable-next-line boundaries/dependencies -- test-only fixtures
+import { e8Accessible, e8Locked, e8MissingReply } from '../../../../test/postFixtures';
+import { PostRepository, blogPostsPath, feedPath, mergePosts, postPath } from '../postRepository';
 import { mapPost } from '../mapPost';
 import type { Post } from '../types';
 
@@ -228,5 +230,55 @@ describe('PostRepository.blogPage (E4)', () => {
   it('a body without `data` is a Parse error', async () => {
     const { http } = client(() => ({ status: 200, body: { extra: { isLast: true } } }));
     await expect(PostRepository.blogPage(http, 'b', null)).rejects.toEqual(new AppError('Parse'));
+  });
+});
+
+describe('PostRepository.post (E8, Story 3.4)', () => {
+  it('sends E8 with comments off and the content profile; maps the live post with its like count', async () => {
+    const { http, transport } = client(() => ({ status: 200, body: e8Accessible() }));
+    const result = await PostRepository.post(http, 'synthetic-blog-1', 'synthetic-id-4');
+    expect(result.kind).toBe('ok');
+    const one = result.kind === 'ok' ? result.post : null;
+    expect(one?.id).toBe('synthetic-id-4');
+    expect(one?.likeCount).toBe(5);
+    expect(one?.hasAccess).toBe(true);
+    const [call] = transport.calls;
+    expect(call.url).toBe(
+      'https://api.boosty.to/v1/blog/synthetic-blog-1/post/synthetic-id-4?comments_limit=0&reply_limit=0',
+    );
+    expect(call.headers.Authorization).toBe(`Bearer ${'t'.repeat(64)}`);
+    expect(call.headers['X-App']).toBeUndefined();
+    expect(transport.calls).toHaveLength(1);
+    // No signed or progress value in the domain.
+    const json = JSON.stringify(one);
+    for (const field of ['timeCode', 'playerUrls', 'signedQuery', 'sig=', 'comments', 'reactions']) {
+      expect(json).not.toContain(field);
+    }
+  });
+
+  it('a locked post is an ok result (never a session problem)', async () => {
+    const { http } = client(() => ({ status: 200, body: e8Locked() }));
+    const result = await PostRepository.post(http, 'synthetic-blog-2', 'synthetic-id-106');
+    expect(result.kind === 'ok' && result.post.hasAccess).toBe(false);
+  });
+
+  it('404 not_found → unavailable (no retry)', async () => {
+    const { http, transport } = client(() => e8MissingReply());
+    expect(await PostRepository.post(http, 'b', 'p')).toEqual({ kind: 'unavailable' });
+    expect(transport.calls).toHaveLength(1);
+  });
+
+  it('a body the mapper rejects is Parse; other failures keep their kind', async () => {
+    const { http } = client(() => ({ status: 200, body: { id: 'p' } }));
+    await expect(PostRepository.post(http, 'b', 'p')).rejects.toEqual(new AppError('Parse'));
+    const failing = client(() => ({ status: 400, body: { error: 'bad_request' } }));
+    await expect(PostRepository.post(failing.http, 'b', 'p')).rejects.toEqual(new AppError('Client'));
+  });
+
+  it('postPath encodes the segments and refuses unsafe ones before any request', () => {
+    expect(postPath('b', 'a b')).toBe('/v1/blog/b/post/a%20b?comments_limit=0&reply_limit=0');
+    for (const [blogUrl, postId] of [['a/b', 'p'], ['..', 'p'], ['b', '..'], ['b', '.'], ['b', '']]) {
+      expect(() => postPath(blogUrl, postId)).toThrow(new AppError('Client'));
+    }
   });
 });

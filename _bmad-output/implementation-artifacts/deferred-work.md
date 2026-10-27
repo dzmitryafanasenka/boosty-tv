@@ -168,6 +168,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-1-subscription-feed-on-the-home-screen.md`
   summary: Before Story 3.4 relies on Shell refocus: `FocusZone.focusTarget` for Главная uses zone order (an arbitrary mounted card, no scroll restore) and the FocusZone remembers the retry/state-action id over the card entry; route Главная's refocus through `useFocusRestoration.restore()` and keep card-only memory.
   evidence: Edge-case review of Story 3.1 (`src/shared/focus/FocusZone.tsx:91-99`, `FeedGrid` retry row `onFocus`); harmless until a Post/Player return exists (3.4).
+  status: Done 2026-10-27 in `_bmad-output/implementation-artifacts/spec-3-4-post-screen.md`: Главная registers a return restore with the Shell (`HomeFocusInfo.setReturnFocus`) that restores only a remembered card through `useFocusRestoration.restore()` (scroll, index, focus, fallback chain); the retry row and the StateView action still return through the zone.
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-1-subscription-feed-on-the-home-screen.md`
   summary: Test that the demo transport pages through all 30 posts (320 with `longFeed`) and then stops, so the release latency check cannot silently run on one page.
   evidence: Verification-gap review: `demoFeedPage` cursor parsing is only exercised on page 1 (`__tests__/demoFlow.test.tsx:91`); the owner sees the card count during the device run.
@@ -184,3 +185,9 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-author-posts-refresh.md`
   summary: Главная's resume head refresh merges while the load-more «Повторить» row is shown and focused; the merge clears the query error, so the row (and focus) likely vanish.
   evidence: Author skips the refresh in that state (`skipWhileError`); applying it to Главная breaks the pinned `homeFeedFlow` test that expects the merge. Unverified on Главная; needs an owner decision on the expected behaviour. Review of spec-author-posts-refresh, loop 2.
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-4-post-screen.md`
+  summary: Update docs/feature-parity.md for Epic 3 (feed, subscriptions, author page, post screen) with «Android (Story 3.x)» evidence, including the inline-link deviation from POST-02 (plain text until Story 6.3).
+  evidence: No Epic 3 story updated the matrix; rows stay «not started» per its own rule. Review 3.4, finding 8.
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-4-post-screen.md`
+  summary: Demo mode: test opening a post from Автор (E8 `<blogUrl>-post-<n>` branch) and harden the demo E8 path parsing (escaped regex, safe decode).
+  evidence: Only feed posts are pressed in demoFlow; dev-only. Review 3.4, finding 9.

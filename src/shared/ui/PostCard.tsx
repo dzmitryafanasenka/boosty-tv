@@ -84,7 +84,7 @@ export type PostCardProps = {
   nowMs?: number;
   testID?: string;
   onFocus?: FocusableSurfaceProps['onFocus'];
-  /** Not wired in Story 3.1 (the Post screen comes in 3.4). */
+  /** OK on the card (Главная and Автор open Пост, Story 3.4). */
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
   ref?: Ref<HostView>;

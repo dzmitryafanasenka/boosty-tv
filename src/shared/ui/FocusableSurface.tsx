@@ -58,6 +58,12 @@ export type FocusableSurfaceProps = Omit<
    * to the next item (ADR 0011). Absent: plain state (buttons, rows).
    */
   resetKey?: string;
+  /**
+   * Draw the focus ring (default). False only for components whose DESIGN.md
+   * focused state is drawn by their own surface style instead (ParagraphStop:
+   * a `surface` background and an accent bar, no scale).
+   */
+  ring?: boolean;
 };
 
 const RING_WIDTH = focus['ring-width'];
@@ -87,6 +93,7 @@ export function FocusableSurface({
   onPressOut,
   ref,
   resetKey,
+  ring = true,
   ...pressableProps
 }: FocusableSurfaceProps) {
   const reducedMotion = useReducedMotion();
@@ -175,7 +182,7 @@ export function FocusableSurface({
         style={[{ borderRadius: radius }, surfaceStyles, { transform: [{ scale }] }]}
       >
         {typeof children === 'function' ? children(state) : children}
-        {state.focused ? (
+        {state.focused && ring ? (
           <View
             testID={testID ? `${testID}/ring` : undefined}
             pointerEvents="none"

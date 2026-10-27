@@ -1,8 +1,10 @@
+import { AppError, isAppError } from '../../api/appError';
 import { blogPostsPageDtoSchema, feedPageDtoSchema } from '../../api/dto/feed';
+import { blogUrlSchema } from '../../api/dto/subscriptions';
 import type { HttpClient } from '../../api/httpClient';
 import { logger as appLogger, type Logger } from '../../services/logger';
 import { mapPost } from './mapPost';
-import type { Post, PostPage } from './types';
+import type { Post, PostPage, PostResult } from './types';
 
 /**
  * PostRepository (AD-1, AD-8): the only caller of the post endpoints. The
@@ -95,4 +97,48 @@ async function blogPage(
   return toPage(body.data, body.extra, logger);
 }
 
-export const PostRepository = { feedPage, blogPage } as const;
+/**
+ * E8 path (Story 3.4). Comments are always off. `blogUrl` must pass
+ * `blogUrlSchema` and `postId` must be a plain segment (not `.` or `..`);
+ * both are encoded as path segments. Anything else throws `AppError('Client')`
+ * before a request is sent.
+ */
+export function postPath(blogUrl: string, postId: string): string {
+  if (!blogUrlSchema.safeParse(blogUrl).success || postId.length === 0 || /^\.{1,2}$/.test(postId)) {
+    throw new AppError('Client');
+  }
+  return `/v1/blog/${encodeURIComponent(blogUrl)}/post/${encodeURIComponent(postId)}?comments_limit=0&reply_limit=0`;
+}
+
+/**
+ * E8, one post (Story 3.4), `Post` at the top level (api-contract §3). A
+ * missing post is a result, not an error: E8 404 (verified `not_found`,
+ * §7) → `unavailable`. HttpClient keeps no 404 body, so every E8 404 maps
+ * here (as E3). A body that the one mapper rejects (no `id`, `user.blogUrl`,
+ * …) is `Parse`; every other failure rejects with its `AppError`. A locked
+ * post (`hasAccess=false`, empty `data`) is an ordinary `ok` result, never a
+ * session problem.
+ */
+async function onePost(
+  http: HttpClient,
+  blogUrl: string,
+  postId: string,
+  logger: Logger = appLogger,
+): Promise<PostResult> {
+  const path = postPath(blogUrl, postId);
+  try {
+    const { body } = await http.get(path);
+    const mapped = mapPost(body, logger);
+    if (mapped === null) {
+      throw new AppError('Parse');
+    }
+    return { kind: 'ok', post: mapped };
+  } catch (error) {
+    if (isAppError(error) && error.kind === 'NotFound') {
+      return { kind: 'unavailable' };
+    }
+    throw error;
+  }
+}
+
+export const PostRepository = { feedPage, blogPage, post: onePost } as const;

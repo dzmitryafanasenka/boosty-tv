@@ -47,9 +47,10 @@ export type SubscriptionsFocusInfo = {
    * Registers how Подписки restores its content focus when the Shell is the
    * focused route again (Back from Автор): the tile by `blogUrl` with the
    * fallback chain. The function returns false when it did nothing (the
-   * Shell then uses the zone's target). Null unregisters.
+   * Shell then uses the zone's target). Returns the unregister function,
+   * which clears the slot only while it still holds this registration.
    */
-  setReturnFocus?(restore: (() => boolean) | null): void;
+  setReturnFocus?(restore: () => boolean): () => void;
 };
 
 export type SubscriptionsScreenProps = {
@@ -257,14 +258,14 @@ export function SubscriptionsScreen({
   phaseRef.current = phase;
   useEffect(() => {
     const info = focusRef.current;
-    info.setReturnFocus?.(() => {
+    const unregister = info.setReturnFocus?.(() => {
       if (phaseRef.current !== 'grid') {
         return false;
       }
       restoreOrFirst();
       return true;
     });
-    return () => info.setReturnFocus?.(null);
+    return () => unregister?.();
   }, [restoreOrFirst]);
 
   const onOpenRef = useRef(onOpenAuthor);

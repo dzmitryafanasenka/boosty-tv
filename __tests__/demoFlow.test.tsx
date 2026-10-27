@@ -158,6 +158,31 @@ test('Story 3.3: Автор answers E3/E4 in demo mode (2 pages, an empty blog, 
   });
 });
 
+test('Story 3.4: Пост answers E8 in demo mode (paragraphs and likes, mixed blocks, a missing post)', async () => {
+  fetchMock.mockClear();
+  const root = await renderApp();
+  const ids = () =>
+    root.container.queryAll(n => n.props.focusable === true).map(n => n.props.testID as string);
+  const text = () => JSON.stringify(root.container.toJSON());
+  await press(root, 'home/feed/demo-post-1');
+  // demo-post-1: 4 paragraphs, then the mixed placeholders and one more paragraph.
+  expect(ids().filter(id => id.startsWith('post/demo-post-1/block/'))).toHaveLength(5);
+  expect(text()).toContain('лайк');
+  expect(text()).toContain(t('post.block.poll'));
+  await act(async () => {
+    root.unmount();
+  });
+
+  await resetQueryCache();
+  const missing = await renderApp();
+  await press(missing, 'home/feed/demo-post-9');
+  expect(JSON.stringify(missing.container.toJSON())).toContain(t('post.unavailableTitle'));
+  expect(fetchMock).not.toHaveBeenCalled();
+  await act(async () => {
+    missing.unmount();
+  });
+});
+
 test('Story 2.8: demo expiry → A11 → A2 → A5 → sign-in with another id: the demo hook wipes the stores; the keychain is never touched', async () => {
   // PhoneScreen's send still goes through the real AuthApiClient (global
   // fetch); answer it here. Confirm and E1 go to the demo's FixtureTransport.
