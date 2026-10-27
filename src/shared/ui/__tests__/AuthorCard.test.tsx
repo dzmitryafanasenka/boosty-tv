@@ -43,14 +43,17 @@ beforeAll(() => jest.useFakeTimers());
 afterAll(() => jest.useRealTimers());
 
 describe('AuthorCard', () => {
-  it('avatar, title (2 lines) and owner name (1 line); one focusable element', async () => {
+  it('avatar, the owner name first (2 lines), the blog title under it (1 line); one focusable element', async () => {
     const root = await render(author());
     const [title] = byId(root, `${ID}/title`);
     const [owner] = byId(root, `${ID}/owner`);
-    expect(title.props.children).toBe('Кухня без спешки');
-    expect(title.props.numberOfLines).toBe(2);
     expect(owner.props.children).toBe('Марина Лебедева');
-    expect(owner.props.numberOfLines).toBe(1);
+    expect(owner.props.numberOfLines).toBe(2);
+    expect(title.props.children).toBe('Кухня без спешки');
+    expect(title.props.numberOfLines).toBe(1);
+    // The name line comes before the title line.
+    const texts = root.container.queryAll(n => n.props.testID === `${ID}/owner` || n.props.testID === `${ID}/title`);
+    expect(texts.map(n => n.props.testID)).toEqual([`${ID}/owner`, `${ID}/title`]);
     const [avatar] = avatars(root);
     expect(avatar.props.source.uri).toBe('https://example.invalid/avatar');
     // List images: decoded at the view size, no fade (Story 3.1 device lessons).
@@ -60,9 +63,9 @@ describe('AuthorCard', () => {
     await act(async () => root.unmount());
   });
 
-  it('accessibility label «{title}. {owner}», role button', async () => {
+  it('accessibility label «{name}. {title}», role button', async () => {
     const root = await render(author());
-    expect(host(root).props.accessibilityLabel).toBe('Кухня без спешки. Марина Лебедева');
+    expect(host(root).props.accessibilityLabel).toBe('Марина Лебедева. Кухня без спешки');
     expect(host(root).props.accessibilityRole).toBe('button');
     await act(async () => root.unmount());
   });
@@ -112,12 +115,21 @@ describe('AuthorCard', () => {
     await act(async () => root.unmount());
   });
 
-  it('no title: «Без названия» (as PostCard), also in the label', async () => {
+  it('no title: the name alone, no second line; no owner either: «Без названия» (as PostCard)', async () => {
     const root = await render(author({ title: '' }));
-    expect(byId(root, `${ID}/title`)[0].props.children).toBe(t('postCard.untitled'));
-    expect(host(root).props.accessibilityLabel).toBe(
-      `${t('postCard.untitled')}. Марина Лебедева`,
-    );
+    expect(byId(root, `${ID}/title`)).toHaveLength(0);
+    expect(host(root).props.accessibilityLabel).toBe('Марина Лебедева');
+    await act(async () => root.unmount());
+    const neither = await render(author({ title: '', ownerName: null }));
+    expect(byId(neither, `${ID}/title`)[0].props.children).toBe(t('postCard.untitled'));
+    expect(host(neither).props.accessibilityLabel).toBe(t('postCard.untitled'));
+    await act(async () => neither.unmount());
+  });
+
+  it('a title equal to the name is not repeated', async () => {
+    const root = await render(author({ title: 'марина  Лебедева' }));
+    expect(byId(root, `${ID}/title`)).toHaveLength(0);
+    expect(host(root).props.accessibilityLabel).toBe('Марина Лебедева');
     await act(async () => root.unmount());
   });
 

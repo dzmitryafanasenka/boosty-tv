@@ -213,6 +213,16 @@ export function PostCardView({
       >
         {postBadgeLabel(post.kind)}
       </Text>
+      {showPinned && post.pinned ? (
+        <Text
+          testID={testID ? `${testID}/pin` : undefined}
+          variant="badge"
+          numberOfLines={1}
+          style={[styles.badge, styles.badgeTopRight]}
+        >
+          {t('postCard.pinned')}
+        </Text>
+      ) : null}
       {post.durationSec !== null ? (
         <Text
           testID={testID ? `${testID}/duration` : undefined}
@@ -253,9 +263,7 @@ export function PostCardView({
           numberOfLines={1}
           style={styles.metaDate}
         >
-          {tf(showPinned && post.pinned ? 'postCard.metaDatePinned' : 'postCard.metaDate', {
-            date: formatCardDate(post.publishedAt, nowMs),
-          })}
+          {tf('postCard.metaDate', { date: formatCardDate(post.publishedAt, nowMs) })}
         </Text>
       </View>
     </FocusableSurface>
@@ -317,6 +325,10 @@ const styles = StyleSheet.create({
   badgeTopLeft: {
     top: spacing['3'],
     left: spacing['3'],
+  },
+  badgeTopRight: {
+    top: spacing['3'],
+    right: spacing['3'],
   },
   badgeRight: {
     right: spacing['3'],

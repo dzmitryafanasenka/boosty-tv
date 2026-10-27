@@ -35,6 +35,8 @@ export {
   AuthorCardView,
   authorCardA11yLabel,
   authorCardTitle,
+  authorPrimaryName,
+  authorSecondaryLine,
   authorCardWidth,
   type AuthorCardProps,
 } from './AuthorCard';

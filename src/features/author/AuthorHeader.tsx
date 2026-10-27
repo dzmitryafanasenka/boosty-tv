@@ -4,7 +4,8 @@ import { tf } from '../../shared/i18n';
 import {
   AuthorAvatar,
   Text,
-  authorCardTitle,
+  authorPrimaryName,
+  authorSecondaryLine,
   colors,
   components,
   rounded,
@@ -15,12 +16,13 @@ const AVATAR = components.avatar.authorHeader;
 /** The header row's fixed height (the avatar). */
 export const AUTHOR_HEADER_HEIGHT = AVATAR;
 
-/** «Автор: {title}. {owner}», or without the owner name. */
+/** «Автор: {name}. {title}», or the name alone (owner's name first, as the tiles). */
 export function authorHeaderA11yLabel(author: Author): string {
-  const title = authorCardTitle(author);
-  return author.ownerName
-    ? tf('author.a11yHeader', { title, owner: author.ownerName })
-    : tf('author.a11yHeaderNoOwner', { title });
+  const name = authorPrimaryName(author);
+  const title = authorSecondaryLine(author);
+  return title !== null
+    ? tf('author.a11yHeader', { name, title })
+    : tf('author.a11yHeaderNameOnly', { name });
 }
 
 /**
@@ -30,6 +32,7 @@ export function authorHeaderA11yLabel(author: Author): string {
  * or subscribe action.
  */
 export function AuthorHeader({ author, testID }: { author: Author; testID: string }) {
+  const secondary = authorSecondaryLine(author);
   return (
     <View
       testID={testID}
@@ -40,18 +43,22 @@ export function AuthorHeader({ author, testID }: { author: Author; testID: strin
     >
       <AuthorAvatar url={author.avatarUrl} testID={`${testID}/avatar`} size={AVATAR} />
       <View style={styles.text}>
-        <Text testID={`${testID}/title`} variant="title-m" numberOfLines={1}>
-          {authorCardTitle(author)}
+        <Text
+          testID={`${testID}/${author.ownerName !== null ? 'owner' : 'title'}`}
+          variant="title-m"
+          numberOfLines={1}
+        >
+          {authorPrimaryName(author)}
         </Text>
-        {author.ownerName ? (
+        {secondary !== null ? (
           <Text
-            testID={`${testID}/owner`}
+            testID={`${testID}/title`}
             variant="meta"
             color="text-meta"
             numberOfLines={1}
-            style={styles.owner}
+            style={styles.secondary}
           >
-            {author.ownerName}
+            {secondary}
           </Text>
         ) : null}
       </View>
@@ -83,7 +90,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: spacing['6'],
   },
-  owner: {
+  secondary: {
     marginTop: spacing['1'],
   },
   skeletonAvatar: {

@@ -266,8 +266,8 @@ describe('load (matrix «Loaded», «Many», «Exactly 30», «Malformed», «No
     expect(subsCalls()[0].headers.Authorization).toBe(`Bearer ${'a'.repeat(64)}`);
     expect(subsCalls()[0].headers['X-App']).toBeUndefined();
     expect(transport.calls.every(c => !c.path.includes('comment'))).toBe(true);
-    // Tile label «{title}. {owner}».
-    expect(one(root, TILE(1)).props.accessibilityLabel).toBe('Blog 1. Owner 1');
+    // Tile label «{name}. {title}» (owner's name first, owner decision 2026-10-27).
+    expect(one(root, TILE(1)).props.accessibilityLabel).toBe('Owner 1. Blog 1');
     await unmount(root);
   });
 
