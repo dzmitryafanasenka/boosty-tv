@@ -15,15 +15,15 @@ import {
   type HttpClient,
 } from './httpClient';
 import { createRefreshCoordinator } from './refreshCoordinator';
-import { decodeSession, encode, type StoredSession } from './session/codec';
+import { encode, type StoredSession } from './session/codec';
 import { createSessionCore } from './session/core';
 import { createLifecycle } from './session/lifecycle';
 import { createRefreshHost } from './session/refreshHost';
+import { createRestore } from './session/restore';
 import { createSignOut } from './session/signOut';
 import {
   CURRENT_USER_PATH,
   type AccountSwitchHook,
-  type RestoreResult,
   type SessionManager,
   type SignInArgs,
   type SignInResult,
@@ -105,7 +105,6 @@ export function createSessionManager({
 }: SessionManagerDeps = {}): SessionManager {
   let accountSwitchHook: AccountSwitchHook | null = onAccountSwitch ?? null;
   const core = createSessionCore({ sessionStore, phoneStore, logger });
-  let restoring: Promise<RestoreResult> | null = null;
   let signingIn: { key: string; promise: Promise<SignInResult> } | null = null;
 
   const host = createRefreshHost(core, logger);
@@ -118,46 +117,7 @@ export function createSessionManager({
   });
   const http = createHttp(coordinator);
 
-  async function readSession(): Promise<RestoreResult> {
-    core.resetForRestore();
-    const result = await core.readSession();
-    if (result.kind === 'empty') {
-      // No session, whatever the phone store holds: a kept phone alone may
-      // come from a sign-in interrupted between the phone and session writes,
-      // so only the expiry marker means `expired`.
-      core.setStatus('signedOut');
-      return { status: 'signedOut', reason: 'none' };
-    }
-    if (result.kind !== 'value') {
-      core.setStatus('signedOut');
-    }
-    if (result.kind === 'wiped') {
-      return { status: 'signedOut', reason: 'wiped' };
-    }
-    if (result.kind === 'unavailable') {
-      return { status: 'signedOut', reason: 'unavailable' };
-    }
-    const decoded = decodeSession(result.value);
-    if (!decoded) {
-      // Readable but not a session: treat as corrupted, start clean.
-      logger.warn('session', 'stored session unreadable; clearing');
-      core.setStatus('signedOut');
-      try {
-        await core.clearSession();
-      } catch {
-        // Logged by the store; the next start tries again.
-      }
-      return { status: 'signedOut', reason: 'wiped' };
-    }
-    if (decoded.kind === 'expired') {
-      core.restoreExpired(decoded.accountId);
-      return { status: 'expired', reason: 'expired' };
-    }
-    // A past `expiresAt` is kept as is: the first request refreshes
-    // proactively (and E1 runs right after the boot).
-    core.restoreSignedIn(decoded.session);
-    return { status: 'signedIn' };
-  }
+  const { restore, getExpiredPhone } = createRestore(core, logger);
 
   /** E1 with a token that is not adopted yet (sign-in). */
   async function validateWithE1(accessToken: string): Promise<string> {
@@ -265,20 +225,7 @@ export function createSessionManager({
   return {
     getStatus: core.getStatus,
     subscribe: core.subscribe,
-    restore() {
-      if (!restoring) {
-        restoring = readSession()
-          .catch((): RestoreResult => {
-            logger.error('session', 'restore failed');
-            core.setStatus('signedOut');
-            return { status: 'signedOut', reason: 'unavailable' };
-          })
-          .finally(() => {
-            restoring = null;
-          });
-      }
-      return restoring;
-    },
+    restore,
     signIn(args) {
       const key = `${args.phone}\n${args.challenge}\n${args.smsCode}`;
       if (signingIn) {
@@ -298,18 +245,7 @@ export function createSessionManager({
       signingIn = { key, promise };
       return promise;
     },
-    async getExpiredPhone() {
-      if (core.getStatus() !== 'expired') {
-        return null;
-      }
-      try {
-        const phone = await core.readPhone();
-        // The status may have changed while reading.
-        return core.getStatus() === 'expired' && phone.kind === 'value' ? phone.value : null;
-      } catch {
-        return null;
-      }
-    },
+    getExpiredPhone,
     signOut,
     setAccountSwitchHook(hook) {
       accountSwitchHook = hook;
