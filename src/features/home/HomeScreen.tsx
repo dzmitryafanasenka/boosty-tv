@@ -14,6 +14,7 @@ import {
   useHeadChangeRefocus,
   useHeldRowAutoFetch,
   useLoadMoreRetry,
+  useNotMovedLatch,
   useShownGridPosts,
   type HostView,
 } from '../../shared/ui';
@@ -53,6 +54,11 @@ export type HomeFocusInfo = {
   sectionItemId: string;
   /** Focus Главная's sidebar item (the last fallback of the grid). */
   focusSidebar(): void;
+  /**
+   * Listen to the Shell's focus events (the same ids as `current()`, only
+   * while the Shell is the focused route); returns the unsubscribe.
+   */
+  onFocusChange(listener: (focusId: string) => void): () => void;
   /**
    * Registers how Главная restores its content focus when the Shell is the
    * focused route again (Back from Пост, Story 3.4): the remembered card by
@@ -101,6 +107,14 @@ type Phase = 'offline' | 'loading' | 'error' | 'empty' | 'grid';
  * - Pagination, refetch and image loads never move focus. A load-more
  *   retry that succeeds focuses the first new card if focus is still on
  *   «Повторить».
+ * - A resume head refresh that changes the head (Epic 3 retro A3, as on
+ *   Автор): while the user has not moved since Главная took its content
+ *   focus by itself (no D-pad move or OK; `useNotMovedLatch`), the new
+ *   first post takes focus and the grid shows the top, whichever comes
+ *   first, the reply or the native focus event of that automatic focus.
+ *   Once the user has moved, the focused card keeps focus (scrolled to its
+ *   new row). Focus the user put on the sidebar, a StateView action or
+ *   «Повторить» is never taken.
  * - OK on a card opens Пост (Story 3.4). Back from it restores that card
  *   by id (card-only memory: only a card entry is restored this way) with
  *   the fallback chain neighbor by index → first card → the sidebar item.
@@ -155,6 +169,8 @@ export function HomeScreen({
   });
   const adapterRef = useRef(gridListAdapter(listRef));
   const ids = useMemo(() => shownPosts.map(post => feedCardId(post.id)), [shownPosts]);
+  const idsRef = useRef(ids);
+  idsRef.current = ids;
 
   // A page that added posts but no shown row (they all went into the held
   // partial row): fetch the next one (only on an append, bounded).
@@ -171,15 +187,23 @@ export function HomeScreen({
     },
     [stateAction],
   );
+  // "The user has not moved since Главная took its content focus by itself"
+  // (Epic 3 retro A3, the Author page's rule; shared `useNotMovedLatch`):
+  // armed only when the page takes its content focus itself (the first
+  // cards arriving, OK on «Главная»), closed by any D-pad move or OK.
+  const latch = useNotMovedLatch(focus.onFocusChange, { armed: false });
   // Nothing above the grid in Story 3.1 (no filters/refresh): the
-  // StateView action when shown, else give up to the sidebar item.
+  // StateView action when shown, else give up to the sidebar item. Both
+  // are the page's own focus (recorded as automatic).
   const focusAbove = useCallback(() => {
     if (stateActionView.current) {
+      latch.auto(HOME_STATE_ACTION_ID);
       requestHostFocus(stateActionView.current);
     } else {
+      latch.auto(focusRef.current.sectionItemId);
       focusRef.current.focusSidebar();
     }
-  }, []);
+  }, [latch]);
   // A pending card focus lands only while the Shell is active and focus is
   // still where Главная may take it: none yet, `nav/home`, a feed card, the
   // StateView action or «Повторить». A move elsewhere (another sidebar item,
@@ -220,6 +244,39 @@ export function HomeScreen({
   const pendingMountFocus = useRef(focusOnMount);
 
   /**
+   * Главная takes its content focus by itself: the remembered card
+   * (FocusRestoration, fallback chain), else the first card. Arms "not
+   * moved": where focus was (`nav/home`, the StateView action) and the
+   * target are automatic, so their late native events are not moves.
+   */
+  const takeContentFocus = useCallback(() => {
+    const info = focusRef.current;
+    latch.arm([info.sectionItemId, info.current()]);
+    const target = restoration.restore();
+    if (target.kind === 'item') {
+      latch.auto(target.id);
+    } else if (target.kind === 'none') {
+      latch.auto(idsRef.current[0]);
+      restoration.focusInitial();
+    }
+  }, [latch, restoration]);
+
+  /**
+   * Главная focuses a StateView action (empty/error) or the offline
+   * «Повторить» by itself: recorded as automatic (armed from where focus
+   * was), so its late native event is not a move when the grid follows.
+   */
+  const takeActionFocus = useCallback(
+    (id: string, view: HostView | null) => {
+      const info = focusRef.current;
+      latch.arm([info.sectionItemId, info.current()]);
+      latch.auto(id);
+      requestHostFocus(view);
+    },
+    [latch],
+  );
+
+  /**
    * The user has not moved focus away from where Главная may take it (also
    * after OK on «Главная»: a move within the sidebar during the skeleton
    * still wins).
@@ -240,7 +297,14 @@ export function HomeScreen({
   useEffect(() => {
     const previous = lastPhase.current;
     lastPhase.current = phase;
-    if (previous === phase || phase === 'loading') {
+    if (previous === phase) {
+      return;
+    }
+    if (phase !== 'grid') {
+      // The grid is gone: nothing to follow until the page takes focus again.
+      latch.disarm();
+    }
+    if (phase === 'loading') {
       return;
     }
     const mountFocus = pendingMountFocus.current;
@@ -248,16 +312,14 @@ export function HomeScreen({
       // Opened with OK while offline: «Повторить» (Story 2.5 behavior; the
       // Shell leaves Главная's content focus to this screen).
       if (mountFocus && mayTakeFocus()) {
-        requestHostFocus(offlineRetryView.current);
+        takeActionFocus(HOME_OFFLINE_RETRY_ID, offlineRetryView.current);
       }
     } else if (phase === 'grid') {
       // Mounted with cached cards (Back to Главная, a section switch): focus
       // stays where the Shell put it unless the section was opened with OK.
       // Only cards that arrive while Главная is shown may take it.
       if (previous === null ? mountFocus && mayTakeFocus() : mayTakeFocus()) {
-        if (restoration.restore().kind === 'none') {
-          restoration.focusInitial();
-        }
+        takeContentFocus();
       } else if (previous === null) {
         // Cached cards, focus stays on the sidebar: only the scroll returns.
         const offset = focusRestoration.peek(routeKey, HOME_SECTION)?.scrollOffset;
@@ -272,10 +334,10 @@ export function HomeScreen({
       // Empty or error: focus stays on the sidebar (as for the offline view,
       // Story 2.5), unless the section was opened with OK or the previous
       // StateView action had focus (its view was replaced).
-      requestHostFocus(stateActionView.current);
+      takeActionFocus(HOME_STATE_ACTION_ID, stateActionView.current);
     }
     pendingMountFocus.current = false;
-  }, [phase, mayTakeFocus, restoration, routeKey]);
+  }, [phase, mayTakeFocus, takeContentFocus, takeActionFocus, latch, routeKey]);
 
   // Blur or unmount: stop a pending restore focus.
   useEffect(() => restoration.cancel, [restoration]);
@@ -311,15 +373,23 @@ export function HomeScreen({
   postsRef.current = shownPosts;
   const onOpenPostRef = useRef(onOpenPost);
   onOpenPostRef.current = onOpenPost;
-  const onCardPress = useCallback((postId: string) => {
-    const post = postsRef.current.find(p => p.id === postId);
-    if (post) {
-      onOpenPostRef.current?.(post.author.blogUrl, post.id);
-    }
-  }, []);
+  const onCardPress = useCallback(
+    (postId: string) => {
+      // OK on a card is a move (the head-follow rule), and opens Пост.
+      latch.move();
+      const post = postsRef.current.find(p => p.id === postId);
+      if (post) {
+        onOpenPostRef.current?.(post.author.blogUrl, post.id);
+      }
+    },
+    [latch],
+  );
 
-  // A resume refresh changed the shown cards other than by an append: the
-  // focused card keeps focus (shared rule, `useHeadChangeRefocus`).
+  // A resume refresh changed the shown cards other than by an append
+  // (shared rule, `useHeadChangeRefocus`): while the user has not moved
+  // since Главная took its content focus by itself, the new first post
+  // takes focus and the grid shows the top (Epic 3 retro A3, as on Автор);
+  // else the focused card keeps focus. Sidebar focus is never taken.
   useHeadChangeRefocus({
     ids,
     cardIdPrefix: FEED_CARD_PREFIX,
@@ -328,6 +398,8 @@ export function HomeScreen({
     canFocus,
     restoration,
     list: adapterRef,
+    followHead: latch.followHead,
+    onFollowHead: latch.onFollowHead,
   });
 
   // Load-more retry: on success, the first new card (if focus is still on «Повторить»).

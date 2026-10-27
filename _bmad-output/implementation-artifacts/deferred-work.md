@@ -203,3 +203,6 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-epic-3-retro-a1-pinned-head-refresh.md`
   summary: A head post deleted or hidden by the author stays in the cached head after a head refresh (the merge keeps cached copies) until a gap or the cache is collected (Epic 3 retro F2, second half).
   evidence: `mergePostsHead` → `mergePosts(fresh.posts, first.posts)`; opening such a post gives «Пост недоступен». Applies to Главная and Автор.
+- source_spec: `_bmad-output/implementation-artifacts/spec-epic-3-retro-a3-home-head-refresh.md`
+  summary: Главная: an empty last page 1 from a resume refresh while a card has focus empties the feed and leaves focus nowhere (the StateView does not take focus by itself); move focus to `nav/home` or the StateView action.
+  evidence: Documented as a known edge in focus-map §3 B (A3 note); pre-existing before A3. Review of spec-epic-3-retro-a3.

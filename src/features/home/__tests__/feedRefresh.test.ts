@@ -83,6 +83,16 @@ describe('mergeFeedHead', () => {
     expect(kind).toBe('replaced');
     expect(data).toEqual({ pages: [fresh], pageParams: [null] });
   });
+
+  it('an empty page 1 with a next cursor keeps the cache; an empty last page replaces it (Epic 3 retro A3)', () => {
+    const cache = twoPages();
+    expect(mergeFeedHead(cache, page([], 'c0'))).toEqual({ kind: 'unchanged', data: cache });
+    expect(mergeFeedHead(cache, page([], 'c0')).data).toBe(cache);
+    expect(mergeFeedHead(cache, page([], null))).toEqual({
+      kind: 'replaced',
+      data: { pages: [page([], null)], pageParams: [null] },
+    });
+  });
 });
 
 describe('refreshFeedHead', () => {
@@ -182,6 +192,44 @@ describe('refreshFeedHead', () => {
     expect(await run).toBe('skipped');
     expect(cached()).toBe(data);
     expect(query.state.dataUpdatedAt).toBe(T0);
+  });
+
+  // Epic 3 retro A3: Главная uses the Author page's options.
+  it('an empty page 1 with a next cursor: the cached feed stays, written back as fresh', async () => {
+    const data = twoPages();
+    seed(data);
+    feedPage.mockResolvedValue(page([], 'c0'));
+    expect(await refreshFeedHead(client, http, T0 + STALE)).toBe('unchanged');
+    expect(ids(cached())).toEqual(ids(data));
+    expect(client.getQueryState(KEY)?.dataUpdatedAt).toBe(T0 + STALE);
+    // Fresh now: the next resume within a staleTime sends nothing.
+    expect(await refreshFeedHead(client, http, T0 + STALE + 1)).toBe('skipped');
+    expect(feedPage).toHaveBeenCalledTimes(1);
+  });
+
+  it('an empty last page 1 (no next cursor): the cache is replaced (a truly empty feed)', async () => {
+    seed();
+    feedPage.mockResolvedValue(page([], null));
+    expect(await refreshFeedHead(client, http, T0 + STALE)).toBe('replaced');
+    expect(cached()).toEqual({ pages: [page([], null)], pageParams: [null] });
+  });
+
+  it('the feed query is in an error state (a failed page append): nothing sent; a reply after it entered one is dropped', async () => {
+    const data = twoPages();
+    seed(data);
+    const query = client.getQueryCache().find({ queryKey: KEY })!;
+    query.setState({ status: 'error', error: new AppError('Network') });
+    expect(await refreshFeedHead(client, http, T0 + STALE)).toBe('skipped');
+    expect(feedPage).not.toHaveBeenCalled();
+
+    query.setState({ status: 'success', error: null });
+    const reply = deferred<PostPage>();
+    feedPage.mockReturnValue(reply.promise);
+    const run = refreshFeedHead(client, http, T0 + STALE);
+    query.setState({ status: 'error', error: new AppError('Network') });
+    reply.resolve(page(['n1', ...range(0, 9)], 'c9'));
+    expect(await run).toBe('skipped');
+    expect(cached()).toBe(data);
   });
 
   it('the cache was reset meanwhile (sign-out, re-login, account switch): the reply is dropped', async () => {

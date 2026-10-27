@@ -47,13 +47,13 @@ describe('mergePostsHead', () => {
     expect(merged.data.pages[0].nextCursor).toBe('c20');
     expect(merged.data.pages[1]).toBe(cache.pages[1]);
     expect(mergePostsHead(cache, page(range(0, 20), 'c20')).kind).toBe('unchanged');
-    // Default (Главная): an empty page 1 is a gap, with or without a next cursor.
+    // Default (no option): an empty page 1 is a gap, with or without a next cursor.
     expect(mergePostsHead(cache, page([], 'c0'))).toEqual({
       kind: 'replaced',
       data: { pages: [page([], 'c0')], pageParams: [null] },
     });
     expect(mergePostsHead(cache, page([], null)).kind).toBe('replaced');
-    // keepEmptyWithMore (Автор): empty with a next cursor keeps the cache
+    // keepEmptyWithMore (Автор, Главная): empty with a next cursor keeps the cache
     // object; an empty last page still replaces it.
     const keep = { keepEmptyWithMore: true };
     expect(mergePostsHead(cache, page([], 'c0'), keep)).toEqual({ kind: 'unchanged', data: cache });
@@ -142,7 +142,7 @@ describe('refreshPostsHead (any paged post key)', () => {
     ]);
   });
 
-  it('an empty fresh page 1, default (Главная): the cache is replaced, as before', async () => {
+  it('an empty fresh page 1, default (no option; Автор and Главная set keepEmptyWithMore): the cache is replaced', async () => {
     seed(KEY_A);
     const now = T0 + QUERY_STALE_TIME_MS;
     const fetch = jest.fn().mockResolvedValue(page([], 'c0'));
@@ -185,7 +185,7 @@ describe('refreshPostsHead (any paged post key)', () => {
     const opts = { skipWhileError: true };
     expect(await refreshPostsHead(client, KEY_A, fetch, now, undefined, undefined, opts)).toBe('skipped');
     expect(fetch).not.toHaveBeenCalled();
-    // Without the option (Главная), the refresh runs.
+    // Without the option, the refresh runs.
     expect(await refreshPostsHead(client, KEY_A, fetch, now)).toBe('prepended');
     expect(fetch).toHaveBeenCalledTimes(1);
 
