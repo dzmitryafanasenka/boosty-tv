@@ -9,6 +9,14 @@ export const queryKeys = {
   subscriptionFeed: () => ['feed', 'subscriptions'] as const,
   /** E2 the subscribed authors (Story 3.2), one request, no paging. */
   subscriptions: () => ['subscriptions'] as const,
+  /**
+   * E3 a blog's header (Story 3.3). `blogUrl` is the blog's identity (AD-9),
+   * not a URL. Separate roots for E3 and E4, so one never prefix-matches
+   * the other.
+   */
+  author: (blogUrl: string) => ['author', blogUrl] as const,
+  /** E4 a blog's posts (Story 3.3), an infinite query (cursors are page params). */
+  authorPosts: (blogUrl: string) => ['authorPosts', blogUrl] as const,
 } as const;
 
 /**

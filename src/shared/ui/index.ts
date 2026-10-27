@@ -29,6 +29,7 @@ export {
 } from './PostCard';
 export {
   AUTHOR_CARD_HEIGHT,
+  AuthorAvatar,
   AuthorCard,
   AuthorCardSkeleton,
   AuthorCardView,
@@ -37,3 +38,22 @@ export {
   authorCardWidth,
   type AuthorCardProps,
 } from './AuthorCard';
+export {
+  POST_GRID_CARD_HEIGHT,
+  POST_GRID_CARD_WIDTH,
+  POST_GRID_COLUMNS,
+  POST_GRID_DRAW_DISTANCE,
+  POST_GRID_LIST_TOP_GAP,
+  POST_GRID_RECYCLE_POOL,
+  POST_GRID_ROW_HEIGHT,
+  POST_GRID_SLOT_PADDING,
+  PostGrid,
+  postGridListAdapter,
+  postGridRowLayout,
+  postGridRows,
+  useHeldRowAutoFetch,
+  useLoadMoreRetry,
+  visibleGridPosts,
+  type PostGridProps,
+  type PostRowItem,
+} from './PostGrid';

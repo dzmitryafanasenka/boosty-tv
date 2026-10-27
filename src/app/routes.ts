@@ -15,6 +15,11 @@ export type RootStackParamList = {
   Code: undefined;
   /** The signed-in Shell: sidebar + sections swapped in place (Story 2.4). */
   Shell: undefined;
+  /**
+   * D Автор (Story 3.3): one blog's header and posts. `blogUrl` already
+   * passed `blogUrlSchema` (it came from an Author entity).
+   */
+  Author: { blogUrl: string };
   /** A11 Session expired (Story 2.6): the stack root after an expiry. */
   Expired: undefined;
   /** Debug builds only: «Проверка фокуса» (registered under `__DEV__`). */

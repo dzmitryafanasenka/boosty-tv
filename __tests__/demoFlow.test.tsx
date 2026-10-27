@@ -123,6 +123,41 @@ test('Story 3.2: Подписки shows the demo authors (E2 answered by the dem
   });
 });
 
+test('Story 3.3: Автор answers E3/E4 in demo mode (2 pages, an empty blog, a missing blog)', async () => {
+  fetchMock.mockClear();
+  const root = await renderApp();
+  const ids = () =>
+    root.container.queryAll(n => n.props.focusable === true).map(n => n.props.testID as string);
+  const text = () => JSON.stringify(root.container.toJSON());
+  await press(root, 'nav/subs');
+  await press(root, 'subs/tile/demo-blog-1');
+  expect(text()).toContain('Демо-блог 1');
+  expect(ids().filter(id => id.startsWith('author/demo-blog-1/post/')).length).toBeGreaterThan(0);
+  expect(fetchMock).not.toHaveBeenCalled();
+  await act(async () => {
+    root.unmount();
+  });
+
+  await resetQueryCache();
+  const empty = await renderApp();
+  await press(empty, 'nav/subs');
+  await press(empty, 'subs/tile/demo-blog-3');
+  expect(JSON.stringify(empty.container.toJSON())).toContain(t('author.emptyTitle'));
+  await act(async () => {
+    empty.unmount();
+  });
+
+  await resetQueryCache();
+  const missing = await renderApp();
+  await press(missing, 'nav/subs');
+  await press(missing, 'subs/tile/demo-blog-8');
+  expect(JSON.stringify(missing.container.toJSON())).toContain(t('author.unavailableTitle'));
+  expect(fetchMock).not.toHaveBeenCalled();
+  await act(async () => {
+    missing.unmount();
+  });
+});
+
 test('Story 2.8: demo expiry → A11 → A2 → A5 → sign-in with another id: the demo hook wipes the stores; the keychain is never touched', async () => {
   // PhoneScreen's send still goes through the real AuthApiClient (global
   // fetch); answer it here. Confirm and E1 go to the demo's FixtureTransport.

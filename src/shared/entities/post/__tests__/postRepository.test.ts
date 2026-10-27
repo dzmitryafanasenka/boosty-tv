@@ -4,7 +4,9 @@ import { createHttpClient, fixedAccessToken } from '../../../api/httpClient';
 import { createLogger } from '../../../services/logger';
 // eslint-disable-next-line boundaries/dependencies -- test-only fixtures
 import { cursorFor, e5Page, feedPost, syntheticFeed } from '../../../../test/feedFixtures';
-import { PostRepository, feedPath, mergePosts } from '../postRepository';
+// eslint-disable-next-line boundaries/dependencies -- test-only fixtures
+import { blogPost, e4Page, syntheticBlogPosts } from '../../../../test/authorFixtures';
+import { PostRepository, blogPostsPath, feedPath, mergePosts } from '../postRepository';
 import { mapPost } from '../mapPost';
 import type { Post } from '../types';
 
@@ -146,5 +148,85 @@ describe('mergePosts', () => {
   it('empty input', () => {
     expect(mergePosts()).toEqual([]);
     expect(mergePosts([], [])).toEqual([]);
+  });
+});
+
+describe('blogPostsPath (E4)', () => {
+  it('limit 20, comments off, no offset on the first page; no filter parameter', () => {
+    expect(blogPostsPath('synthetic-blog-1', null)).toBe(
+      '/v1/blog/synthetic-blog-1/post/?limit=20&comments_limit=0&reply_limit=0',
+    );
+  });
+
+  it('encodes the blogUrl as a path segment and the cursor verbatim', () => {
+    expect(blogPostsPath('a:b', 'x y&z')).toBe(
+      '/v1/blog/a%3Ab/post/?limit=20&comments_limit=0&reply_limit=0&offset=x%20y%26z',
+    );
+  });
+});
+
+describe('PostRepository.blogPage (E4)', () => {
+  it('sends E4 with the content profile and maps the live page', async () => {
+    const { http, transport } = client(() => ({ status: 200, body: e4Page(1) }));
+    const page = await PostRepository.blogPage(http, 'synthetic-blog-1', null);
+    expect(page.posts).toHaveLength(20);
+    expect(page.nextCursor).toBe('redacted');
+    const [call] = transport.calls;
+    expect(call.url).toBe(
+      'https://api.boosty.to/v1/blog/synthetic-blog-1/post/?limit=20&comments_limit=0&reply_limit=0',
+    );
+    expect(call.headers.Authorization).toBe(`Bearer ${'t'.repeat(64)}`);
+    expect(call.headers['X-App']).toBeUndefined();
+    expect(call.headers['X-From-Id']).toBeUndefined();
+  });
+
+  it('maps the locked live posts as locked (hasAccess false), never an error', async () => {
+    const { http } = client(() => ({ status: 200, body: e4Page(2, { isLast: true }) }));
+    const page = await PostRepository.blogPage(http, 'synthetic-blog-2', 'redacted');
+    expect(page.nextCursor).toBeNull();
+    expect(page.posts.some(p => !p.hasAccess)).toBe(true);
+    expect(page.posts.some(p => p.hasAccess)).toBe(true);
+  });
+
+  it('pages by the cursor of the previous page', async () => {
+    const { http, transport } = client(syntheticBlogPosts({ blogUrl: 'b', total: 45 }));
+    const first = await PostRepository.blogPage(http, 'b', null);
+    expect(first.posts).toHaveLength(20);
+    expect(first.nextCursor).toBe(cursorFor(20));
+    const second = await PostRepository.blogPage(http, 'b', first.nextCursor);
+    expect(transport.calls[1].url).toContain('&offset=cursor%3A20');
+    const third = await PostRepository.blogPage(http, 'b', second.nextCursor);
+    expect(third.posts).toHaveLength(5);
+    expect(third.nextCursor).toBeNull();
+  });
+
+  it.each([
+    ['isLast=true', { offset: 'x', isLast: true }],
+    ['no extra', undefined],
+    ['extra without offset', { isLast: false }],
+  ])('stops on %s', async (_name, extra) => {
+    const { http } = client(() => ({ status: 200, body: { data: [blogPost('b', 0)], extra } }));
+    expect((await PostRepository.blogPage(http, 'b', null)).nextCursor).toBeNull();
+  });
+
+  it('drops a malformed post (logged by id only) and keeps the page', async () => {
+    const logger = createLogger();
+    const { http } = client(() => ({
+      status: 200,
+      body: { data: [blogPost('b', 0), { id: 'broken' }, blogPost('b', 1)], extra: { isLast: true } },
+    }));
+    const page = await PostRepository.blogPage(http, 'b', null, logger);
+    expect(page.posts.map(p => p.id)).toEqual(['blog-post-0', 'blog-post-1']);
+    expect(logger.entries().filter(e => e.scope === 'post')).toHaveLength(1);
+  });
+
+  it('empty data: an empty last page', async () => {
+    const { http } = client(() => ({ status: 200, body: { data: [], extra: { isLast: true } } }));
+    expect(await PostRepository.blogPage(http, 'b', null)).toEqual({ posts: [], nextCursor: null });
+  });
+
+  it('a body without `data` is a Parse error', async () => {
+    const { http } = client(() => ({ status: 200, body: { extra: { isLast: true } } }));
+    await expect(PostRepository.blogPage(http, 'b', null)).rejects.toEqual(new AppError('Parse'));
   });
 });

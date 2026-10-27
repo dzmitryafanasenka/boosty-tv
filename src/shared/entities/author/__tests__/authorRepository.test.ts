@@ -9,7 +9,9 @@ import {
   subscriptionsBody,
   // eslint-disable-next-line boundaries/dependencies -- test-only fixtures
 } from '../../../../test/subscriptionFixtures';
-import { AuthorRepository, SUBSCRIPTIONS_PATH } from '../authorRepository';
+// eslint-disable-next-line boundaries/dependencies -- test-only fixtures
+import { e3Body, e3MissingReply } from '../../../../test/authorFixtures';
+import { AuthorRepository, SUBSCRIPTIONS_PATH, blogPath } from '../authorRepository';
 import { mapSubscription } from '../mapAuthor';
 
 function client(handler: FixtureHandler) {
@@ -189,5 +191,57 @@ describe('AuthorRepository.subscriptions', () => {
     const error = await AuthorRepository.subscriptions(http).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(AppError);
     expect((error as AppError).kind).toBe('Server');
+  });
+});
+
+describe('AuthorRepository.blog (E3)', () => {
+  it('sends exactly E3 with the content profile and maps the live body (title, blogUrl, owner only)', async () => {
+    const { http, transport } = client(() => ({ status: 200, body: e3Body('synthetic-blog-1') }));
+    const result = await AuthorRepository.blog(http, 'synthetic-blog-1');
+    expect(result).toEqual({
+      kind: 'ok',
+      author: {
+        blogUrl: 'synthetic-blog-1',
+        title: 'redacted',
+        ownerName: 'redacted',
+        avatarUrl: 'https://example.invalid/avatar',
+      },
+    });
+    expect(transport.calls).toHaveLength(1);
+    expect(transport.calls[0].url).toBe('https://api.boosty.to/v1/blog/synthetic-blog-1');
+    expect(transport.calls[0].headers.Authorization).toBe(`Bearer ${'t'.repeat(64)}`);
+    expect(transport.calls[0].headers['X-App']).toBeUndefined();
+  });
+
+  it('encodes the blogUrl as a path segment', () => {
+    expect(blogPath('a:b')).toBe('/v1/blog/a%3Ab');
+  });
+
+  it('404 blog_not_found: unavailable (not an error), sent once', async () => {
+    const { http, transport } = client(() => e3MissingReply());
+    expect(await AuthorRepository.blog(http, 'gone')).toEqual({ kind: 'unavailable' });
+    expect(transport.calls).toHaveLength(1);
+  });
+
+  it('a missing or blank title keeps the blog («Без названия» on screen); no owner: no name, no avatar', async () => {
+    const { http } = client(() => ({ status: 200, body: { blogUrl: 'b', title: '  ', owner: null } }));
+    expect(await AuthorRepository.blog(http, 'b')).toEqual({
+      kind: 'ok',
+      author: { blogUrl: 'b', title: '', ownerName: null, avatarUrl: null },
+    });
+  });
+
+  it('a body without a valid blogUrl is a Parse error', async () => {
+    const { http } = client(() => ({ status: 200, body: { title: 'x' } }));
+    await expect(AuthorRepository.blog(http, 'b')).rejects.toEqual(new AppError('Parse'));
+  });
+
+  it.each([
+    [503, 'Server'],
+    [403, 'Client'],
+    [429, 'RateLimited'],
+  ])('HTTP %s rejects with %s (a 403 is never unavailable or expiry)', async (status, kind) => {
+    const { http } = client(() => ({ status, body: {} }));
+    await expect(AuthorRepository.blog(http, 'b')).rejects.toMatchObject({ kind });
   });
 });

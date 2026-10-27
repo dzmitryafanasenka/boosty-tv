@@ -22,3 +22,9 @@ export type SubscriptionList = {
   /** All subscriptions on the server; null when the response has none. */
   total: number | null;
 };
+
+/**
+ * E3: the blog's header, or `unavailable` for a missing blog (404
+ * `blog_not_found`: «Автор недоступен», no retry).
+ */
+export type BlogResult = { kind: 'ok'; author: Author } | { kind: 'unavailable' };

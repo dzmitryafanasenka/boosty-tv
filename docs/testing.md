@@ -688,3 +688,24 @@ Not verified: TalkBack labels on cards; second-account cache isolation on the de
 | Physical remote (grid, focus states, Back order) | **Pass** (owner, 2026-10-26): tiles, OK → first tile, → ← Back, return restores the tile | owner, physical remote |
 
 Not measured on the device: the 55-author virtualized grid (fast ↓ column keeping, recycling, performance) — the owner's account has 3 subscriptions; host tests only. Not verified: «Показаны первые N» and the empty state (C3) on the device; TalkBack labels on tiles.
+
+### Story 3.3 — Author page, 2026-10-27
+
+**Status: implemented and host-tested; the main path verified on the pinned device (Chromecast with Google TV 4K, release-like build, the owner's existing session) by the agent with adb (injected keys, uiautomator, screencap). Not yet checked by the owner with the physical remote.**
+
+**Build:** `./gradlew assembleRelease -PreactNativeArchitectures=armeabi-v7a` BUILD SUCCESSFUL (JDK 17); release-like (`zipalign -p 4` + `apksigner`, SDK debug key outside the repo), installed with `adb install -r`. The shipped Hermes bundle: `state/author/action` 1, `createDemoSessionManager` 0. Nothing uninstalled or cleared; no sign-in, no sign-out.
+
+| Check | Result | Who / how |
+|---|---|---|
+| E3/E4 with the content profile | The header (title, owner name, avatar) and the posts (accessible and locked) rendered; no error state (recorded in `docs/api-contract.md` §1) | agent, adb |
+| Подписки → → → OK on the 2nd tile | Автор opens; focus moves to the first post; sidebar current item «Подписки» | agent, adb (uiautomator) |
+| ↓ through pages | 14 × ↓ at 1.2 s: a new card each step (≈ 42 posts, ≥ 3 E4 pages); column 1 kept (bounds x 408) | agent, adb |
+| ← / → | ← → `author/nav/subs`; → → back to the same card | agent, adb |
+| Back from a card | Подписки, focus on the same tile (`subs/tile/<blogUrl>`) | agent, adb |
+| Back from the Author sidebar | Подписки, focus on the same tile | agent, adb |
+| OK on «Главная» in the Author sidebar | Shell on Главная (current item), focus on the remembered feed card | agent, adb |
+
+Host tests: `__tests__/authorFlow.test.tsx` (every matrix row, the focus rules, the stand-in pushed route for Story 3.4's return, 320 posts, account scope), `__tests__/subscriptionsFlow.test.tsx` (OK on a tile opens Автор), `__tests__/demoFlow.test.tsx` (demo E3/E4), repository unit tests for E3/E4. The full suite ran 3× green; the new and changed flow suites (author, subscriptions, home, demo, shell) ran 30× green.
+
+Not verified on the device: the empty, error and «Автор недоступен» states (the owner's blogs have posts and exist; host and demo only); the return to Автор from a pushed route (Post is Story 3.4; host-tested with a stand-in route); performance/jank of the Author grid (not measured; it is the Главная grid component); TalkBack labels; the physical remote.
+

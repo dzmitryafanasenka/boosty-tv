@@ -174,3 +174,10 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-1-subscription-feed-on-the-home-screen.md`
   summary: PostCard for posts without a preview (polls, files) should show the author avatar on a plate (DESIGN.md PostCard anatomy); today it shows a plain placeholder plate.
   evidence: Review pass 2 of Story 3.1; no poll/file posts were seen in the owner's feed, so the gap is not visible yet — fold into the story that renders polls/files (Epic 6) or the 3.6 locked-card work.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-3-author-page.md`
+  summary: Keep the 404 body's `error` code in AppError so only E3 `blog_not_found` maps to «Автор недоступен» (today every E3 404 does).
+  evidence: HttpClient maps every 404 to `NotFound` and drops the body (`src/shared/api/appError.ts`); a path change or proxy 404 would show «Автор недоступен» with no retry. Review 3.3, finding 4.
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-3-author-page.md`
+  summary: The demo Author test should load demo-blog-1's second page and check 30 distinct cards.
+  evidence: `__tests__/demoFlow.test.tsx` asserts only that some cards exist; a demo transport that ignored the cursor would pass. Dev-only. Review 3.3, finding 3.

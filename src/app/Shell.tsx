@@ -7,22 +7,15 @@ import {
   useState,
   type RefObject,
 } from 'react';
-import { BackHandler, StyleSheet, TVFocusGuideView, View } from 'react-native';
+import { BackHandler } from 'react-native';
 import { HomeScreen, type HomeFocusInfo, type HomeScreenProps } from '../features/home';
 import { SETTINGS_VERSION_ID, SettingsScreen } from '../features/settings';
 import { SubscriptionsScreen, type SubscriptionsFocusInfo } from '../features/subscriptions';
 import type { HttpClient } from '../shared/api';
 import { FocusZone, Screen, type FocusZoneHandle } from '../shared/focus';
-import { t } from '../shared/i18n';
-import {
-  NavItem,
-  Text,
-  colors,
-  requestHostFocus,
-  spacing,
-  type HostView,
-} from '../shared/ui';
+import { requestHostFocus, type HostView } from '../shared/ui';
 import { enabledSections, type SectionId } from './phaseFlags';
+import { NAV_ID, Sidebar, sidebarLayout, useSidebarNav } from './Sidebar';
 
 export type ShellProps = {
   /**
@@ -47,15 +40,14 @@ export type ShellProps = {
   onExpireSession?: () => void;
   /** Главная's offline StateView (Story 2.5); absent: the feed. */
   homeOffline?: HomeScreenProps['offline'];
-};
-
-/** Focus ids of the sidebar items (docs/focus-map.md §1.5). */
-const NAV_ID: Record<SectionId, string> = {
-  home: 'nav/home',
-  search: 'nav/search',
-  subs: 'nav/subs',
-  events: 'nav/events',
-  settings: 'nav/settings',
+  /** Подписки: OK on a tile opens the Author page (Story 3.3). */
+  onOpenAuthor?: (blogUrl: string) => void;
+  /**
+   * A section to open when the Shell is the focused route again: OK on a
+   * sidebar item of a screen on top (Автор, owner decision 2026-10-27)
+   * popped back here. Read once per return; null: a plain return.
+   */
+  takePendingSection?: () => SectionId | null;
 };
 
 /** The content's initial element per section; none: focus stays on the sidebar. */
@@ -98,6 +90,8 @@ export function Shell({
   onCheckSession,
   onExpireSession,
   homeOffline,
+  onOpenAuthor,
+  takePendingSection,
 }: ShellProps) {
   const sections = useMemo(() => enabledSections(), []);
   const [view, setView] = useState<View_>({ section: HOME, focusContent: false });
@@ -107,9 +101,16 @@ export function Shell({
   const zone = useRef<'sidebar' | 'content'>('sidebar');
   /** The last focused element (a nav id or a content item id); null: none yet. */
   const lastFocusId = useRef<string | null>(null);
-  const navViews = useRef(new Map<SectionId, HostView>());
-  const navRefCallbacks = useRef(new Map<SectionId, (v: HostView | null) => void>());
+  const nav = useSidebarNav(view.section);
+  const navViews = nav.views;
   const contentRef = useRef<FocusZoneHandle>(null);
+  /**
+   * The current section's own return focus (Подписки: restoration by
+   * `blogUrl` with the fallback chain); null: the content zone's target.
+   */
+  const sectionReturn = useRef<(() => boolean) | null>(null);
+  const takePendingRef = useRef(takePendingSection);
+  takePendingRef.current = takePendingSection;
   /**
    * Whether the Shell is the focused route. A covered Shell ignores focus
    * events: Android can move fallback focus into a covered screen (e.g. when
@@ -117,36 +118,14 @@ export function Shell({
    * restores on return.
    */
   const routeFocused = useRef(false);
-  const [sidebarDestination, setSidebarDestination] = useState<HostView | null>(null);
 
-  const navRef = useCallback((section: SectionId) => {
-    let callback = navRefCallbacks.current.get(section);
-    if (!callback) {
-      callback = (v: HostView | null) => {
-        if (v) {
-          navViews.current.set(section, v);
-        } else {
-          navViews.current.delete(section);
-        }
-      };
-      navRefCallbacks.current.set(section, callback);
-    }
-    return callback;
-  }, []);
-
-  // ← from content lands on the current section's item.
-  useEffect(() => {
-    setSidebarDestination(navViews.current.get(view.section) ?? null);
-  }, [view.section]);
-  const sidebarDestinations = useMemo(
-    () => (sidebarDestination ? [sidebarDestination] : []),
-    [sidebarDestination],
+  const focusNav = useCallback(
+    (section: SectionId) => {
+      zone.current = 'sidebar';
+      requestHostFocus(navViews.current.get(section));
+    },
+    [navViews],
   );
-
-  const focusNav = useCallback((section: SectionId) => {
-    zone.current = 'sidebar';
-    requestHostFocus(navViews.current.get(section));
-  }, []);
 
   const openSection = useCallback((section: SectionId) => {
     if (section === sectionRef.current) {
@@ -162,7 +141,21 @@ export function Shell({
   useFocusEffect(
     useCallback(() => {
       routeFocused.current = true;
-      if (!(zone.current === 'content' && contentRef.current?.focusTarget())) {
+      const pending = takePendingRef.current?.() ?? null;
+      if (pending !== null && sections.includes(pending)) {
+        // OK on a sidebar item of the screen that was on top: as OK on that
+        // item here. The item has focus and the user has not moved, so the
+        // section may take its content focus (Главная, Подписки rules).
+        lastFocusId.current = NAV_ID[pending];
+        focusNav(pending);
+        if (pending === sectionRef.current) {
+          contentRef.current?.focusTarget();
+        } else {
+          setView({ section: pending, focusContent: true });
+        }
+      } else if (zone.current === 'content' && sectionReturn.current?.()) {
+        // The section restored its own content focus.
+      } else if (!(zone.current === 'content' && contentRef.current?.focusTarget())) {
         focusNav(sectionRef.current);
       }
       // An open modal never reaches this listener: the modal host adds its
@@ -184,7 +177,7 @@ export function Shell({
         routeFocused.current = false;
         sub.remove();
       };
-    }, [focusNav]),
+    }, [focusNav, sections]),
   );
 
   // The offline view went away (E1 succeeded) while «Повторить» had focus:
@@ -236,37 +229,24 @@ export function Shell({
       current: () => lastFocusId.current,
       sectionItemId: NAV_ID.subs,
       focusSidebar: () => focusNav('subs'),
+      setReturnFocus: restore => {
+        sectionReturn.current = restore;
+      },
     }),
     [focusNav],
   );
 
   return (
     <Screen testID="shell">
-      <TVFocusGuideView
+      <Sidebar
         testID="shell/sidebar"
-        style={styles.sidebar}
-        destinations={sidebarDestinations}
-        trapFocusUp
-        trapFocusDown
-        trapFocusLeft
-      >
-        <Text variant="section" accessibilityRole="header" style={styles.wordmark}>
-          {t('shell.wordmark')}
-        </Text>
-        {sections.map((section, index) => (
-          <View key={section} style={index > 0 ? styles.navGap : undefined}>
-            <NavItem
-              ref={navRef(section)}
-              testID={NAV_ID[section]}
-              label={t(`shell.nav.${section}`)}
-              current={section === view.section}
-              hasTVPreferredFocus={section === HOME}
-              onPress={() => openSection(section)}
-              onFocus={() => onSidebarFocus(section)}
-            />
-          </View>
-        ))}
-      </TVFocusGuideView>
+        sections={sections}
+        current={view.section}
+        nav={nav}
+        preferredSection={HOME}
+        onPress={openSection}
+        onFocus={onSidebarFocus}
+      />
       <FocusZone
         key={view.section}
         ref={contentRef}
@@ -278,7 +258,7 @@ export function Shell({
         focusOnMount={view.focusContent && !SELF_FOCUS_SECTIONS.has(view.section)}
         onItemFocus={onContentFocus}
         isActive={isShellActive}
-        style={styles.content}
+        style={sidebarLayout.content}
       >
         <SectionContent
           section={view.section}
@@ -292,6 +272,7 @@ export function Shell({
           onCheckSession={onCheckSession}
           onExpireSession={onExpireSession}
           homeOffline={homeOffline}
+          onOpenAuthor={onOpenAuthor}
         />
       </FocusZone>
     </Screen>
@@ -310,6 +291,7 @@ function SectionContent({
   onCheckSession,
   onExpireSession,
   homeOffline,
+  onOpenAuthor,
 }: {
   section: SectionId;
   routeKey: string;
@@ -322,6 +304,7 @@ function SectionContent({
   onCheckSession?: () => void;
   onExpireSession?: () => void;
   homeOffline?: HomeScreenProps['offline'];
+  onOpenAuthor?: (blogUrl: string) => void;
 }) {
   switch (section) {
     case 'home':
@@ -350,6 +333,7 @@ function SectionContent({
           routeKey={routeKey}
           focusOnMount={focusContent}
           focus={subsFocus}
+          onOpenAuthor={onOpenAuthor}
         />
       );
     // Phase-gated off (phaseFlags): never rendered.
@@ -358,29 +342,3 @@ function SectionContent({
       return null;
   }
 }
-
-const styles = StyleSheet.create({
-  sidebar: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    width: spacing['sidebar-width'],
-    backgroundColor: colors['bg-sidebar'],
-    paddingLeft: spacing['safe-x'],
-    paddingTop: spacing['safe-y'],
-  },
-  wordmark: {
-    marginBottom: spacing['10'],
-  },
-  navGap: {
-    marginTop: spacing['2'],
-  },
-  content: {
-    position: 'absolute',
-    top: spacing['safe-y'],
-    bottom: spacing['safe-y'],
-    left: spacing['content-x'],
-    width: spacing['content-width'],
-  },
-});

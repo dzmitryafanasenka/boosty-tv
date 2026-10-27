@@ -11,6 +11,8 @@ import {
   requestHostFocus,
   spacing,
   typography,
+  useHeldRowAutoFetch,
+  useLoadMoreRetry,
   type HostView,
 } from '../../shared/ui';
 import {
@@ -142,29 +144,8 @@ export function HomeScreen({ offline, http, routeKey, focusOnMount = false, focu
   const ids = useMemo(() => shownPosts.map(post => feedCardId(post.id)), [shownPosts]);
 
   // A page that added posts but no shown row (they all went into the held
-  // partial row) would stall paging: nothing new to focus or scroll to.
-  // Fetch the next page then (bounded like the hook's own auto-fetch). Only
-  // an append counts (the last post changed): a resume refresh that puts
-  // posts on top sends no further request.
-  const lastPostId = feed.posts[feed.posts.length - 1]?.id;
-  const counts = useRef({ all: feed.posts.length, shown: shownPosts.length, last: lastPostId });
-  const { autoFetchNext, hasNextPage, isFetching, loadMoreFailed } = feed;
-  useEffect(() => {
-    if (isFetching) {
-      return;
-    }
-    const before = counts.current;
-    counts.current = { all: feed.posts.length, shown: shownPosts.length, last: lastPostId };
-    if (
-      feed.posts.length > before.all &&
-      lastPostId !== before.last &&
-      shownPosts.length === before.shown &&
-      hasNextPage &&
-      !loadMoreFailed
-    ) {
-      autoFetchNext();
-    }
-  }, [feed.posts.length, shownPosts.length, lastPostId, hasNextPage, isFetching, loadMoreFailed, autoFetchNext]);
+  // partial row): fetch the next one (only on an append, bounded).
+  useHeldRowAutoFetch(feed, shownPosts.length);
 
   const focusRef = useRef(focus);
   focusRef.current = focus;
@@ -338,32 +319,12 @@ export function HomeScreen({ offline, http, routeKey, focusOnMount = false, focu
   }, [ids, canFocus, restoration]);
 
   // Load-more retry: on success, the first new card (if focus is still on «Повторить»).
-  const retryFrom = useRef<number | null>(null);
-  const onRetryLoadMore = useCallback(() => {
-    retryFrom.current = ids.length;
-    feed.fetchNextPage();
-  }, [feed, ids.length]);
-  useEffect(() => {
-    const from = retryFrom.current;
-    if (from === null || feed.isFetchingNextPage) {
-      return;
-    }
-    // Any completed retry ends the wait.
-    retryFrom.current = null;
-    if (feed.loadMoreFailed) {
-      // Failed again: the row stays, focus stays on «Повторить».
-      return;
-    }
-    if (!focusRef.current.isActive() || focusRef.current.current() !== FEED_RETRY_ID) {
-      return;
-    }
-    if (ids.length > from) {
-      restoration.focusItem(ids[from]);
-    } else if (ids.length > 0) {
-      // Nothing new and the row is gone: the last card, not lost focus.
-      restoration.focusItem(ids[ids.length - 1]);
-    }
-  }, [ids, feed.isFetchingNextPage, feed.loadMoreFailed, restoration]);
+  const onRetryLoadMore = useLoadMoreRetry(
+    feed,
+    ids,
+    restoration,
+    () => focusRef.current.isActive() && focusRef.current.current() === FEED_RETRY_ID,
+  );
 
   if (phase === 'offline' && offline) {
     return (
