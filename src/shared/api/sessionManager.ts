@@ -1,21 +1,35 @@
-import { z } from 'zod';
 import {
   phoneSecureStore,
   sessionSecureStore,
   type SecureStore,
 } from '../platform/secureStore';
 import { logger as appLogger, type Logger } from '../services/logger';
-import { isAppError, type AppErrorKind } from './appError';
 import { authApiClient, type AuthApiClient } from './authApiClient';
-import { AuthError, isAuthError } from './authError';
-import { userCurrentSchema } from './dto/userCurrent';
 import {
   createHttpClient,
-  fixedAccessToken,
   type AccessTokenSource,
   type HttpClient,
 } from './httpClient';
-import { createRefreshCoordinator, type RefreshHost } from './refreshCoordinator';
+import { createRefreshCoordinator } from './refreshCoordinator';
+import { createSessionCore } from './session/core';
+import type * as DebugModule from './session/debug';
+import { createLifecycle } from './session/lifecycle';
+import { createRefreshHost } from './session/refreshHost';
+import { createRestore } from './session/restore';
+import { createSignIn } from './session/signIn';
+import { createSignOut } from './session/signOut';
+import type { AccountSwitchHook, SessionManager } from './session/types';
+
+export {
+  CURRENT_USER_PATH,
+  type AccountSwitchHook,
+  type RestoreResult,
+  type SessionManager,
+  type SessionStatus,
+  type SignInArgs,
+  type SignInResult,
+  type ValidateResult,
+} from './session/types';
 
 /**
  * SessionManager (AD-3): the only reader and writer of tokens. The UI sees
@@ -57,170 +71,21 @@ import { createRefreshCoordinator, type RefreshHost } from './refreshCoordinator
  * succeeded, so the code cannot be reused).
  *
  * Never logs the phone, the challenge, the code, tokens or the E1 body.
+ *
+ * This file is the facade (ADR 0009): it owns the deps and their defaults,
+ * builds the refresh coordinator and `http`, and composes the modules under
+ * `session/` (private to `shared/api`): `core` (the only holder of session
+ * state and of the stores), `codec`, `refreshHost`, `restore`, `signIn`,
+ * `signOut`, `lifecycle` and, in debug builds, `debug`.
  */
-
-export type SessionStatus = 'signedOut' | 'signedIn' | 'expired';
-
-export type RestoreResult =
-  | { status: 'signedIn' }
-  /**
-   * The last session was rejected (refresh 400 `invalid_grant`): only the
-   * stored expiry marker means this. The status is `expired`, so the A11
-   * prefill can read the phone; the app opens A11.
-   */
-  | { status: 'expired'; reason: 'expired' }
-  | {
-      status: 'signedOut';
-      /**
-       * `none`: nothing stored. `wiped`: the store was corrupted and reset
-       * («Войдите снова»). `unavailable`: a transient storage error; the
-       * data is kept and the next start reads it again.
-       */
-      reason: 'none' | 'wiped' | 'unavailable';
-    };
-
-/** The outcome of a successful sign-in. */
-export type SignInResult = {
-  /**
-   * The E1 id differs from the previous account id (or there was none). The
-   * account-switch hook already wiped the previous account's data (Story
-   * 2.8); callers only read it.
-   */
-  accountChanged: boolean;
-};
-
-/** The outcome of one E1 session check. */
-export type ValidateResult =
-  | { kind: 'ok' }
-  /** Not signed in: nothing was sent. */
-  | { kind: 'skipped' }
-  /** The refresh was rejected: the status is now `expired`. */
-  | { kind: 'expired' }
-  /** The session is kept; `error` after the AD-6 retries. */
-  | { kind: 'failed'; error: AppErrorKind };
-
-export type SignInArgs = {
-  /** E.164, the phone the challenge was sent to. */
-  phone: string;
-  /** The send result's `code`. */
-  challenge: string;
-  /** What the user typed. */
-  smsCode: string;
-};
-
-export type SessionManager = {
-  getStatus(): SessionStatus;
-  /** Called on every status change. Returns the unsubscribe function. */
-  subscribe(listener: (status: SessionStatus) => void): () => void;
-  /** Reads the stored session (again) and keeps it in memory. Never rejects. */
-  restore(): Promise<RestoreResult>;
-  /** Rejects with `AuthError` only. */
-  signIn(args: SignInArgs): Promise<SignInResult>;
-  /**
-   * The stored phone (E.164) for the A11 → A2 prefill, or null. Readable
-   * only while the status is `expired`; null in any other status, when
-   * nothing is stored or the store fails. Never rejects.
-   */
-  getExpiredPhone(): Promise<string | null>;
-  /**
-   * Local sign-out (no server call): clears SecureStore first (the phone,
-   * then the session or expiry marker), then memory. Rejects with the
-   * store's error when a clear fails; the in-memory session and status are
-   * then kept, and so is the stored session entry (the phone goes first, so
-   * a phone failure changes nothing; a later session failure leaves only the
-   * re-login prefill gone). Works from `signedIn`
-   * and `expired` (the marker and the phone); drops the account id and the
-   * previous account id. The app calls it only through `AccountScope.reset()`
-   * (the `session` store, Story 2.7).
-   */
-  signOut(): Promise<void>;
-  /**
-   * Sets the account-switch hook (Story 2.8), once, from `app/bootstrap.ts`:
-   * the app's `AccountScope.reset()`. `signIn` awaits it when the E1 id
-   * differs from the previous account id (or there is none), before the new
-   * phone and session are written. A rejection, or no hook set, fails the
-   * sign-in as spent and stores nothing.
-   */
-  setAccountSwitchHook(hook: AccountSwitchHook): void;
-  /** E1 session check, single-flight. Never rejects; never moves focus. */
-  validate(): Promise<ValidateResult>;
-  /**
-   * Lifecycle hook (`AppState` change): runs `validate()` on every change to
-   * `active` and returns its result; null for any other change.
-   */
-  onAppStateChange(state: string): Promise<ValidateResult> | null;
-  /** The content `HttpClient`, with this manager as its token source. */
-  readonly http: HttpClient;
-  /**
-   * This manager's phone send/resend for A2/A5, and nothing else: confirm and
-   * refresh stay behind `signIn` and the refresh coordinator. Screens take it
-   * from the active session (`src/app/session.ts`), so a demo run sends
-   * nothing to Boosty.
-   */
-  readonly authApi: Pick<AuthApiClient, 'sendCode' | 'resendCode'>;
-  /**
-   * Debug builds only (undefined in release): replaces the in-memory access
-   * token with a corrupted one of the same length, then runs `validate()`,
-   * so E1 → 401 → one real refresh → retry. Storage is not touched.
-   */
-  readonly debugCorruptAccessToken?: () => Promise<ValidateResult>;
-  /**
-   * Debug builds only (undefined in release, Story 2.6): sets the status to
-   * `expired` in memory only, as a real expiry would, but writes nothing to
-   * SecureStore and sends nothing. The next cold start reads the stored
-   * session again.
-   */
-  readonly debugExpireInMemory?: () => void;
-};
-
-export const CURRENT_USER_PATH = '/v1/user/current';
-
-/** The session value in the `boostytv.session` keychain service. */
-const storedSessionSchema = z.object({
-  v: z.literal(1),
-  accessToken: z.string().min(1),
-  refreshToken: z.string().min(1),
-  /** Epoch milliseconds, from `expires_in` read as seconds. */
-  expiresAt: z.number(),
-  /** E1 `id`, as a string. */
-  accountId: z.string().min(1),
-});
-
-type StoredSession = z.infer<typeof storedSessionSchema>;
 
 /**
- * The expiry marker that replaces the session on refresh 400
- * `invalid_grant` (Story 2.6): no token, only the account id for the
- * same-account check after a restart.
+ * Debug builds only (C14): `__DEV__` is a constant in Metro bundles, so in
+ * release the require is folded away and the module is not bundled. Keep
+ * this a local, unexported binding: an exported one is not folded away by
+ * the release minifier (__tests__/releaseBundle.test.js).
  */
-const expiryMarkerSchema = z.object({
-  v: z.literal(1),
-  expired: z.literal(true),
-  accountId: z.string().min(1),
-});
-
-type ExpiryMarker = z.infer<typeof expiryMarkerSchema>;
-
-type Decoded =
-  | { kind: 'session'; session: StoredSession }
-  | { kind: 'expired'; accountId: string };
-
-function decodeSession(raw: string): Decoded | null {
-  try {
-    const value: unknown = JSON.parse(raw);
-    const session = storedSessionSchema.safeParse(value);
-    if (session.success) {
-      return { kind: 'session', session: session.data };
-    }
-    const marker = expiryMarkerSchema.safeParse(value);
-    return marker.success ? { kind: 'expired', accountId: marker.data.accountId } : null;
-  } catch {
-    return null;
-  }
-}
-
-/** Wipes every account-scoped store (the app's `AccountScope.reset()`). */
-export type AccountSwitchHook = () => Promise<void>;
+const debug: typeof DebugModule | null = __DEV__ ? require('./session/debug') : null;
 
 export type SessionManagerDeps = {
   authApi?: AuthApiClient;
@@ -243,85 +108,9 @@ export function createSessionManager({
   logger = appLogger,
   onAccountSwitch,
 }: SessionManagerDeps = {}): SessionManager {
-  let accountSwitchHook: AccountSwitchHook | null = onAccountSwitch ?? null;
-  let status: SessionStatus = 'signedOut';
-  /** The signed-in session; memory only besides SecureStore. */
-  let session: StoredSession | null = null;
-  /**
-   * The account id of the session that expired (memory, or the stored
-   * marker); null when there is none. Compared with E1 on the next sign-in.
-   */
-  let previousAccountId: string | null = null;
-  /** Bumped by restore, sign-in and sign-out. */
-  let generation = 0;
-  const listeners = new Set<(next: SessionStatus) => void>();
-  let restoring: Promise<RestoreResult> | null = null;
-  let signingIn: { key: string; promise: Promise<SignInResult> } | null = null;
-  let validating: Promise<ValidateResult> | null = null;
-  let appState = 'active';
-  /** Sign-out has started: the coordinator sees no session. */
-  let signingOut = false;
-  /** Serializes every SecureStore write and clear of this manager. */
-  let storeQueue: Promise<unknown> = Promise.resolve();
+  const core = createSessionCore({ sessionStore, phoneStore, logger });
 
-  function enqueue<T>(op: () => Promise<T>): Promise<T> {
-    const result = storeQueue.then(op, op);
-    storeQueue = result.catch(() => undefined);
-    return result;
-  }
-
-  const setStatus = (next: SessionStatus) => {
-    if (next === status) {
-      return;
-    }
-    status = next;
-    logger.info('session', 'status', { status: next });
-    for (const listener of [...listeners]) {
-      listener(next);
-    }
-  };
-
-  const host: RefreshHost<StoredSession> = {
-    current: () =>
-      status === 'signedIn' && session && !signingOut ? { session, generation } : null,
-    isExpired: () => status === 'expired',
-    isCurrent: g => g === generation,
-    persist: (next, g) =>
-      enqueue(async () => {
-        if (g !== generation || signingOut) {
-          return 'stale' as const;
-        }
-        await sessionStore.write(JSON.stringify(next));
-        return 'saved' as const;
-      }),
-    adopt(next, g) {
-      if (g !== generation || status !== 'signedIn' || signingOut) {
-        return false;
-      }
-      session = next;
-      return true;
-    },
-    expire(g) {
-      if (g !== generation || status !== 'signedIn') {
-        logger.info('session', 'late rejection dropped');
-        return false;
-      }
-      // Nothing further is sent with these tokens; the stored session is
-      // replaced by the expiry marker (the phone stays for re-login). A
-      // failed write is logged and does not change the status.
-      const accountId = session?.accountId ?? null;
-      previousAccountId = accountId;
-      session = null;
-      setStatus('expired');
-      if (accountId) {
-        const marker: ExpiryMarker = { v: 1, expired: true, accountId };
-        enqueue(() => sessionStore.write(JSON.stringify(marker))).catch(() => {
-          logger.error('session', 'expiry marker not saved');
-        });
-      }
-      return true;
-    },
-  };
+  const host = createRefreshHost(core, logger);
 
   const coordinator = createRefreshCoordinator({
     host,
@@ -331,279 +120,36 @@ export function createSessionManager({
   });
   const http = createHttp(coordinator);
 
-  async function readSession(): Promise<RestoreResult> {
-    generation += 1;
-    session = null;
-    previousAccountId = null;
-    const result = await sessionStore.read();
-    if (result.kind === 'empty') {
-      // No session, whatever the phone store holds: a kept phone alone may
-      // come from a sign-in interrupted between the phone and session writes,
-      // so only the expiry marker means `expired`.
-      setStatus('signedOut');
-      return { status: 'signedOut', reason: 'none' };
-    }
-    if (result.kind !== 'value') {
-      setStatus('signedOut');
-    }
-    if (result.kind === 'wiped') {
-      return { status: 'signedOut', reason: 'wiped' };
-    }
-    if (result.kind === 'unavailable') {
-      return { status: 'signedOut', reason: 'unavailable' };
-    }
-    const decoded = decodeSession(result.value);
-    if (!decoded) {
-      // Readable but not a session: treat as corrupted, start clean.
-      logger.warn('session', 'stored session unreadable; clearing');
-      setStatus('signedOut');
-      try {
-        await enqueue(() => sessionStore.clear());
-      } catch {
-        // Logged by the store; the next start tries again.
-      }
-      return { status: 'signedOut', reason: 'wiped' };
-    }
-    if (decoded.kind === 'expired') {
-      previousAccountId = decoded.accountId;
-      setStatus('expired');
-      return { status: 'expired', reason: 'expired' };
-    }
-    // A past `expiresAt` is kept as is: the first request refreshes
-    // proactively (and E1 runs right after the boot).
-    session = decoded.session;
-    setStatus('signedIn');
-    return { status: 'signedIn' };
-  }
+  const { restore, getExpiredPhone } = createRestore(core, logger);
 
-  /** E1 with a token that is not adopted yet (sign-in). */
-  async function validateWithE1(accessToken: string): Promise<string> {
-    try {
-      // Sent once, as in Story 2.3 (api-contract §2.2): no AD-6 retries.
-      const response = await createHttp(fixedAccessToken(accessToken)).request({
-        path: CURRENT_USER_PATH,
-        schema: userCurrentSchema,
-        retry: false,
-      });
-      return String(response.body.id);
-    } catch (error) {
-      logger.warn('session', 'E1 failed', {
-        kind: isAppError(error) ? error.kind : 'unknown',
-        status: isAppError(error) ? error.status : undefined,
-      });
-      throw new AuthError('Unknown');
-    }
-  }
+  const { signIn, setAccountSwitchHook } = createSignIn({
+    core,
+    authApi,
+    createHttp,
+    now,
+    logger,
+    onAccountSwitch,
+  });
 
-  async function discardSaved(): Promise<void> {
-    for (const store of [sessionStore, phoneStore]) {
-      try {
-        await enqueue(() => store.clear());
-      } catch {
-        // Logged by the store.
-      }
-    }
-  }
+  const { validate, onAppStateChange } = createLifecycle({ core, http, logger });
 
-  async function doSignIn({ phone, challenge, smsCode }: SignInArgs): Promise<SignInResult> {
-    const tokens = await authApi.confirmCode(phone, challenge, smsCode);
-    // From here on the challenge is spent: any failure says so.
-    const spent = () => new AuthError('Unknown', { challengeSpent: true });
-    const confirmedAt = now();
-    let accountId: string;
-    try {
-      accountId = await validateWithE1(tokens.accessToken);
-    } catch {
-      throw spent();
-    }
-    const next: StoredSession = {
-      v: 1,
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-      expiresAt: confirmedAt + tokens.expiresIn * 1000,
-      accountId,
-    };
-    // The previous account: the in-memory session, else the expiry marker.
-    const previous = session?.accountId ?? previousAccountId;
-    const accountChanged = previous === null || previous !== accountId;
-    if (accountChanged) {
-      // Story 2.8: wipe the previous account before anything of this one is
-      // written. The hook's gate is `signOut()` (old phone, marker, memory);
-      // it bumps the generation and emits `signedOut`, which navigates
-      // nowhere. A failed gate keeps the old data; nothing of this account is
-      // stored and the tokens are dropped with this frame. No hook set is
-      // a wiring bug: fail closed rather than store B next to A's data.
-      if (!accountSwitchHook) {
-        logger.error('session', 'no account-switch hook set; nothing kept');
-        throw spent();
-      }
-      try {
-        await accountSwitchHook();
-      } catch {
-        logger.error('session', 'account switch failed; nothing kept');
-        throw spent();
-      }
-      // After the hook: its reset cleared the log ring.
-      logger.info('session', 'accountChanged');
-    }
-    // A new session: any refresh still running for an older one is dropped.
-    generation += 1;
-    // The phone first and non-fatal (it only prefills re-login): its ADR
-    // 0006 recovery may delete the shared keychain file, which must happen
-    // before the session is written, never after.
-    try {
-      await enqueue(() => phoneStore.write(phone));
-    } catch {
-      logger.warn('session', 'phone not saved');
-    }
-    // Overwrites the expiry marker, if any.
-    try {
-      await enqueue(() => sessionStore.write(JSON.stringify(next)));
-    } catch {
-      logger.error('session', 'save failed; nothing kept');
-      await discardSaved();
-      throw spent();
-    }
-    logger.info('session', 'signed in', { accountChanged });
-    session = next;
-    previousAccountId = null;
-    setStatus('signedIn');
-    return { accountChanged };
-  }
+  const signOut = createSignOut(core, logger);
 
-  async function doValidate(): Promise<ValidateResult> {
-    if (status !== 'signedIn') {
-      return { kind: 'skipped' };
-    }
-    try {
-      await http.get(CURRENT_USER_PATH, userCurrentSchema);
-      logger.info('session', 'E1 ok');
-      return { kind: 'ok' };
-    } catch (error) {
-      const kind: AppErrorKind = isAppError(error) ? error.kind : 'Client';
-      logger.warn('session', 'E1 failed', { kind });
-      return kind === 'SessionExpired' ? { kind: 'expired' } : { kind: 'failed', error: kind };
-    }
-  }
-
-  function validate(): Promise<ValidateResult> {
-    if (!validating) {
-      validating = doValidate().finally(() => {
-        validating = null;
-      });
-    }
-    return validating;
-  }
-
-  async function signOut(): Promise<void> {
-    generation += 1;
-    signingOut = true;
-    // SecureStore first, then memory (api-contract §2.3 «Logout order»).
-    // The phone before the session entry: a phone failure then leaves the
-    // stored session and memory exactly as they were.
-    try {
-      await enqueue(() => phoneStore.clear());
-      await enqueue(() => sessionStore.clear());
-    } finally {
-      signingOut = false;
-    }
-    session = null;
-    previousAccountId = null;
-    logger.info('session', 'signed out');
-    setStatus('signedOut');
-  }
-
-  function corrupt(token: string): string {
-    return token.replace(/[A-Za-z0-9]/g, c =>
-      /\d/.test(c) ? String((Number(c) + 5) % 10) : c === 'x' || c === 'X' ? 'q' : 'x',
-    );
-  }
+  const debugHooks = debug?.createDebugHooks({ core, validate, logger });
 
   return {
-    getStatus: () => status,
-    subscribe(listener) {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
-    },
-    restore() {
-      if (!restoring) {
-        restoring = readSession()
-          .catch((): RestoreResult => {
-            logger.error('session', 'restore failed');
-            setStatus('signedOut');
-            return { status: 'signedOut', reason: 'unavailable' };
-          })
-          .finally(() => {
-            restoring = null;
-          });
-      }
-      return restoring;
-    },
-    signIn(args) {
-      const key = `${args.phone}\n${args.challenge}\n${args.smsCode}`;
-      if (signingIn) {
-        if (signingIn.key === key) {
-          return signingIn.promise;
-        }
-        logger.warn('session', 'signIn rejected: another sign-in in flight');
-        return Promise.reject(new AuthError('Unknown'));
-      }
-      const promise = doSignIn(args)
-        .catch((error: unknown) => {
-          throw isAuthError(error) ? error : new AuthError('Unknown');
-        })
-        .finally(() => {
-          signingIn = null;
-        });
-      signingIn = { key, promise };
-      return promise;
-    },
-    async getExpiredPhone() {
-      if (status !== 'expired') {
-        return null;
-      }
-      try {
-        const phone = await phoneStore.read();
-        // The status may have changed while reading.
-        return status === 'expired' && phone.kind === 'value' ? phone.value : null;
-      } catch {
-        return null;
-      }
-    },
+    getStatus: core.getStatus,
+    subscribe: core.subscribe,
+    restore,
+    signIn,
+    getExpiredPhone,
     signOut,
-    setAccountSwitchHook(hook) {
-      accountSwitchHook = hook;
-    },
+    setAccountSwitchHook,
     validate,
-    onAppStateChange(next) {
-      const previous = appState;
-      appState = next;
-      return next === 'active' && previous !== 'active' ? validate() : null;
-    },
+    onAppStateChange,
     http,
     authApi: { sendCode: authApi.sendCode, resendCode: authApi.resendCode },
-    debugCorruptAccessToken: __DEV__
-      ? () => {
-          if (status === 'signedIn' && session) {
-            session = { ...session, accessToken: corrupt(session.accessToken) };
-            logger.info('session', 'debug: access token corrupted in memory');
-          }
-          return validate();
-        }
-      : undefined,
-    debugExpireInMemory: __DEV__
-      ? () => {
-          if (status === 'signedIn' && session) {
-            // As `host.expire`, minus the marker write: storage is untouched.
-            generation += 1;
-            previousAccountId = session.accountId;
-            session = null;
-            logger.info('session', 'debug: expired in memory');
-            setStatus('expired');
-          }
-        }
-      : undefined,
+    debugCorruptAccessToken: debugHooks?.debugCorruptAccessToken,
+    debugExpireInMemory: debugHooks?.debugExpireInMemory,
   };
 }
