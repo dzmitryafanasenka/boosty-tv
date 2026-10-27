@@ -224,8 +224,15 @@ function ShellRoute({
   navigation,
 }: StackScreenProps<RootStackParamList, 'Shell'>) {
   const ui = useSessionUi();
+  // OK on a Подписки tile: Автор. Only while the Shell is the focused route
+  // (the same guard as `onOpenPost`): a second OK during the transition (a
+  // double press, or another tile) is dropped (Epic 3 retro F8).
   const onOpenAuthor = useCallback(
-    (blogUrl: string) => navigation.navigate('Author', { blogUrl }),
+    (blogUrl: string) => {
+      if (navigation.isFocused()) {
+        navigation.navigate('Author', { blogUrl });
+      }
+    },
     [navigation],
   );
   // OK on a feed card (Главная): Пост, with Главная as its sidebar's current item.
