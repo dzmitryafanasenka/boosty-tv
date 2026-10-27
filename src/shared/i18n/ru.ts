@@ -112,8 +112,25 @@ export const ru = {
     errorTitle: 'Не удалось загрузить подписки',
     firstOnly: 'Показаны первые {n}',
   },
+  // Автор (Story 3.3, E3 + E4; docs/focus-map.md §4 D). Missing blog (any
+  // E3 404; only `blog_not_found` is verified): «Назад» only, no retry. The header reads
+  // «Автор: {title}. {owner}» (or without the owner).
+  author: {
+    loading: 'Загружаем страницу автора',
+    loadingPosts: 'Загружаем публикации',
+    a11yHeader: 'Автор: {title}. {owner}',
+    a11yHeaderNoOwner: 'Автор: {title}',
+    emptyTitle: 'Публикаций нет',
+    emptyBody: 'Когда автор опубликует посты, они появятся здесь.',
+    errorTitle: 'Не удалось загрузить страницу автора',
+    postsErrorTitle: 'Не удалось загрузить публикации',
+    unavailableTitle: 'Автор недоступен',
+    unavailableBody: 'Этой страницы нет или она закрыта.',
+    loadMoreError: 'Не удалось загрузить следующие публикации.',
+  },
   common: {
     retry: 'Повторить',
+    back: 'Назад',
   },
   // DESIGN.md PostCard (Story 3.1). `{n}` is the video count. The card's
   // accessibility label reads «Видео. {title}. {author}, {date}.».

@@ -557,13 +557,17 @@ describe('focus (focus-map §3 C, §1.6)', () => {
     await unmount(root);
   });
 
-  it('OK on a tile does nothing yet (Автор is Story 3.3)', async () => {
+  it('OK on a tile opens Автор for that blogUrl (Story 3.3; the flow is authorFlow.test.tsx)', async () => {
     const root = await openSubs();
-    focusMock.mockClear();
-    await press(root, TILE(1));
+    await press(root, TILE(2));
+    expect(visible(root, 'author')).toBe(true);
+    // Подписки stays mounted below (the JS stack keeps covered screens).
     expect(visible(root, 'subs')).toBe(true);
-    expect(focusTargets().filter(id => id !== undefined)).toEqual([]);
-    expect(transport.calls.filter(c => c.path.startsWith('/v1/blog/'))).toHaveLength(0);
+    const blogCalls = transport.calls.filter(c => c.path.startsWith('/v1/blog/'));
+    expect(blogCalls.map(c => c.path).sort()).toEqual([
+      `/v1/blog/${blogUrlOf(2)}`,
+      `/v1/blog/${blogUrlOf(2)}/post/`,
+    ]);
     await unmount(root);
   });
 });

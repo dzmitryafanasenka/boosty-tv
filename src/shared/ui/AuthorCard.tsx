@@ -47,13 +47,27 @@ export type AuthorCardProps = {
   width: number;
   testID?: string;
   onFocus?: FocusableSurfaceProps['onFocus'];
-  /** Not wired in Story 3.2 (the Author screen comes in 3.3). */
+  /** OK: open the Author page (Story 3.3). */
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
   ref?: Ref<HostView>;
 };
 
-function Avatar({ url, testID }: { url: string | null; testID?: string }) {
+/**
+ * The author's round avatar, or a neutral placeholder when there is none or
+ * it failed to load (AuthorCard, the Author page header). `size` defaults
+ * to the card's avatar.
+ */
+export function AuthorAvatar({
+  url,
+  testID,
+  size = AVATAR,
+}: {
+  url: string | null;
+  testID?: string;
+  size?: number;
+}) {
+  const sized = size === AVATAR ? null : { width: size, height: size };
   // Recycled cells (ADR 0011): a failure belongs to one URL only.
   const [failed, setFailed] = useItemState(false, url ?? undefined);
   return url && !failed ? (
@@ -65,14 +79,14 @@ function Avatar({ url, testID }: { url: string | null; testID?: string }) {
       source={{ uri: url }}
       resizeMethod="resize"
       fadeDuration={0}
-      style={styles.avatar}
+      style={[styles.avatar, sized]}
       onError={() => setFailed(true)}
       accessibilityIgnoresInvertColors
     />
   ) : (
     <View
       testID={testID ? `${testID}-placeholder` : undefined}
-      style={[styles.avatar, styles.placeholder]}
+      style={[styles.avatar, styles.placeholder, sized]}
     />
   );
 }
@@ -109,7 +123,7 @@ export function AuthorCardView({
         // mount cost): the avatar Image, one layout-only column (flattened
         // by Fabric) and two Texts.
         <>
-          <Avatar url={author.avatarUrl} testID={testID ? `${testID}/avatar` : undefined} />
+          <AuthorAvatar url={author.avatarUrl} testID={testID ? `${testID}/avatar` : undefined} />
           <View style={styles.text}>
             <Text
               testID={testID ? `${testID}/title` : undefined}

@@ -24,3 +24,17 @@ export const feedPageDtoSchema = z.object({
 });
 
 export type FeedPageDto = z.infer<typeof feedPageDtoSchema>;
+
+/**
+ * 200 body of E4 `GET /v1/blog/{blogUrl}/post/` (docs/api-contract.md §3,
+ * live shape in `src/test/fixtures/boosty/e4-blog-posts-1.json`):
+ * `{data: Post[], extra{offset, isLast}}`. As E5: posts stay `unknown` (one
+ * malformed post is dropped, never the page), a missing `data` is a `Parse`
+ * error, and the opaque `extra.offset` is passed back verbatim.
+ */
+export const blogPostsPageDtoSchema = z.object({
+  data: z.array(z.unknown()),
+  extra: feedPageDtoSchema.shape.extra,
+});
+
+export type BlogPostsPageDto = z.infer<typeof blogPostsPageDtoSchema>;

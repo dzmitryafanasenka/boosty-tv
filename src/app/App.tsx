@@ -4,6 +4,7 @@ import {
   NavigationContainer,
   DarkTheme,
   createNavigationContainerRef,
+  useFocusEffect,
   type Theme,
 } from '@react-navigation/native';
 import {
@@ -18,7 +19,7 @@ import {
   useState,
   type RefObject,
 } from 'react';
-import { AppState, StatusBar, StyleSheet, View } from 'react-native';
+import { AppState, BackHandler, StatusBar, StyleSheet, View } from 'react-native';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import {
@@ -27,23 +28,38 @@ import {
   PhoneScreen,
   WelcomeScreen,
 } from '../features/auth';
+import { AuthorScreen, refreshAuthorPostsHeads, type AuthorFocusInfo } from '../features/author';
 import { refreshFeedHead } from '../features/home';
 import { SignOutDialog } from '../features/settings';
 import { accountScope } from '../shared/account';
 import type { SignInResult, ValidateResult } from '../shared/api';
 import {
+  FocusZone,
+  MAIN_SECTION,
   ModalHostProvider,
+  Screen,
+  focusRestoration,
   useModal,
+  type FocusZoneHandle,
   type ModalApi,
 } from '../shared/focus';
 import { t } from '../shared/i18n';
-import { Text, colors, components, spacing, type HostView } from '../shared/ui';
+import {
+  Text,
+  colors,
+  components,
+  requestHostFocus,
+  spacing,
+  type HostView,
+} from '../shared/ui';
 import type * as DevFocusModule from './dev/devFocus';
 import { queryClient, resetQueryCache } from './queryClient';
 import type { RootStackParamList } from './routes';
 import { DEMO_ACTIVE, session } from './session';
+import { enabledSections, type SectionId } from './phaseFlags';
 import { SessionUiContext, useSessionUi, type SessionUi } from './sessionUi';
 import { Shell } from './Shell';
+import { NAV_ID, Sidebar, sidebarLayout, useSidebarNav } from './Sidebar';
 
 /**
  * Debug builds only (Story 2.4 «Проверка фокуса»). `__DEV__` is a constant
@@ -55,7 +71,8 @@ const dev: typeof DevFocusModule | null = __DEV__
   : null;
 
 const Stack = createStackNavigator<RootStackParamList>();
-const navigationRef = createNavigationContainerRef<RootStackParamList>();
+/** Exported for flow tests (a stand-in route pushed above Автор before Story 3.4). */
+export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 /** Background of the container and cards, so no light frame shows. */
 const theme: Theme = {
@@ -188,10 +205,26 @@ function ModalBridge({ apiRef }: { apiRef: RefObject<ModalApi | null> }) {
   return null;
 }
 
+/**
+ * The Shell section to open on its next return (OK on a sidebar item of
+ * Автор, owner decision 2026-10-27): set right before the pop, read once by
+ * the Shell when it is the focused route again.
+ */
+let pendingShellSection: SectionId | null = null;
+function takePendingShellSection(): SectionId | null {
+  const section = pendingShellSection;
+  pendingShellSection = null;
+  return section;
+}
+
 function ShellRoute({
   navigation,
 }: StackScreenProps<RootStackParamList, 'Shell'>) {
   const ui = useSessionUi();
+  const onOpenAuthor = useCallback(
+    (blogUrl: string) => navigation.navigate('Author', { blogUrl }),
+    [navigation],
+  );
   const modal = useModal();
   const onOpenSignOut = useCallback(
     (initiator: RefObject<HostView | null>) => {
@@ -220,7 +253,150 @@ function ShellRoute({
           ? { retrying: ui.retrying, onRetry: ui.onRetry }
           : undefined
       }
+      onOpenAuthor={onOpenAuthor}
+      takePendingSection={takePendingShellSection}
     />
+  );
+}
+
+/** Автор is opened from Подписки: its sidebar's current item (decision A). */
+const AUTHOR_ORIGIN: SectionId = 'subs';
+/** Sidebar item testIDs on Автор: `author/nav/<section>` (the Shell's stay mounted below). */
+const AUTHOR_NAV_PREFIX = 'author/';
+
+/**
+ * D Автор (Story 3.3) in the shared screen wrapper (trapped on all sides),
+ * with the Shell's sidebar (owner decision 2026-10-27, option A): the same
+ * component and enabled sections, current item = Подписки (the origin).
+ *
+ * - ← from the grid's first column → the current item; → from the sidebar →
+ *   the remembered post (the content zone's destination).
+ * - OK on «Подписки» pops to the Shell (the same tile); OK on another item
+ *   pops and opens that section in the Shell, as OK on it there.
+ * - Back anywhere on the route (content or sidebar) pops (focus-map §4 D).
+ * - FocusRestoration is keyed by this route's key and forgotten on unmount.
+ */
+function AuthorRoute({
+  navigation,
+  route,
+}: StackScreenProps<RootStackParamList, 'Author'>) {
+  const { blogUrl } = route.params;
+  const sections = useMemo(() => enabledSections(), []);
+  const nav = useSidebarNav(AUTHOR_ORIGIN);
+  const zoneRef = useRef<FocusZoneHandle>(null);
+  /** The last focused element on this route (a sidebar or content id). */
+  const lastFocusId = useRef<string | null>(null);
+  /** The page's focus listeners (`AuthorFocusInfo.onFocusChange`). */
+  const focusListeners = useRef(new Set<(focusId: string) => void>());
+  const recordFocus = useCallback((focusId: string) => {
+    lastFocusId.current = focusId;
+    for (const listener of [...focusListeners.current]) {
+      listener(focusId);
+    }
+  }, []);
+  // `isFocused()`, not a ref set in a focus effect: the page's own effects
+  // run before this component's, already on the first focus.
+  const isActive = useCallback(() => navigation.isFocused(), [navigation]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        pendingShellSection = null;
+        navigation.goBack();
+        return true;
+      });
+      return () => sub.remove();
+    }, [navigation]),
+  );
+
+  const routeKey = route.key;
+  useEffect(
+    () => () => {
+      focusRestoration.forget(routeKey);
+      // A pop that never reached the Shell must not open a section later.
+      pendingShellSection = null;
+    },
+    [routeKey],
+  );
+
+  const onSidebarPress = useCallback(
+    (section: SectionId) => {
+      // Only while this route is focused: a second OK during the pop is ignored.
+      if (!navigation.isFocused()) {
+        return;
+      }
+      pendingShellSection = section === AUTHOR_ORIGIN ? null : section;
+      navigation.goBack();
+    },
+    [navigation],
+  );
+  const onBack = useCallback(() => {
+    pendingShellSection = null;
+    navigation.goBack();
+  }, [navigation]);
+  const onSidebarFocus = useCallback(
+    (section: SectionId) => {
+      if (isActive()) {
+        recordFocus(`${AUTHOR_NAV_PREFIX}${NAV_ID[section]}`);
+      }
+    },
+    [isActive, recordFocus],
+  );
+  const onContentFocus = useCallback(
+    (focusId: string) => {
+      if (isActive()) {
+        recordFocus(focusId);
+      }
+    },
+    [isActive, recordFocus],
+  );
+  const views = nav.views;
+  const focus = useMemo<AuthorFocusInfo>(
+    () => ({
+      isActive,
+      current: () => lastFocusId.current,
+      sectionItemId: `${AUTHOR_NAV_PREFIX}${NAV_ID[AUTHOR_ORIGIN]}`,
+      focusSidebar: () => requestHostFocus(views.current.get(AUTHOR_ORIGIN)),
+      focusZoneTarget: () => zoneRef.current?.focusTarget() ?? false,
+      onFocusChange: listener => {
+        focusListeners.current.add(listener);
+        return () => {
+          focusListeners.current.delete(listener);
+        };
+      },
+    }),
+    [isActive, views],
+  );
+
+  return (
+    <Screen testID="author">
+      <Sidebar
+        testID="author/sidebar"
+        idPrefix={AUTHOR_NAV_PREFIX}
+        sections={sections}
+        current={AUTHOR_ORIGIN}
+        nav={nav}
+        onPress={onSidebarPress}
+        onFocus={onSidebarFocus}
+      />
+      <FocusZone
+        ref={zoneRef}
+        testID="author/content"
+        routeKey={routeKey}
+        sectionId={MAIN_SECTION}
+        onItemFocus={onContentFocus}
+        isActive={isActive}
+        style={sidebarLayout.content}
+      >
+        <AuthorScreen
+          http={session.http}
+          blogUrl={blogUrl}
+          routeKey={routeKey}
+          focus={focus}
+          onBack={onBack}
+        />
+      </FocusZone>
+    </Screen>
   );
 }
 
@@ -309,11 +485,14 @@ function App() {
     const appState = AppState.addEventListener('change', state => {
       // Resume: E1 again; only a success changes anything (offline → the
       // feed, and a stale cached feed gets its head refreshed: one E5 page 1,
-      // AD-7). Failures send nothing more.
+      // AD-7; so do the posts of every Author route in the stack: one E4
+      // page 1 each, spec-author-posts-refresh). Failures send nothing more.
       session.onAppStateChange(state)?.then(result => {
         if (alive.current && result.kind === 'ok') {
           setHomeOffline(false);
-          refreshFeedHead(queryClient, session.http, Date.now()).catch(() => {});
+          const now = Date.now();
+          refreshFeedHead(queryClient, session.http, now).catch(() => {});
+          refreshAuthorPostsHeads(queryClient, session.http, now).catch(() => {});
         }
       });
     });
@@ -391,6 +570,7 @@ function App() {
                   <Stack.Screen name="Phone" component={Phone} />
                   <Stack.Screen name="Code" component={Code} />
                   <Stack.Screen name="Shell" component={ShellRoute} />
+                  <Stack.Screen name="Author" component={AuthorRoute} />
                   <Stack.Screen name="Expired" component={Expired} />
                   {__DEV__ && dev ? (
                     <>

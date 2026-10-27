@@ -80,14 +80,15 @@ type TileProps = {
   author: Author;
   index: number;
   restoration: ListRestoration;
+  onOpen: (blogUrl: string) => void;
 };
 
 /**
  * One tile: a FocusZone item (Back, ← → zones) and a FocusRestoration item.
  * Memoized with stable props, so a focus move re-renders only the two
- * tiles' focus state. OK does nothing until Story 3.3 (Автор).
+ * tiles' focus state. OK opens Автор (Story 3.3).
  */
-const SubsTile = memo(function SubsTileView({ author, index, restoration }: TileProps) {
+const SubsTile = memo(function SubsTileView({ author, index, restoration, onOpen }: TileProps) {
   const id = subsTileId(author.blogUrl);
   const zone = useZoneItem(id);
   const zoneRef = zone.ref;
@@ -105,6 +106,8 @@ const SubsTile = memo(function SubsTileView({ author, index, restoration }: Tile
     zone.onFocus();
     restoration.onItemFocus(id, index);
   }, [zone, restoration, id, index]);
+  const blogUrl = author.blogUrl;
+  const onPress = useCallback(() => onOpen(blogUrl), [onOpen, blogUrl]);
   return (
     <AuthorCard
       ref={ref}
@@ -112,14 +115,19 @@ const SubsTile = memo(function SubsTileView({ author, index, restoration }: Tile
       author={author}
       width={SUBS_TILE_WIDTH}
       onFocus={onFocus}
+      onPress={onPress}
       style={index % SUBS_COLUMNS === 0 ? styles.slot : styles.slotGap}
     />
   );
 });
 
-type RowProps = { row: SubsRowItem; restoration: ListRestoration };
+type RowProps = {
+  row: SubsRowItem;
+  restoration: ListRestoration;
+  onOpen: (blogUrl: string) => void;
+};
 
-const SubsRow = memo(function SubsRowView({ row, restoration }: RowProps) {
+const SubsRow = memo(function SubsRowView({ row, restoration, onOpen }: RowProps) {
   return (
     <View style={styles.row}>
       {row.authors.map((author, column) => (
@@ -130,6 +138,7 @@ const SubsRow = memo(function SubsRowView({ row, restoration }: RowProps) {
           author={author}
           index={row.start + column}
           restoration={restoration}
+          onOpen={onOpen}
         />
       ))}
     </View>
@@ -143,6 +152,8 @@ export type SubscriptionsGridProps = {
   listRef: RefObject<FlashListRef<SubsRowItem> | null>;
   /** Row to open at (scroll on return); undefined: the top. */
   initialRow?: number;
+  /** OK on a tile (stable). */
+  onOpen: (blogUrl: string) => void;
 };
 
 /**
@@ -158,13 +169,14 @@ export function SubscriptionsGrid({
   restoration,
   listRef,
   initialRow,
+  onOpen,
 }: SubscriptionsGridProps) {
   const rows = useMemo(() => subsRows(authors), [authors]);
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<SubsRowItem>) => (
-      <SubsRow row={item} restoration={restoration} />
+      <SubsRow row={item} restoration={restoration} onOpen={onOpen} />
     ),
-    [restoration],
+    [restoration, onOpen],
   );
   return (
     <FlashList

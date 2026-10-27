@@ -5,7 +5,28 @@ export {
   previewOf,
   textOf,
 } from './mapPost';
-export { FEED_PAGE_SIZE, PostRepository, feedPath, mergePosts } from './postRepository';
+export {
+  BLOG_POSTS_PAGE_SIZE,
+  FEED_PAGE_SIZE,
+  PostRepository,
+  blogPostsPath,
+  feedPath,
+  mergePosts,
+} from './postRepository';
+export {
+  mergePostsHead,
+  refreshPostsHead,
+  type PostsData,
+  type PostsHeadRefreshLog,
+  type PostsHeadRefreshResult,
+} from './postsHeadRefresh';
+export {
+  MAX_AUTO_FETCHES,
+  nextPageCursor,
+  usePagedPosts,
+  type PagedPosts,
+  type PagedPostsOptions,
+} from './usePagedPosts';
 export type {
   Block,
   BlockType,

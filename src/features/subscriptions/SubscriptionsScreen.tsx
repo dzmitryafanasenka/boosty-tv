@@ -43,6 +43,13 @@ export type SubscriptionsFocusInfo = {
   sectionItemId: string;
   /** Focus Подписки's sidebar item (the last fallback of the grid). */
   focusSidebar(): void;
+  /**
+   * Registers how Подписки restores its content focus when the Shell is the
+   * focused route again (Back from Автор): the tile by `blogUrl` with the
+   * fallback chain. The function returns false when it did nothing (the
+   * Shell then uses the zone's target). Null unregisters.
+   */
+  setReturnFocus?(restore: (() => boolean) | null): void;
 };
 
 export type SubscriptionsScreenProps = {
@@ -53,6 +60,8 @@ export type SubscriptionsScreenProps = {
   /** The section was opened with OK: take the content focus once content exists. */
   focusOnMount?: boolean;
   focus: SubscriptionsFocusInfo;
+  /** OK on a tile: open the Author page (Story 3.3). */
+  onOpenAuthor?: (blogUrl: string) => void;
 };
 
 type Phase = 'loading' | 'error' | 'empty' | 'grid';
@@ -72,7 +81,10 @@ type Phase = 'loading' | 'error' | 'empty' | 'grid';
  * - Empty (C3): nothing is focusable; focus stays on the sidebar.
  * - Error: «Повторить» takes focus when the section was opened with OK and
  *   the user has not moved; a retry keeps focus on the busy button.
- * - OK on a tile does nothing yet (the Author screen is Story 3.3).
+ * - OK on a tile opens Автор (Story 3.3); the tile is already remembered
+ *   (FocusRestoration, by its focus). Back from Автор restores it by
+ *   `blogUrl` with the fallback chain (neighbor by index → first tile →
+ *   the sidebar item), at the same scroll.
  *
  * The response reached the E2 limit and `total > 30`: «Показаны первые N»
  * (N = tiles shown) next to the header, not focusable; no paging
@@ -83,6 +95,7 @@ export function SubscriptionsScreen({
   routeKey,
   focusOnMount = false,
   focus,
+  onOpenAuthor,
 }: SubscriptionsScreenProps) {
   const subs = useSubscriptions(http);
   const windowHeight = useWindowDimensions().height;
@@ -237,6 +250,27 @@ export function SubscriptionsScreen({
   // Blur or unmount: stop a pending restore focus.
   useEffect(() => restoration.cancel, [restoration]);
 
+  // Return from Автор (the Shell is focused again with focus in content):
+  // the remembered tile by `blogUrl`, else the fallback chain. Only the grid
+  // restores this way; the error action and the sidebar use the zone.
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+  useEffect(() => {
+    const info = focusRef.current;
+    info.setReturnFocus?.(() => {
+      if (phaseRef.current !== 'grid') {
+        return false;
+      }
+      restoreOrFirst();
+      return true;
+    });
+    return () => info.setReturnFocus?.(null);
+  }, [restoreOrFirst]);
+
+  const onOpenRef = useRef(onOpenAuthor);
+  onOpenRef.current = onOpenAuthor;
+  const onOpenTile = useCallback((blogUrl: string) => onOpenRef.current?.(blogUrl), []);
+
   // A background refetch (a remount after `staleTime`) changed the tiles
   // other than by an append: the rows regroup and may remount (rows are
   // keyed by their first `blogUrl`), so a focused tile would lose native
@@ -353,6 +387,7 @@ export function SubscriptionsScreen({
           restoration={gridRestoration}
           listRef={listRef}
           initialRow={initialRow}
+          onOpen={onOpenTile}
         />
       ) : null}
     </View>

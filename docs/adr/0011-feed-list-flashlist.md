@@ -68,6 +68,8 @@ The recycling guards (`resetKey`, image keys) are harmless with FlatList.
 
 ## Consequences
 
+- Story 3.3 (2026-10-27): the grid moved to `src/shared/ui/PostGrid.tsx` and serves Главная (`features/home/FeedGrid.tsx` is now a thin wrapper with Главная's ids) and the Author page with the same setup; the paging hook moved to `src/shared/entities/post/usePagedPosts.ts`. The rollback below applies to `PostGrid` (`postGridRows`, `postGridRowLayout`, `postGridListAdapter`).
+
 - Device checks (2026-10-26, owner with the physical remote and adb runs):
   - **done:** columns kept on fast ↓; the end guide; restoration on return; no focus jump on page appends (#1843 not reproduced, see «Device results»); performance against the FlatList baseline;
   - **not done:** TalkBack on cards; a stale image on a recycled cell was not checked separately.
