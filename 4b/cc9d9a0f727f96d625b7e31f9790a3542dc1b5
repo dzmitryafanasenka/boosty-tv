@@ -1,0 +1,45 @@
+.eslintrc.js
+  s_06dd4e6f3c24d0::t_93e494dd5ef742 9-14,38-44,109-218
+__tests__/boundaries.test.js
+  s_06dd4e6f3c24d0::t_200ef841a151b2 110-176
+__tests__/sessionRefresh.test.ts
+  s_06dd4e6f3c24d0::t_9afde32eb3653c 669-763
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_06dd4e6f3c24d0::t_1db83676e363de 216,238-240
+_bmad-output/implementation-artifacts/spec-session-robustness.md
+  s_06dd4e6f3c24d0::t_7040639bb80b85 1-111
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_06dd4e6f3c24d0::t_b05bbccbb2bcff 70
+docs/adr/0009-session-manager-split.md
+  s_06dd4e6f3c24d0::t_044a8b90855422 143-152
+src/shared/api/__tests__/sessionManager.test.ts
+  s_06dd4e6f3c24d0::t_f76f336f65b020 8-9,640-708
+src/shared/api/session/__tests__/core.test.ts
+  s_06dd4e6f3c24d0::t_e50127522ade3a 201-241
+src/shared/api/session/core.ts
+  s_06dd4e6f3c24d0::t_d5edc3aaf307c4 8,21-25,36-39,61-62,67-70,113,115-116,140-141,143,150,175,182-185,196,199
+src/shared/api/session/lifecycle.ts
+  s_06dd4e6f3c24d0::t_6925c7cb94fc5d 30-37,56-58,60-66
+src/shared/api/session/restore.ts
+  s_06dd4e6f3c24d0::t_0d165ac9e5c9e2 1,23-29,34-45,48-61
+src/shared/api/session/signIn.ts
+  s_06dd4e6f3c24d0::t_88172af390bdb6 7,80-96,139-141,155-162
+src/test/async.ts
+  s_06dd4e6f3c24d0::t_39f60296167894 1-19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "4bcc9d9a0f727f96d625b7e31f9790a3542dc1b5",
+  "prompts": {},
+  "sessions": {
+    "s_06dd4e6f3c24d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b17b1d18-d247-4604-86f0-d38f6644be98",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
