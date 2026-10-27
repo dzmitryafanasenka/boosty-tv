@@ -1,6 +1,7 @@
 import { createLogger } from '../../../services/logger';
 // eslint-disable-next-line boundaries/dependencies -- test-only fixtures
 import { blockEnd, e8Accessible, e8Locked, paragraph, postDetail, text } from '../../../../test/postFixtures';
+import { spacing, typography } from '../../../ui/tokens';
 import { mapPost } from '../mapPost';
 import {
   PARAGRAPH_STOP_MAX_CHARS,
@@ -214,11 +215,24 @@ describe('blockKey / listItemTexts', () => {
 });
 
 describe('long paragraphs (one stop must stay well under the column)', () => {
+  it('the budget fits the single-column text measure: ≈ 8 lines, well under half the viewport', () => {
+    // 600 dp measure − 18 dp paragraph padding and bar; ≈ 7.7 dp per Cyrillic character.
+    const perLine = Math.floor((spacing['text-measure'] - 18) / 7.7);
+    expect(perLine).toBeGreaterThanOrEqual(70);
+    expect(perLine).toBeLessThanOrEqual(80);
+    const lines = Math.ceil(PARAGRAPH_STOP_MAX_CHARS / perLine);
+    const height = lines * typography.body.lineHeight + 2 * spacing['3'];
+    // The column's viewport: 540 − 2 × safe-y − focus headroom.
+    const viewport = 540 - 2 * spacing['safe-y'] - spacing['focus-headroom'];
+    expect(height).toBeLessThan(viewport / 2);
+    expect(PARAGRAPH_STOP_MAX_CHARS).toBe(600);
+  });
+
   const words = (value: string) => value.split(/\s+/).filter(Boolean);
   const sentence = (n: number) => `Предложение номер ${n} с несколькими словами для длины.`;
 
   it('a long paragraph → several stops, each within the budget, order and text preserved', () => {
-    const long = Array.from({ length: 30 }, (_, i) => sentence(i)).join(' ');
+    const long = Array.from({ length: 45 }, (_, i) => sentence(i)).join(' ');
     expect(long.length).toBeGreaterThan(3 * PARAGRAPH_STOP_MAX_CHARS);
     const items = body([text(long), blockEnd()]);
     expect(items.length).toBeGreaterThan(3);

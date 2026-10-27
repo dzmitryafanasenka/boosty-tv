@@ -26,9 +26,6 @@ export const postVideoPrefix = (postId: string) => `post/${postId}/video/`;
 export const postVideoId = (postId: string, mediaId: string) =>
   `${postVideoPrefix(postId)}${mediaId}`;
 
-/** The left column: a third of the content minus the column gap. */
-const COLUMN_GAP = spacing['10'];
-const LEFT_WIDTH = Math.floor((spacing['content-width'] - COLUMN_GAP) / 3);
 const NO_DESTINATIONS: HostView[] = [];
 
 /** What the route tells the Post page about focus (it owns the sidebar and the zone). */
@@ -66,11 +63,13 @@ export type PostScreenProps = {
 type Phase = 'unavailable' | 'error' | 'loading' | 'ready';
 
 /**
- * F Пост (Story 3.4, docs/focus-map.md §4 F): E8 in two columns. Left: the
- * author row (OK → Автор), the title and the meta line (date · likes, read
- * only). Right: one MediaRow per video on top (Story 3.5, in block order),
- * then the blocks as plain paragraphs (each a ParagraphStop) and neutral
- * non-focusable placeholders, in a scrolling column. Not here yet:
+ * F Пост (Story 3.4, docs/focus-map.md §4 F): E8 in one scrolling column
+ * (owner decision 2026-10-27, header on top). First the header: the author
+ * row (OK → Автор), the title and the meta line (date · likes, read only);
+ * it scrolls away with the content (never pinned). Then one MediaRow per
+ * video (Story 3.5, in block order), then the blocks as plain paragraphs
+ * (each a ParagraphStop) and neutral non-focusable placeholders, the text
+ * capped at `spacing['text-measure']`. Not here yet:
  * «Смотреть» and progress (Epic 4), the locked copy (3.6), styles, collapse
  * and real blocks (Epic 6). A locked post shows its header and teaser
  * placeholders (no rows).
@@ -83,11 +82,12 @@ type Phase = 'unavailable' | 'error' | 'loading' | 'ready';
  *   still on the sidebar's current item, nothing yet, or the StateView
  *   action just pressed). A StateView action takes focus the same way, or
  *   when the focused content it replaces is gone.
- * - ↓ ↑ move through the rows, then the paragraphs, natively (the column
- *   scrolls the focused one into view). ← from a row or paragraph → the
- *   left column's guide → the author; → from the author → the right
- *   column's guide → the last focused row or paragraph (else the first).
- *   Each column traps ↑ ↓.
+ * - ↓ ↑ move through the author, the rows, then the paragraphs, natively
+ *   (the column scrolls the focused one into view; ↑ from the first row or
+ *   paragraph reaches the author). The column's guide traps ↑ ↓; its
+ *   destination is the last focused element of the column, else the
+ *   initial one. ← from any of them → the sidebar's current item; → from
+ *   the sidebar → the content zone's remembered element.
  * - A refetch never moves focus, unless the focused row or paragraph is
  *   gone: the initial target then.
  * - Return to the route (Автор on top popped): the remembered element
@@ -129,8 +129,8 @@ export function PostScreen({
           : postBodyItems(post.teaser),
     [post],
   );
-  /** The first stop of the right column: the first MediaRow, else the first paragraph. */
-  const firstRightId = useMemo(() => {
+  /** The first stop below the header: the first MediaRow, else the first paragraph. */
+  const firstStopId = useMemo(() => {
     if (rows.length > 0) {
       return `${videoPrefix}${rows[0].ref.mediaId}`;
     }
@@ -138,7 +138,7 @@ export function PostScreen({
     return first ? `${blockPrefix}${first.key}` : null;
   }, [rows, items, videoPrefix, blockPrefix]);
   /** The first row or paragraph; a locked post or one with neither: the author. */
-  const initialId = post !== null && post.hasAccess && firstRightId !== null ? firstRightId : authorId;
+  const initialId = post !== null && post.hasAccess && firstStopId !== null ? firstStopId : authorId;
 
   const focusRef = useRef(focus);
   focusRef.current = focus;
@@ -146,53 +146,52 @@ export function PostScreen({
   const initialRef = useRef(initialId);
   initialRef.current = initialId;
 
-  // The left column's guide: ← from the right column lands on the author.
-  const authorZone = useZoneItem(authorId);
-  const [authorView, setAuthorView] = useState<HostView | null>(null);
-  const authorRef = useCallback(
-    (view: HostView | null) => {
-      authorZone.ref?.(view);
-      if (view) {
-        views.current.set(authorId, view);
-      } else {
-        views.current.delete(authorId);
-      }
-      setAuthorView(view);
-    },
-    [authorZone, authorId],
+  // The column's guide: focus entering the column lands on its last
+  // focused element (author, row or paragraph), else the initial one.
+  const lastFocused = useRef<string | null>(null);
+  const [columnTarget, setColumnTarget] = useState<HostView | null>(null);
+  const refreshColumnTarget = useCallback(() => {
+    const remembered = lastFocused.current ? views.current.get(lastFocused.current) : undefined;
+    const next = remembered ?? views.current.get(initialRef.current) ?? null;
+    setColumnTarget(prev => (prev === next ? prev : next));
+  }, []);
+  const columnDestinations = useMemo(
+    () => (columnTarget ? [columnTarget] : NO_DESTINATIONS),
+    [columnTarget],
   );
-  const leftDestinations = useMemo(() => (authorView ? [authorView] : NO_DESTINATIONS), [authorView]);
 
-  // The right column's guide: → from the author lands on the last focused
-  // row or paragraph, else the first one; neither: no destination.
-  const lastRight = useRef<string | null>(null);
-  const [rightTarget, setRightTarget] = useState<HostView | null>(null);
-  const refreshRightTarget = useCallback(() => {
-    const remembered = lastRight.current ? views.current.get(lastRight.current) : undefined;
-    const first = firstRightId ? views.current.get(firstRightId) : undefined;
-    const next = remembered ?? first ?? null;
-    setRightTarget(prev => (prev === next ? prev : next));
-  }, [firstRightId]);
-  const rightDestinations = useMemo(() => (rightTarget ? [rightTarget] : NO_DESTINATIONS), [rightTarget]);
-
-  /** A row's or paragraph's host view, by focus id. */
-  const onRightView = useCallback((id: string, view: HostView | null) => {
+  /** A column element's host view (author, row or paragraph), by focus id. */
+  const onStopView = useCallback((id: string, view: HostView | null) => {
     if (view) {
       views.current.set(id, view);
     } else {
       views.current.delete(id);
     }
   }, []);
-  const onRightFocus = useCallback(
+  const onStopFocus = useCallback(
     (id: string) => {
-      lastRight.current = id;
-      refreshRightTarget();
+      lastFocused.current = id;
+      refreshColumnTarget();
     },
-    [refreshRightTarget],
+    [refreshColumnTarget],
   );
+
+  const authorZone = useZoneItem(authorId);
+  const authorRef = useCallback(
+    (view: HostView | null) => {
+      authorZone.ref?.(view);
+      onStopView(authorId, view);
+      refreshColumnTarget();
+    },
+    [authorZone, authorId, onStopView, refreshColumnTarget],
+  );
+  const onAuthorFocus = useCallback(() => {
+    authorZone.onFocus();
+    onStopFocus(authorId);
+  }, [authorZone, authorId, onStopFocus]);
   useEffect(() => {
-    refreshRightTarget();
-  }, [rows, items, refreshRightTarget]);
+    refreshColumnTarget();
+  }, [rows, items, initialId, refreshColumnTarget]);
 
   const stateAction = useZoneItem(POST_STATE_ACTION_ID);
   const stateActionView = useRef<HostView | null>(null);
@@ -265,6 +264,10 @@ export function PostScreen({
     if (previous === phase) {
       return;
     }
+    if (phase !== 'ready') {
+      // The column is gone (skeleton or StateView): forget its remembered element.
+      lastFocused.current = null;
+    }
     if (phase === 'ready') {
       if (mayTakeFocus()) {
         focusInitial();
@@ -292,8 +295,8 @@ export function PostScreen({
       (current.startsWith(blockPrefix) || current.startsWith(videoPrefix)) &&
       !views.current.has(current)
     ) {
-      if (lastRight.current === current) {
-        lastRight.current = null;
+      if (lastFocused.current === current) {
+        lastFocused.current = null;
       }
       focusInitial();
     }
@@ -332,28 +335,9 @@ export function PostScreen({
   return (
     <View testID="post/page" style={styles.root}>
       <TVFocusGuideView
-        testID="post/left"
-        style={styles.left}
-        destinations={leftDestinations}
-        trapFocusUp
-        trapFocusDown
-      >
-        {post !== null ? (
-          <PostHeader
-            post={post}
-            authorId={authorId}
-            authorRef={authorRef}
-            onAuthorFocus={authorZone.onFocus}
-            onAuthorPress={onAuthorPress}
-          />
-        ) : (
-          <PostHeaderSkeleton />
-        )}
-      </TVFocusGuideView>
-      <TVFocusGuideView
-        testID="post/right"
-        style={styles.right}
-        destinations={rightDestinations}
+        testID="post/column"
+        style={styles.column}
+        destinations={columnDestinations}
         trapFocusUp
         trapFocusDown
       >
@@ -363,18 +347,25 @@ export function PostScreen({
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
           >
+            <PostHeader
+              post={post}
+              authorId={authorId}
+              authorRef={authorRef}
+              onAuthorFocus={onAuthorFocus}
+              onAuthorPress={onAuthorPress}
+            />
             <PostVideoRows
               rows={rows}
               idPrefix={videoPrefix}
               playable={playerEnabled}
-              onRowView={onRightView}
-              onRowFocus={onRightFocus}
+              onRowView={onStopView}
+              onRowFocus={onStopFocus}
             />
             <PostBody
               items={items}
               idPrefix={blockPrefix}
-              onParagraphView={onRightView}
-              onParagraphFocus={onRightFocus}
+              onParagraphView={onStopView}
+              onParagraphFocus={onStopFocus}
             />
           </ScrollView>
         ) : (
@@ -383,6 +374,7 @@ export function PostScreen({
             accessible
             accessibilityLabel={t('post.loading')}
           >
+            <PostHeaderSkeleton />
             <PostBodySkeleton />
           </View>
         )}
@@ -394,21 +386,15 @@ export function PostScreen({
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    flexDirection: 'row',
   },
-  left: {
-    width: LEFT_WIDTH,
-    paddingHorizontal: spacing['focus-headroom'],
-    paddingTop: spacing['focus-headroom'],
-  },
-  right: {
+  column: {
     flex: 1,
-    marginLeft: COLUMN_GAP,
   },
   scroll: {
     flex: 1,
   },
-  // Focus headroom around the rows and paragraphs; room below the last one.
+  // Focus headroom around the author row, the rows and the paragraphs;
+  // room below the last one.
   scrollContent: {
     paddingHorizontal: spacing['focus-headroom'],
     paddingTop: spacing['focus-headroom'],

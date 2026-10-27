@@ -104,6 +104,8 @@ export const spacing = {
   'author-tile-width': 232,
   'author-tile-gap': 12,
   'focus-headroom': 12,
+  /** The longest line of body text (Post screen paragraphs, ≈ 75 Cyrillic characters at `body`). */
+  'text-measure': 600,
 } as const;
 
 export const focus = {

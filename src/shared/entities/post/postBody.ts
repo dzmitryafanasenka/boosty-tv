@@ -34,15 +34,17 @@ import type { Block, ListItem } from './types';
  */
 
 /**
- * The longest ParagraphStop, in characters. The right column's text is
- * about 422 dp wide (720 content − 232 left column − 24 gap − 2 × 12
- * headroom − 18 paragraph padding and bar): ≈ 55 Cyrillic characters per
- * line at `typography.body` (14 sp, ≈ 7.7 dp per character), 22 dp per
- * line. 400 characters ≈ 8 lines ≈ 190 dp with the padding, well under
- * the column's ≈ 470 dp viewport (540 − 2 × 27 safe area − 12 headroom),
- * even with the wider glyphs of all-caps or emoji lines.
+ * The longest ParagraphStop, in characters. The Post column's text is
+ * capped at `spacing['text-measure']` (600 dp, owner decision 2026-10-27,
+ * header on top): 600 − 18 paragraph padding and bar ≈ 582 dp ≈ 75
+ * Cyrillic characters per line at `typography.body` (14 sp, ≈ 7.7 dp per
+ * character), 22 dp per line. 600 characters ≈ 8 lines ≈ 190 dp with the
+ * padding, well under the column's ≈ 470 dp viewport (540 − 2 × 27 safe
+ * area − 12 headroom), even with the wider glyphs of all-caps or emoji
+ * lines. (In the former two-column layout the text was ≈ 422 dp wide and
+ * the budget 400.)
  */
-export const PARAGRAPH_STOP_MAX_CHARS = 400;
+export const PARAGRAPH_STOP_MAX_CHARS = 600;
 
 /**
  * The cut position for a part that starts at `start` (`text.length - start`

@@ -61,7 +61,7 @@ const ParagraphStop = memo(function ParagraphStopView({ id, text, onView, onFocu
       accessibilityLabel={text}
       onFocus={handleFocus}
       surfaceStyle={surfaceStyle}
-      style={styles.gap}
+      style={styles.text}
     >
       <Text variant="body">{text}</Text>
     </FocusableSurface>
@@ -77,7 +77,7 @@ function BlockPlaceholder({ id, kind }: { id: string; kind: PlaceholderKind }) {
       focusable={false}
       accessible
       accessibilityLabel={label}
-      style={[styles.placeholder, styles.gap]}
+      style={[styles.placeholder, styles.text]}
     >
       <Text variant="body-s" color="text-tertiary" numberOfLines={1}>
         {label}
@@ -94,7 +94,11 @@ export type PostBodyProps = {
   onParagraphFocus: (id: string) => void;
 };
 
-/** The right column's blocks, in order (ids `post/<postId>/block/<blockKey>`). */
+/**
+ * The post's blocks below the rows, in order (ids
+ * `post/<postId>/block/<blockKey>`). Paragraphs and placeholders are capped
+ * at the text measure, left-aligned (owner decision 2026-10-27).
+ */
 export function PostBody({ items, idPrefix, onParagraphView, onParagraphFocus }: PostBodyProps) {
   return (
     <>
@@ -124,7 +128,7 @@ type VideoRowStopProps = {
 };
 
 /**
- * One MediaRow as a focus stop of the right column (Story 3.5): a content
+ * One MediaRow as a focus stop of the Post column (Story 3.5): a content
  * zone item, its host view reported by focus id. OK does nothing until the
  * player (Epic 4, `phaseFlags.player`).
  */
@@ -171,8 +175,8 @@ export type PostVideoRowsProps = {
 };
 
 /**
- * The post's MediaRows, in block order, at the top of the right column
- * (DESIGN.md Post screen). Keys and ids use the media id
+ * The post's MediaRows, in block order, under the header, full content
+ * width (DESIGN.md Post screen). Keys and ids use the media id
  * (`post/<postId>/video/<mediaId>`), never the index or a URL.
  */
 export function PostVideoRows({ rows, idPrefix, playable, onRowView, onRowFocus }: PostVideoRowsProps) {
@@ -192,10 +196,10 @@ export function PostVideoRows({ rows, idPrefix, playable, onRowView, onRowFocus 
   );
 }
 
-/** The right column's skeleton: a few non-focusable text lines. */
+/** The body's skeleton: a few non-focusable text lines, capped at the text measure. */
 export function PostBodySkeleton() {
   return (
-    <View testID="post/body-skeleton" focusable={false}>
+    <View testID="post/body-skeleton" focusable={false} style={styles.measure}>
       {[100, 92, 96, 60, 0, 100, 88, 70].map((width, i) =>
         width === 0 ? (
           <View key={i} style={styles.skeletonBreak} />
@@ -210,6 +214,14 @@ export function PostBodySkeleton() {
 const styles = StyleSheet.create({
   gap: {
     marginBottom: spacing['6'],
+  },
+  // Body text: at most the text measure, left-aligned (≈ 75 characters a line).
+  measure: {
+    maxWidth: spacing['text-measure'],
+  },
+  text: {
+    marginBottom: spacing['6'],
+    maxWidth: spacing['text-measure'],
   },
   paragraph: {
     paddingVertical: spacing['3'],

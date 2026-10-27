@@ -41,7 +41,10 @@ type AuthorRowProps = {
   ref?: Ref<HostView>;
 };
 
-/** The author row: avatar and name; OK opens Автор. The left column's only focus stop. */
+/**
+ * The author row: avatar and name; OK opens Автор. The header's only focus
+ * stop, as wide as its content (at most the text measure), at the left.
+ */
 function AuthorRow({ post, testID, onFocus, onPress, ref }: AuthorRowProps) {
   const surfaceStyle = ({ focused }: SurfaceState) => [
     styles.authorSurface,
@@ -58,6 +61,7 @@ function AuthorRow({ post, testID, onFocus, onPress, ref }: AuthorRowProps) {
       onFocus={onFocus}
       onPress={onPress}
       surfaceStyle={surfaceStyle}
+      style={styles.author}
     >
       <View style={styles.authorRow}>
         <AuthorAvatar url={post.author.avatarUrl} testID={`${testID}/avatar`} size={AVATAR} />
@@ -79,7 +83,10 @@ export type PostHeaderProps = {
 };
 
 /**
- * The left column (focus-map §4 F): the author row (OK → Автор), the title
+ * The header on top of the Post column (focus-map §4 F; owner decision
+ * 2026-10-27, not pinned: it scrolls away with the content). The header
+ * container spans the content width; inside it: the author row (OK → Автор,
+ * as wide as its content), the title
  * (≤ 6 lines; fallback: the first text, then «Без названия», as PostCard)
  * and the meta line «date · N лайков» (the like count is read-only, never
  * focusable; no comment count).
@@ -93,7 +100,7 @@ export function PostHeader({
   nowMs,
 }: PostHeaderProps) {
   return (
-    <View testID="post/header">
+    <View testID="post/header" style={styles.header}>
       <AuthorRow
         ref={authorRef}
         post={post}
@@ -117,10 +124,10 @@ export function PostHeader({
   );
 }
 
-/** The left column's skeleton: an avatar circle and three lines, not focusable. */
+/** The header's skeleton: an avatar circle and three lines, not focusable. */
 export function PostHeaderSkeleton() {
   return (
-    <View testID="post/header-skeleton" focusable={false}>
+    <View testID="post/header-skeleton" focusable={false} style={styles.header}>
       <View style={styles.authorRow}>
         <View style={styles.skeletonAvatar} />
         <View style={[styles.skeletonLine, styles.skeletonName]} />
@@ -133,6 +140,14 @@ export function PostHeaderSkeleton() {
 }
 
 const styles = StyleSheet.create({
+  // Room between the header and the first row or paragraph.
+  header: {
+    marginBottom: spacing['10'],
+  },
+  author: {
+    alignSelf: 'flex-start',
+    maxWidth: spacing['text-measure'],
+  },
   authorSurface: {
     minHeight: ROW.minHeight,
     justifyContent: 'center',
@@ -164,19 +179,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.skeleton,
   },
   skeletonName: {
-    width: '50%',
+    width: '30%',
     marginLeft: spacing['4'],
   },
   skeletonTitle: {
-    width: '90%',
+    width: '80%',
     marginTop: spacing['8'],
   },
   skeletonTitleShort: {
-    width: '60%',
+    width: '50%',
     marginTop: spacing['4'],
   },
   skeletonMeta: {
-    width: '40%',
+    width: '20%',
     marginTop: spacing['6'],
   },
 });

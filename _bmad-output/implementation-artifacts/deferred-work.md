@@ -191,3 +191,9 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-4-post-screen.md`
   summary: Demo mode: test opening a post from Автор (E8 `<blogUrl>-post-<n>` branch) and harden the demo E8 path parsing (escaped regex, safe decode).
   evidence: Only feed posts are pressed in demoFlow; dev-only. Review 3.4, finding 9.
+- source_spec: `_bmad-output/implementation-artifacts/spec-post-header-layout.md`
+  summary: Epic 4: decide where «Смотреть/Продолжить» and «С начала» sit in the header-on-top Post layout (in the header row vs right under it) and their place in the ↑ ↓ order.
+  evidence: The owner moved the Post screen to a header on top (2026-10-27); focus-map F initial focus is «Смотреть», placement is open. Review of spec-post-header-layout.
+- source_spec: `_bmad-output/implementation-artifacts/spec-post-header-layout.md`
+  summary: Mark `Post Screen.dc.html` (Claude Design) as superseded by the header-on-top layout in the UX folder, or regenerate it.
+  evidence: DESIGN.md records the owner decision; the mock still shows two columns.
