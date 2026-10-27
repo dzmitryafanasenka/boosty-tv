@@ -4,7 +4,6 @@ import {
   NavigationContainer,
   DarkTheme,
   createNavigationContainerRef,
-  useFocusEffect,
   type Theme,
 } from '@react-navigation/native';
 import {
@@ -19,7 +18,7 @@ import {
   useState,
   type RefObject,
 } from 'react';
-import { AppState, BackHandler, StatusBar, StyleSheet, View } from 'react-native';
+import { AppState, StatusBar, StyleSheet, View } from 'react-native';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import {
@@ -28,39 +27,21 @@ import {
   PhoneScreen,
   WelcomeScreen,
 } from '../features/auth';
-import { AuthorScreen, refreshAuthorPostsHeads, type AuthorFocusInfo } from '../features/author';
+import { refreshAuthorPostsHeads } from '../features/author';
 import { refreshFeedHead } from '../features/home';
-import { PostScreen, type PostFocusInfo } from '../features/post';
 import { SignOutDialog } from '../features/settings';
 import { accountScope } from '../shared/account';
 import type { SignInResult, ValidateResult } from '../shared/api';
-import {
-  FocusZone,
-  MAIN_SECTION,
-  ModalHostProvider,
-  Screen,
-  focusRestoration,
-  useModal,
-  type FocusZoneHandle,
-  type ModalApi,
-} from '../shared/focus';
+import { ModalHostProvider, useModal, type ModalApi } from '../shared/focus';
 import { t } from '../shared/i18n';
-import {
-  Text,
-  colors,
-  components,
-  requestHostFocus,
-  spacing,
-  type HostView,
-} from '../shared/ui';
+import { Text, colors, components, spacing, type HostView } from '../shared/ui';
 import type * as DevFocusModule from './dev/devFocus';
 import { queryClient, resetQueryCache } from './queryClient';
 import type { RootStackParamList } from './routes';
 import { DEMO_ACTIVE, session } from './session';
-import { enabledSections, phaseFlags, type SectionId } from './phaseFlags';
 import { SessionUiContext, useSessionUi, type SessionUi } from './sessionUi';
 import { Shell } from './Shell';
-import { NAV_ID, Sidebar, sidebarLayout, useSidebarNav } from './Sidebar';
+import { AuthorRoute, PostRoute, takePendingShellSection } from './stackRoutes';
 
 /**
  * Debug builds only (Story 2.4 «Проверка фокуса»). `__DEV__` is a constant
@@ -206,20 +187,6 @@ function ModalBridge({ apiRef }: { apiRef: RefObject<ModalApi | null> }) {
   return null;
 }
 
-/**
- * The Shell section to open on its next return (OK on a sidebar item of
- * Автор or Пост, owner decision 2026-10-27, ADR 0012): set right before the
- * pop, read once by the Shell when it is the focused route again. `owner`
- * is the route that set it: only its unmount clears it (a `popTo` through
- * an Автор below unmounts that one at once, before the Shell reads it).
- */
-let pendingShellSection: { section: SectionId; owner: string } | null = null;
-function takePendingShellSection(): SectionId | null {
-  const pending = pendingShellSection;
-  pendingShellSection = null;
-  return pending?.section ?? null;
-}
-
 function ShellRoute({
   navigation,
 }: StackScreenProps<RootStackParamList, 'Shell'>) {
@@ -276,258 +243,6 @@ function ShellRoute({
       onOpenPost={onOpenPost}
       takePendingSection={takePendingShellSection}
     />
-  );
-}
-
-/** Автор opened from Подписки: its sidebar's current item (decision A). */
-const AUTHOR_ORIGIN: SectionId = 'subs';
-/** Sidebar item testIDs on Автор: `author/nav/<section>` (the Shell's stay mounted below). */
-const AUTHOR_NAV_PREFIX = 'author/';
-/** Sidebar item testIDs on Пост: `post/nav/<section>`. */
-const POST_NAV_PREFIX = 'post/';
-
-type StackSidebarFocus = {
-  isActive(): boolean;
-  current(): string | null;
-  sectionItemId: string;
-  focusSidebar(): void;
-  focusZoneTarget(): boolean;
-  onFocusChange(listener: (focusId: string) => void): () => void;
-};
-
-/**
- * The shared sidebar of a stack screen (ADR 0012: Автор, Пост) with the
- * origin Shell section as its current item:
- *
- * - OK on a sidebar item pops to the Shell (`popTo`, also through an Автор
- *   or Пост below) and, for an item other than the origin, opens that
- *   section there as OK on it would (`pendingShellSection`). Only while the
- *   route is focused: a second OK during the pop is ignored.
- * - Back anywhere on the route (content or sidebar) pops one route.
- * - FocusRestoration is keyed by the route's key and forgotten on unmount.
- * - `focus`: what the page needs (the route's last focused element, the
- *   sidebar's current item, the content zone's target, focus events).
- */
-function useStackSidebar(
-  navigation: StackScreenProps<RootStackParamList, 'Author' | 'Post'>['navigation'],
-  routeKey: string,
-  origin: SectionId,
-  idPrefix: string,
-) {
-  const sections = useMemo(() => enabledSections(), []);
-  const nav = useSidebarNav(origin);
-  const zoneRef = useRef<FocusZoneHandle>(null);
-  /** The last focused element on this route (a sidebar or content id). */
-  const lastFocusId = useRef<string | null>(null);
-  /** The page's focus listeners (`onFocusChange`). */
-  const focusListeners = useRef(new Set<(focusId: string) => void>());
-  const recordFocus = useCallback((focusId: string) => {
-    lastFocusId.current = focusId;
-    for (const listener of [...focusListeners.current]) {
-      listener(focusId);
-    }
-  }, []);
-  // `isFocused()`, not a ref set in a focus effect: the page's own effects
-  // run before this component's, already on the first focus.
-  const isActive = useCallback(() => navigation.isFocused(), [navigation]);
-
-  useFocusEffect(
-    useCallback(() => {
-      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-        pendingShellSection = null;
-        navigation.goBack();
-        return true;
-      });
-      return () => sub.remove();
-    }, [navigation]),
-  );
-
-  useEffect(
-    () => () => {
-      focusRestoration.forget(routeKey);
-      // A pop that never reached the Shell must not open a section later.
-      if (pendingShellSection?.owner === routeKey) {
-        pendingShellSection = null;
-      }
-    },
-    [routeKey],
-  );
-
-  const onSidebarPress = useCallback(
-    (section: SectionId) => {
-      if (!navigation.isFocused()) {
-        return;
-      }
-      pendingShellSection = section === origin ? null : { section, owner: routeKey };
-      navigation.popTo('Shell');
-    },
-    [navigation, origin, routeKey],
-  );
-  const onBack = useCallback(() => {
-    pendingShellSection = null;
-    navigation.goBack();
-  }, [navigation]);
-  const onSidebarFocus = useCallback(
-    (section: SectionId) => {
-      if (isActive()) {
-        recordFocus(`${idPrefix}${NAV_ID[section]}`);
-      }
-    },
-    [isActive, recordFocus, idPrefix],
-  );
-  const onContentFocus = useCallback(
-    (focusId: string) => {
-      if (isActive()) {
-        recordFocus(focusId);
-      }
-    },
-    [isActive, recordFocus],
-  );
-  const views = nav.views;
-  const focus = useMemo<StackSidebarFocus>(
-    () => ({
-      isActive,
-      current: () => lastFocusId.current,
-      sectionItemId: `${idPrefix}${NAV_ID[origin]}`,
-      focusSidebar: () => requestHostFocus(views.current.get(origin)),
-      focusZoneTarget: () => zoneRef.current?.focusTarget() ?? false,
-      onFocusChange: listener => {
-        focusListeners.current.add(listener);
-        return () => {
-          focusListeners.current.delete(listener);
-        };
-      },
-    }),
-    [isActive, views, idPrefix, origin],
-  );
-
-  return { sections, nav, zoneRef, onSidebarPress, onBack, onSidebarFocus, onContentFocus, focus };
-}
-
-/**
- * D Автор (Story 3.3) in the shared screen wrapper (trapped on all sides),
- * with the Shell's sidebar (owner decision 2026-10-27, option A; ADR 0012):
- * the same component and enabled sections, current item = the origin
- * section (Подписки, or Главная for an Автор opened from a feed post).
- *
- * - ← from the grid's first column → the current item; → from the sidebar →
- *   the remembered post (the content zone's destination).
- * - OK on a post opens Пост (Story 3.4) with the same origin section.
- * - Sidebar OK and Back: `useStackSidebar`.
- */
-function AuthorRoute({
-  navigation,
-  route,
-}: StackScreenProps<RootStackParamList, 'Author'>) {
-  const { blogUrl } = route.params;
-  const origin = route.params.section ?? AUTHOR_ORIGIN;
-  const routeKey = route.key;
-  const sidebar = useStackSidebar(navigation, routeKey, origin, AUTHOR_NAV_PREFIX);
-  const focus: AuthorFocusInfo = sidebar.focus;
-  const onOpenPost = useCallback(
-    (postBlogUrl: string, postId: string) => {
-      if (navigation.isFocused()) {
-        navigation.push('Post', { blogUrl: postBlogUrl, postId, section: origin });
-      }
-    },
-    [navigation, origin],
-  );
-
-  return (
-    <Screen testID="author">
-      <Sidebar
-        testID="author/sidebar"
-        idPrefix={AUTHOR_NAV_PREFIX}
-        sections={sidebar.sections}
-        current={origin}
-        nav={sidebar.nav}
-        onPress={sidebar.onSidebarPress}
-        onFocus={sidebar.onSidebarFocus}
-      />
-      <FocusZone
-        ref={sidebar.zoneRef}
-        testID="author/content"
-        routeKey={routeKey}
-        sectionId={MAIN_SECTION}
-        onItemFocus={sidebar.onContentFocus}
-        isActive={focus.isActive}
-        style={sidebarLayout.content}
-      >
-        <AuthorScreen
-          http={session.http}
-          blogUrl={blogUrl}
-          routeKey={routeKey}
-          focus={focus}
-          onBack={sidebar.onBack}
-          onOpenPost={onOpenPost}
-        />
-      </FocusZone>
-    </Screen>
-  );
-}
-
-/**
- * F Пост (Story 3.4) in the shared screen wrapper, with the Shell's sidebar
- * (ADR 0012): current item = the origin section (Главная from the feed,
- * Подписки from Автор). OK on the author row opens Автор, or pops to it when
- * the route below is Автор of the same blog. Sidebar OK and Back:
- * `useStackSidebar`.
- */
-function PostRoute({ navigation, route }: StackScreenProps<RootStackParamList, 'Post'>) {
-  const { blogUrl, postId, section: origin } = route.params;
-  const routeKey = route.key;
-  const sidebar = useStackSidebar(navigation, routeKey, origin, POST_NAV_PREFIX);
-  const focus: PostFocusInfo = sidebar.focus;
-  const onOpenAuthor = useCallback(
-    (authorBlogUrl: string) => {
-      if (!navigation.isFocused()) {
-        return;
-      }
-      const state = navigation.getState();
-      const below = state.routes[state.index - 1];
-      if (
-        below?.name === 'Author' &&
-        (below.params as RootStackParamList['Author'] | undefined)?.blogUrl === authorBlogUrl
-      ) {
-        navigation.goBack();
-      } else {
-        navigation.push('Author', { blogUrl: authorBlogUrl, section: origin });
-      }
-    },
-    [navigation, origin],
-  );
-
-  return (
-    <Screen testID="post">
-      <Sidebar
-        testID="post/sidebar"
-        idPrefix={POST_NAV_PREFIX}
-        sections={sidebar.sections}
-        current={origin}
-        nav={sidebar.nav}
-        onPress={sidebar.onSidebarPress}
-        onFocus={sidebar.onSidebarFocus}
-      />
-      <FocusZone
-        ref={sidebar.zoneRef}
-        testID="post/content"
-        routeKey={routeKey}
-        sectionId={MAIN_SECTION}
-        onItemFocus={sidebar.onContentFocus}
-        isActive={focus.isActive}
-        style={sidebarLayout.content}
-      >
-        <PostScreen
-          http={session.http}
-          blogUrl={blogUrl}
-          postId={postId}
-          focus={focus}
-          onBack={sidebar.onBack}
-          onOpenAuthor={onOpenAuthor}
-          playerEnabled={phaseFlags.player}
-        />
-      </FocusZone>
-    </Screen>
   );
 }
 

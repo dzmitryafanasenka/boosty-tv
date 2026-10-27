@@ -2,7 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FlashListRef } from '@shopify/flash-list';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import type { HttpClient } from '../../shared/api';
-import { focusRestoration, useFocusRestoration, useZoneItem } from '../../shared/focus';
+import {
+  focusRestoration,
+  mayTakeScreenFocus,
+  restoreElseFirst,
+  useFocusRestoration,
+  useLatestRef,
+  usePhaseChange,
+  useZoneItem,
+} from '../../shared/focus';
 import { t } from '../../shared/i18n';
 import {
   PostCardSkeleton,
@@ -252,12 +260,9 @@ export function HomeScreen({
   const takeContentFocus = useCallback(() => {
     const info = focusRef.current;
     latch.arm([info.sectionItemId, info.current()]);
-    const target = restoration.restore();
+    const target = restoreElseFirst(restoration, () => latch.auto(idsRef.current[0]));
     if (target.kind === 'item') {
       latch.auto(target.id);
-    } else if (target.kind === 'none') {
-      latch.auto(idsRef.current[0]);
-      restoration.focusInitial();
     }
   }, [latch, restoration]);
 
@@ -281,25 +286,12 @@ export function HomeScreen({
    * after OK on «Главная»: a move within the sidebar during the skeleton
    * still wins).
    */
-  const mayTakeFocus = useCallback(() => {
-    if (!focusRef.current.isActive()) {
-      return false;
-    }
-    const current = focusRef.current.current();
-    return (
-      current === null ||
-      current === focusRef.current.sectionItemId ||
-      current === HOME_STATE_ACTION_ID
-    );
-  }, []);
+  const mayTakeFocus = useCallback(
+    () => mayTakeScreenFocus(focusRef.current, HOME_STATE_ACTION_ID),
+    [],
+  );
 
-  const lastPhase = useRef<Phase | null>(null);
-  useEffect(() => {
-    const previous = lastPhase.current;
-    lastPhase.current = phase;
-    if (previous === phase) {
-      return;
-    }
+  usePhaseChange(phase, (_phase, previous) => {
     if (phase !== 'grid') {
       // The grid is gone: nothing to follow until the page takes focus again.
       latch.disarm();
@@ -337,7 +329,7 @@ export function HomeScreen({
       takeActionFocus(HOME_STATE_ACTION_ID, stateActionView.current);
     }
     pendingMountFocus.current = false;
-  }, [phase, mayTakeFocus, takeContentFocus, takeActionFocus, latch, routeKey]);
+  });
 
   // Blur or unmount: stop a pending restore focus.
   useEffect(() => restoration.cancel, [restoration]);
@@ -347,8 +339,7 @@ export function HomeScreen({
   // chain (deferred from Story 3.1: the content zone's target used zone
   // order and no scroll). Card-only memory: the load-more «Повторить» and
   // the StateView action return through the zone as before.
-  const phaseRef = useRef(phase);
-  phaseRef.current = phase;
+  const phaseRef = useLatestRef(phase);
   useEffect(() => {
     const info = focusRef.current;
     const unregister = info.setReturnFocus?.(() => {
@@ -361,13 +352,11 @@ export function HomeScreen({
       ) {
         return false;
       }
-      if (restoration.restore().kind === 'none') {
-        restoration.focusInitial();
-      }
+      restoreElseFirst(restoration);
       return true;
     });
     return () => unregister?.();
-  }, [restoration, routeKey]);
+  }, [restoration, routeKey, phaseRef]);
 
   const postsRef = useRef(shownPosts);
   postsRef.current = shownPosts;

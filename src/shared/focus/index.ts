@@ -17,6 +17,13 @@ export {
 export { ModalHostProvider, useModal, type ModalApi } from './ModalHost';
 export { Screen, type ScreenProps } from './Screen';
 export {
+  mayTakeScreenFocus,
+  restoreElseFirst,
+  useLatestRef,
+  usePhaseChange,
+  type ScreenFocusGate,
+} from './screenFocus';
+export {
   useFocusRestoration,
   type FocusRestorationOptions,
   type ListRestoration,

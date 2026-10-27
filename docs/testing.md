@@ -806,3 +806,20 @@ Story 3.6 final host run (orchestrator, 2026-10-27, after the review fixes): lin
 ### Epic 3 retro A3 — Главная follows a refreshed head, 2026-10-27
 
 Device (agent, adb, release-like build, owner's session, Chromecast with Google TV 4K): cold start (focus on the first feed card, untouched) → Home key, 66 s, relaunch → focus on the same card, no error; ↓ ↓ → to another card → Home key, 66 s, relaunch → focus kept on that card. No new posts appeared meanwhile, so the head change itself (focus → the new first post on an untouched page) was not seen on the device (host-tested). Host: lint, typecheck, check:fixtures clean; `npm test` ×3: 1186 passed; `homeFeedFlow`, `authorFlow`, `useNotMovedLatch` 30/30. Not checked with the physical remote.
+
+### Epic 3 retro A7 — shared screen focus pieces and one stack-route wrapper, 2026-10-27
+
+Refactor, no behaviour change (`spec-epic-3-retro-a7-screen-focus-and-stack-routes.md`): the stack routes and the Shell return handshake moved to `src/app/stackRoutes.tsx` (`StackSidebarRoute`); `useHeldError` (`src/shared/api`) and `mayTakeScreenFocus` / `restoreElseFirst` / `usePhaseChange` / `useLatestRef` (`src/shared/focus/screenFocus.ts`) replace the per-screen copies; the flow-test helpers and the guide/FlashList recorders moved to `src/test/flow.tsx`.
+
+**Build:** `./gradlew assembleRelease -PreactNativeArchitectures=armeabi-v7a` (JDK 17, `ANDROID_HOME=/opt/homebrew/share/android-commandlinetools`) BUILD SUCCESSFUL; release-like (`zipalign -p 4` + `apksigner`, SDK debug key outside the repo), installed with `adb install -r`. Nothing uninstalled or cleared; no sign-in, no sign-out.
+
+Device (agent, adb injected keys + uiautomator, release-like build, owner's session, Chromecast with Google TV 4K):
+
+| Check | Result |
+|---|---|
+| Cold start → → OK → Пост → Back | Focus on the first feed card; → the second card; OK → Пост, focus on its first paragraph; Back → the same feed card |
+| Подписки → tile → Автор → Пост → ↑ author row → OK → Back × 3 | OK on «Подписки» → the first tile; OK → Автор, first post; OK → Пост, focus on its MediaRow; ↑ → the author row; OK → pops to the same Автор and card; Back → the same tile → `nav/subs` → `nav/home` |
+| Sidebar OK from Автор («Главная») | Pops to the Shell; Главная opens (`shell/content/home`) with focus on its remembered card |
+| Sidebar OK from Пост opened from Главная («Подписки») | Pops to the Shell; Подписки opens (`shell/content/subs`) with focus on the remembered tile; Back → `nav/subs` → `nav/home` |
+
+Animations were left at the device default, so the A4 check (sidebar OK with animations off) is still open. Host: lint (`--max-warnings 0`), typecheck, check:fixtures clean; `npm test` ×3: 1198 passed each; every `*Flow.test.tsx` suite (12 suites, 384 tests) 30/30. Not checked with the physical remote.

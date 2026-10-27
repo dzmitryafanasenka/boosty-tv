@@ -44,11 +44,16 @@ import {
   byTestId,
   clearNativeModules,
   createFlow,
+  deferred,
+  destinationIds,
   focusableIds,
+  focusTargets,
   installFixtureTransport,
   installNativeModules,
   lastFocusTarget,
+  lists,
   resetKeychain,
+  resetRecorders,
   text,
   unmount,
   visible,
@@ -62,47 +67,12 @@ jest.mock('react-native/Libraries/Utilities/BackHandler', () =>
   require('../src/test/backHandlerMock'),
 );
 
-/** The last `destinations` each focus guide received, by testID. */
-const mockGuideDestinations = new Map<string, unknown[] | undefined>();
-jest.mock('react-native/Libraries/Components/TV/TVFocusGuideView', () => {
-  const actual = jest.requireActual('react-native/Libraries/Components/TV/TVFocusGuideView');
-  const React = jest.requireActual('react');
-  const Real = actual.default;
-  function RecordingGuide(props: { testID?: string; destinations?: unknown[] }) {
-    if (props.testID) {
-      mockGuideDestinations.set(props.testID, props.destinations);
-    }
-    return React.createElement(Real, props);
-  }
-  return { __esModule: true, default: RecordingGuide };
-});
+jest.mock('react-native/Libraries/Components/TV/TVFocusGuideView', () =>
+  require('../src/test/flow').recordingFocusGuideModule(),
+);
 
-/**
- * The real FlashList with `onEndReached` held back (FlashList's Jest setup
- * measures every item 100 × 100, so the end would always be "reached"; as
- * homeFeedFlow), and its scroll calls recorded.
- */
-const mockLists = { scrollToIndex: jest.fn() };
-jest.mock('@shopify/flash-list', () => {
-  const actual = jest.requireActual('@shopify/flash-list');
-  const React = jest.requireActual('react');
-  function RecordingFlashList(props: Record<string, any>) {
-    const inner = React.useRef(null);
-    React.useImperativeHandle(
-      props.ref,
-      () => ({
-        scrollToOffset: (params: unknown) => inner.current?.scrollToOffset(params),
-        scrollToIndex: (params: unknown) => {
-          mockLists.scrollToIndex(params);
-          return inner.current?.scrollToIndex(params) ?? Promise.resolve();
-        },
-      }),
-      [],
-    );
-    return React.createElement(actual.FlashList, { ...props, ref: inner, onEndReached: undefined });
-  }
-  return { ...actual, FlashList: RecordingFlashList };
-});
+/** The real FlashList behind the recorder `lists` (`src/test/flow`; `onEndReached` held back). */
+jest.mock('@shopify/flash-list', () => require('../src/test/flow').recordingFlashListModule());
 
 /** `phaseFlags.player`, switchable per test (the app reads it at render). */
 const mockPlayerFlag = { on: false };
@@ -160,14 +130,6 @@ let fullHandler: (req: FixtureRequest) => Reply;
 
 const THREE = [...paragraph('First'), ...paragraph('Second'), ...paragraph('Third')];
 
-function deferred() {
-  let resolve!: (reply: FixtureReply) => void;
-  const promise = new Promise<FixtureReply>(r => {
-    resolve = r;
-  });
-  return { promise, resolve };
-}
-
 beforeAll(() => {
   jest.useFakeTimers();
   notifyManager.setScheduler(callback => {
@@ -186,8 +148,7 @@ beforeEach(() => {
   jest.spyOn(console, 'error').mockImplementation(() => {});
   focusMock.mockClear();
   backHandler.reset();
-  mockLists.scrollToIndex.mockClear();
-  mockGuideDestinations.clear();
+  resetRecorders();
   resetKeychain({ 'boostytv.session': STORED });
   installNativeModules({ AppInfo: { versionName: '1.0' } });
   e8 = (_req, blogUrl, postId) => ({
@@ -237,13 +198,6 @@ type Root = Awaited<ReturnType<typeof render>>;
 const currentRoute = () => navigationRef.getCurrentRoute()?.name;
 const routeNames = () => navigationRef.getRootState()?.routes.map(r => r.name);
 const e8Calls = () => transport.calls.filter(c => E8_RE.test(c.path));
-const focusTargets = () =>
-  focusMock.mock.calls.map(c => (c[0] as { props?: { testID?: string } } | null)?.props?.testID);
-function destinationIds(guide: string): string[] {
-  return (mockGuideDestinations.get(guide) ?? []).map(
-    view => (view as { props?: { testID?: string } }).props?.testID as string,
-  );
-}
 const contentIds = (root: Root) => focusableIds(root, byTestId(root, 'post/content')[0]);
 const pageText = (root: Root) => text(byTestId(root, 'post/page')[0]);
 /** The descendants of `node` with this testID. */
@@ -852,12 +806,12 @@ describe('Back to the origin card (matrix «Back»)', () => {
     const root = await openFromHome(5);
     await focusOn(root, BLOCK(FEED_ID(5), 'text@2'));
     focusMock.mockClear();
-    mockLists.scrollToIndex.mockClear();
+    lists.scrollToIndex.mockClear();
     await back();
     expect(currentRoute()).toBe('Shell');
     expect(lastFocusTarget()).toBe(FEED_CARD(5));
     // Same index: no scroll by index.
-    expect(mockLists.scrollToIndex).not.toHaveBeenCalled();
+    expect(lists.scrollToIndex).not.toHaveBeenCalled();
     expect(backHandler.exitApp).not.toHaveBeenCalled();
     // Главная was not requested again.
     expect(transport.callsTo(E5_PATH)).toHaveLength(1);

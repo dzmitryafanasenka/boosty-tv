@@ -235,6 +235,17 @@ export function Shell({
     },
     [recordFocus],
   );
+  // A section registers its own return restore (Главная, Подписки; ADR 0012).
+  const setReturnFocus = useCallback((restore: () => boolean) => {
+    sectionReturn.current = restore;
+    // Clears the slot only while it still holds this registration (a
+    // newer section may have registered before this one unmounts).
+    return () => {
+      if (sectionReturn.current === restore) {
+        sectionReturn.current = null;
+      }
+    };
+  }, []);
   // Главная moves focus into its content only while the user has not moved
   // (docs/focus-map.md §1.6 skeleton rule), and never while the Shell is
   // covered or closing.
@@ -245,18 +256,9 @@ export function Shell({
       sectionItemId: NAV_ID[HOME],
       focusSidebar: () => focusNav(HOME),
       onFocusChange,
-      setReturnFocus: restore => {
-        sectionReturn.current = restore;
-        // Clears the slot only while it still holds this registration (a
-        // newer section may have registered before this one unmounts).
-        return () => {
-          if (sectionReturn.current === restore) {
-            sectionReturn.current = null;
-          }
-        };
-      },
+      setReturnFocus,
     }),
-    [focusNav, onFocusChange],
+    [focusNav, onFocusChange, setReturnFocus],
   );
   // Подписки follows the same rules (docs/focus-map.md §1.6, §3 C).
   const subsFocus = useMemo<SubscriptionsFocusInfo>(
@@ -265,18 +267,9 @@ export function Shell({
       current: () => lastFocusId.current,
       sectionItemId: NAV_ID.subs,
       focusSidebar: () => focusNav('subs'),
-      setReturnFocus: restore => {
-        sectionReturn.current = restore;
-        // Clears the slot only while it still holds this registration (a
-        // newer section may have registered before this one unmounts).
-        return () => {
-          if (sectionReturn.current === restore) {
-            sectionReturn.current = null;
-          }
-        };
-      },
+      setReturnFocus,
     }),
-    [focusNav],
+    [focusNav, setReturnFocus],
   );
 
   return (
