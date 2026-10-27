@@ -1,0 +1,27 @@
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_06dd4e6f3c24d0::t_47405ea27aa783 203-205
+_bmad-output/implementation-artifacts/spec-epic-3-retro-a1-pinned-head-refresh.md
+  s_06dd4e6f3c24d0::t_a6fd6ad85836ed 1-41
+src/features/author/authorPostsRefresh.ts
+  s_06dd4e6f3c24d0::t_7b4511e0743e79 37-39
+src/shared/entities/post/__tests__/postsHeadRefresh.test.ts
+  s_06dd4e6f3c24d0::t_5b6acf8ad770fc 12,221-285
+src/shared/entities/post/postsHeadRefresh.ts
+  s_06dd4e6f3c24d0::t_b744aa8dbb41a9 6,41-50,53-74,90-92,97-100,112-117,121-124,127-129,156,192
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "3c9259101273fdc9bc27637dfeb74d8685444c95",
+  "prompts": {},
+  "sessions": {
+    "s_06dd4e6f3c24d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b17b1d18-d247-4604-86f0-d38f6644be98",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
