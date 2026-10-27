@@ -1,0 +1,59 @@
+CLAUDE.md
+  s_06dd4e6f3c24d0::t_a8678535eb4fad 7,26,36,38,56,70,81,130,140,150
+_bmad-output/planning-artifacts/architecture/architecture-boosty-tv-2026-10-25/ARCHITECTURE-SPINE.md
+  s_06dd4e6f3c24d0::t_6eeafeaeebf28e 7,33,84,431
+_bmad-output/planning-artifacts/briefs/brief-boosty-tv-2026-10-25/brief.md
+  s_06dd4e6f3c24d0::t_34570e3e3ec239 12-13
+_bmad-output/planning-artifacts/design/claude-design-prompt.ru.md
+  s_06dd4e6f3c24d0::t_0a9a63315dac1e 20
+_bmad-output/planning-artifacts/design/claude-design-v1/docs/handoff-rn-tv.md
+  s_06dd4e6f3c24d0::t_89a991ca123241 3,20
+_bmad-output/planning-artifacts/epics.md
+  s_06dd4e6f3c24d0::t_8aa5e2954c1751 36-37,111,1659
+_bmad-output/planning-artifacts/prds/prd-boosty-tv-2026-10-25/prd.md
+  s_06dd4e6f3c24d0::t_11ced3c0ff2307 407,424
+_bmad-output/planning-artifacts/ux-designs/ux-boosty-tv-2026-10-25/EXPERIENCE.md
+  s_06dd4e6f3c24d0::t_9a56a1e2a5b1bc 22
+_bmad-output/planning-artifacts/ux-designs/ux-boosty-tv-2026-10-25/review-rubric.md
+  s_06dd4e6f3c24d0::t_f8f1c6c2ef5e40 164
+docs/adr/0006-secure-storage-keychain-reset-helper.md
+  s_06dd4e6f3c24d0::t_68e261c2e598ab 5
+docs/adr/0010-server-state-tanstack-query.md
+  s_06dd4e6f3c24d0::t_21393de1589561 5,21
+docs/adr/0011-feed-list-flashlist.md
+  s_06dd4e6f3c24d0::t_c8e909f420fe10 5
+docs/adr/0012-sidebar-on-stack-screens.md
+  s_06dd4e6f3c24d0::t_4710d5625687c2 5
+docs/android-tv-auth-playback-spike.md
+  s_06dd4e6f3c24d0::t_3a7c4622aae3eb 3-4,39-40
+docs/focus-map.md
+  s_06dd4e6f3c24d0::t_c75862c5a5b772 3
+docs/testing.md
+  s_06dd4e6f3c24d0::t_3aeb3245383942 3-4,72
+docs/feature-parity.md
+  s_c572ccf9db4e64::t_8dc22b2250cb29 34-35,38-47,51-57,61-72,78-90,94-100,104-120,124-131,135-137,141-153
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "5c30f0e06a4e48fcb78b082bb7ec10833823e014",
+  "prompts": {},
+  "sessions": {
+    "s_06dd4e6f3c24d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b17b1d18-d247-4604-86f0-d38f6644be98",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_c572ccf9db4e64": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ae054570c46c527e6",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
