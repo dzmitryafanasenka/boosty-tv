@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 10-25-2026 14:34
-last_updated: 10-27-2026 17:36
+last_updated: 10-27-2026 19:07
 project: Boosty TV
 project_key: NOKEY
 tracking_system: file-system
@@ -221,7 +221,7 @@ action_items:
       pieces, the lastError hook and one stack-route wrapper; move flow-test helpers
       into src/test/flow.tsx"
     owner: "architect"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-10-27.md"
   - id: "epic-3-retro-item-16-owner-physical-remote-pass-of-epic-3-flo"
     epic: 3
