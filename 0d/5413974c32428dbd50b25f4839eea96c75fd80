@@ -1,0 +1,77 @@
+__tests__/authorFlow.test.tsx
+  s_06dd4e6f3c24d0::t_668cc7b0ca19e3 44-45,47,51,53,67-69,71-72,124,172,596,601,871,888-889,926,938,960,966,991,997,1037,1041,1186,1213,1221,1359-1360,1364,1380
+__tests__/homeFeedFlow.test.tsx
+  s_06dd4e6f3c24d0::t_eafb2a187401a8 45-46,48,52,54,68-70,85-86,136,162,164-166,168,880,1077,1106,1123,1189,1214,1222,1246,1255,1318,1327-1328,1340,1367,1383,1406,1429-1430,1438,1479,1497,1540,1567-1568,1588,1606
+__tests__/postFlow.test.tsx
+  s_06dd4e6f3c24d0::t_7c3801176de850 47-48,50,54,56,70-72,74-75,151,809,814
+__tests__/shellFlow.test.tsx
+  s_06dd4e6f3c24d0::t_4a5877c06ba640 24,29,38-40,82
+__tests__/subscriptionsFlow.test.tsx
+  s_06dd4e6f3c24d0::t_aca0eac4beb04f 36-37,39,43,45,59-61,63-64,109,141,465,572,584,587
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_06dd4e6f3c24d0::t_1202281cd5f86f 209-211
+_bmad-output/implementation-artifacts/spec-epic-3-retro-a7-screen-focus-and-stack-routes.md
+  s_06dd4e6f3c24d0::t_536fbcebccac09 1-85
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_06dd4e6f3c24d0::t_018bc1ec43e573 32,195
+docs/adr/0012-sidebar-on-stack-screens.md
+  s_06dd4e6f3c24d0::t_ae3d84db8f9f20 13,15,20,27
+docs/focus-map.md
+  s_06dd4e6f3c24d0::t_0b95d1bd9884f6 84-85,202,229
+docs/testing.md
+  s_06dd4e6f3c24d0::t_df822bc69373a4 809-825
+src/app/App.tsx
+  s_06dd4e6f3c24d0::t_9183d6327e8676 21,30,35,37,44
+src/app/Shell.tsx
+  s_06dd4e6f3c24d0::t_9084a2bac9d70b 238-248,259,261,270,272
+src/app/stackRoutes.tsx
+  s_06dd4e6f3c24d0::t_f25d254bee7f3b 1-323
+src/features/author/AuthorScreen.tsx
+  s_06dd4e6f3c24d0::t_fb5a178ea85a2d 2,6-14,222,225-228,249,273,276,302
+src/features/author/useAuthor.ts
+  s_06dd4e6f3c24d0::t_41a84fb7868579 2-7,39-40
+src/features/home/HomeScreen.tsx
+  s_06dd4e6f3c24d0::t_993e4d949572fa 5-13,263,289-292,294,332,342,355,359
+src/features/post/PostScreen.tsx
+  s_06dd4e6f3c24d0::t_9c76276351d61d 18-23,303-306,318,338,341,359,378
+src/features/post/usePost.ts
+  s_06dd4e6f3c24d0::t_e88b8c41ab06cb 2-7,37-38
+src/features/subscriptions/SubscriptionsScreen.tsx
+  s_06dd4e6f3c24d0::t_1bf02f952f06eb 5-13,190,203-206,208-209,246,254,265
+src/features/subscriptions/useSubscriptions.ts
+  s_06dd4e6f3c24d0::t_f23434f7995e76 2-7,49-50
+src/shared/api/__tests__/useHeldError.test.tsx
+  s_06dd4e6f3c24d0::t_81c829f24dcb8d 1-94
+src/shared/api/index.ts
+  s_06dd4e6f3c24d0::t_7ec49fa1247700 28
+src/shared/api/useHeldError.ts
+  s_06dd4e6f3c24d0::t_3199a9218a731b 1-33
+src/shared/entities/post/usePagedPosts.ts
+  s_06dd4e6f3c24d0::t_64ebc51241ffc4 3,100-101,103-108
+src/shared/focus/__tests__/screenFocus.test.tsx
+  s_06dd4e6f3c24d0::t_b182dcb34e3523 1-104
+src/shared/focus/index.ts
+  s_06dd4e6f3c24d0::t_efc357bc6a5dd6 19-25
+src/shared/focus/screenFocus.ts
+  s_06dd4e6f3c24d0::t_d80e0150540d6d 1-70
+src/shared/ui/PostGrid.tsx
+  s_06dd4e6f3c24d0::t_11d25f2fe20008 19,283
+src/test/flow.tsx
+  s_06dd4e6f3c24d0::t_60cfa3b3b85ade 15-18,27,118-225
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "0d5413974c32428dbd50b25f4839eea96c75fd80",
+  "prompts": {},
+  "sessions": {
+    "s_06dd4e6f3c24d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b17b1d18-d247-4604-86f0-d38f6644be98",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
