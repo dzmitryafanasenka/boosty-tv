@@ -1,0 +1,69 @@
+__tests__/demoFlow.test.tsx
+  s_06dd4e6f3c24d0::t_fff5ed4387cc19 186-207
+__tests__/postFlow.test.tsx
+  s_06dd4e6f3c24d0::t_136d405a896b2b 23,35,107-121,150,379,396,412,418,432,480,483,970-1232
+docs/focus-map.md
+  s_06dd4e6f3c24d0::t_47f5a79118e567 239-245
+src/app/App.tsx
+  s_06dd4e6f3c24d0::t_ceb9c469db3d18 60,520
+src/app/__tests__/phaseFlags.test.ts
+  s_06dd4e6f3c24d0::t_221c9141a3a09e 10,15-19
+src/app/dev/demo.ts
+  s_06dd4e6f3c24d0::t_1076f844251314 51-53
+src/app/phaseFlags.ts
+  s_06dd4e6f3c24d0::t_bbbe18f51dfae7 6-10,18
+src/features/post/PostBody.tsx
+  s_06dd4e6f3c24d0::t_4bb2a4c4916aba 3,8,118-194
+src/features/post/PostScreen.tsx
+  s_06dd4e6f3c24d0::t_c2e4105a71d399 5-10,14,25-27,59-63,71-76,81-82,86-92,103,117,120-122,124-129,132-136,139-141,167-168,171-172,175,178-179,186,188,195,283-284,292,295-296,300,366-372,376-377,411
+src/features/post/index.ts
+  s_06dd4e6f3c24d0::t_be5d5df9775ecb 6
+src/shared/entities/post/__tests__/mapPost.test.ts
+  s_06dd4e6f3c24d0::t_cac05ad90b539a 160-168
+src/shared/entities/post/__tests__/mediaRows.test.ts
+  s_06dd4e6f3c24d0::t_3b1b1db33bd044 1-96
+src/shared/entities/post/__tests__/postBody.test.ts
+  s_06dd4e6f3c24d0::t_ad91ee5780a2b0 15-17,39,126-127,129-130,132-137,150-202
+src/shared/entities/post/index.ts
+  s_06dd4e6f3c24d0::t_ef64507673626f 24,27,46,52
+src/shared/entities/post/mapPost.ts
+  s_06dd4e6f3c24d0::t_a378afddcc8d2c 165-169
+src/shared/entities/post/mediaRows.ts
+  s_06dd4e6f3c24d0::t_73a99c6de7eff1 1-36
+src/shared/entities/post/postBody.ts
+  s_06dd4e6f3c24d0::t_da0981e160be88 6,20-28,141-143,177-185,220-225
+src/shared/entities/post/types.ts
+  s_06dd4e6f3c24d0::t_831bd53bb05c10 104-129
+src/shared/i18n/ru.ts
+  s_06dd4e6f3c24d0::t_59328469b1cd94 132-133,151-159
+src/shared/ui/MediaRow.tsx
+  s_06dd4e6f3c24d0::t_b13706352d9d63 1-156
+src/shared/ui/__tests__/MediaRow.test.tsx
+  s_06dd4e6f3c24d0::t_f7e03e35ac0749 1-184
+src/shared/ui/__tests__/surfaceRules.test.tsx
+  s_06dd4e6f3c24d0::t_754df8395bd117 16,34-49
+src/shared/ui/index.ts
+  s_06dd4e6f3c24d0::t_0da44ae82a099d 63-69
+_bmad-output/implementation-artifacts/spec-3-5-media-rows-in-a-post.md
+  s_06dd4e6f3c24d0::t_2513f33809d46f 1-104
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_06dd4e6f3c24d0::t_c4464333b10290 32,64-65
+docs/testing.md
+  s_06dd4e6f3c24d0::t_7dd60ff23d991f 736-756
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "7396d82ba992a235676d49bf6529e4b114f4e5ef",
+  "prompts": {},
+  "sessions": {
+    "s_06dd4e6f3c24d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b17b1d18-d247-4604-86f0-d38f6644be98",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
