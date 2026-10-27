@@ -186,6 +186,9 @@ export const ru = {
     untitled: 'Без названия',
     /** After the author name, which ellipsizes; the date never does. */
     metaDate: ' · {date}',
+    // A pinned post on the Author page (Boosty keeps it first, owner decision 2026-10-27).
+    metaDatePinned: ' · Закреплено · {date}',
+    a11yPinned: 'Закреплено. {label}',
     a11y: '{badge}. {title}. {author}, {date}.',
     a11yDuration: '{badge}. {title}. {author}, {date}. Длительность {duration}.',
   },

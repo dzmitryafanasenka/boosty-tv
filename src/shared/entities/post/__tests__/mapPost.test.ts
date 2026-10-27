@@ -1,6 +1,8 @@
 import { createLogger } from '../../../services/logger';
 // eslint-disable-next-line boundaries/dependencies -- test-only fixtures
 import { e5Posts, feedPost, lockedPost } from '../../../../test/feedFixtures';
+// eslint-disable-next-line boundaries/dependencies -- test-only fixtures
+import { e4Page } from '../../../../test/authorFixtures';
 import { firstText, kindOf, mapPost, previewOf, textOf } from '../mapPost';
 import type { Block, Post } from '../types';
 
@@ -76,6 +78,22 @@ describe('mapPost: the live E5 posts', () => {
     expect(withLevel({ name: 5 }).levelName).toBeNull();
     expect(withLevel(null).levelName).toBeNull();
     expect(withLevel('junk').levelName).toBeNull();
+  });
+});
+
+describe('mapPost: pinned (owner decision 2026-10-27)', () => {
+  it('the live E4 pinned post is pinned; the others are not', () => {
+    const posts = e4Page(2).data.map(raw => mapPost(raw, createLogger()));
+    expect(posts.every(post => post !== null)).toBe(true);
+    expect((posts as Post[])[0].pinned).toBe(true);
+    // It is older than the next post: Boosty keeps it first, the app does not reorder.
+    expect((posts as Post[])[0].publishedAt).toBeLessThan((posts as Post[])[1].publishedAt);
+    expect((posts as Post[]).slice(1).every(post => !post.pinned)).toBe(true);
+  });
+
+  it('missing or a wrong type is not pinned', () => {
+    expect((mapPost(feedPost(0), createLogger()) as Post).pinned).toBe(false);
+    expect((mapPost(feedPost(0, { isPinned: 'yes' }), createLogger()) as Post).pinned).toBe(false);
   });
 });
 

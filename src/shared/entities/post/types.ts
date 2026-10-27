@@ -87,6 +87,8 @@ export type Post = {
   levelName: string | null;
   /** `count.likes` (read-only, Story 3.4); null when the API gives none. */
   likeCount: number | null;
+  /** `isPinned`: the author pinned it (E4 puts it first); the Author page marks it. */
+  pinned: boolean;
 };
 
 /** One E5 page: the posts and the opaque cursor of the next page. */

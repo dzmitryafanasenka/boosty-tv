@@ -345,6 +345,8 @@ type GridCardProps = {
   onCardFocus: (index: number, view: HostView | null) => void;
   onCardPress?: (postId: string) => void;
   nowMs?: number;
+  /** Mark pinned posts «Закреплено» (the Author page). */
+  showPinned?: boolean;
 };
 
 /**
@@ -360,6 +362,7 @@ const GridCard = memo(function GridCardView({
   onCardFocus,
   onCardPress,
   nowMs,
+  showPinned,
 }: GridCardProps) {
   const id = `${cardIdPrefix}${post.id}`;
   const zone = useZoneItem(id);
@@ -390,6 +393,7 @@ const GridCard = memo(function GridCardView({
       post={post}
       width={POST_GRID_CARD_WIDTH}
       nowMs={nowMs}
+      showPinned={showPinned}
       onFocus={onFocus}
       onPress={onCardPress ? onPress : undefined}
       style={index % POST_GRID_COLUMNS === 0 ? styles.slot : styles.slotGap}
@@ -404,6 +408,8 @@ type GridRowProps = {
   onCardFocus: (index: number, view: HostView | null) => void;
   onCardPress?: (postId: string) => void;
   nowMs?: number;
+  /** Mark pinned posts «Закреплено» (the Author page). */
+  showPinned?: boolean;
 };
 
 /** A row re-renders when its posts change; its memoized cards do not. */
@@ -414,6 +420,7 @@ const GridRow = memo(function GridRowView({
   onCardFocus,
   onCardPress,
   nowMs,
+  showPinned,
 }: GridRowProps) {
   return (
     <View style={styles.row}>
@@ -429,6 +436,7 @@ const GridRow = memo(function GridRowView({
           onCardFocus={onCardFocus}
           onCardPress={onCardPress}
           nowMs={nowMs}
+          showPinned={showPinned}
         />
       ))}
     </View>
@@ -552,6 +560,8 @@ export type PostGridProps = {
   /** OK on a card (optional; a stable callback). */
   onCardPress?: (postId: string) => void;
   nowMs?: number;
+  /** Mark pinned posts «Закреплено» (the Author page). */
+  showPinned?: boolean;
   /** Card focus ids are `<cardIdPrefix><postId>` (e.g. `home/feed/`). */
   cardIdPrefix: string;
   /** The load-more «Повторить» focus id (e.g. `home/feed/retry`). */
@@ -579,6 +589,7 @@ export function PostGrid({
   initialRow,
   onCardPress,
   nowMs,
+  showPinned,
   cardIdPrefix,
   retryId,
   testIDPrefix,
@@ -615,9 +626,10 @@ export function PostGrid({
         onCardFocus={onCardFocus}
         onCardPress={onCardPress}
         nowMs={nowMs}
+        showPinned={showPinned}
       />
     ),
-    [cardIdPrefix, restoration, onCardFocus, onCardPress, nowMs],
+    [cardIdPrefix, restoration, onCardFocus, onCardPress, nowMs, showPinned],
   );
 
   const footerState = useMemo<FooterState>(

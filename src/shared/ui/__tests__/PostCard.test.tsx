@@ -294,3 +294,31 @@ describe('PostCard in a recycled cell (FlashList, ADR 0011)', () => {
     await act(async () => root.unmount());
   });
 });
+
+describe('pinned (Author page, owner decision 2026-10-27)', () => {
+  const pinned = asPost(feedPost(0, { isPinned: true }));
+
+  it('with showPinned: «Закреплено» before the date and at the start of the label', async () => {
+    const root = createRoot();
+    await act(async () => {
+      root.render(<PostCard post={pinned} width={162} nowMs={NOW} testID={ID} showPinned />);
+    });
+    expect(json(root)).toContain(`Закреплено · ${dateOf(pinned)}`);
+    expect(host(root).props.accessibilityLabel).toMatch(/^Закреплено\. /);
+    await act(async () => root.unmount());
+  });
+
+  it('without showPinned (Главная), or not pinned: no mark', async () => {
+    const plain = await render(pinned);
+    expect(json(plain)).not.toContain('Закреплено');
+    expect(host(plain).props.accessibilityLabel).not.toMatch(/Закреплено/);
+    await act(async () => plain.unmount());
+    const root = createRoot();
+    await act(async () => {
+      root.render(<PostCard post={asPost(feedPost(0))} width={162} nowMs={NOW} testID={ID} showPinned />);
+    });
+    expect(json(root)).not.toContain('Закреплено');
+    expect(host(root).props.accessibilityLabel).not.toMatch(/Закреплено/);
+    await act(async () => root.unmount());
+  });
+});

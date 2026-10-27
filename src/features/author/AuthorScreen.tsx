@@ -459,6 +459,7 @@ export function AuthorScreen({
           cardIdPrefix={cardPrefix}
           retryId={retryId}
           testIDPrefix="author/posts"
+          showPinned
           loadMoreErrorLabel={t('author.loadMoreError')}
         />
       ) : null}

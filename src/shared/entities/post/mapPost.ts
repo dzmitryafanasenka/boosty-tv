@@ -258,5 +258,6 @@ export function mapPost(raw: unknown, logger: Logger = appLogger): Post | null {
     // Trimmed: a blank name is no level (Story 3.6, the copy without a level).
     levelName: nonEmpty(dto.subscriptionLevel?.name?.trim()),
     likeCount: dto.count?.likes ?? null,
+    pinned: dto.isPinned === true,
   };
 }
