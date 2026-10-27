@@ -1,0 +1,149 @@
+__tests__/debugNetLog.test.js
+  s_06dd4e6f3c24d0::t_407b4b73a1e8c4 1-42
+__tests__/playerFlow.test.tsx
+  s_06dd4e6f3c24d0::t_069d82227916db 1-1217
+__tests__/postFlow.test.tsx
+  s_06dd4e6f3c24d0::t_8d4c6c5ed22ffb 1184,1190-1191,1197,1204
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_06dd4e6f3c24d0::t_392f3813506df4 216-236
+_bmad-output/implementation-artifacts/spec-4-1-play-a-video-from-a-post.md
+  s_06dd4e6f3c24d0::t_c8520d22af648d 1-127
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_06dd4e6f3c24d0::t_6b89c7241edb58 32,69-70
+android/app/src/debug/java/io/github/dzmitryafanasenka/boostytv/DebugNetLog.kt
+  s_06dd4e6f3c24d0::t_dfa12fda8db72a 1-52
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/BoostyNativePackage.kt
+  s_06dd4e6f3c24d0::t_b83b395a2bf02e 15
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/MainActivity.kt
+  s_06dd4e6f3c24d0::t_0a9fac1356e77d 3,23-32
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/MainApplication.kt
+  s_06dd4e6f3c24d0::t_63e593682651b3 24-26
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/SeekKeysModule.kt
+  s_06dd4e6f3c24d0::t_2cd17dfb2761fc 1-85
+android/app/src/release/java/io/github/dzmitryafanasenka/boostytv/DebugNetLog.kt
+  s_06dd4e6f3c24d0::t_0399f686d43e71 1-10
+docs/api-contract.md
+  s_06dd4e6f3c24d0::t_31d86afd0d22f7 33,420-432
+docs/focus-map.md
+  s_06dd4e6f3c24d0::t_8fe8b381464069 42,247-253,286-296
+docs/testing.md
+  s_06dd4e6f3c24d0::t_eb6b94b3d56b7b 33,835-866
+package-lock.json
+  s_06dd4e6f3c24d0::t_975e87f3b0818a 21,10628-10637
+package.json
+  s_06dd4e6f3c24d0::t_95e008bc695d95 24
+src/app/App.tsx
+  s_06dd4e6f3c24d0::t_f3cf38af6f3b64 44,421
+src/app/__tests__/phaseFlags.test.ts
+  s_06dd4e6f3c24d0::t_bbde5f48dcda18 3,10,15-16
+src/app/phaseFlags.ts
+  s_06dd4e6f3c24d0::t_a8042d5e58b507 9-10,18
+src/app/routes.ts
+  s_06dd4e6f3c24d0::t_c5c9666ae56411 1,34-40
+src/app/stackRoutes.tsx
+  s_06dd4e6f3c24d0::t_49d2a36a3667f3 6,8,291-301,331,338-377
+src/features/player/PlayerOverlay.tsx
+  s_06dd4e6f3c24d0::t_5116af19b40744 1-400
+src/features/player/PlayerScreen.tsx
+  s_06dd4e6f3c24d0::t_3ca31cf149dd91 1-666
+src/features/player/__tests__/PlayerOverlay.test.ts
+  s_06dd4e6f3c24d0::t_4dd78df825af97 1-16
+src/features/player/__tests__/seekController.test.ts
+  s_06dd4e6f3c24d0::t_ff3f70e20b6fcd 1-194
+src/features/player/index.ts
+  s_06dd4e6f3c24d0::t_acbfca31e41bab 1-11
+src/features/player/mediaResolver.ts
+  s_06dd4e6f3c24d0::t_3e184fa68d6085 1-185
+src/features/player/seekController.ts
+  s_06dd4e6f3c24d0::t_e00247b5ef7c42 1-217
+src/features/post/PostBody.tsx
+  s_06dd4e6f3c24d0::t_7681a4cfb2ca2e 3,5,7,11,240-241,246-248,256,271-272,279,294-295,303-310,321,328-377,394-398
+src/features/post/PostScreen.tsx
+  s_06dd4e6f3c24d0::t_4a50977cd9bb91 15,27-33,48-49,108-114,128-132,140-142,164,181,196-201,203-205,211,253-256,310,400,408,469-477,484
+src/shared/api/dto/post.ts
+  s_06dd4e6f3c24d0::t_6a4b5b8ec532c0 125-145
+src/shared/api/queryKeys.ts
+  s_06dd4e6f3c24d0::t_6d763d526bbd29 27-34
+src/shared/entities/post/__tests__/videoSources.test.ts
+  s_06dd4e6f3c24d0::t_a92299d7398712 1-191
+src/shared/entities/post/index.ts
+  s_06dd4e6f3c24d0::t_1240d3952e3bb0 28-34
+src/shared/entities/post/postRepository.ts
+  s_06dd4e6f3c24d0::t_241795b1dba466 7-8,129-143,151-152,155,161-191
+src/shared/entities/post/videoSources.ts
+  s_06dd4e6f3c24d0::t_1d5db62a8b8fa8 1-127
+src/shared/i18n/ru.ts
+  s_06dd4e6f3c24d0::t_9c9a55000ac993 169-192
+src/shared/platform/PlayerEngineView.tsx
+  s_06dd4e6f3c24d0::t_41863b8fcf4017 1-97
+src/shared/platform/__tests__/PlayerEngineView.test.tsx
+  s_06dd4e6f3c24d0::t_d2149aec9d2fec 1-89
+src/shared/platform/__tests__/playerEngine.test.ts
+  s_06dd4e6f3c24d0::t_4322efcb2ed985 1-31
+src/shared/platform/playerEngine.ts
+  s_06dd4e6f3c24d0::t_0b0f50078e2d96 1-94
+src/shared/platform/seekKeys.ts
+  s_06dd4e6f3c24d0::t_569c9953f1d486 1-64
+src/shared/ui/FocusableSurface.tsx
+  s_06dd4e6f3c24d0::t_984d3925497988 42-47,91,118
+src/shared/ui/MediaRow.tsx
+  s_06dd4e6f3c24d0::t_144a937b21b2a4 14-19,52,55-56,65,77
+src/shared/ui/__tests__/FocusableSurface.test.tsx
+  s_06dd4e6f3c24d0::t_719515f3a69357 1-51
+src/shared/ui/__tests__/MediaRow.test.tsx
+  s_06dd4e6f3c24d0::t_068f95966293b4 23,26,121-123,125-126,130,132-133
+src/test/playerEngineMock.tsx
+  s_06dd4e6f3c24d0::t_07cb4f407c6eba 1-50
+src/test/tvEventMock.ts
+  s_06dd4e6f3c24d0::t_4160f9697f8deb 1-36
+_bmad-output/implementation-artifacts/epic-4-context.md
+  s_312fd5621f57a3::t_39605dc642aebc 1-60
+docs/research/seek-preview-thumbnails.md
+  s_dc22a23e308c75::t_795e245ac25e87 1-185
+src/features/player/__tests__/mediaResolver.test.ts
+  s_0f982f8a22283f::t_1c363ad3c595ff 1-55
+src/shared/platform/__tests__/playbackArbiter.test.ts
+  s_0f982f8a22283f::t_e3b0c9549fad32 1-35
+src/shared/platform/playbackArbiter.ts
+  s_0f982f8a22283f::t_4caaba5894d3c9 1-44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "72630ff33a540e7fba6250e1457e65aeb93e781c",
+  "prompts": {},
+  "sessions": {
+    "s_06dd4e6f3c24d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b17b1d18-d247-4604-86f0-d38f6644be98",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_0f982f8a22283f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a3df72c57b4558f3b",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_312fd5621f57a3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-afe205e7254f24510",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_dc22a23e308c75": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a3a7c69bb2bd1ab4b",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
