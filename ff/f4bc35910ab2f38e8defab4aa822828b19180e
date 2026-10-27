@@ -1,0 +1,59 @@
+__tests__/homeFeedFlow.test.tsx
+  s_06dd4e6f3c24d0::t_18d00ae91366fe 26,1114,1118,1288,1306,1309-1312,1315-1319,1370-1683
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_06dd4e6f3c24d0::t_b3bad2264c8034 206-208
+_bmad-output/implementation-artifacts/spec-epic-3-retro-a3-home-head-refresh.md
+  s_06dd4e6f3c24d0::t_45e7ae2c1250a0 1-101
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_06dd4e6f3c24d0::t_e151f030fda892 32,187
+docs/adr/0010-server-state-tanstack-query.md
+  s_06dd4e6f3c24d0::t_72dfd6c299c280 38-39
+docs/focus-map.md
+  s_06dd4e6f3c24d0::t_ee7a60ee1143ae 170
+docs/testing.md
+  s_06dd4e6f3c24d0::t_249ab7306db162 805-808
+src/app/Shell.tsx
+  s_06dd4e6f3c24d0::t_2151a3d98e278a 107-121,219-227,229-237,247,259
+src/features/author/AuthorScreen.tsx
+  s_06dd4e6f3c24d0::t_a25052cbe356bf 21,153-156,159,161,164,166,235-244,249,252,324-325
+src/features/home/HomeScreen.tsx
+  s_06dd4e6f3c24d0::t_5f601f5cc16243 17,57-61,110-117,172-173,190-194,196-197,200,203,206,246-278,300-307,315,322,337,340,376-386,388-392,401-402
+src/features/home/feedRefresh.ts
+  s_06dd4e6f3c24d0::t_1cc396f810113e 26-39,44,65
+src/shared/entities/post/__tests__/postsHeadRefresh.test.ts
+  s_06dd4e6f3c24d0::t_d498defd8d4bd7 50,56,145,188
+src/shared/entities/post/postsHeadRefresh.ts
+  s_06dd4e6f3c24d0::t_da52a3e512a668 30-31,37-38,80
+src/shared/ui/PostGrid.tsx
+  s_06dd4e6f3c24d0::t_ece4f3784d1ece 205-209,262-265,300-409
+src/shared/ui/index.ts
+  s_06dd4e6f3c24d0::t_3cf94c7a7b2700 59,63
+src/features/home/__tests__/feedRefresh.test.ts
+  s_32dac120acac8c::t_e320ab76a79a10 86-95,197-234
+src/shared/ui/__tests__/useNotMovedLatch.test.tsx
+  s_32dac120acac8c::t_ca45c07ae6ee5a 1-146
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "fff4bc35910ab2f38e8defab4aa822828b19180e",
+  "prompts": {},
+  "sessions": {
+    "s_06dd4e6f3c24d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b17b1d18-d247-4604-86f0-d38f6644be98",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_32dac120acac8c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a811cd17f21b53acd",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
