@@ -1,4 +1,3 @@
-import { z } from 'zod';
 import {
   phoneSecureStore,
   sessionSecureStore,
@@ -16,6 +15,7 @@ import {
   type HttpClient,
 } from './httpClient';
 import { createRefreshCoordinator, type RefreshHost } from './refreshCoordinator';
+import { decodeSession, encode, type ExpiryMarker, type StoredSession } from './session/codec';
 import {
   CURRENT_USER_PATH,
   type AccountSwitchHook,
@@ -79,50 +79,6 @@ export {
  *
  * Never logs the phone, the challenge, the code, tokens or the E1 body.
  */
-
-/** The session value in the `boostytv.session` keychain service. */
-const storedSessionSchema = z.object({
-  v: z.literal(1),
-  accessToken: z.string().min(1),
-  refreshToken: z.string().min(1),
-  /** Epoch milliseconds, from `expires_in` read as seconds. */
-  expiresAt: z.number(),
-  /** E1 `id`, as a string. */
-  accountId: z.string().min(1),
-});
-
-type StoredSession = z.infer<typeof storedSessionSchema>;
-
-/**
- * The expiry marker that replaces the session on refresh 400
- * `invalid_grant` (Story 2.6): no token, only the account id for the
- * same-account check after a restart.
- */
-const expiryMarkerSchema = z.object({
-  v: z.literal(1),
-  expired: z.literal(true),
-  accountId: z.string().min(1),
-});
-
-type ExpiryMarker = z.infer<typeof expiryMarkerSchema>;
-
-type Decoded =
-  | { kind: 'session'; session: StoredSession }
-  | { kind: 'expired'; accountId: string };
-
-function decodeSession(raw: string): Decoded | null {
-  try {
-    const value: unknown = JSON.parse(raw);
-    const session = storedSessionSchema.safeParse(value);
-    if (session.success) {
-      return { kind: 'session', session: session.data };
-    }
-    const marker = expiryMarkerSchema.safeParse(value);
-    return marker.success ? { kind: 'expired', accountId: marker.data.accountId } : null;
-  } catch {
-    return null;
-  }
-}
 
 export type SessionManagerDeps = {
   authApi?: AuthApiClient;
@@ -193,7 +149,7 @@ export function createSessionManager({
         if (g !== generation || signingOut) {
           return 'stale' as const;
         }
-        await sessionStore.write(JSON.stringify(next));
+        await sessionStore.write(encode(next));
         return 'saved' as const;
       }),
     adopt(next, g) {
@@ -217,7 +173,7 @@ export function createSessionManager({
       setStatus('expired');
       if (accountId) {
         const marker: ExpiryMarker = { v: 1, expired: true, accountId };
-        enqueue(() => sessionStore.write(JSON.stringify(marker))).catch(() => {
+        enqueue(() => sessionStore.write(encode(marker))).catch(() => {
           logger.error('session', 'expiry marker not saved');
         });
       }
@@ -360,7 +316,7 @@ export function createSessionManager({
     }
     // Overwrites the expiry marker, if any.
     try {
-      await enqueue(() => sessionStore.write(JSON.stringify(next)));
+      await enqueue(() => sessionStore.write(encode(next)));
     } catch {
       logger.error('session', 'save failed; nothing kept');
       await discardSaved();
