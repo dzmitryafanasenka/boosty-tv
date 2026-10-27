@@ -183,6 +183,28 @@ test('Story 3.4: Пост answers E8 in demo mode (paragraphs and likes, mixed b
   });
 });
 
+test('Story 3.5: a demo post with two videos shows two MediaRows on top (the second without a title)', async () => {
+  fetchMock.mockClear();
+  const root = await renderApp();
+  const ids = () =>
+    root.container.queryAll(n => n.props.focusable === true).map(n => n.props.testID as string);
+  await press(root, 'home/feed/demo-post-4');
+  const rows = ids().filter(id => id.startsWith('post/demo-post-4/video/'));
+  expect(rows).toEqual([
+    'post/demo-post-4/video/demo-video-4-0',
+    'post/demo-post-4/video/demo-video-4-1',
+  ]);
+  const label = (id: string) =>
+    root.container.queryAll(n => n.props.testID === id && n.props.focusable === true)[0].props
+      .accessibilityLabel;
+  expect(label(rows[0])).toMatch(/^Видео 1\. Демо-ролик 5\. \d+:\d\d$/);
+  expect(label(rows[1])).toMatch(/^Видео 2\. \d+:\d\d$/);
+  expect(fetchMock).not.toHaveBeenCalled();
+  await act(async () => {
+    root.unmount();
+  });
+});
+
 test('Story 2.8: demo expiry → A11 → A2 → A5 → sign-in with another id: the demo hook wipes the stores; the keychain is never touched', async () => {
   // PhoneScreen's send still goes through the real AuthApiClient (global
   // fetch); answer it here. Confirm and E1 go to the demo's FixtureTransport.

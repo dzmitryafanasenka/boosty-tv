@@ -2,11 +2,16 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, TVFocusGuideView, View } from 'react-native';
 import type { HttpClient } from '../../shared/api';
-import { postBodyItems, type PostBodyItem } from '../../shared/entities/post';
+import {
+  postBodyItems,
+  videoRowsOf,
+  type PostBodyItem,
+  type VideoRow,
+} from '../../shared/entities/post';
 import { useZoneItem } from '../../shared/focus';
 import { t } from '../../shared/i18n';
 import { StateView, requestHostFocus, spacing, type HostView } from '../../shared/ui';
-import { PostBody, PostBodySkeleton } from './PostBody';
+import { PostBody, PostBodySkeleton, PostVideoRows } from './PostBody';
 import { PostHeader, PostHeaderSkeleton } from './PostHeader';
 import { usePost } from './usePost';
 
@@ -17,6 +22,9 @@ export const postAuthorId = (postId: string) => `post/${postId}/author`;
 export const postBlockPrefix = (postId: string) => `post/${postId}/block/`;
 export const postBlockId = (postId: string, blockKey: string) =>
   `${postBlockPrefix(postId)}${blockKey}`;
+export const postVideoPrefix = (postId: string) => `post/${postId}/video/`;
+export const postVideoId = (postId: string, mediaId: string) =>
+  `${postVideoPrefix(postId)}${mediaId}`;
 
 /** The left column: a third of the content minus the column gap. */
 const COLUMN_GAP = spacing['10'];
@@ -48,6 +56,11 @@ export type PostScreenProps = {
   onBack: () => void;
   /** OK on the author row: open Автор for this blog. */
   onOpenAuthor: (blogUrl: string) => void;
+  /**
+   * `phaseFlags.player` (AD-20), passed by the route: off → the MediaRows
+   * have no action. Epic 4 adds the action when it is on.
+   */
+  playerEnabled: boolean;
 };
 
 type Phase = 'unavailable' | 'error' | 'loading' | 'ready';
@@ -55,26 +68,28 @@ type Phase = 'unavailable' | 'error' | 'loading' | 'ready';
 /**
  * F Пост (Story 3.4, docs/focus-map.md §4 F): E8 in two columns. Left: the
  * author row (OK → Автор), the title and the meta line (date · likes, read
- * only). Right: the blocks as plain paragraphs (each a ParagraphStop) and
- * neutral non-focusable placeholders, in a scrolling column. Not here yet:
- * MediaRows and «Смотреть» (3.5, Epic 4), the locked copy (3.6), styles,
- * collapse and real blocks (Epic 6). A locked post shows its header and
- * teaser placeholders.
+ * only). Right: one MediaRow per video on top (Story 3.5, in block order),
+ * then the blocks as plain paragraphs (each a ParagraphStop) and neutral
+ * non-focusable placeholders, in a scrolling column. Not here yet:
+ * «Смотреть» and progress (Epic 4), the locked copy (3.6), styles, collapse
+ * and real blocks (Epic 6). A locked post shows its header and teaser
+ * placeholders (no rows).
  *
  * Focus:
  * - Skeleton: nothing focusable in content; focus goes to the sidebar's
  *   current item explicitly (it must leave the covered screen below).
- * - When the post arrives, the first paragraph takes focus (a locked post
- *   or one without text: the author) only if the user has not moved (focus
+ * - When the post arrives, the first MediaRow takes focus, else the first
+ *   paragraph (a locked post or one with neither: the author) only if the user has not moved (focus
  *   still on the sidebar's current item, nothing yet, or the StateView
  *   action just pressed). A StateView action takes focus the same way, or
  *   when the focused content it replaces is gone.
- * - ↓ ↑ move between paragraphs natively (the column scrolls the focused
- *   one into view). ← from a paragraph → the left column's guide → the
- *   author; → from the author → the right column's guide → the last
- *   focused paragraph (else the first). Each column traps ↑ ↓.
- * - A refetch never moves focus, unless the focused paragraph is gone: the
- *   initial target then.
+ * - ↓ ↑ move through the rows, then the paragraphs, natively (the column
+ *   scrolls the focused one into view). ← from a row or paragraph → the
+ *   left column's guide → the author; → from the author → the right
+ *   column's guide → the last focused row or paragraph (else the first).
+ *   Each column traps ↑ ↓.
+ * - A refetch never moves focus, unless the focused row or paragraph is
+ *   gone: the initial target then.
  * - Return to the route (Автор on top popped): the remembered element
  *   through the content zone, else the sidebar's current item.
  */
@@ -85,6 +100,7 @@ export function PostScreen({
   focus,
   onBack,
   onOpenAuthor,
+  playerEnabled,
 }: PostScreenProps) {
   const state = usePost(http, blogUrl, postId);
   const { post } = state;
@@ -98,19 +114,31 @@ export function PostScreen({
 
   const authorId = postAuthorId(postId);
   const blockPrefix = postBlockPrefix(postId);
+  const videoPrefix = postVideoPrefix(postId);
   const contentPrefix = postIdPrefix(postId);
 
-  // The body: the blocks of an accessible post, the teaser of a locked one.
+  // The MediaRows (an accessible post's videos with an id, deduped) and the
+  // body: the other blocks of an accessible post, the teaser of a locked one.
+  const rows: readonly VideoRow[] = useMemo(() => (post === null ? [] : videoRowsOf(post)), [post]);
   const items: readonly PostBodyItem[] = useMemo(
-    () => (post === null ? [] : postBodyItems(post.hasAccess ? post.blocks : post.teaser)),
+    () =>
+      post === null
+        ? []
+        : post.hasAccess
+          ? postBodyItems(post.blocks, { videoRows: true })
+          : postBodyItems(post.teaser),
     [post],
   );
-  const firstParagraphId = useMemo(() => {
+  /** The first stop of the right column: the first MediaRow, else the first paragraph. */
+  const firstRightId = useMemo(() => {
+    if (rows.length > 0) {
+      return `${videoPrefix}${rows[0].ref.mediaId}`;
+    }
     const first = items.find(item => item.kind === 'paragraph');
     return first ? `${blockPrefix}${first.key}` : null;
-  }, [items, blockPrefix]);
-  /** First paragraph; a locked post or one without text: the author. */
-  const initialId = post !== null && post.hasAccess && firstParagraphId !== null ? firstParagraphId : authorId;
+  }, [rows, items, videoPrefix, blockPrefix]);
+  /** The first row or paragraph; a locked post or one with neither: the author. */
+  const initialId = post !== null && post.hasAccess && firstRightId !== null ? firstRightId : authorId;
 
   const focusRef = useRef(focus);
   focusRef.current = focus;
@@ -136,34 +164,35 @@ export function PostScreen({
   const leftDestinations = useMemo(() => (authorView ? [authorView] : NO_DESTINATIONS), [authorView]);
 
   // The right column's guide: → from the author lands on the last focused
-  // paragraph, else the first one; no paragraph: no destination.
-  const lastParagraph = useRef<string | null>(null);
+  // row or paragraph, else the first one; neither: no destination.
+  const lastRight = useRef<string | null>(null);
   const [rightTarget, setRightTarget] = useState<HostView | null>(null);
   const refreshRightTarget = useCallback(() => {
-    const remembered = lastParagraph.current ? views.current.get(lastParagraph.current) : undefined;
-    const first = firstParagraphId ? views.current.get(firstParagraphId) : undefined;
+    const remembered = lastRight.current ? views.current.get(lastRight.current) : undefined;
+    const first = firstRightId ? views.current.get(firstRightId) : undefined;
     const next = remembered ?? first ?? null;
     setRightTarget(prev => (prev === next ? prev : next));
-  }, [firstParagraphId]);
+  }, [firstRightId]);
   const rightDestinations = useMemo(() => (rightTarget ? [rightTarget] : NO_DESTINATIONS), [rightTarget]);
 
-  const onParagraphView = useCallback((id: string, view: HostView | null) => {
+  /** A row's or paragraph's host view, by focus id. */
+  const onRightView = useCallback((id: string, view: HostView | null) => {
     if (view) {
       views.current.set(id, view);
     } else {
       views.current.delete(id);
     }
   }, []);
-  const onParagraphFocus = useCallback(
+  const onRightFocus = useCallback(
     (id: string) => {
-      lastParagraph.current = id;
+      lastRight.current = id;
       refreshRightTarget();
     },
     [refreshRightTarget],
   );
   useEffect(() => {
     refreshRightTarget();
-  }, [items, refreshRightTarget]);
+  }, [rows, items, refreshRightTarget]);
 
   const stateAction = useZoneItem(POST_STATE_ACTION_ID);
   const stateActionView = useRef<HostView | null>(null);
@@ -251,8 +280,8 @@ export function PostScreen({
     }
   }, [phase, mayTakeFocus, contentFocused, focusInitial, focusAction]);
 
-  // A refetch changed the blocks and the focused paragraph is gone: the
-  // initial target (its view is already unmounted when this runs).
+  // A refetch changed the blocks and the focused row or paragraph is gone:
+  // the initial target (its view is already unmounted when this runs).
   useEffect(() => {
     const info = focusRef.current;
     const current = info.current();
@@ -260,15 +289,15 @@ export function PostScreen({
       phaseRef.current === 'ready' &&
       info.isActive() &&
       current !== null &&
-      current.startsWith(blockPrefix) &&
+      (current.startsWith(blockPrefix) || current.startsWith(videoPrefix)) &&
       !views.current.has(current)
     ) {
-      if (lastParagraph.current === current) {
-        lastParagraph.current = null;
+      if (lastRight.current === current) {
+        lastRight.current = null;
       }
       focusInitial();
     }
-  }, [items, blockPrefix, focusInitial]);
+  }, [rows, items, blockPrefix, videoPrefix, focusInitial]);
 
   const authorBlogUrl = post?.author.blogUrl ?? null;
   const onAuthorPress = useCallback(() => {
@@ -334,11 +363,18 @@ export function PostScreen({
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
           >
+            <PostVideoRows
+              rows={rows}
+              idPrefix={videoPrefix}
+              playable={playerEnabled}
+              onRowView={onRightView}
+              onRowFocus={onRightFocus}
+            />
             <PostBody
               items={items}
               idPrefix={blockPrefix}
-              onParagraphView={onParagraphView}
-              onParagraphFocus={onParagraphFocus}
+              onParagraphView={onRightView}
+              onParagraphFocus={onRightFocus}
             />
           </ScrollView>
         ) : (
@@ -372,7 +408,7 @@ const styles = StyleSheet.create({
   scroll: {
     flex: 1,
   },
-  // Focus headroom around the paragraphs; room below the last one.
+  // Focus headroom around the rows and paragraphs; room below the last one.
   scrollContent: {
     paddingHorizontal: spacing['focus-headroom'],
     paddingTop: spacing['focus-headroom'],

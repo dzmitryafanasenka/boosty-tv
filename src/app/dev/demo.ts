@@ -48,7 +48,9 @@ function demoPost(n: number, blog?: { blogUrl: string; index: number }) {
         ...Array.from({ length: videos }, (_, v) => ({
           type: 'ok_video',
           id: `demo-video-${n}-${v}`,
-          title: `Видео ${v + 1}`,
+          // Story 3.5: the second video of a two-video post has no title
+          // (its MediaRow reads «Видео 2» only).
+          title: v === 0 ? `Демо-ролик ${n + 1}` : '',
           duration: 600 + ((n * 137) % 3000),
         })),
         { type: 'text', content: '["Демо-текст поста","unstyled",[]]', modificator: '' },

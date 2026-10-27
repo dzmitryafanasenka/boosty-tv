@@ -3,6 +3,7 @@ export {
   PostScreen,
   postAuthorId,
   postBlockId,
+  postVideoId,
   type PostFocusInfo,
   type PostScreenProps,
 } from './PostScreen';

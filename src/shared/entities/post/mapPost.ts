@@ -162,7 +162,11 @@ export function kindOf(hasAccess: boolean, blocks: readonly Block[]): PostKind {
   if (!hasAccess) {
     return { kind: 'locked' };
   }
-  const videos = blocks.filter(b => b.type === 'ok_video').length;
+  // As the Post screen's MediaRows (Story 3.5): distinct non-empty ids. A
+  // post whose videos all lack an id keeps the count of its video blocks.
+  const videoBlocks = blocks.filter(b => b.type === 'ok_video');
+  const ids = new Set(videoBlocks.map(b => b.id).filter(id => id.length > 0));
+  const videos = ids.size > 0 ? ids.size : videoBlocks.length;
   if (videos > 1) {
     return { kind: 'videos', count: videos };
   }
