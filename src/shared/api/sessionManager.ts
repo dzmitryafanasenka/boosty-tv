@@ -14,9 +14,10 @@ import {
   type AccessTokenSource,
   type HttpClient,
 } from './httpClient';
-import { createRefreshCoordinator, type RefreshHost } from './refreshCoordinator';
-import { decodeSession, encode, type ExpiryMarker, type StoredSession } from './session/codec';
+import { createRefreshCoordinator } from './refreshCoordinator';
+import { decodeSession, encode, type StoredSession } from './session/codec';
 import { createSessionCore } from './session/core';
+import { createRefreshHost } from './session/refreshHost';
 import {
   CURRENT_USER_PATH,
   type AccountSwitchHook,
@@ -108,35 +109,7 @@ export function createSessionManager({
   let validating: Promise<ValidateResult> | null = null;
   let appState = 'active';
 
-  const host: RefreshHost<StoredSession> = {
-    current: () => {
-      const session = core.current();
-      return core.getStatus() === 'signedIn' && session && !core.isSigningOut()
-        ? { session, generation: core.generation() }
-        : null;
-    },
-    isExpired: () => core.getStatus() === 'expired',
-    isCurrent: g => core.isCurrent(g),
-    persist: (next, g) => core.writeSessionIf(next, () => core.isCurrent(g) && !core.isSigningOut()),
-    adopt: (next, g) => core.adoptRefreshed(next, g),
-    expire(g) {
-      if (!core.isCurrent(g) || core.getStatus() !== 'signedIn') {
-        logger.info('session', 'late rejection dropped');
-        return false;
-      }
-      // Nothing further is sent with these tokens; the stored session is
-      // replaced by the expiry marker (the phone stays for re-login). A
-      // failed write is logged and does not change the status.
-      const accountId = core.markExpired();
-      if (accountId) {
-        const marker: ExpiryMarker = { v: 1, expired: true, accountId };
-        core.writeSession(encode(marker)).catch(() => {
-          logger.error('session', 'expiry marker not saved');
-        });
-      }
-      return true;
-    },
-  };
+  const host = createRefreshHost(core, logger);
 
   const coordinator = createRefreshCoordinator({
     host,
