@@ -1,0 +1,101 @@
+__tests__/authorFlow.test.tsx
+  s_06dd4e6f3c24d0::t_cfcfc6e040748c 626,629-634,1019-1060
+__tests__/demoFlow.test.tsx
+  s_06dd4e6f3c24d0::t_9c1f61b3a59255 161-185
+__tests__/homeFeedFlow.test.tsx
+  s_06dd4e6f3c24d0::t_4d5ade82ccdfd5 14,635,637-644
+__tests__/postFlow.test.tsx
+  s_06dd4e6f3c24d0::t_37c91e117ee42e 1-951
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_06dd4e6f3c24d0::t_4616592a95d436 171,188-193
+_bmad-output/implementation-artifacts/spec-3-4-post-screen.md
+  s_06dd4e6f3c24d0::t_57afce33f7ccb7 1-114
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_06dd4e6f3c24d0::t_6b20f28f9017b5 32,63-64
+docs/adr/0012-sidebar-on-stack-screens.md
+  s_06dd4e6f3c24d0::t_e23807bfbd5222 20-24,26
+docs/api-contract.md
+  s_06dd4e6f3c24d0::t_c8f06d00a7b4f2 33
+docs/focus-map.md
+  s_06dd4e6f3c24d0::t_6750d18c790f92 65,167,207,225-238
+docs/testing.md
+  s_06dd4e6f3c24d0::t_880fede1c183cf 714-735
+src/app/App.tsx
+  s_06dd4e6f3c24d0::t_3a8ba5c2d218eb 33,75,211-214,216,218,220,231-239,269,275,279-289,292-293,295-302,304-309,311,315,342-344,354-355,357,366,369,380,384-385,394-426,434-438,441,445-446,454-519,697
+src/app/Shell.tsx
+  s_06dd4e6f3c24d0::t_20076393896a7a 45-46,96,111-113,226-235,248-254,297,317,331,342
+src/app/dev/demo.ts
+  s_06dd4e6f3c24d0::t_b0176dd94a3086 19-22,143-194,221-229
+src/app/routes.ts
+  s_06dd4e6f3c24d0::t_4933b436309c43 1-2,22-24,26-32
+src/features/author/AuthorScreen.tsx
+  s_06dd4e6f3c24d0::t_eb7e04793fdc79 67-68,104-105,107-114,249-254,256-259
+src/features/home/HomeScreen.tsx
+  s_06dd4e6f3c24d0::t_4333bf951751a2 56-64,81-82,104-106,111-118,283-320,432
+src/features/post/PostBody.tsx
+  s_06dd4e6f3c24d0::t_2bd1d63ceb974a 1-163
+src/features/post/index.ts
+  s_06dd4e6f3c24d0::t_7950a30bb0fb85 1-8
+src/features/post/usePost.ts
+  s_06dd4e6f3c24d0::t_47083912de5bae 1-54
+src/features/subscriptions/SubscriptionsScreen.tsx
+  s_06dd4e6f3c24d0::t_a4a7a0081118d2 50-51,53,261,268
+src/shared/api/__tests__/queryKeys.test.ts
+  s_06dd4e6f3c24d0::t_c0080def0933a7 16-23
+src/shared/api/dto/post.ts
+  s_06dd4e6f3c24d0::t_c09ea78b8dd9ef 2,12-13,18-19,21-22,30,45-49
+src/shared/api/queryKeys.ts
+  s_06dd4e6f3c24d0::t_b4451d489b150c 22-26
+src/shared/entities/post/__tests__/mapPost.test.ts
+  s_06dd4e6f3c24d0::t_3ed80681307482 228-244
+src/shared/entities/post/__tests__/postBody.test.ts
+  s_06dd4e6f3c24d0::t_9e5e6807a01dfc 1-197
+src/shared/entities/post/__tests__/postRepository.test.ts
+  s_06dd4e6f3c24d0::t_8be986235d97b2 9-11,235-284
+src/shared/entities/post/index.ts
+  s_06dd4e6f3c24d0::t_e1686d8beefe5d 15,17-25,48
+src/shared/entities/post/mapPost.ts
+  s_06dd4e6f3c24d0::t_2c4d02f48196ec 255
+src/shared/entities/post/postBody.ts
+  s_06dd4e6f3c24d0::t_42a83f49786d49 1-229
+src/shared/entities/post/postRepository.ts
+  s_06dd4e6f3c24d0::t_c316b07fc132f8 1,3,7,100-144
+src/shared/entities/post/types.ts
+  s_06dd4e6f3c24d0::t_0d170ab2bbd47f 88-89,98-103
+src/shared/i18n/ru.ts
+  s_06dd4e6f3c24d0::t_20ad92462bcc4f 131-151
+src/shared/ui/FocusableSurface.tsx
+  s_06dd4e6f3c24d0::t_b5f63ac6ea2a38 61-66,96,185
+src/shared/ui/PostCard.tsx
+  s_06dd4e6f3c24d0::t_bfb0e06cc1d33c 87
+src/test/postFixtures.ts
+  s_06dd4e6f3c24d0::t_3d4d49d48cf5a7 1-68
+src/features/post/PostHeader.tsx
+  s_c021bc61dbdc92::t_8bba1c4e5915c9 1-182
+src/features/post/PostScreen.tsx
+  s_c021bc61dbdc92::t_4f35316d068c2b 1-389
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "141be03725a5c6e1e3c834dc2a9d7635b1c89d9d",
+  "prompts": {},
+  "sessions": {
+    "s_06dd4e6f3c24d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b17b1d18-d247-4604-86f0-d38f6644be98",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_c021bc61dbdc92": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ad54df965b6798ff8",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
