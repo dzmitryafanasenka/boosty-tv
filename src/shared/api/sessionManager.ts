@@ -12,6 +12,7 @@ import {
 } from './httpClient';
 import { createRefreshCoordinator } from './refreshCoordinator';
 import { createSessionCore } from './session/core';
+import type * as DebugModule from './session/debug';
 import { createLifecycle } from './session/lifecycle';
 import { createRefreshHost } from './session/refreshHost';
 import { createRestore } from './session/restore';
@@ -70,7 +71,21 @@ export {
  * succeeded, so the code cannot be reused).
  *
  * Never logs the phone, the challenge, the code, tokens or the E1 body.
+ *
+ * This file is the facade (ADR 0009): it owns the deps and their defaults,
+ * builds the refresh coordinator and `http`, and composes the modules under
+ * `session/` (private to `shared/api`): `core` (the only holder of session
+ * state and of the stores), `codec`, `refreshHost`, `restore`, `signIn`,
+ * `signOut`, `lifecycle` and, in debug builds, `debug`.
  */
+
+/**
+ * Debug builds only (C14): `__DEV__` is a constant in Metro bundles, so in
+ * release the require is folded away and the module is not bundled. Keep
+ * this a local, unexported binding: an exported one is not folded away by
+ * the release minifier (__tests__/releaseBundle.test.js).
+ */
+const debug: typeof DebugModule | null = __DEV__ ? require('./session/debug') : null;
 
 export type SessionManagerDeps = {
   authApi?: AuthApiClient;
@@ -120,11 +135,7 @@ export function createSessionManager({
 
   const signOut = createSignOut(core, logger);
 
-  function corrupt(token: string): string {
-    return token.replace(/[A-Za-z0-9]/g, c =>
-      /\d/.test(c) ? String((Number(c) + 5) % 10) : c === 'x' || c === 'X' ? 'q' : 'x',
-    );
-  }
+  const debugHooks = debug?.createDebugHooks({ core, validate, logger });
 
   return {
     getStatus: core.getStatus,
@@ -138,25 +149,7 @@ export function createSessionManager({
     onAppStateChange,
     http,
     authApi: { sendCode: authApi.sendCode, resendCode: authApi.resendCode },
-    debugCorruptAccessToken: __DEV__
-      ? () => {
-          const session = core.current();
-          if (core.getStatus() === 'signedIn' && session) {
-            core.replaceAccessToken(corrupt(session.accessToken));
-            logger.info('session', 'debug: access token corrupted in memory');
-          }
-          return validate();
-        }
-      : undefined,
-    debugExpireInMemory: __DEV__
-      ? () => {
-          if (core.getStatus() === 'signedIn' && core.current()) {
-            // As `host.expire`, minus the marker write: storage is untouched.
-            core.bumpGeneration();
-            logger.info('session', 'debug: expired in memory');
-            core.markExpired();
-          }
-        }
-      : undefined,
+    debugCorruptAccessToken: debugHooks?.debugCorruptAccessToken,
+    debugExpireInMemory: debugHooks?.debugExpireInMemory,
   };
 }
