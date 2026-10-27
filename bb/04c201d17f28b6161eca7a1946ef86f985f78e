@@ -1,0 +1,61 @@
+__tests__/postFlow.test.tsx
+  s_06dd4e6f3c24d0::t_a4fcea1fc88d88 551,1318-1664
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_06dd4e6f3c24d0::t_b03fff75d3b22d 200-202
+_bmad-output/implementation-artifacts/epic-3-context.md
+  s_06dd4e6f3c24d0::t_edb8943f0c170a 7,12-15,20-28,32-39,43-48,52-54
+_bmad-output/implementation-artifacts/spec-3-6-locked-posts.md
+  s_06dd4e6f3c24d0::t_caa5b441495661 1-96
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_06dd4e6f3c24d0::t_9b7bc3b4ddd85d 32,65-66
+docs/feature-parity.md
+  s_06dd4e6f3c24d0::t_e9cacf300e6f27 85
+docs/focus-map.md
+  s_06dd4e6f3c24d0::t_ee4d12159cd603 251-257
+docs/testing.md
+  s_06dd4e6f3c24d0::t_9a587fe523db10 733,754,777-804
+src/app/dev/demo.ts
+  s_06dd4e6f3c24d0::t_165197a9c14b81 22-24,71-73
+src/features/post/LockedNotice.tsx
+  s_06dd4e6f3c24d0::t_0597b0d27dbdbc 1-53
+src/features/post/PostBody.tsx
+  s_06dd4e6f3c24d0::t_8d1d3c8058d7c7 1-2,89-170,177-180,185-187,189-196,199-227,347-356
+src/features/post/PostScreen.tsx
+  s_06dd4e6f3c24d0::t_4ce70611466583 3-10,21-22,39-67,110-114,160-161,169,180-220,427,429-431,442-444,457-458,489-491
+src/shared/entities/post/__tests__/mapPost.test.ts
+  s_06dd4e6f3c24d0::t_02cc533805ab6a 70-79
+src/shared/entities/post/__tests__/postBody.test.ts
+  s_06dd4e6f3c24d0::t_8549fe958eb314 151-191
+src/shared/entities/post/mapPost.ts
+  s_06dd4e6f3c24d0::t_10ebddb03514a0 258-259
+src/shared/entities/post/postBody.ts
+  s_06dd4e6f3c24d0::t_eb84a0962a60ec 27-29,107-113,189-193,196-197,200,254-266
+src/shared/i18n/ru.ts
+  s_06dd4e6f3c24d0::t_03e7165bd48a81 143-151
+src/features/post/__tests__/teaser.test.tsx
+  s_2fbbe2d2f9b1b0::t_eeecfe692d652e 1-82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "bb04c201d17f28b6161eca7a1946ef86f985f78e",
+  "prompts": {},
+  "sessions": {
+    "s_06dd4e6f3c24d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b17b1d18-d247-4604-86f0-d38f6644be98",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_2fbbe2d2f9b1b0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a1438f6b2d99e29d3",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
