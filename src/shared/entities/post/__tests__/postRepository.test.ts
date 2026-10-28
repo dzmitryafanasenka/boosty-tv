@@ -11,7 +11,7 @@ import { e8Accessible, e8Locked, e8MissingReply } from '../../../../test/postFix
 import { PostRepository, blogPostsPath, feedPath, mergePosts, postPath } from '../postRepository';
 import { mapPost } from '../mapPost';
 import type { Post } from '../types';
-import { DEFAULT_FILTER } from '../../../filters';
+import { ALL_TIME, DEFAULT_FILTER } from '../../../filters';
 // eslint-disable-next-line boundaries/dependencies -- test-only fixtures
 import e5OnlyBought from '../../../../test/fixtures/boosty/e5-feed-only-bought.json';
 
@@ -45,15 +45,53 @@ describe('feedPath', () => {
   });
 
   it('Story 5.3: each access value maps to the reference params («Все посты»: both false)', () => {
-    expect(feedPath(null, { access: 'allowed' })).toBe(`${BASE}&only_allowed=true&only_bought=false`);
-    expect(feedPath(null, { access: 'all' })).toBe(`${BASE}&only_allowed=false&only_bought=false`);
-    expect(feedPath(null, { access: 'bought' })).toBe(`${BASE}&only_allowed=false&only_bought=true`);
+    expect(feedPath(null, { access: 'allowed', period: ALL_TIME })).toBe(`${BASE}&only_allowed=true&only_bought=false`);
+    expect(feedPath(null, { access: 'all', period: ALL_TIME })).toBe(`${BASE}&only_allowed=false&only_bought=false`);
+    expect(feedPath(null, { access: 'bought', period: ALL_TIME })).toBe(`${BASE}&only_allowed=false&only_bought=true`);
   });
 
   it('passes the opaque cursor back verbatim, URL-encoded, after the access params', () => {
-    expect(feedPath('a b&c=d/é:1', { access: 'all' })).toBe(
+    expect(feedPath('a b&c=d/é:1', { access: 'all', period: ALL_TIME })).toBe(
       `${BASE}&only_allowed=false&only_bought=false&offset=a%20b%26c%3Dd%2F%C3%A9%3A1`,
     );
+  });
+
+  describe('Story 5.4: the period resolved at request time', () => {
+    const NOW = new Date(2026, 9, 28, 14, 30).getTime();
+    const sec = (y: number, m: number, d: number, h = 0, min = 0, s = 0) =>
+      Math.floor(new Date(y, m - 1, d, h, min, s).getTime() / 1000);
+
+    it('«За всё время» sends no period params', () => {
+      expect(feedPath(null, DEFAULT_FILTER, NOW)).toBe(`${BASE}&only_allowed=true&only_bought=false`);
+    });
+
+    it('a preset: from_ts = local 00:00 of today − 6, to_ts = today 23:59:59 (epoch seconds), before the offset', () => {
+      const path = feedPath('c1', { access: 'allowed', period: { kind: 'preset', days: 7 } }, NOW);
+      expect(path).toBe(
+        `${BASE}&only_allowed=true&only_bought=false&from_ts=${sec(2026, 10, 22)}&to_ts=${sec(2026, 10, 28, 23, 59, 59)}&offset=c1`,
+      );
+    });
+
+    it('a custom range: 1 Aug 00:00:00 – 25 Sep 23:59:59 local', () => {
+      const path = feedPath(
+        null,
+        { access: 'all', period: { kind: 'custom', fromDay: '2026-08-01', toDay: '2026-09-25' } },
+        NOW,
+      );
+      expect(path).toContain(`&from_ts=${sec(2026, 8, 1)}&to_ts=${sec(2026, 9, 25, 23, 59, 59)}`);
+    });
+
+    it('feedPage reads the clock only when it sends (Date.now() by default)', async () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(NOW);
+      try {
+        const { http, transport } = client(() => ({ status: 200, body: e5Page() }));
+        await PostRepository.feedPage(http, null, { access: 'allowed', period: { kind: 'preset', days: 30 } });
+        expect(transport.calls[0].url).toContain(`from_ts=${sec(2026, 9, 29)}&to_ts=${sec(2026, 10, 28, 23, 59, 59)}`);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
   });
 });
 
@@ -76,7 +114,7 @@ describe('PostRepository.feedPage', () => {
 
   it('Story 5.3: «Только купленные» sends its params; a one-post last page (the live shape) ends the paging', async () => {
     const { http, transport } = client(() => ({ status: 200, body: e5OnlyBought.body }));
-    const page = await PostRepository.feedPage(http, null, { access: 'bought' });
+    const page = await PostRepository.feedPage(http, null, { access: 'bought', period: ALL_TIME });
     expect(transport.calls[0].url).toContain('&only_allowed=false&only_bought=true');
     expect(page.posts).toHaveLength(1);
     expect(page.nextCursor).toBeNull();

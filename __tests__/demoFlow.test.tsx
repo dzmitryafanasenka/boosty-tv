@@ -9,6 +9,7 @@ import App from '../src/app/App';
 import { resetQueryCache } from '../src/app/queryClient';
 import { session } from '../src/app/session';
 import { focusRestoration } from '../src/shared/focus';
+import { filtersStore, formatDayKey, periodBounds } from '../src/shared/filters';
 import { t } from '../src/shared/i18n';
 import { createAsyncStorage } from '@react-native-async-storage/async-storage';
 import { accountScope } from '../src/shared/account';
@@ -218,6 +219,36 @@ test('Story 3.5: a demo post with two videos shows two MediaRows on top (the sec
   await act(async () => {
     root.unmount();
   });
+});
+
+test('Story 5.4: the demo feed honours from_ts / to_ts (a custom day keeps only that day’s posts)', async () => {
+  // The demo posts: 2026-10-01 00:00 UTC minus n hours (n = 0…29); the
+  // local calendar day of post 0 (the zone of the test host).
+  const start = 1_790_812_800;
+  const first = new Date(start * 1000);
+  const dayKey = formatDayKey({ year: first.getFullYear(), month: first.getMonth() + 1, day: first.getDate() });
+  const period = { kind: 'custom', fromDay: dayKey, toDay: dayKey } as const;
+  const bounds = periodBounds(period, Date.now())!;
+  const expected = Array.from({ length: 30 }, (_, n) => n)
+    .filter(n => n % 7 !== 6)
+    .filter(n => start - n * 3600 >= bounds.fromTs && start - n * 3600 <= bounds.toTs)
+    .map(n => `home/feed/demo-post-${n}`);
+  filtersStore.getState().setPeriod('feed', period);
+  try {
+    const root = await renderApp();
+    const cards = root.container
+      .queryAll(n => n.props.focusable === true)
+      .map(n => n.props.testID as string)
+      .filter(id => id.startsWith('home/feed/demo-post-'));
+    expect(expected.length).toBeGreaterThan(0);
+    expect(expected.length).toBeLessThan(26);
+    expect(cards).toEqual(expected);
+    await act(async () => {
+      root.unmount();
+    });
+  } finally {
+    filtersStore.getState().clear();
+  }
 });
 
 test('Story 2.8: demo expiry → A11 → A2 → A5 → sign-in with another id: the demo hook wipes the stores; the keychain is never touched', async () => {

@@ -1,63 +1,224 @@
-import { useEffect, useRef } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { BackHandler, StyleSheet, View } from 'react-native';
 import { t } from '../i18n';
-import { SettingRow, SideSheet, Text, requestHostFocus, spacing, type HostView } from '../ui';
-import { ACCESS_VALUES, isDefaultFilter, type AccessFilter, type FilterScope } from './filter';
+import { SettingRow, SideSheet, Text, spacing, type HostView } from '../ui';
+import {
+  ACCESS_VALUES,
+  PERIOD_PRESET_DAYS,
+  addDays,
+  calendarDayOf,
+  formatDayKey,
+  isDefaultFilter,
+  parseDayKey,
+  type AccessFilter,
+  type CalendarDay,
+  type FilterScope,
+  type Period,
+  type PeriodPresetDays,
+} from './filter';
 import { filtersStore, useFilter } from './filtersStore';
+import { focusSoon } from './focusSoon';
+import { formatPeriod } from './periodLabel';
+import { PeriodStepper } from './PeriodStepper';
 
-/** Focus ids (docs/focus-map.md §1.5, D8). */
+/** Focus ids (docs/focus-map.md §1.5, D8–D10). */
 export const FILTERS_SHEET_ID = 'filters/sheet';
 export const FILTERS_RESET_ID = 'filters/reset';
+export const FILTERS_PERIOD_ID = 'filters/period';
+export const PERIOD_LIST_ID = 'filters/period/list';
+export const PERIOD_ALL_ID = 'filters/period/all';
+export const PERIOD_CUSTOM_ID = 'filters/period/custom';
 export const filterAccessId = (access: AccessFilter) => `filters/access/${access}`;
+export const periodPresetId = (days: PeriodPresetDays) => `filters/period/${days}d`;
 
-/** Focus a view now and again two frames later (the modal host's device lesson). */
-function focusSoon(view: () => HostView | null): () => void {
-  requestHostFocus(view());
-  let frame = requestAnimationFrame(() => {
-    frame = requestAnimationFrame(() => requestHostFocus(view()));
-  });
-  return () => cancelAnimationFrame(frame);
-}
+/** The stepper's default range when no custom range is active: today − 30 → today. */
+export const CUSTOM_DEFAULT_SPAN_DAYS = 30;
 
 export type FilterSheetProps = {
   /** Whose Filter the sheet edits (Story 5.3: `feed`). */
   scope: FilterScope;
 };
 
+type Level = 'sheet' | 'period' | 'custom';
+
+/** The list row of a period (its focus id). */
+function periodRowId(period: Period): string {
+  switch (period.kind) {
+    case 'all':
+      return PERIOD_ALL_ID;
+    case 'preset':
+      return periodPresetId(period.days);
+    case 'custom':
+      return PERIOD_CUSTOM_ID;
+  }
+}
+
+/** The stepper's opening range: the active custom range, else today − 30 → today. */
+function stepperRange(period: Period, today: CalendarDay): { from: CalendarDay; to: CalendarDay } {
+  if (period.kind === 'custom') {
+    const from = parseDayKey(period.fromDay);
+    const to = parseDayKey(period.toDay);
+    if (from && to) {
+      return { from, to };
+    }
+  }
+  return { from: addDays(today, -CUSTOM_DEFAULT_SPAN_DAYS), to: today };
+}
+
 /**
- * The filter SideSheet (Story 5.3, FILTER-01, EXPERIENCE.md «FilterChip →
- * filter SideSheet»): 320 dp, opened through the one modal host with
- * `placement: 'end'` (focus trapped, ← → do nothing, Back closes it and
- * focus returns to the chip). One column: the «Доступ» values as radio
- * rows, then «Сбросить» while the Filter is not the default.
+ * The filter SideSheet (Stories 5.3–5.4, FILTER-01/02, EXPERIENCE.md
+ * «FilterChip → filter SideSheet»): 320 dp, opened through the one modal
+ * host with `placement: 'end'` (focus trapped, ← → do nothing, Back closes
+ * it and focus returns to the chip). Three levels:
  *
- * - Opens with focus on the selected access value.
- * - OK on a value applies it at once (no Apply button): the store changes,
- *   the list behind refetches; focus stays on that row.
- * - OK on «Сбросить» resets the scope; the row goes away and focus moves to
- *   «Доступные мне».
+ * - **sheet (D8):** the «Доступ» values as radio rows, the «Период» row
+ *   (its value: the current period), then «Сбросить» while the Filter is
+ *   not the default. Opens with focus on the selected access value. OK on
+ *   a value applies it at once (no Apply button), focus stays; OK on
+ *   «Сбросить» resets access and period, the row goes and focus moves to
+ *   «Доступные мне». OK on «Период» → the list.
+ * - **period (D9):** «За всё время», the three presets (radio) and «Свой
+ *   период…» (nav; its value is the active custom range). Opens on the
+ *   current period. A preset applies at once and returns to the sheet with
+ *   focus on «Период»; «Свой период…» → the stepper.
+ * - **custom (D10):** `PeriodStepper`; «Готово» applies the range and
+ *   returns to the sheet on «Период».
  *
- * It reads the Filter from `filtersStore` itself: the modal host renders
- * this element once, the Filter changes under it.
+ * Back closes the deepest level first (this sheet's own BackHandler
+ * listener, newer than the modal host's): stepper → list (on «Свой
+ * период…», edits discarded), list → sheet (on «Период»), sheet → the host
+ * closes it. It reads the Filter from `filtersStore` itself: the modal host
+ * renders this element once, the Filter changes under it.
  */
 export function FilterSheet({ scope }: FilterSheetProps) {
   const filter = useFilter(scope);
   const showReset = !isDefaultFilter(filter);
-  const rows = useRef(new Map<AccessFilter, HostView | null>());
-  const selectedAtOpen = useRef(filter.access);
+  const [level, setLevel] = useState<Level>('sheet');
+  const levelRef = useRef(level);
+  levelRef.current = level;
+  /** Every row's host view, by focus id. */
+  const rows = useRef(new Map<string, HostView | null>());
+  const rowRef = (id: string) => (view: HostView | null) => {
+    rows.current.set(id, view);
+  };
+  /**
+   * The row the current level focuses (set before the level changes): on
+   * open the selected access value, on a return the row that led away.
+   */
+  const levelFocus = useRef(filterAccessId(filter.access));
   /** «Сбросить» was pressed: its row goes away, focus → «Доступные мне». */
   const focusAfterReset = useRef(false);
+  /** Today's date for the stepper, read when it opens (never stored in the Filter). */
+  const [today, setToday] = useState<CalendarDay | null>(null);
 
-  // Initial focus: the selected value.
-  useEffect(() => focusSoon(() => rows.current.get(selectedAtOpen.current) ?? null), []);
+  const goTo = (next: Level, focusId: string) => {
+    levelFocus.current = focusId;
+    setLevel(next);
+  };
+  const toSheetOnPeriod = () => goTo('sheet', FILTERS_PERIOD_ID);
+  const goToRef = useRef(goTo);
+  goToRef.current = goTo;
+
+  // The deeper levels are Back layers of their own.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      switch (levelRef.current) {
+        case 'custom':
+          goToRef.current('period', PERIOD_CUSTOM_ID);
+          return true;
+        case 'period':
+          goToRef.current('sheet', FILTERS_PERIOD_ID);
+          return true;
+        case 'sheet':
+          // The modal host closes the sheet.
+          return false;
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
+  // Each level's focus. The stepper focuses its own first field.
+  useEffect(() => {
+    if (level === 'custom') {
+      return undefined;
+    }
+    return focusSoon(() => rows.current.get(levelFocus.current) ?? null);
+  }, [level]);
 
   useEffect(() => {
     if (!showReset && focusAfterReset.current) {
       focusAfterReset.current = false;
-      return focusSoon(() => rows.current.get('allowed') ?? null);
+      return focusSoon(() => rows.current.get(filterAccessId('allowed')) ?? null);
     }
     return undefined;
   }, [showReset]);
+
+  const pickPeriod = (period: Period) => {
+    filtersStore.getState().setPeriod(scope, period);
+    toSheetOnPeriod();
+  };
+
+  if (level === 'period') {
+    const currentId = periodRowId(filter.period);
+    const custom = filter.period.kind === 'custom';
+    return (
+      <SideSheet testID={PERIOD_LIST_ID} variant="filters" title={t('filters.period.title')}>
+        <View accessibilityRole="radiogroup" style={styles.rows}>
+          <SettingRow
+            ref={rowRef(PERIOD_ALL_ID)}
+            testID={PERIOD_ALL_ID}
+            kind="radio"
+            selected={filter.period.kind === 'all'}
+            label={t('filters.period.all')}
+            hasTVPreferredFocus={levelFocus.current === PERIOD_ALL_ID}
+            onPress={() => pickPeriod({ kind: 'all' })}
+          />
+          {PERIOD_PRESET_DAYS.map(days => {
+            const id = periodPresetId(days);
+            return (
+              <SettingRow
+                key={id}
+                ref={rowRef(id)}
+                testID={id}
+                kind="radio"
+                selected={currentId === id}
+                label={t(`filters.period.preset.d${days}`)}
+                hasTVPreferredFocus={levelFocus.current === id}
+                onPress={() => pickPeriod({ kind: 'preset', days })}
+              />
+            );
+          })}
+          <SettingRow
+            ref={rowRef(PERIOD_CUSTOM_ID)}
+            testID={PERIOD_CUSTOM_ID}
+            kind="nav"
+            label={t('filters.period.custom')}
+            value={custom ? formatPeriod(filter.period) : undefined}
+            valueLines={2}
+            hasTVPreferredFocus={levelFocus.current === PERIOD_CUSTOM_ID}
+            onPress={() => {
+              setToday(calendarDayOf(Date.now()));
+              goTo('custom', PERIOD_CUSTOM_ID);
+            }}
+          />
+        </View>
+      </SideSheet>
+    );
+  }
+
+  if (level === 'custom' && today !== null) {
+    const range = stepperRange(filter.period, today);
+    return (
+      <PeriodStepper
+        initialFrom={range.from}
+        initialTo={range.to}
+        today={today}
+        onDone={(from, to) =>
+          pickPeriod({ kind: 'custom', fromDay: formatDayKey(from), toDay: formatDayKey(to) })
+        }
+      />
+    );
+  }
 
   return (
     <SideSheet testID={FILTERS_SHEET_ID} variant="filters" title={t('filters.title')}>
@@ -66,22 +227,32 @@ export function FilterSheet({ scope }: FilterSheetProps) {
       </Text>
       <View accessibilityRole="radiogroup" style={styles.rows}>
         {ACCESS_VALUES.map(access => {
-          const selected = access === filter.access;
+          const id = filterAccessId(access);
           return (
             <SettingRow
               key={access}
-              ref={view => {
-                rows.current.set(access, view);
-              }}
-              testID={filterAccessId(access)}
+              ref={rowRef(id)}
+              testID={id}
               kind="radio"
-              selected={selected}
+              selected={access === filter.access}
               label={t(`filters.access.${access}`)}
-              hasTVPreferredFocus={access === selectedAtOpen.current}
+              hasTVPreferredFocus={levelFocus.current === id}
               onPress={() => filtersStore.getState().setAccess(scope, access)}
             />
           );
         })}
+      </View>
+      <View style={styles.period}>
+        <SettingRow
+          ref={rowRef(FILTERS_PERIOD_ID)}
+          testID={FILTERS_PERIOD_ID}
+          kind="nav"
+          label={t('filters.period.title')}
+          value={formatPeriod(filter.period)}
+          valueLines={2}
+          hasTVPreferredFocus={levelFocus.current === FILTERS_PERIOD_ID}
+          onPress={() => goTo('period', periodRowId(filter.period))}
+        />
       </View>
       {showReset ? (
         <View style={styles.reset}>
@@ -106,6 +277,9 @@ const styles = StyleSheet.create({
   },
   rows: {
     gap: spacing['3'],
+  },
+  period: {
+    marginTop: spacing['6'],
   },
   reset: {
     marginTop: spacing['8'],

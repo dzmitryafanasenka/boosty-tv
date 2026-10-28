@@ -32,6 +32,7 @@ import { t, tf, tp } from '../src/shared/i18n';
 import { requestHostFocus } from '../src/shared/ui/requestHostFocus';
 import type { Root } from 'test-renderer';
 import backHandler from '../src/test/backHandlerMock';
+import { tvEvents } from '../src/test/tvEventMock';
 import {
   E5_PATH,
   cursorFor,
@@ -2624,13 +2625,14 @@ describe('Story 5.3: filter the feed by access', () => {
 
     const sheet = await openSheet();
     expect(text(byTestId(sheet, SHEET)[0])).toContain(t('filters.title'));
-    // The three values, no «Сбросить» (the default); the sheet is the only
-    // focusable content in the modal (the host's trap holds it).
+    // The three values and «Период» (Story 5.4), no «Сбросить» (the
+    // default); the sheet is the only focusable content in the modal (the
+    // host's trap holds it).
     expect(
       byTestId(sheet, 'modal/content')[0]
         .queryAll(n => n.props.focusable === true)
         .map(n => n.props.testID),
-    ).toEqual([ALLOWED, ALL, BOUGHT]);
+    ).toEqual([ALLOWED, ALL, BOUGHT, 'filters/period']);
     expect(focusTargets()).toContain(ALLOWED);
     expect(one(sheet, ALLOWED).props.accessibilityState).toEqual(
       expect.objectContaining({ selected: true }),
@@ -2728,7 +2730,7 @@ describe('Story 5.3: filter the feed by access', () => {
     expect(visible(root, SHEET)).toBe(false);
     expect(lastFocusTarget()).toBe(CHIP);
     // The Filter stays (no Apply button).
-    expect(getFilter('feed')).toEqual({ access: 'all' });
+    expect(getFilter('feed')).toEqual({ access: 'all', period: { kind: 'all' } });
     await focusOn(root, CHIP);
     await back();
     expect(lastFocusTarget()).toBe('nav/home');
@@ -2803,7 +2805,7 @@ describe('Story 5.3: filter the feed by access', () => {
     const root = await openSheet();
     await press(root, ALL);
     await back();
-    expect(getFilter('feed')).toEqual({ access: 'all' });
+    expect(getFilter('feed')).toEqual({ access: 'all', period: { kind: 'all' } });
     await press(root, 'nav/settings');
     await press(root, 'settings/row/signout');
     await press(root, 'dialog/signout/confirm');
@@ -2970,6 +2972,337 @@ describe('Story 5.3: filter the feed by access', () => {
     expect(byTestId(root, CHIP)).toHaveLength(0);
     expect(cardIds(root)[0]).toBe(firstCard());
     expect(feedCalls()).toHaveLength(1);
+    await unmount(root);
+  });
+});
+
+describe('Story 5.4: filter by period', () => {
+  const CHIP = 'home/filters';
+  const SHEET = 'filters/sheet';
+  const LIST = 'filters/period/list';
+  const STEPPER = 'filters/period/stepper';
+  const PERIOD = 'filters/period';
+  const ALL_TIME_ROW = 'filters/period/all';
+  const WEEK = 'filters/period/7d';
+  const CUSTOM = 'filters/period/custom';
+  const DONE = 'filters/period/custom/done';
+  const RESET = 'filters/reset';
+  const field = (group: 'from' | 'to', name: 'day' | 'month' | 'year') =>
+    `filters/period/custom/${group}/${name}`;
+  /** 28 Oct 2026, 14:30 local. */
+  const NOW = new Date(2026, 9, 28, 14, 30).getTime();
+  const sec = (y: number, m: number, d: number, h = 0, min = 0, s2 = 0) =>
+    Math.floor(new Date(y, m - 1, d, h, min, s2).getTime() / 1000);
+  const paramOf = (url: string, name: string) => {
+    const match = new RegExp(`[?&]${name}=([^&]*)`).exec(url);
+    return match ? Number(match[1]) : null;
+  };
+  const emptyPage = (): FixtureReply => ({
+    status: 200,
+    body: { data: { posts: [], blogs: [], counters: {} }, extra: { isLast: true } },
+  });
+  /** The E5 answer for a request with period params (the test may replace it). */
+  let periodReply: () => Reply;
+
+  beforeEach(() => {
+    jest.setSystemTime(NOW);
+    tvEvents.reset();
+    periodReply = () => ({ status: 200, body: e5Page() });
+    feed = req => (paramOf(req.url, 'from_ts') === null ? { status: 200, body: e5Page() } : periodReply());
+  });
+
+  /** Главная loaded, OK on «Фильтры» → the sheet. */
+  async function openSheet() {
+    const root = await renderApp();
+    await focusOn(root, `home/feed/${e5Posts()[0].id}`);
+    await focusOn(root, CHIP);
+    await press(root, CHIP);
+    expect(visible(root, SHEET)).toBe(true);
+    return root;
+  }
+
+  /** The sheet open, OK on «Период» → the list. */
+  async function openList() {
+    const root = await openSheet();
+    focusMock.mockClear();
+    await press(root, PERIOD);
+    expect(visible(root, LIST)).toBe(true);
+    return root;
+  }
+
+  /** The list open, OK on «Свой период…» → the stepper. */
+  async function openStepper() {
+    const root = await openList();
+    focusMock.mockClear();
+    await press(root, CUSTOM);
+    expect(visible(root, STEPPER)).toBe(true);
+    return root;
+  }
+
+  /** `n` raw ↑ (+) or ↓ (−) key ups on the focused field. */
+  async function step(n: number) {
+    for (let i = 0; i < Math.abs(n); i += 1) {
+      await act(async () => {
+        tvEvents.emit({ eventType: n > 0 ? 'up' : 'down', eventKeyAction: 1 });
+      });
+    }
+  }
+
+  /** Focus a field from inside the fields, past the entry guard. */
+  async function onField(root: Root, id: string) {
+    await focusOn(root, id);
+    jest.setSystemTime(Date.now() + 600);
+  }
+
+  const valueOf = (root: Root, id: string) =>
+    text(byTestId(root, `${id}/value`)[0]).match(/"children":\["([^"]+)"\]/)?.[1];
+
+  it('the sheet: «Период» under «Доступ» with the current period; OK → the list on the current period', async () => {
+    const root = await openSheet();
+    expect(one(root, PERIOD).props.accessibilityLabel).toBe(
+      `${t('filters.period.title')} ${t('filters.period.all')}`,
+    );
+    focusMock.mockClear();
+    await press(root, PERIOD);
+    expect(visible(root, SHEET)).toBe(false);
+    expect(text(byTestId(root, LIST)[0])).toContain(t('filters.period.title'));
+    expect(
+      byTestId(root, 'modal/content')[0]
+        .queryAll(n => n.props.focusable === true)
+        .map(n => n.props.testID),
+    ).toEqual([ALL_TIME_ROW, WEEK, 'filters/period/30d', 'filters/period/90d', CUSTOM]);
+    expect(lastFocusTarget()).toBe(ALL_TIME_ROW);
+    expect(one(root, ALL_TIME_ROW).props.accessibilityState).toEqual(expect.objectContaining({ selected: true }));
+    // Opening the list sends nothing.
+    expect(feedCalls()).toHaveLength(1);
+    await unmount(root);
+  });
+
+  it('matrix «Preset»: «Последние 7 дней» → one E5 with from_ts = 00:00 of today − 6 and to_ts = today 23:59:59; back on «Период»; count 1', async () => {
+    const root = await openList();
+    focusMock.mockClear();
+    await press(root, WEEK);
+    expect(feedCalls()).toHaveLength(2);
+    const url = feedCalls()[1].url;
+    expect(paramOf(url, 'from_ts')).toBe(sec(2026, 10, 22));
+    expect(paramOf(url, 'to_ts')).toBe(sec(2026, 10, 28, 23, 59, 59));
+    expect(url).toContain('only_allowed=true&only_bought=false&from_ts=');
+    expect(cursorOf(url)).toBeNull();
+    // Back on the sheet, focus on «Период» with its new value.
+    expect(visible(root, SHEET)).toBe(true);
+    expect(lastFocusTarget()).toBe(PERIOD);
+    expect(one(root, PERIOD).props.accessibilityLabel).toBe(
+      `${t('filters.period.title')} ${t('filters.period.preset.d7')}`,
+    );
+    expect(visible(root, RESET)).toBe(true);
+    // The chip: the one active section's value and the count.
+    const value = t('filters.period.preset.d7');
+    expect(text(one(root, CHIP))).toContain(tf('filters.chip', { value }));
+    expect(text(byTestId(root, `${CHIP}/count`)[0])).toContain('1');
+    expect(one(root, CHIP).props.accessibilityLabel).toBe(
+      tf('filters.chipA11yCount', { value, count: `1 ${tp('filters.activeCount', 1)}` }),
+    );
+    // Reopened, the list opens on «Последние 7 дней».
+    focusMock.mockClear();
+    await press(root, PERIOD);
+    expect(lastFocusTarget()).toBe(WEEK);
+    await unmount(root);
+  });
+
+  it('matrix «Preset», E5 fails: the error state behind; the sheet stays usable', async () => {
+    periodReply = () => ({ status: 403, body: {} });
+    const root = await openList();
+    await press(root, WEEK);
+    expect(visible(root, 'home/feed/error')).toBe(true);
+    expect(visible(root, SHEET)).toBe(true);
+    expect(lastFocusTarget()).toBe(PERIOD);
+    // The page took no focus out of the sheet.
+    expect(focusTargets()).not.toContain('state/home/action');
+    await back();
+    expect(visible(root, SHEET)).toBe(false);
+    expect(lastFocusTarget()).toBe(CHIP);
+    await unmount(root);
+  });
+
+  it('a period change never moves focus out of the sheet, even when the Shell last saw the sidebar (device: Story 5.4)', async () => {
+    const page = deferred();
+    periodReply = () => page.promise;
+    const root = await openList();
+    // Native focus fell back to the sidebar while the list unmounted.
+    focusMock.mockClear();
+    await press(root, WEEK);
+    await focusOn(root, 'nav/home');
+    page.resolve({ status: 200, body: e5Page() });
+    await settle();
+    // The sheet asked for «Период»; nothing on Главная asked for focus after it.
+    expect(focusTargets()).toContain(PERIOD);
+    expect(focusTargets().filter(id => id?.startsWith('home/') || id?.startsWith('nav/'))).toEqual([]);
+    expect(lastFocusTarget()).toBe(PERIOD);
+    await unmount(root);
+  });
+
+  it('matrix «Custom»: 1 авг 2026 – 25 сен 2026 through the stepper, «Готово» → E5 bounds 1 Aug 00:00:00 – 25 Sep 23:59:59 local', async () => {
+    const root = await openStepper();
+    // Opens on «С: день» with today − 30 → today.
+    expect(lastFocusTarget()).toBe(field('from', 'day'));
+    expect(valueOf(root, field('from', 'day'))).toBe('28');
+    expect(valueOf(root, field('from', 'month'))).toBe(t('date.month.sep'));
+    expect(valueOf(root, field('to', 'day'))).toBe('28');
+    expect(valueOf(root, field('to', 'month'))).toBe(t('date.month.oct'));
+    await onField(root, field('from', 'day'));
+    await step(-27);
+    await onField(root, field('from', 'month'));
+    await step(-1);
+    await onField(root, field('to', 'day'));
+    await step(-3);
+    await onField(root, field('to', 'month'));
+    await step(-1);
+    expect(text(byTestId(root, 'filters/period/custom/summary')[0])).toContain('1 августа 2026 — 25 сентября 2026');
+    // No request while stepping.
+    expect(feedCalls()).toHaveLength(1);
+    // OK on a field → «Готово».
+    focusMock.mockClear();
+    await press(root, field('to', 'month'));
+    expect(lastFocusTarget()).toBe(DONE);
+    focusMock.mockClear();
+    await press(root, DONE);
+    expect(feedCalls()).toHaveLength(2);
+    const url = feedCalls()[1].url;
+    expect(paramOf(url, 'from_ts')).toBe(sec(2026, 8, 1));
+    expect(paramOf(url, 'to_ts')).toBe(sec(2026, 9, 25, 23, 59, 59));
+    expect(getFilter('feed').period).toEqual({ kind: 'custom', fromDay: '2026-08-01', toDay: '2026-09-25' });
+    expect(visible(root, SHEET)).toBe(true);
+    expect(lastFocusTarget()).toBe(PERIOD);
+    expect(text(one(root, PERIOD))).toContain('1 августа 2026 — 25 сентября 2026');
+    // The list: «Свой период…» selected with the range; the stepper reopens on it.
+    focusMock.mockClear();
+    await press(root, PERIOD);
+    expect(lastFocusTarget()).toBe(CUSTOM);
+    expect(one(root, CUSTOM).props.accessibilityLabel).toBe(
+      `${t('filters.period.custom')} 1 августа 2026 — 25 сентября 2026`,
+    );
+    await press(root, CUSTOM);
+    expect(valueOf(root, field('from', 'day'))).toBe('1');
+    expect(valueOf(root, field('to', 'month'))).toBe(t('date.month.sep'));
+    await unmount(root);
+  });
+
+  it('matrix «Invalid»: from after to → «Готово» disabled + hint; no request', async () => {
+    const root = await openStepper();
+    await onField(root, field('from', 'month'));
+    await step(1);
+    // 28 Oct — 28 Oct is valid; one more day is not.
+    await onField(root, field('from', 'day'));
+    await step(1);
+    // The day stops at today: 28 Oct is the last reachable date.
+    expect(valueOf(root, field('from', 'day'))).toBe('28');
+    await onField(root, field('to', 'day'));
+    await step(-1);
+    expect(text(root)).toContain(t('filters.period.invalid'));
+    const done = byTestId(root, DONE).filter(n => typeof n.props.onFocus === 'function');
+    expect(done[0].props.accessibilityState).toEqual(expect.objectContaining({ disabled: true }));
+    expect(done[0].props.focusable).toBe(false);
+    // OK on a field does nothing; nothing is sent.
+    focusMock.mockClear();
+    await press(root, field('to', 'day'));
+    expect(focusTargets()).toEqual([]);
+    expect(feedCalls()).toHaveLength(1);
+    expect(getFilter('feed')).toEqual(DEFAULT_FILTER);
+    await unmount(root);
+  });
+
+  it('matrix «Day clamp»: 31 + the month → февраль → 28', async () => {
+    const root = await openStepper();
+    await onField(root, field('from', 'month'));
+    await step(-1);
+    await onField(root, field('from', 'day'));
+    await step(3);
+    expect(valueOf(root, field('from', 'day'))).toBe('31');
+    await onField(root, field('from', 'month'));
+    await step(-6);
+    expect(valueOf(root, field('from', 'month'))).toBe(t('date.month.feb'));
+    expect(valueOf(root, field('from', 'day'))).toBe('28');
+    await unmount(root);
+  });
+
+  it('matrix «Back»: stepper → list on «Свой период…» (edits discarded), list → sheet on «Период», sheet → the chip', async () => {
+    const root = await openStepper();
+    await onField(root, field('from', 'day'));
+    await step(-5);
+    focusMock.mockClear();
+    await back();
+    expect(visible(root, LIST)).toBe(true);
+    expect(lastFocusTarget()).toBe(CUSTOM);
+    expect(getFilter('feed')).toEqual(DEFAULT_FILTER);
+    expect(feedCalls()).toHaveLength(1);
+    // The edits are gone: the stepper opens on today − 30 again.
+    await press(root, CUSTOM);
+    expect(valueOf(root, field('from', 'day'))).toBe('28');
+    await back();
+    focusMock.mockClear();
+    await back();
+    expect(visible(root, SHEET)).toBe(true);
+    expect(lastFocusTarget()).toBe(PERIOD);
+    await back();
+    expect(visible(root, SHEET)).toBe(false);
+    expect(lastFocusTarget()).toBe(CHIP);
+    await unmount(root);
+  });
+
+  it('matrix «Two sections»: «Все посты» + 7 days → chip «Фильтры» + 2; «Сбросить» resets both', async () => {
+    const root = await openSheet();
+    await press(root, 'filters/access/all');
+    await press(root, PERIOD);
+    await press(root, WEEK);
+    const url = feedCalls()[feedCalls().length - 1].url;
+    expect(url).toContain('only_allowed=false&only_bought=false&from_ts=');
+    expect(text(one(root, CHIP))).toContain(t('filters.title'));
+    expect(text(one(root, CHIP))).not.toContain('·');
+    expect(text(byTestId(root, `${CHIP}/count`)[0])).toContain('2');
+    expect(one(root, CHIP).props.accessibilityLabel).toBe(
+      tf('filters.chipA11yMany', { count: `2 ${tp('filters.activeCount', 2)}` }),
+    );
+    focusMock.mockClear();
+    await press(root, RESET);
+    expect(getFilter('feed')).toEqual(DEFAULT_FILTER);
+    expect(lastFocusTarget()).toBe('filters/access/allowed');
+    expect(one(root, PERIOD).props.accessibilityLabel).toBe(
+      `${t('filters.period.title')} ${t('filters.period.all')}`,
+    );
+    expect(byTestId(root, `${CHIP}/count`)).toHaveLength(0);
+    await unmount(root);
+  });
+
+  it('matrix «Key stability»: the same preset as the clock moves keeps one query key (no time in it)', async () => {
+    const root = await openList();
+    await press(root, WEEK);
+    const keys = () =>
+      queryClient
+        .getQueryCache()
+        .findAll({ queryKey: queryKeys.allSubscriptionFeeds() })
+        .map(q => JSON.stringify(q.queryKey));
+    const before = keys();
+    expect(before).toContain(
+      JSON.stringify(queryKeys.subscriptionFeed({ access: 'allowed', period: { kind: 'preset', days: 7 } })),
+    );
+    jest.setSystemTime(NOW + 30 * 60 * 1000);
+    // A re-render (the list again, the same preset again: a no-op).
+    await press(root, PERIOD);
+    await press(root, WEEK);
+    expect(keys()).toEqual(before);
+    expect(feedCalls()).toHaveLength(2);
+    await unmount(root);
+  });
+
+  it('a filtered empty period: «Ничего не найдено» + «Сбросить фильтры» → the default', async () => {
+    periodReply = emptyPage;
+    const root = await openList();
+    await press(root, WEEK);
+    await back();
+    expect(visible(root, 'home/feed/filtered-empty')).toBe(true);
+    await focusOn(root, 'state/home/action');
+    await press(root, 'state/home/action');
+    expect(getFilter('feed')).toEqual(DEFAULT_FILTER);
     await unmount(root);
   });
 });

@@ -1,11 +1,20 @@
 import { createStore, useStore } from 'zustand';
 import { defineAccountScoped } from '../account/defineAccountScoped';
-import { DEFAULT_FILTER, type AccessFilter, type Filter, type FilterScope } from './filter';
+import {
+  DEFAULT_FILTER,
+  periodEquals,
+  type AccessFilter,
+  type Filter,
+  type FilterScope,
+  type Period,
+} from './filter';
 
 type FiltersState = {
   /** One Filter per scope; a missing scope is the default Filter. */
   readonly filters: Readonly<Partial<Record<FilterScope, Filter>>>;
   setAccess(scope: FilterScope, access: AccessFilter): void;
+  /** The scope's period (Story 5.4); the same period changes nothing. */
+  setPeriod(scope: FilterScope, period: Period): void;
   /** Back to the default Filter for that scope. */
   reset(scope: FilterScope): void;
   /** Every scope back to the default (AccountScope). */
@@ -13,7 +22,7 @@ type FiltersState = {
 };
 
 /**
- * The one filters store (AD-18, Story 5.3): a Filter per scope, in memory
+ * The one filters store (AD-18, Stories 5.3–5.4): a Filter per scope, in memory
  * only (never persisted across a restart) and account-scoped: wiped on
  * sign-out and account switch (`filtersAccountStore`), kept across a
  * same-account re-login. Zustand (ARCHITECTURE-SPINE) because the filter
@@ -28,6 +37,14 @@ export const filtersStore = createStore<FiltersState>()(set => ({
         return state;
       }
       return { filters: { ...state.filters, [scope]: { ...current, access } } };
+    }),
+  setPeriod: (scope, period) =>
+    set(state => {
+      const current = state.filters[scope] ?? DEFAULT_FILTER;
+      if (periodEquals(current.period, period)) {
+        return state;
+      }
+      return { filters: { ...state.filters, [scope]: { ...current, period } } };
     }),
   reset: scope =>
     set(state => {

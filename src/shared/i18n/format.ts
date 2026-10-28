@@ -6,7 +6,8 @@ import { t, tf } from './index';
  * local time zone (`Date` getters).
  */
 
-const MONTH_KEYS = [
+/** Catalog keys of the months, January first (`date.month.*`, `date.monthGenitive.*`). */
+export const MONTH_KEYS = [
   'jan',
   'feb',
   'mar',
