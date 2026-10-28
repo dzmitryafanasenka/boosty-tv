@@ -53,6 +53,13 @@ export type PlayerEngineProps = {
    * (`reportBandwidth`).
    */
   onResolution?: (heightPx: number) => void;
+  /**
+   * Story 4.6: another app took audio focus (a full or a transient loss).
+   * The Android adapter reads react-native-video's `onAudioFocusChanged`
+   * (`hasAudioFocus: false`); react-native-video has already paused natively
+   * on a full loss, the player pauses its own state for every loss.
+   */
+  onAudioFocusLost?: () => void;
   ref?: Ref<PlayerEngineHandle>;
 };
 

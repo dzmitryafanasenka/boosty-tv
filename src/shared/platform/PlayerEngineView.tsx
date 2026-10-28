@@ -1,6 +1,7 @@
 import { useImperativeHandle, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import Video, {
+  type OnAudioFocusChangedData,
   type OnBandwidthUpdateData,
   type OnBufferData,
   type OnLoadData,
@@ -51,6 +52,7 @@ export function PlayerEngineView({
   onEnd,
   onError,
   onResolution,
+  onAudioFocusLost,
   ref,
 }: PlayerEngineProps) {
   const video = useRef<VideoRef>(null);
@@ -101,6 +103,11 @@ export function PlayerEngineView({
       onBuffer={(e: OnBufferData) => onBuffering?.(e.isBuffering)}
       onSeek={(e: OnSeekData) => onSeekDone?.(wholeSeconds(e.currentTime))}
       onEnd={() => onEnd?.()}
+      onAudioFocusChanged={(e: OnAudioFocusChangedData) => {
+        if (!e.hasAudioFocus) {
+          onAudioFocusLost?.();
+        }
+      }}
       onError={(e: OnVideoErrorData) => {
         const code = e.error?.errorCode ?? (e.error?.code !== undefined ? String(e.error.code) : null);
         onError?.(code !== null && SHORT_CODE.test(code) ? code : null);
