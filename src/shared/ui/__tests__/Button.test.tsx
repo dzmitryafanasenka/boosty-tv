@@ -205,7 +205,9 @@ describe('Button', () => {
   });
 
   it('secondary kind uses the secondary surfaces', async () => {
-    const root = await render(<Button testID={ID} label="A" kind="secondary" />);
+    const root = await render(
+      <Button testID={ID} label="A" kind="secondary" />,
+    );
     expect(surfaceBackground(root)).toBe(colors['surface-raised']);
     await act(async () => {
       host(root).props.onFocus(evt);
@@ -280,5 +282,80 @@ describe('reduced motion', () => {
       expect.anything(),
       expect.objectContaining({ toValue: focus['scale-button'] }),
     );
+  });
+
+  it('busyLabel (Story 5.1): the busy label instead of the spinner; both labels keep their place; OK ignored', async () => {
+    const onPress = jest.fn();
+    const root = await render(
+      <Button
+        testID={ID}
+        label="Обновить"
+        busyLabel="Обновляем…"
+        accessibilityLabel="Обновить ленту"
+        onPress={onPress}
+      />,
+    );
+    const textNode = (value: string) =>
+      root.container.queryAll(
+        n =>
+          (n.type === 'RCTText' || n.type === 'Text') &&
+          n.children.includes(value),
+      )[0];
+    expect(host(root).props.accessibilityLabel).toBe('Обновить ленту');
+    expect(
+      StyleSheet.flatten(textNode('Обновить').props.style).opacity,
+    ).toBeUndefined();
+    expect(StyleSheet.flatten(textNode('Обновляем…').props.style).opacity).toBe(
+      0,
+    );
+
+    await act(async () => {
+      root.render(
+        <Button
+          testID={ID}
+          label="Обновить"
+          busyLabel="Обновляем…"
+          accessibilityLabel="Обновить ленту"
+          busy
+          onPress={onPress}
+        />,
+      );
+    });
+    expect(byId(root, `${ID}/spinner`)).toHaveLength(0);
+    expect(host(root).props.accessibilityLabel).toBe('Обновляем…');
+    expect(host(root).props.focusable).toBe(true);
+    expect(StyleSheet.flatten(textNode('Обновить').props.style).opacity).toBe(
+      0,
+    );
+    expect(
+      StyleSheet.flatten(textNode('Обновляем…').props.style).opacity,
+    ).toBeUndefined();
+    await act(async () => {
+      host(root).props.onClick({ ...evt, currentTarget: 1, target: 1 });
+    });
+    expect(onPress).not.toHaveBeenCalled();
+  });
+
+  it('focusable={false}: not focusable, drawn as enabled', async () => {
+    const root = await render(
+      <Button testID={ID} label="A" kind="secondary" focusable={false} />,
+    );
+    expect(host(root).props.focusable).toBe(false);
+    expect(surfaceBackground(root)).toBe(colors['surface-raised']);
+  });
+
+  it('busyAccessibilityLabel: read while busy; the visible busy label unchanged', async () => {
+    const root = await render(
+      <Button
+        testID={ID}
+        label="Обновить"
+        busyLabel="Обновляем…"
+        busyAccessibilityLabel="Обновляем ленту…"
+        accessibilityLabel="Обновить ленту"
+        busy
+      />,
+    );
+    expect(host(root).props.accessibilityLabel).toBe('Обновляем ленту…');
+    expect(byId(root, `${ID}/busy-label`)[0].children).toContain('Обновляем…');
   });
 });

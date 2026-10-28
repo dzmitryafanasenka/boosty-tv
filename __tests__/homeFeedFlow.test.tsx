@@ -9,10 +9,12 @@
  * docs/testing.md).
  */
 import { createAsyncStorage } from '@react-native-async-storage/async-storage';
-import { notifyManager } from '@tanstack/react-query';
+import { QueryClientProvider, notifyManager } from '@tanstack/react-query';
 import { act } from 'react';
 import { AppState, StyleSheet } from 'react-native';
 import App, { navigationRef } from '../src/app/App';
+import { HomeScreen, type HomeFocusInfo } from '../src/features/home';
+import type { HttpClient } from '../src/shared/api';
 import { QUERY_STALE_TIME_MS, queryClient, resetQueryCache } from '../src/app/queryClient';
 import { queryKeys } from '../src/shared/api';
 import {
@@ -39,6 +41,7 @@ import {
   lockedPost,
   syntheticFeed,
 } from '../src/test/feedFixtures';
+import { E2_PATH, e2Body } from '../src/test/subscriptionFixtures';
 import e1Ok from '../src/test/fixtures/boosty/e1-user-current.json';
 import e1Unauthorized from '../src/test/fixtures/boosty/e1-no-token.json';
 import refreshRejected from '../src/test/fixtures/boosty/refresh-invalid-grant.json';
@@ -1815,6 +1818,218 @@ describe('refresh on resume (spec-feed-refresh-on-resume, AD-7)', () => {
   });
 });
 
+describe('Story 5.1: «Обновить» in the feed title row', () => {
+  const REFRESH = 'home/refresh';
+  /** 30 synthetic posts; page 1 answered by `head` once set. */
+  let head: ((req: FixtureRequest) => Reply) | null;
+  function feedWithHead() {
+    const pages = syntheticFeed({ total: 30 });
+    head = null;
+    return (req: FixtureRequest): Reply =>
+      cursorOf(req.url) === null && head ? head(req) : pages(req);
+  }
+  const headPage = (posts: Record<string, unknown>[], next: number): FixtureReply => ({
+    status: 200,
+    body: { data: { posts, blogs: [], counters: {} }, extra: { offset: cursorFor(next), isLast: false } },
+  });
+  const newPost = (n: number) => feedPost(1000 + n, { id: `new-${n}`, title: `New ${n}` });
+  const e2Calls = () => transport.callsTo(E2_PATH);
+  const button = (root: Root) => one(root, REFRESH);
+
+  beforeEach(() => {
+    other = req => (req.path === E2_PATH ? { status: 200, body: e2Body() } : undefined);
+  });
+
+  /** The feed loaded, Подписки visited once (E2 cached), back on Главная on card `n`, then on «Обновить». */
+  async function onTheButton(n = 1) {
+    feed = feedWithHead();
+    const root = await renderApp();
+    await press(root, 'nav/subs');
+    expect(e2Calls()).toHaveLength(1);
+    await press(root, 'nav/home');
+    await focusOn(root, `home/feed/feed-post-${n}`);
+    await focusOn(root, REFRESH);
+    focusMock.mockClear();
+    lists.scrollToIndex.mockClear();
+    return root;
+  }
+
+  it('the title row: «Новое в подписках» + «Обновить» (secondary small, a11y «Обновить ленту»); ↑ from the feed guides to it', async () => {
+    const root = await renderApp();
+    expect(text(root)).toContain(t('home.feed.title'));
+    expect(button(root).props.accessibilityLabel).toBe(t('home.refreshA11y'));
+    expect(text(button(root))).toContain(t('home.refresh'));
+    expect(destinationIds('home/title-row')).toEqual([REFRESH]);
+    // Not on the button: the ↓ band is no guide (↑ from a card is not caught by it).
+    expect(destinationIds('home/refresh/down-guide')).toEqual([]);
+    await unmount(root);
+  });
+
+  it('press: one E5 page 1 + one E2; «Обновляем…» while it runs; new posts on top, pages kept; focus stays on the button; ↓ → the remembered card', async () => {
+    const root = await onTheButton(4);
+    // A second page loaded (focus in the last row), then back up to card 4.
+    await focusOn(root, 'home/feed/feed-post-8');
+    await focusOn(root, 'home/feed/feed-post-13');
+    await focusOn(root, 'home/feed/feed-post-4');
+    await focusOn(root, REFRESH);
+    const calls = feedCalls().length;
+    expect(calls).toBe(2);
+    const reply = deferred();
+    head = () => reply.promise;
+    await press(root, REFRESH);
+    expect(feedCalls()).toHaveLength(calls + 1);
+    expect(cursorOf(feedCalls()[calls].url)).toBeNull();
+    expect(button(root).props.accessibilityState).toEqual(expect.objectContaining({ busy: true }));
+    // The visible label «Обновляем…»; TalkBack hears «Обновляем ленту…».
+    expect(button(root).props.accessibilityLabel).toBe(t('home.refreshingA11y'));
+    expect(text(byTestId(root, `${REFRESH}/busy-label`)[0])).toContain(t('home.refreshing'));
+    expect(visible(root, `${REFRESH}/busy-label`)).toBe(true);
+    // OK again while it runs: nothing.
+    await press(root, REFRESH);
+    expect(feedCalls()).toHaveLength(calls + 1);
+
+    reply.resolve(headPage([newPost(0), newPost(1), ...Array.from({ length: 8 }, (_, i) => feedPost(i))], 8));
+    await settle();
+    expect(feedCalls()).toHaveLength(calls + 1);
+    expect(e2Calls()).toHaveLength(2);
+    const ids = gridPosts(root).map(p => p.id);
+    expect(ids.slice(0, 3)).toEqual(['new-0', 'new-1', 'feed-post-0']);
+    expect(ids).toContain('feed-post-18');
+    expect(button(root).props.accessibilityState).toEqual(expect.objectContaining({ busy: false }));
+    expect(button(root).props.accessibilityLabel).toBe(t('home.refreshA11y'));
+    expect(visible(root, `${REFRESH}/error`)).toBe(false);
+    // Focus stays on the button: the page requests no focus and no scroll.
+    expect(focusMock).not.toHaveBeenCalled();
+    expect(lists.scrollToIndex).not.toHaveBeenCalled();
+    // ↓ from the button: the remembered card (by id, now at index 6).
+    expect(destinationIds('home/refresh/down-guide')).toEqual(['home/feed/feed-post-4']);
+    expect(text(root)).not.toContain(t('home.feed.errorTitle'));
+    await unmount(root);
+  });
+
+  it('a gap (page 1 shares no post): the feed is page 1 alone; focus stays on the button; ↓ → the neighbour by index', async () => {
+    const root = await onTheButton(4);
+    head = () => headPage(Array.from({ length: 10 }, (_, i) => newPost(i)), 10);
+    await press(root, REFRESH);
+    expect(gridPosts(root).map(p => p.id)).toEqual(Array.from({ length: 9 }, (_, i) => `new-${i}`));
+    expect(focusMock).not.toHaveBeenCalled();
+    expect(destinationIds('home/refresh/down-guide')).toEqual(['home/feed/new-4']);
+    await unmount(root);
+  });
+
+  it('nothing remembered: ↓ from the button → the first card', async () => {
+    feed = feedWithHead();
+    const root = await renderApp();
+    // The page focused the first card itself; the user goes ↑ to the button.
+    await focusOn(root, REFRESH);
+    expect(destinationIds('home/refresh/down-guide')).toEqual(['home/feed/feed-post-0']);
+    await unmount(root);
+  });
+
+  it('a failure keeps every card and shows the inline error (never the full-screen error); the next press tries again', async () => {
+    const root = await onTheButton();
+    const before = gridPosts(root).map(p => p.id);
+    logger.clear();
+    head = () => ({ status: 500, body: {} });
+    await press(root, REFRESH, { settle: WITH_TIMERS });
+    expect(gridPosts(root).map(p => p.id)).toEqual(before);
+    expect(visible(root, `${REFRESH}/error`)).toBe(true);
+    expect(text(root)).toContain(t('home.refreshFailed'));
+    expect(text(root)).not.toContain(t('home.feed.errorTitle'));
+    expect(button(root).props.accessibilityState).toEqual(expect.objectContaining({ busy: false }));
+    expect(focusMock).not.toHaveBeenCalled();
+    expect(logger.entries()).toContainEqual(
+      expect.objectContaining({ scope: 'feed', message: 'manual refresh failed', fields: { kind: 'Server' } }),
+    );
+    // The next press: one more request; success clears the error.
+    const calls = feedCalls().length;
+    head = () => headPage([newPost(0), ...Array.from({ length: 9 }, (_, i) => feedPost(i))], 9);
+    await press(root, REFRESH);
+    expect(feedCalls()).toHaveLength(calls + 1);
+    expect(visible(root, `${REFRESH}/error`)).toBe(false);
+    expect(gridPosts(root)[0].id).toBe('new-0');
+    await unmount(root);
+  });
+
+  it('the inline error clears when the feed data changes (e.g. a later resume refresh)', async () => {
+    const root = await onTheButton();
+    head = () => ({ status: 500, body: {} });
+    await press(root, REFRESH, { settle: WITH_TIMERS });
+    expect(visible(root, `${REFRESH}/error`)).toBe(true);
+    jest.setSystemTime(Date.now() + 1_000);
+    await act(async () => {
+      queryClient.setQueryData(queryKeys.subscriptionFeed(), (data: any) => ({
+        ...data,
+        pages: [{ ...data.pages[0], posts: [...data.pages[0].posts] }, ...data.pages.slice(1)],
+      }));
+    });
+    await settle();
+    expect(visible(root, `${REFRESH}/error`)).toBe(false);
+    await unmount(root);
+  });
+
+  it('without the Continue row: ↑ from the first feed row → «Обновить» (the row guide); ↓ back → the remembered card', async () => {
+    const root = await onTheButton(2);
+    expect(visible(root, 'home/continue')).toBe(false);
+    await focusOn(root, 'home/feed/feed-post-1');
+    // ↑ from the first row: the title row (above the grid) guides to the button.
+    expect(destinationIds('home/title-row')).toEqual([REFRESH]);
+    expect(focusableIds(root, byTestId(root, 'home/title-row')[0])).toEqual([REFRESH]);
+    await focusOn(root, REFRESH);
+    expect(destinationIds('home/refresh/down-guide')).toEqual(['home/feed/feed-post-1']);
+    await unmount(root);
+  });
+
+  it('grid → offline while «Обновить» has focus: the offline «Повторить» takes focus', async () => {
+    // The feed cached by a first run, then Главная alone with a fake Shell.
+    const app = await renderApp();
+    await unmount(app);
+    let current: string | null = REFRESH;
+    const info: HomeFocusInfo = {
+      isActive: () => true,
+      current: () => current,
+      sectionItemId: 'nav/home',
+      focusSidebar: () => {},
+      onFocusChange: () => () => {},
+    };
+    const screen = (offline?: { retrying: boolean; onRetry: () => void }) => (
+      <QueryClientProvider client={queryClient}>
+        <HomeScreen http={{} as HttpClient} routeKey="shell" focus={info} offline={offline} />
+      </QueryClientProvider>
+    );
+    const root = await render(screen());
+    expect(byTestId(root, REFRESH).length).toBeGreaterThan(0);
+    current = REFRESH;
+    focusMock.mockClear();
+    await act(async () => {
+      root.render(screen({ retrying: false, onRetry: () => {} }));
+    });
+    await settle();
+    expect(lastFocusTarget()).toBe('home/offline/retry');
+    await unmount(root);
+  });
+
+  it('Back from the button → nav/home (a content zone item); the sidebar is not taken by the refresh', async () => {
+    const root = await onTheButton();
+    await back();
+    expect(lastFocusTarget()).toBe('nav/home');
+    await unmount(root);
+  });
+
+  it('an empty last page 1 while the button has focus: the empty StateView takes focus', async () => {
+    const root = await onTheButton();
+    head = () => ({
+      status: 200,
+      body: { data: { posts: [], blogs: [], counters: {} }, extra: { offset: cursorFor(0), isLast: true } },
+    });
+    await press(root, REFRESH);
+    expect(visible(root, 'home/feed/empty')).toBe(true);
+    expect(byTestId(root, REFRESH)).toHaveLength(0);
+    expect(lastFocusTarget()).toBe('state/home/action');
+    await unmount(root);
+  });
+});
+
 describe('Story 4.7: «Продолжить просмотр» on Главная', () => {
   const PREFIX = 'home/continue/';
   const BLOG = 'synthetic-blog-1';
@@ -2296,6 +2511,29 @@ describe('Story 4.7: «Продолжить просмотр» on Главная
     expect(byTestId(root, `${PREFIX}feed-video/preview`)[0].props.source).toEqual({
       uri: 'https://example.invalid/mem.jpg',
     });
+    await unmount(root);
+  });
+
+  it('Story 5.1: the title row sits under the row; on a Continue card it is no guide and «Обновить» is not focusable (↓ keeps the column)', async () => {
+    seed(1, 600, 1000);
+    seed(2, 600, 2000);
+    const root = await renderApp();
+    expect(lastFocusTarget()).toBe(card(1));
+    await focusOn(root, card(1));
+    // The title row is in the list header, under the Continue row.
+    const header = byTestId(root, 'home/header')[0];
+    expect(focusableIds(root, header)).not.toContain('home/refresh');
+    expect(byTestId(root, 'home/title-row').length).toBeGreaterThan(0);
+    expect(destinationIds('home/title-row')).toEqual([]);
+    expect(destinationIds('home/refresh/down-guide')).toEqual([]);
+    // ↓ to the first feed row (native), then ↑: the row guides to the button.
+    await focusOn(root, `home/feed/${e5Posts()[1].id}`);
+    expect(focusableIds(root, header)).toContain('home/refresh');
+    expect(destinationIds('home/title-row')).toEqual(['home/refresh']);
+    // On the button: ↓ → the remembered feed card; ↑ → the Continue row's remembered card.
+    await focusOn(root, 'home/refresh');
+    expect(destinationIds('home/refresh/down-guide')).toEqual([`home/feed/${e5Posts()[1].id}`]);
+    expect(destinationIds('home/continue/guide')).toEqual([card(1)]);
     await unmount(root);
   });
 });

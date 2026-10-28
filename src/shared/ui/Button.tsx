@@ -8,7 +8,7 @@ import {
 } from './FocusableSurface';
 import { Spinner } from './Spinner';
 import { Text } from './Text';
-import { colors, components, focus, rounded } from './tokens';
+import { colors, components, focus, rounded, typography } from './tokens';
 
 export type ButtonKind = 'primary' | 'secondary';
 export type ButtonSize = 'normal' | 'small';
@@ -21,6 +21,18 @@ export type ButtonProps = {
   size?: ButtonSize;
   /** Action in progress: spinner, focus kept, OK ignored. */
   busy?: boolean;
+  /**
+   * Shown instead of the spinner while `busy` (e.g. «Обновляем…», Story
+   * 5.1). The button keeps the wider of the two labels' widths, so the
+   * swap never changes its size.
+   */
+  busyLabel?: string;
+  /** Accessibility label when it differs from the visible one (default `label`). */
+  accessibilityLabel?: string;
+  /** Accessibility label while `busy` (default `busyLabel`, else as idle). */
+  busyAccessibilityLabel?: string;
+  /** See `FocusableSurface` `focusable` (default true). */
+  focusable?: boolean;
   disabled?: boolean;
   hasTVPreferredFocus?: boolean;
   testID?: string;
@@ -73,6 +85,10 @@ export function Button({
   kind = 'primary',
   size = 'normal',
   busy = false,
+  busyLabel,
+  accessibilityLabel,
+  busyAccessibilityLabel,
+  focusable,
   disabled = false,
   hasTVPreferredFocus,
   testID,
@@ -105,32 +121,60 @@ export function Button({
       radius={s.radius}
       scaleFocus={k.scaleFocus}
       disabled={disabled}
+      focusable={focusable}
       hasTVPreferredFocus={hasTVPreferredFocus}
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={
+        busy && (busyAccessibilityLabel ?? busyLabel) !== undefined
+          ? (busyAccessibilityLabel ?? busyLabel)
+          : (accessibilityLabel ?? label)
+      }
       accessibilityState={{ busy, disabled }}
       onPress={busy || disabled ? undefined : onPress}
       onFocus={onFocus}
       surfaceStyle={surfaceStyle}
     >
       {/* The label always keeps its place, so busy never changes the width. */}
-      <View>
-        <Text
-          variant={s.variant}
-          numberOfLines={1}
-          style={[{ color: textColor }, busy && styles.hidden]}
-        >
-          {label}
-        </Text>
-        {busy ? (
-          <View style={styles.spinnerSlot}>
-            <Spinner
-              color={textColor}
-              testID={testID ? `${testID}/spinner` : undefined}
-            />
-          </View>
-        ) : null}
-      </View>
+      {busyLabel !== undefined ? (
+        <View style={styles.labels}>
+          <Text
+            variant={s.variant}
+            numberOfLines={1}
+            style={[{ color: textColor }, busy && styles.hidden]}
+          >
+            {label}
+          </Text>
+          <Text
+            testID={testID ? `${testID}/busy-label` : undefined}
+            variant={s.variant}
+            numberOfLines={1}
+            style={[
+              { color: textColor, marginTop: -typography[s.variant].lineHeight },
+              !busy && styles.hidden,
+            ]}
+          >
+            {busyLabel}
+          </Text>
+        </View>
+      ) : (
+        <View>
+          <Text
+            variant={s.variant}
+            numberOfLines={1}
+            style={[{ color: textColor }, busy && styles.hidden]}
+          >
+            {label}
+          </Text>
+          {busy ? (
+            <View style={styles.spinnerSlot}>
+              <Spinner
+                color={textColor}
+                testID={testID ? `${testID}/spinner` : undefined}
+              />
+            </View>
+          ) : null}
+        </View>
+      )}
     </FocusableSurface>
   );
 }
@@ -141,6 +185,10 @@ const styles = StyleSheet.create({
   },
   hidden: {
     opacity: 0,
+  },
+  // Both labels stacked in one line's place: the wider one sets the width.
+  labels: {
+    alignItems: 'center',
   },
   spinnerSlot: {
     position: 'absolute',

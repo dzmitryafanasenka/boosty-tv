@@ -65,3 +65,53 @@ export function refreshFeedHead(
     FEED_HEAD_OPTIONS,
   );
 }
+
+/** One manual refresh at a time per client (its promise). */
+const manualRunning = new WeakMap<QueryClient, Promise<FeedRefreshResult>>();
+
+/**
+ * Главная's «Обновить» (Story 5.1, FR-16, FEED-03): a forced head refresh
+ * (`refreshPostsHead` with `force`: no staleness check, waits for a running
+ * page append, also while a page append has failed; one E5 page-1 request
+ * merged into the cached feed, loaded pages kept, never a refetch of the
+ * infinite query, ADR 0010), and an invalidation of exactly the
+ * subscriptions query (E2, refetched once when it is cached, even with no
+ * observer; not awaited). Single-flight: a call while one runs returns the
+ * same promise; a resume refresh already running is joined, not
+ * duplicated. The result is the feed's (`failed`: the cache stays, the kind
+ * is logged as `feed` / `manual refresh failed`); an E2 failure is the
+ * subscriptions query's own error, not this one's.
+ */
+export function manualRefreshFeed(
+  client: QueryClient,
+  http: HttpClient,
+  now: number,
+  logger: Logger = appLogger,
+): Promise<FeedRefreshResult> {
+  const running = manualRunning.get(client);
+  if (running) {
+    return running;
+  }
+  // E2 is not awaited: the button is busy for the feed only (the
+  // subscriptions query shows its own state); its errors are its own.
+  client
+    .invalidateQueries({ queryKey: queryKeys.subscriptions(), exact: true, refetchType: 'all' })
+    .catch(() => {});
+  const run = (async () => {
+    try {
+      return await refreshPostsHead(
+        client,
+        queryKeys.subscriptionFeed(),
+        () => PostRepository.feedPage(http, null),
+        now,
+        logger,
+        { scope: 'feed', message: 'manual refresh failed' },
+        { ...FEED_HEAD_OPTIONS, force: true },
+      );
+    } finally {
+      manualRunning.delete(client);
+    }
+  })();
+  manualRunning.set(client, run);
+  return run;
+}

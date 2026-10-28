@@ -6,4 +6,4 @@ export {
   type HomeScreenProps,
 } from './HomeScreen';
 export { FEED_RETRY_ID, feedCardId } from './FeedGrid';
-export { mergeFeedHead, refreshFeedHead, type FeedRefreshResult } from './feedRefresh';
+export { manualRefreshFeed, mergeFeedHead, refreshFeedHead, type FeedRefreshResult } from './feedRefresh';

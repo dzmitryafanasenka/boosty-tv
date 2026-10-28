@@ -1,4 +1,4 @@
-import type { InfiniteData, QueryClient, QueryKey } from '@tanstack/react-query';
+import type { InfiniteData, Query, QueryClient, QueryKey } from '@tanstack/react-query';
 import { isAppError } from '../../api/appError';
 import { QUERY_STALE_TIME_MS } from '../../api/queryKeys';
 import { logger as appLogger, type Logger } from '../../services/logger';
@@ -48,6 +48,16 @@ export type PostsHeadRefreshOptions = {
    * Epic 3 retro A1. Главная (E5) does not set it.
    */
   pinnedFirst?: boolean;
+  /**
+   * A user-asked refresh (Главная's «Обновить», Story 5.1): no staleness
+   * check (the cache's age does not matter); while a refresh of the same
+   * query is already running (e.g. a resume refresh) its promise is
+   * returned instead of a second request (single-flight); while a fetch of
+   * the query runs (a page append) it waits for that fetch to settle, then
+   * refreshes; `skipWhileError` is ignored (the user asked on the button,
+   * not on the load-more «Повторить»; a merged head clears that error).
+   */
+  force?: boolean;
 };
 
 /**
@@ -130,8 +140,29 @@ export function mergePostsHead(
   };
 }
 
-/** One refresh at a time per client and query (by its hash). */
-const running = new WeakMap<QueryClient, Set<string>>();
+/**
+ * Resolves once `query` has no fetch running (or left the cache: a reset),
+ * for a forced refresh that arrived during a page append.
+ */
+function fetchSettled(client: QueryClient, query: Query<PostsData>): Promise<void> {
+  return new Promise(resolve => {
+    const cache = client.getQueryCache();
+    const done = () => query.state.fetchStatus === 'idle' || cache.get(query.queryHash) !== query;
+    if (done()) {
+      resolve();
+      return;
+    }
+    const unsubscribe = cache.subscribe(event => {
+      if (event.query === query && done()) {
+        unsubscribe();
+        resolve();
+      }
+    });
+  });
+}
+
+/** One refresh at a time per client and query (by its hash): its promise. */
+const running = new WeakMap<QueryClient, Map<string, Promise<PostsHeadRefreshResult>>>();
 
 /**
  * Refresh the head of the paged list cached under `queryKey` (see the module
@@ -140,6 +171,8 @@ const running = new WeakMap<QueryClient, Set<string>>();
  * which page appends move too), a refresh of the same query is already
  * running, the query is fetching (a page append would overwrite the
  * merge), or (`skipWhileError`) the query is in an error state.
+ * `force` drops the age check and joins a running refresh of the same query
+ * (its promise) instead of skipping.
  * A failure is silent: the cache stays and only the error kind is logged
  * (no content). A response that arrives after the cache was reset
  * (sign-out, account switch, re-login), while a fetch of the query started
@@ -153,51 +186,81 @@ export async function refreshPostsHead(
   now: number,
   logger: Logger = appLogger,
   log: PostsHeadRefreshLog = DEFAULT_LOG,
-  { skipWhileError = false, keepEmptyWithMore = false, pinnedFirst = false }: PostsHeadRefreshOptions = {},
+  {
+    skipWhileError = false,
+    keepEmptyWithMore = false,
+    pinnedFirst = false,
+    force = false,
+  }: PostsHeadRefreshOptions = {},
 ): Promise<PostsHeadRefreshResult> {
   const query = client.getQueryCache().find<PostsData>({ queryKey, exact: true });
   let inFlight = running.get(client);
+  const joined = query ? inFlight?.get(query.queryHash) : undefined;
+  if (joined) {
+    return force ? joined : 'skipped';
+  }
+  if (force && query && query.state.fetchStatus !== 'idle') {
+    // A page append runs: refresh once it settled (the same rules again).
+    await fetchSettled(client, query);
+    return refreshPostsHead(client, queryKey, fetchFirstPage, now, logger, log, {
+      skipWhileError,
+      keepEmptyWithMore,
+      pinnedFirst,
+      force,
+    });
+  }
+  const skipError = skipWhileError && !force;
   if (
     !query ||
-    inFlight?.has(query.queryHash) ||
     query.state.data === undefined ||
     query.state.data.pages.length === 0 ||
     query.state.fetchStatus !== 'idle' ||
-    (skipWhileError && query.state.status === 'error') ||
-    now - query.state.dataUpdatedAt < QUERY_STALE_TIME_MS
+    (skipError && query.state.status === 'error') ||
+    (!force && now - query.state.dataUpdatedAt < QUERY_STALE_TIME_MS)
   ) {
     return 'skipped';
   }
 
   if (!inFlight) {
-    inFlight = new Set();
+    inFlight = new Map();
     running.set(client, inFlight);
   }
   const hash = query.queryHash;
-  inFlight.add(hash);
+  // Always settles asynchronously (a synchronous throw too), so the entry
+  // below is set before the `finally` that removes it.
+  let page: Promise<PostPage>;
   try {
-    const fresh = await fetchFirstPage();
-    // Reset meanwhile (a new query instance or none), or a fetch started:
-    // drop the response.
-    const current = client.getQueryCache().find<PostsData>({ queryKey, exact: true });
-    const cached = current?.state.data;
-    if (
-      current !== query ||
-      cached === undefined ||
-      current.state.fetchStatus !== 'idle' ||
-      (skipWhileError && current.state.status === 'error')
-    ) {
-      return 'skipped';
-    }
-    const merged = mergePostsHead(cached, fresh, { keepEmptyWithMore, pinnedFirst });
-    client.setQueryData<PostsData>(queryKey, merged.data, { updatedAt: now });
-    return merged.kind;
+    page = fetchFirstPage();
   } catch (error) {
-    logger.warn(log.scope, log.message, {
-      kind: isAppError(error) ? error.kind : 'Unknown',
-    });
-    return 'failed';
-  } finally {
-    inFlight.delete(hash);
+    page = Promise.reject(error);
   }
+  const run = (async (): Promise<PostsHeadRefreshResult> => {
+    try {
+      const fresh = await page;
+      // Reset meanwhile (a new query instance or none), or a fetch started:
+      // drop the response.
+      const current = client.getQueryCache().find<PostsData>({ queryKey, exact: true });
+      const cached = current?.state.data;
+      if (
+        current !== query ||
+        cached === undefined ||
+        current.state.fetchStatus !== 'idle' ||
+        (skipError && current.state.status === 'error')
+      ) {
+        return 'skipped';
+      }
+      const merged = mergePostsHead(cached, fresh, { keepEmptyWithMore, pinnedFirst });
+      client.setQueryData<PostsData>(queryKey, merged.data, { updatedAt: now });
+      return merged.kind;
+    } catch (error) {
+      logger.warn(log.scope, log.message, {
+        kind: isAppError(error) ? error.kind : 'Unknown',
+      });
+      return 'failed';
+    } finally {
+      inFlight.delete(hash);
+    }
+  })();
+  inFlight.set(hash, run);
+  return run;
 }

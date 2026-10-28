@@ -131,7 +131,11 @@ describe('Shell', () => {
 
     const content = byTestId(root, 'shell/content/home')[0];
     expect(visible(root, 'home/feed')).toBe(true);
-    expect(focusableIds(root, content)).toEqual(e5Posts().map(p => `home/feed/${p.id}`));
+    // «Обновить» (Story 5.1), then the cards.
+    expect(focusableIds(root, content)).toEqual([
+      'home/refresh',
+      ...e5Posts().map(p => `home/feed/${p.id}`),
+    ]);
     expect(text(root)).toContain(t('shell.wordmark'));
     expect(text(root)).toContain(t('home.feed.title'));
     await unmount(root);

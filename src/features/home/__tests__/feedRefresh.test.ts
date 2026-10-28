@@ -2,7 +2,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { AppError, queryKeys, type HttpClient } from '../../../shared/api';
 import { PostRepository, type Post, type PostPage } from '../../../shared/entities/post';
 import { createLogger } from '../../../shared/services/logger';
-import { mergeFeedHead, refreshFeedHead, type FeedData } from '../feedRefresh';
+import { manualRefreshFeed, mergeFeedHead, refreshFeedHead, type FeedData } from '../feedRefresh';
 
 const STALE = 60_000;
 const KEY = queryKeys.subscriptionFeed();
@@ -243,5 +243,127 @@ describe('refreshFeedHead', () => {
     reply.resolve(page(['n1', ...range(0, 9)], 'c9'));
     expect(await run).toBe('skipped');
     expect(ids(cached())).toEqual(['other']);
+  });
+});
+
+describe('manualRefreshFeed (Story 5.1, «Обновить»)', () => {
+  const SUBS = queryKeys.subscriptions();
+  /** A cached subscriptions query with a query function and no observer. */
+  async function seedSubscriptions(fn: jest.Mock) {
+    await client.prefetchQuery({ queryKey: SUBS, queryFn: fn });
+    fn.mockClear();
+  }
+
+  it('a fresh cache: one E5 page 1 merged (no staleness check) and one E2 refetch', async () => {
+    seed(twoPages(), T0);
+    const subs = jest.fn().mockResolvedValue(['blog']);
+    await seedSubscriptions(subs);
+    feedPage.mockResolvedValue(page(['n1', ...range(0, 9)], 'c9'));
+    expect(await manualRefreshFeed(client, http, T0 + 1)).toBe('prepended');
+    expect(feedPage).toHaveBeenCalledTimes(1);
+    expect(feedPage).toHaveBeenCalledWith(http, null);
+    expect(subs).toHaveBeenCalledTimes(1);
+    expect(ids(cached())?.slice(0, 2)).toEqual(['n1', 'p0']);
+    expect(cached()?.pages).toHaveLength(2);
+  });
+
+  it('single-flight: a second call while one runs shares it (one E5, one E2)', async () => {
+    seed();
+    const subs = jest.fn().mockResolvedValue([]);
+    await seedSubscriptions(subs);
+    const reply = deferred<PostPage>();
+    feedPage.mockReturnValue(reply.promise);
+    const first = manualRefreshFeed(client, http, T0);
+    const second = manualRefreshFeed(client, http, T0);
+    expect(second).toBe(first);
+    reply.resolve(page(range(0, 10), 'c10'));
+    expect(await first).toBe('unchanged');
+    expect(feedPage).toHaveBeenCalledTimes(1);
+    expect(subs).toHaveBeenCalledTimes(1);
+  });
+
+  it('a resume refresh already running is joined, not duplicated', async () => {
+    seed();
+    const reply = deferred<PostPage>();
+    feedPage.mockReturnValue(reply.promise);
+    const resume = refreshFeedHead(client, http, T0 + STALE);
+    const manual = manualRefreshFeed(client, http, T0 + STALE);
+    reply.resolve(page(['n1', ...range(0, 9)], 'c9'));
+    expect(await resume).toBe('prepended');
+    expect(await manual).toBe('prepended');
+    expect(feedPage).toHaveBeenCalledTimes(1);
+  });
+
+  it('E5 fails: failed, the cache stays, logged by kind only; E2 failing is not this result', async () => {
+    const data = twoPages();
+    seed(data);
+    const subs = jest.fn().mockResolvedValue([]);
+    await seedSubscriptions(subs);
+    subs.mockRejectedValue(new AppError('Server'));
+    const logger = createLogger();
+    feedPage.mockRejectedValue(new AppError('Network'));
+    expect(await manualRefreshFeed(client, http, T0, logger)).toBe('failed');
+    expect(cached()).toBe(data);
+    expect(logger.entries()).toEqual([
+      expect.objectContaining({ scope: 'feed', message: 'manual refresh failed', fields: { kind: 'Network' } }),
+    ]);
+    feedPage.mockResolvedValue(page(range(0, 10), 'c10'));
+    expect(await manualRefreshFeed(client, http, T0, logger)).toBe('unchanged');
+  });
+
+  it('a next-page fetch is running: waits for it, then one E5', async () => {
+    seed();
+    const query = client.getQueryCache().find({ queryKey: KEY })!;
+    query.setState({ fetchStatus: 'fetching' });
+    feedPage.mockResolvedValue(page(['n1', ...range(0, 9)], 'c9'));
+    const run = manualRefreshFeed(client, http, T0);
+    await Promise.resolve();
+    expect(feedPage).not.toHaveBeenCalled();
+    query.setState({ fetchStatus: 'idle' });
+    expect(await run).toBe('prepended');
+    expect(feedPage).toHaveBeenCalledTimes(1);
+    expect(ids(cached())?.[0]).toBe('n1');
+  });
+
+  it('the feed query is in an error state (a failed page append): one E5, merged', async () => {
+    seed();
+    const query = client.getQueryCache().find({ queryKey: KEY })!;
+    query.setState({ status: 'error', error: new AppError('Network') });
+    feedPage.mockResolvedValue(page(['n1', ...range(0, 9)], 'c9'));
+    expect(await manualRefreshFeed(client, http, T0)).toBe('prepended');
+    expect(feedPage).toHaveBeenCalledTimes(1);
+    expect(ids(cached())?.[0]).toBe('n1');
+  });
+
+  it('an empty page 1 with a next cursor: the cached feed stays', async () => {
+    const data = twoPages();
+    seed(data);
+    feedPage.mockResolvedValue(page([], 'c0'));
+    expect(await manualRefreshFeed(client, http, T0)).toBe('unchanged');
+    expect(cached()).toBe(data);
+  });
+
+  it('E2 is not awaited and only the exact subscriptions key refetches', async () => {
+    seed();
+    const subs = jest.fn().mockResolvedValue([]);
+    await seedSubscriptions(subs);
+    const other = jest.fn().mockResolvedValue([]);
+    await client.prefetchQuery({ queryKey: [...SUBS, 'other'], queryFn: other });
+    other.mockClear();
+    const e2 = deferred<string[]>();
+    subs.mockReturnValue(e2.promise);
+    feedPage.mockResolvedValue(page(range(0, 10), 'c10'));
+    // Resolves while E2 is still pending.
+    expect(await manualRefreshFeed(client, http, T0)).toBe('unchanged');
+    expect(subs).toHaveBeenCalledTimes(1);
+    expect(other).not.toHaveBeenCalled();
+    e2.resolve([]);
+  });
+
+  it('no subscriptions cached: no E2 request', async () => {
+    seed();
+    feedPage.mockResolvedValue(page(range(0, 10), 'c10'));
+    expect(await manualRefreshFeed(client, http, T0)).toBe('unchanged');
+    expect(client.getQueryState(SUBS)).toBeUndefined();
   });
 });
