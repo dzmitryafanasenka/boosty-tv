@@ -1,0 +1,25 @@
+_bmad-output/planning-artifacts/ux-designs/ux-boosty-tv-2026-10-25/DESIGN.md
+  s_67d3a4bcdb9d96::t_da1b06142ca10f 119
+src/app/Sidebar.tsx
+  s_67d3a4bcdb9d96::t_64abbc114d815e 4,133-135,139
+src/shared/ui/NavItem.tsx
+  s_67d3a4bcdb9d96::t_a5ee8a64e1ac40 92,97
+src/shared/ui/tokens.ts
+  s_67d3a4bcdb9d96::t_b8bbe6bfb9858a 156-164
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "c9a3cfb7e0ffab697108c5c17129664ec7c6a06a",
+  "prompts": {},
+  "sessions": {
+    "s_67d3a4bcdb9d96": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e93f6f61-902b-4690-b071-9acc2f500329",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
