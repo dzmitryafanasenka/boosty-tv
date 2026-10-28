@@ -153,7 +153,15 @@ export const components = {
     transition: motion.focus,
   },
   'nav-item': {
-    width: 120,
+    /**
+     * Owner decision 2026-10-28 (option B): the item spans the sidebar with
+     * equal side insets (`sidebar-width` − 2 × `insetX`); its label starts at
+     * `safe-x` (`insetX` + `paddingLeft`), aligned with the wordmark. The
+     * item's background and focus ring enter the safe area; the text does not.
+     */
+    width: 136,
+    insetX: 16,
+    paddingLeft: 32,
     height: 36,
     radius: rounded.md,
     currentBg: colors['surface-current'],

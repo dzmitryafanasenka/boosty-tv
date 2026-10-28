@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { StyleSheet, TVFocusGuideView, View } from 'react-native';
 import { t } from '../shared/i18n';
-import { NavItem, Text, colors, spacing, type HostView } from '../shared/ui';
+import { NavItem, Text, colors, components, spacing, type HostView } from '../shared/ui';
 import type { SectionId } from './phaseFlags';
 
 /** Focus ids of the sidebar items (docs/focus-map.md §1.5). */
@@ -130,10 +130,13 @@ const styles = StyleSheet.create({
     left: 0,
     width: spacing['sidebar-width'],
     backgroundColor: colors['bg-sidebar'],
-    paddingLeft: spacing['safe-x'],
+    // The items span the panel with equal side insets (owner decision
+    // 2026-10-28); the wordmark and the item labels start at `safe-x`.
+    paddingLeft: components['nav-item'].insetX,
     paddingTop: spacing['safe-y'],
   },
   wordmark: {
+    marginLeft: spacing['safe-x'] - components['nav-item'].insetX,
     marginBottom: spacing['10'],
   },
   navGap: {
