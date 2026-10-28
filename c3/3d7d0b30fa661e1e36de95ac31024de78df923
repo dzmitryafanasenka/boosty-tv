@@ -1,0 +1,71 @@
+__tests__/codeFlow.test.tsx
+  s_67d3a4bcdb9d96::t_a47c75fa34725a 388,397
+__tests__/demoFlow.test.tsx
+  s_67d3a4bcdb9d96::t_b1102c08c12761 92-93,96,99
+__tests__/homeFeedFlow.test.tsx
+  s_67d3a4bcdb9d96::t_a3e080a12a2a08 12,16-17,44,1821-2032,2516-2538
+__tests__/shellFlow.test.tsx
+  s_67d3a4bcdb9d96::t_388ec4d969b044 134-138
+_bmad-output/implementation-artifacts/epic-5-context.md
+  s_67d3a4bcdb9d96::t_b792e1c38f64a7 1-84
+_bmad-output/implementation-artifacts/spec-5-1-refresh-the-feed.md
+  s_67d3a4bcdb9d96::t_aaa94eb2ce0202 1-90
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_67d3a4bcdb9d96::t_2cfb1e37172f1f 32,60,79-80
+docs/adr/0010-server-state-tanstack-query.md
+  s_67d3a4bcdb9d96::t_37f74d5dadf22f 41
+docs/feature-parity.md
+  s_67d3a4bcdb9d96::t_2400ff8eea8962 65
+docs/focus-map.md
+  s_67d3a4bcdb9d96::t_aca314cadfebf2 59,195-203
+docs/testing.md
+  s_67d3a4bcdb9d96::t_340f07da3ef887 896-920
+src/features/home/HomeScreen.tsx
+  s_67d3a4bcdb9d96::t_5dd6a964497b38 1,3-4,24,30-31,58,67-68,72-84,232,437-441,459-461,465-466,607-726,749-753,831,843,845-848,852,857,862-950,952-959,961-976
+src/features/home/__tests__/feedRefresh.test.ts
+  s_67d3a4bcdb9d96::t_2fd9a35083ba49 5,248-369
+src/features/home/feedRefresh.ts
+  s_67d3a4bcdb9d96::t_a842fbd55c6e64 68-117
+src/features/home/index.ts
+  s_67d3a4bcdb9d96::t_bcdd03a812dfc2 9
+src/shared/entities/post/__tests__/postsHeadRefresh.test.ts
+  s_67d3a4bcdb9d96::t_40b3903f2f46bb 286-352
+src/shared/entities/post/postsHeadRefresh.ts
+  s_67d3a4bcdb9d96::t_008a16091704f5 1,51-60,143-165,174-175,189-194,198-212,218-219,225,229-231,233,235,237-265
+src/shared/entities/post/usePagedPosts.ts
+  s_67d3a4bcdb9d96::t_3aa6e70354cf05 32-33,152
+src/shared/focus/useFocusRestoration.ts
+  s_67d3a4bcdb9d96::t_e8fb3affe5e0f1 52-53,165-166,249-250
+src/shared/i18n/ru.ts
+  s_67d3a4bcdb9d96::t_5cc8d53a35b095 98-105
+src/shared/ui/Button.tsx
+  s_67d3a4bcdb9d96::t_ad751521835114 11,24-35,88-91,124,127-131,138-177,189-192
+src/shared/ui/FocusableSurface.tsx
+  s_67d3a4bcdb9d96::t_719dc8ec0dd71c 49-54,99,167
+src/shared/ui/__tests__/Button.test.tsx
+  s_dfc40cad1eb830::t_e326185fbd5eb4 208-210,286-360
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "c33d7d0b30fa661e1e36de95ac31024de78df923",
+  "prompts": {},
+  "sessions": {
+    "s_67d3a4bcdb9d96": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e93f6f61-902b-4690-b071-9acc2f500329",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_dfc40cad1eb830": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a5071f4e2fed6b4fd",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
