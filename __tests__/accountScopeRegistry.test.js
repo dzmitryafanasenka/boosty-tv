@@ -50,7 +50,7 @@ test('every declaration names its store with a string literal', () => {
 
 test('the scan finds the known declarations', () => {
   expect(declaredNames().map(d => d.name).sort()).toEqual(
-    ['authFlow', 'focusRestoration', 'logger', 'queryCache', 'session'].sort(),
+    ['authFlow', 'focusRestoration', 'logger', 'progress', 'queryCache', 'session'].sort(),
   );
 });
 

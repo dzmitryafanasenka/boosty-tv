@@ -10,7 +10,10 @@ import { resetQueryCache } from '../src/app/queryClient';
 import { session } from '../src/app/session';
 import { focusRestoration } from '../src/shared/focus';
 import { t } from '../src/shared/i18n';
+import { createAsyncStorage } from '@react-native-async-storage/async-storage';
+import { accountScope } from '../src/shared/account';
 import { logger } from '../src/shared/services/logger';
+import { progressStore } from '../src/shared/services/progress';
 import { components, spacing } from '../src/shared/ui';
 import {
   clearNativeModules,
@@ -197,8 +200,9 @@ test('Story 3.5: a demo post with two videos shows two MediaRows on top (the sec
   const label = (id: string) =>
     root.container.queryAll(n => n.props.testID === id && n.props.focusable === true)[0].props
       .accessibilityLabel;
-  expect(label(rows[0])).toMatch(/^Видео 1\. Демо-ролик 5\. \d+:\d\d$/);
-  expect(label(rows[1])).toMatch(/^Видео 2\. \d+:\d\d$/);
+  // Story 4.2: the label ends with the progress status (nothing watched in the demo).
+  expect(label(rows[0])).toMatch(/^Видео 1\. Демо-ролик 5\. \d+:\d\d\. Не начато$/);
+  expect(label(rows[1])).toMatch(/^Видео 2\. \d+:\d\d\. Не начато$/);
   expect(fetchMock).not.toHaveBeenCalled();
   await act(async () => {
     root.unmount();
@@ -262,6 +266,40 @@ test('Story 2.8: demo expiry → A11 → A2 → A5 → sign-in with another id: 
   // Nothing reached the global fetch: the send went through the demo
   // session's fixture transport (Epic 2 retro, item 1).
   expect(fetchMock).not.toHaveBeenCalled();
+  await act(async () => {
+    root.unmount();
+  });
+});
+
+test('Story 4.2: demo progress stays in memory; a demo sign-out never clears the real local progress', async () => {
+  const real = createAsyncStorage('boostytv-account');
+  await real.setItem('progress.v1', 'owner-real-progress');
+  const root = await renderApp();
+  const ref = { blogUrl: 'demo-blog-1', postId: 'demo-post-0', mediaId: 'demo-video-0-0' };
+  await act(async () => {
+    await progressStore.ready();
+    progressStore.put(
+      {
+        ref,
+        positionSec: 42,
+        durationSec: 600,
+        updatedAt: 1,
+        meta: { title: 'Демо', postTitle: 'Демо', authorName: 'Демо', previewUrl: null, durationSec: 600 },
+      },
+      { flush: true },
+    );
+    await progressStore.flush();
+  });
+  // The demo neither read nor wrote the owner's database.
+  expect(progressStore.get('demo-video-0-0')?.positionSec).toBe(42);
+  expect(await real.getItem('progress.v1')).toBe('owner-real-progress');
+  expect(await real.getAllKeys()).toEqual(['progress.v1']);
+  // A demo sign-out (AccountScope reset) wipes the demo's progress only.
+  await act(async () => {
+    await accountScope.reset();
+  });
+  expect(progressStore.get('demo-video-0-0')).toBeUndefined();
+  expect(await real.getItem('progress.v1')).toBe('owner-real-progress');
   await act(async () => {
     root.unmount();
   });

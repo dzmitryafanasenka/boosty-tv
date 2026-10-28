@@ -36,8 +36,14 @@ export type RootStackParamList = {
    * opened from: the origin route's key and the focus id of the element
    * whose OK opened it (`post/<postId>/primary` or a MediaRow), so exit
    * returns focus there. Ids only: never a URL, `signedQuery` or `timeCode`.
+   * `start` (Story 4.2): `beginning` for «С начала» (starts at 0); absent or
+   * `resume`: the resume point (ProgressRepository).
    */
-  Player: { ref: MediaRef; origin: { routeKey: string; focusId: string } };
+  Player: {
+    ref: MediaRef;
+    origin: { routeKey: string; focusId: string };
+    start?: 'resume' | 'beginning';
+  };
   /** A11 Session expired (Story 2.6): the stack root after an expiry. */
   Expired: undefined;
   /** Debug builds only: «Проверка фокуса» (registered under `__DEV__`). */

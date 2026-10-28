@@ -17,9 +17,11 @@ import { blogUrlSchema } from './subscriptions';
  *   the mapper, and an unknown `type` becomes `Block.Unknown`.
  * - Of `count`, only `likes` is read (Story 3.4, the read-only like count);
  *   a missing or invalid value is no like line.
- * - Never parsed: `signedQuery`, `playerUrls`, `timeCode`, `comments`,
- *   `count.comments`, reactions, prices. They are not part of the domain
- *   (AD-9; comments are excluded).
+ * - Never parsed into the post: `signedQuery`, `playerUrls`, `timeCode`,
+ *   `comments`, `count.comments`, reactions, prices. They are not part of
+ *   the domain (AD-9; comments are excluded). `playerUrls` (Story 4.1) and
+ *   `timeCode` (Story 4.2) have their own schemas below, read beside the
+ *   mapper for the player and the ProgressRepository only.
  */
 
 const optionalString = z.string().nullish().catch(undefined);
@@ -142,4 +144,17 @@ export const okVideoSourcesDtoSchema = z.object({
 export const playerUrlDtoSchema = z.object({
   type: z.string().catch(''),
   url: z.string().nullish().catch(undefined),
+});
+
+/**
+ * Story 4.2: an `ok_video` block's saved server progress (`timeCode`,
+ * seconds; api-contract §3, §6). Parsed from an E8's raw `data[]` only to
+ * hand it to the ProgressRepository through the `onServerProgress` sink
+ * (`PostRepository`); never part of the Post entity, a query cache value, a
+ * route or a log. A missing or wrong-typed `timeCode` is no value.
+ */
+export const okVideoTimeCodeDtoSchema = z.object({
+  type: z.literal('ok_video'),
+  id: z.string().min(1),
+  timeCode: z.number().nonnegative().nullish().catch(undefined),
 });

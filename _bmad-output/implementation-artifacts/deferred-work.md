@@ -243,3 +243,21 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-epic-3-retro-a6-locked-session-check.md`
   summary: Flow-test that `sessionCheck.reset()` runs on a session status change (a locked check, sign-out → sign-in or A11 → re-login, then a locked answer within 5 min sends a new E1).
   evidence: Wired in `src/app/App.tsx` and unit-tested in `sessionCheck.test.ts` only; review A6 finding 13.
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-2-progress-is-saved-and-playback-resumes.md`
+  summary: Story 4.2 device checks still open — a multi-video post's per-row status and «Продолжить · Видео N» (the owner knows of no multi-video post), the physical-remote pass and TalkBack. Resume after exit / cold start, «С начала» and the live content-profile E9 passed (2026-10-28).
+  evidence: docs/testing.md «Story 4.2» (adb + the owner's website check); host-tested in playerFlow «Multi-video».
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-2-progress-is-saved-and-playback-resumes.md`
+  summary: A failed E9 is re-sent by itself at most 5 times (10 s apart) after the last trigger; a write still owed after that (offline at exit) is lost until that video plays again. The local entry is kept, so the TV resumes correctly; only the server copy (other devices, the website) lags.
+  evidence: `src/shared/services/progress/progressRepository.ts` `MAX_AUTO_RETRIES`; a persisted outbox would need its own design.
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-2-progress-is-saved-and-playback-resumes.md`
+  summary: Feed and Author cards show no progress yet (FR-14); E4/E5 also carry `timeCode`, but only E8 feeds the ProgressRepository. The Continue view (Story 4.7) reads `progressStore.entries()`.
+  evidence: Spec 4.2 «Never»; api-contract §3 «Video duration is in the feed».
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-2-progress-is-saved-and-playback-resumes.md`
+  summary: A player retry («Повторить», a fresh E8) after «С начала» resumes from the local entry, which is written only after 10 s of movement or a pause; an error within the first seconds of a start over therefore resumes the older position.
+  evidence: `PlayerScreen` `startMode` switches to `resume` after the first source's start.
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-2-progress-is-saved-and-playback-resumes.md`
+  summary: Flow-test E9 hold-on-expiry through the real HttpClient and SessionManager (E9 401 → failed refresh → `expired` → no sends while expired → one E9 with the latest position after a same-account re-login).
+  evidence: Only `progressRepository.test.ts` with a fake session covers it; the order of the E9 rejection vs the status change in the refresh coordinator is not pinned (review finding 9).
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-2-progress-is-saved-and-playback-resumes.md`
+  summary: Check whether `ok_video.preview` URLs carry a CDN token before Story 4.7 renders the stored `meta.previewUrl`; if signed, store none and re-read the preview from E8.
+  evidence: Unverified (medium if true): the progress store persists `meta.previewUrl`; settle by inspecting one live E8 preview URL shape (redacted).

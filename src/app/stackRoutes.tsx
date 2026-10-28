@@ -291,10 +291,15 @@ export function PostRoute({ navigation, route }: StackScreenProps<RootStackParam
   // OK on «Смотреть» or a MediaRow (Story 4.1): the Player for exactly that
   // video; exit returns focus to `focusId` on this route. Only while Пост is
   // the focused route (a second OK during the transition is dropped).
+  // «С начала» (Story 4.2) passes `beginning`: that video starts at 0.
   const onOpenPlayer = useCallback(
-    (ref: MediaRef, focusId: string) => {
+    (ref: MediaRef, focusId: string, start?: 'beginning') => {
       if (navigation.isFocused()) {
-        navigation.push('Player', { ref, origin: { routeKey, focusId } });
+        navigation.push('Player', {
+          ref,
+          origin: { routeKey, focusId },
+          ...(start === 'beginning' ? { start } : {}),
+        });
       }
     },
     [navigation, routeKey],
@@ -348,7 +353,7 @@ export function PostRoute({ navigation, route }: StackScreenProps<RootStackParam
  * one-shot override would never be consumed there.
  */
 export function PlayerRoute({ navigation, route }: StackScreenProps<RootStackParamList, 'Player'>) {
-  const { ref, origin } = route.params;
+  const { ref, origin, start } = route.params;
   const isActive = useCallback(() => navigation.isFocused(), [navigation]);
   useEffect(
     () =>
@@ -371,7 +376,13 @@ export function PlayerRoute({ navigation, route }: StackScreenProps<RootStackPar
   }, [navigation]);
   return (
     <Screen testID="player">
-      <PlayerScreen http={session.http} mediaRef={ref} isActive={isActive} onExit={onExit} />
+      <PlayerScreen
+        http={session.http}
+        mediaRef={ref}
+        isActive={isActive}
+        onExit={onExit}
+        start={start ?? 'resume'}
+      />
     </Screen>
   );
 }

@@ -158,18 +158,31 @@ export const ru = {
       unknown: 'Блок',
     },
     // DESIGN.md MediaRow (Story 3.5): «Видео N», the title, the duration.
-    // No status or action before Epic 4 (progress, «Смотреть»).
+    // Story 4.2: the status from the ProgressRepository (never a fake one);
+    // `{n}` in `left` is whole minutes, rounded up. The row's label ends with
+    // the status (`a11yStatus`).
     video: {
       label: 'Видео {n}',
       a11y: '{label}. {title}. {duration}',
       a11yNoTitle: '{label}. {duration}',
       a11yNoDuration: '{label}. {title}',
       a11yLabelOnly: '{label}',
+      a11yStatus: '{base}. {status}',
+      status: {
+        notStarted: 'Не начато',
+        left: 'Осталось {n} мин',
+        watched: 'Просмотрено',
+      },
     },
     // The primary button under the header (Story 4.1, owner decision
-    // 2026-10-27, option A). A multi-video post names the target video.
+    // 2026-10-27, option A). A multi-video post names the target video
+    // (Story 4.2: the first unfinished one). «Продолжить» when it has
+    // progress; «С начала» (to its right) starts it at 0.
     watch: 'Смотреть',
     watchVideo: 'Смотреть · {label}',
+    continue: 'Продолжить',
+    continueVideo: 'Продолжить · {label}',
+    restart: 'С начала',
   },
   // G Плеер (Story 4.1, docs/focus-map.md §4 G). No «Настройки» before
   // Story 4.3; no resume or progress before Story 4.2. Times are

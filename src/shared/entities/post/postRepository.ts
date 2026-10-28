@@ -1,10 +1,11 @@
 import { AppError, isAppError } from '../../api/appError';
 import { blogPostsPageDtoSchema, feedPageDtoSchema } from '../../api/dto/feed';
+import { blockTypeDtoSchema, okVideoTimeCodeDtoSchema } from '../../api/dto/post';
 import { blogUrlSchema } from '../../api/dto/subscriptions';
 import type { HttpClient } from '../../api/httpClient';
 import { logger as appLogger, type Logger } from '../../services/logger';
 import { mapPost } from './mapPost';
-import type { MediaRef, Post, PostPage, PostResult } from './types';
+import type { MediaRef, Post, PostPage, PostResult, ServerProgressSink } from './types';
 import { videoSourcesOf, type VideoSourcesResult } from './videoSources';
 
 /**
@@ -126,22 +127,50 @@ async function onePost(
   http: HttpClient,
   blogUrl: string,
   postId: string,
-  logger: Logger = appLogger,
+  { logger = appLogger, onServerProgress }: E8Options = {},
 ): Promise<PostResult> {
-  const fetched = await fetchPost(http, blogUrl, postId, logger);
+  const fetched = await fetchPost(http, blogUrl, postId, logger, onServerProgress);
   return fetched === null ? { kind: 'unavailable' } : { kind: 'ok', post: fetched.post };
+}
+
+/** E8 options: the logger and the ProgressRepository's `timeCode` sink (Story 4.2). */
+export type E8Options = {
+  logger?: Logger;
+  onServerProgress?: ServerProgressSink;
+};
+
+/**
+ * Story 4.2: hands each `ok_video`'s `timeCode` (whole seconds) of an
+ * accessible post's raw `data[]` to the sink, in block order. Blocks without
+ * an id or a usable `timeCode` are skipped. Nothing here logs a value.
+ */
+function reportServerProgress(rawData: readonly unknown[], sink: ServerProgressSink) {
+  for (const raw of rawData) {
+    const typed = blockTypeDtoSchema.safeParse(raw);
+    if (!typed.success || typed.data.type !== 'ok_video') {
+      continue;
+    }
+    const block = okVideoTimeCodeDtoSchema.safeParse(raw);
+    const timeCode = block.success ? block.data.timeCode : undefined;
+    if (block.success && typeof timeCode === 'number' && Number.isFinite(timeCode)) {
+      sink(block.data.id, Math.floor(timeCode));
+    }
+  }
 }
 
 /**
  * The one E8 request: the mapped post and the raw `data[]` (only the
  * player's `videoSources` reads it), or null for E8 404. A body the mapper
- * rejects is `Parse`; every other failure rejects with its `AppError`.
+ * rejects is `Parse`; every other failure rejects with its `AppError`. The
+ * `timeCode` of an accessible post's videos goes to `onServerProgress`
+ * (Story 4.2), never into the post.
  */
 async function fetchPost(
   http: HttpClient,
   blogUrl: string,
   postId: string,
   logger: Logger,
+  onServerProgress?: ServerProgressSink,
 ): Promise<{ post: Post; rawData: readonly unknown[] } | null> {
   const path = postPath(blogUrl, postId);
   try {
@@ -151,7 +180,11 @@ async function fetchPost(
       throw new AppError('Parse');
     }
     const data = (body as { data?: unknown } | null)?.data;
-    return { post: mapped, rawData: Array.isArray(data) ? data : [] };
+    const rawData = Array.isArray(data) ? data : [];
+    if (onServerProgress && mapped.hasAccess) {
+      reportServerProgress(rawData, onServerProgress);
+    }
+    return { post: mapped, rawData };
   } catch (error) {
     if (isAppError(error) && error.kind === 'NotFound') {
       return null;
@@ -174,9 +207,9 @@ async function fetchPost(
 async function videoSources(
   http: HttpClient,
   ref: MediaRef,
-  logger: Logger = appLogger,
+  { logger = appLogger, onServerProgress }: E8Options = {},
 ): Promise<VideoSourcesResult> {
-  const fetched = await fetchPost(http, ref.blogUrl, ref.postId, logger);
+  const fetched = await fetchPost(http, ref.blogUrl, ref.postId, logger, onServerProgress);
   if (fetched === null) {
     return { kind: 'unavailable' };
   }

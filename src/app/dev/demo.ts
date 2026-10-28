@@ -5,6 +5,7 @@ import {
   type SessionManager,
 } from '../../shared/api';
 import { createFixtureTransport } from '../../shared/api/fixtureTransport';
+import type { KeyValueStore } from '../../shared/platform/keyValueStore';
 import type { ReadResult, SecureStore } from '../../shared/platform/secureStore';
 
 /**
@@ -21,7 +22,9 @@ import type { ReadResult, SecureStore } from '../../shared/platform/secureStore'
  * one also with image, file, audio, poll and unknown blocks and an inline link;
  * `demo-post-9` answers 404 `not_found`; locked posts (every seventh) have a
  * teaser image without a URL, and `demo-post-6`/`-20` a level name while
- * `demo-post-13`/`-27` have none, Story 3.6), every other request a 404. The
+ * `demo-post-13`/`-27` have none, Story 3.6), E9 progress writes 200 (Story
+ * 4.2; demo videos have no `playerUrls`, so the player itself cannot play
+ * them), every other request a 404. The
  * keychain is never touched, so the owner's stored session survives a demo
  * run.
  *
@@ -148,6 +151,8 @@ function demoBlogPage(url: string, blogUrl: string) {
 
 const DEMO_BLOG_PATH = /^\/v1\/blog\/(demo-blog-\d+)(\/post\/)?$/;
 const DEMO_POST_PATH = /^\/v1\/blog\/(demo-blog-\d+)\/post\/([^/]+)$/;
+/** E9: `PUT /v1/viewstat/video/{mediaId}/timecode/` (Story 4.2). */
+const DEMO_TIMECODE_PATH = /^\/v1\/viewstat\/video\/[^/]+\/timecode\/$/;
 /** The demo post whose E8 answers 404 `not_found` («Пост недоступен»). */
 const DEMO_MISSING_POST = 'demo-post-9';
 
@@ -223,8 +228,32 @@ function memoryStore(initial: string | null): SecureStore {
   };
 }
 
+/**
+ * The demo's progress storage (Story 4.2): in memory only, so the demo never
+ * touches the owner's real local progress (as it never touches the keychain).
+ */
+export function createDemoKeyValueStore(): KeyValueStore {
+  const values = new Map<string, string>();
+  return {
+    get: async key => values.get(key) ?? null,
+    set: async (key, value) => {
+      values.set(key, value);
+    },
+    remove: async key => {
+      values.delete(key);
+    },
+    clear: async () => {
+      values.clear();
+    },
+  };
+}
+
 export function createDemoSessionManager(): SessionManager {
   const transport = createFixtureTransport(request => {
+    // E9 (Story 4.2): progress writes answer 200 with no body, as live.
+    if (request.method === 'PUT' && DEMO_TIMECODE_PATH.test(request.path)) {
+      return { status: 200, delayMs: 300 };
+    }
     const single = DEMO_POST_PATH.exec(request.path);
     if (single) {
       const [, blogUrl, postId] = single;

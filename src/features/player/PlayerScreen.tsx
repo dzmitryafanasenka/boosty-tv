@@ -11,10 +11,12 @@ import type { HttpClient } from '../../shared/api';
 import type { MediaRef } from '../../shared/entities/post';
 import { useLatestRef } from '../../shared/focus';
 import { t } from '../../shared/i18n';
+import { subscribeAppBackground } from '../../shared/platform/appLifecycle';
 import { playbackArbiter } from '../../shared/platform/playbackArbiter';
 import type { PlayerEngineHandle } from '../../shared/platform/playerEngine';
 import { PlayerEngineView } from '../../shared/platform/PlayerEngineView';
 import { subscribeSeekKeys, type SeekKeyEvent } from '../../shared/platform/seekKeys';
+import { useProgressRepository, type ProgressEvent } from '../../shared/services/progress';
 import {
   Button,
   Spinner,
@@ -54,6 +56,23 @@ const KEY_UP = 1;
 
 type Phase = 'loading' | 'playing' | 'error' | 'locked' | 'unavailable';
 
+/** Where playback starts (Story 4.2): the resume point, or 0 («С начала»). */
+export type PlayerStart = 'resume' | 'beginning';
+
+/**
+ * The start-position gate of one source (Story 4.2): no progress is
+ * reported before the start position is reached (never a pre-seek `t=0`).
+ * - `load`: waiting for `onLoad` (and the local store);
+ * - `seek`: the initial seek to `target` is in flight (until its `onSeekDone`);
+ * - `first`: starting at 0, the first progress event starts reporting;
+ * - `started`: reports flow.
+ */
+type StartGate =
+  | { kind: 'load' }
+  | { kind: 'seek'; target: number }
+  | { kind: 'first' }
+  | { kind: 'started' };
+
 export type PlayerScreenProps = {
   /** The active session's content client (from the route; never a singleton). */
   http: HttpClient;
@@ -63,6 +82,8 @@ export type PlayerScreenProps = {
   isActive: () => boolean;
   /** Leave the player: the route pops and focus returns to the origin element. */
   onExit: () => void;
+  /** Story 4.2: `resume` (default) starts at the resume point, `beginning` at 0. */
+  start?: PlayerStart;
 };
 
 /**
@@ -91,11 +112,34 @@ export type PlayerScreenProps = {
  *   surface while hidden; the timeline when it shows (↓ play/pause).
  * - Spinner after 500 ms of buffering.
  * - Back: overlay shown → hide it (focus → the surface); otherwise exit.
- * - No progress writes, resume, quality sheet or autoplay of the next video
- *   (Stories 4.2–4.5).
+ * - Progress (Story 4.2, ProgressRepository): `begin` when the source is
+ *   ready; after `onLoad` one seek to `resumePoint` (or 0 for «С начала»);
+ *   reports only after that seek is done (or, starting at 0, from the first
+ *   progress event); then `tick` on progress, `pause` on a user pause (not a
+ *   hold-scrub pause), `end`, `background`, `exit` (Stop, Back, «Назад»,
+ *   unmount). The repository decides when E9 is written.
+ * - No quality sheet or autoplay of the next video (Stories 4.3–4.5).
  */
-export function PlayerScreen({ http, mediaRef, isActive, onExit }: PlayerScreenProps) {
-  const media = useMediaSource(http, mediaRef);
+export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume' }: PlayerScreenProps) {
+  const progress = useProgressRepository();
+  const media = useMediaSource(http, mediaRef, progress?.onServerProgress);
+  // The local store is loaded before the engine starts, so the resume point
+  // is known at `onLoad` (a cold start reads the persisted entry).
+  const [progressReady, setProgressReady] = useState(() => progress === null || progress.store.isReady());
+  useEffect(() => {
+    if (progress === null) {
+      return;
+    }
+    let alive = true;
+    progress.ready().then(() => {
+      if (alive) {
+        setProgressReady(true);
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, [progress]);
   const { state } = media;
   const ready = state.kind === 'ready' ? state : null;
   /** The resolution whose playback failed to start or broke. */
@@ -158,8 +202,14 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit }: PlayerScreenP
   const seeking = seek.isSeeking();
   const seekTarget = seek.target();
 
+  /** The start-position gate of the current source (Story 4.2). */
+  const gate = useRef<StartGate>({ kind: 'load' });
+  /** The first source of this player opening starts at `start`; a later one (retry) resumes. */
+  const startMode = useRef<PlayerStart>(start);
+
   // A new resolution (a fresh E8) starts the engine over.
   useEffect(() => {
+    gate.current = { kind: 'load' };
     seek.reset();
     scrubWasPlaying.current = false;
     ended.current = false;
@@ -282,7 +332,44 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit }: PlayerScreenP
     setInteraction(n => n + 1);
   }, []);
 
-  const live = useLatestRef({ phase, overlay, paused, positionSec, durationSec, isActive, onExit });
+  const live = useLatestRef({ phase, overlay, paused, positionSec, durationSec, isActive, onExit, mediaRef });
+
+  /**
+   * One progress report (Story 4.2), only once the start position was
+   * reached; the repository decides whether E9 is written.
+   */
+  const reportProgress = useCallback(
+    (event: ProgressEvent, positionOverride?: number) => {
+      if (progress === null || gate.current.kind !== 'started') {
+        return;
+      }
+      const { positionSec: position, durationSec: duration, mediaRef: ref } = live.current;
+      progress.report(ref, positionOverride ?? position, event, duration > 0 ? duration : null);
+    },
+    [progress, live],
+  );
+  const reportRef = useLatestRef(reportProgress);
+
+  // `begin` once per source (a fresh E8: a new resolution), with the video's meta.
+  const readyResolution = ready?.resolution ?? null;
+  const readyProgressRef = useLatestRef(ready?.progress ?? null);
+  useEffect(() => {
+    const meta = readyProgressRef.current;
+    if (progress !== null && readyResolution !== null && meta !== null) {
+      progress.begin(live.current.mediaRef, meta);
+    }
+  }, [progress, readyResolution, readyProgressRef, live]);
+
+  // Background: a forced write (best effort; the app may be stopped).
+  useEffect(() => subscribeAppBackground(() => reportRef.current('background')), [reportRef]);
+  // Unmount (any exit path): a forced write, not awaited.
+  useEffect(() => () => reportRef.current('exit'), [reportRef]);
+
+  /** Exit (Back, Stop, «Назад»): report, then leave. */
+  const exitPlayer = useCallback(() => {
+    reportProgress('exit');
+    live.current.onExit();
+  }, [reportProgress, live]);
 
   /** The entry guard: true for the first input right after focus landed here (used up once). */
   const entryGuarded = useCallback(() => {
@@ -298,13 +385,25 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit }: PlayerScreenP
     (play: boolean) => {
       if (play && ended.current) {
         ended.current = false;
+        // A replay after the end is a new progress session from 0 (a short
+        // visit writes nothing, owner decision 2026-10-28); reports wait for
+        // the seek to 0, as for a new source.
+        const meta = readyProgressRef.current;
+        if (progress !== null && meta !== null) {
+          progress.begin(live.current.mediaRef, meta);
+          gate.current = { kind: 'seek', target: 0 };
+        }
         engine.current?.seek(0);
         setPositionSec(0);
+      }
+      if (!play && !live.current.paused) {
+        // A user pause (never a hold-scrub pause: that one sets `paused` itself).
+        reportProgress('pause');
       }
       setPaused(!play);
       showOverlay();
     },
-    [showOverlay],
+    [showOverlay, reportProgress, live, progress, readyProgressRef],
   );
   const togglePause = useCallback(() => setPlaying(live.current.paused), [live, setPlaying]);
   /**
@@ -406,7 +505,7 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit }: PlayerScreenP
 
   const onTvEvent = useCallback(
     (event: HWEvent) => {
-      const { phase: current, isActive: active, onExit: exit } = live.current;
+      const { phase: current, isActive: active } = live.current;
       if (!active() || current !== 'playing' || Number(event.eventKeyAction) !== KEY_UP) {
         return;
       }
@@ -463,11 +562,11 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit }: PlayerScreenP
           seekBy(-1);
           return;
         case 'stop':
-          exit();
+          exitPlayer();
           return;
       }
     },
-    [live, seek, seekBy, showOverlay, togglePause, setPlaying, entryGuarded],
+    [live, seek, seekBy, showOverlay, togglePause, setPlaying, entryGuarded, exitPlayer],
   );
   useTVEventHandler(onTvEvent);
 
@@ -484,36 +583,82 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit }: PlayerScreenP
           setOverlay(false);
           return true;
         }
-        live.current.onExit();
+        exitPlayer();
         return true;
       });
       return () => sub.remove();
-    }, [live, seek]),
+    }, [live, seek, exitPlayer]),
   );
 
   // --------------------------------------------------------------- engine
 
-  const onLoad = useCallback(({ durationSec: d }: { durationSec: number }) => {
-    setDurationSec(d);
-    setBuffering(false);
-  }, []);
-  const onProgress = useCallback((sec: number) => {
-    setPositionSec(prev => (prev === sec ? prev : sec));
-  }, []);
+  const onLoad = useCallback(
+    ({ durationSec: d }: { durationSec: number }) => {
+      setDurationSec(d);
+      setBuffering(false);
+      if (gate.current.kind !== 'load') {
+        return;
+      }
+      // Story 4.2: the start position, once per source: the resume point
+      // (local, else the server `timeCode`; 0 when none or finished), or 0
+      // for «С начала». Reports wait until the seek there is done.
+      const target =
+        progress === null || startMode.current === 'beginning'
+          ? 0
+          : progress.resumePoint(live.current.mediaRef, d > 0 ? d : null);
+      startMode.current = 'resume';
+      if (target > 0) {
+        gate.current = { kind: 'seek', target };
+        setPositionSec(target);
+        engine.current?.seek(target);
+      } else {
+        gate.current = { kind: 'first' };
+      }
+    },
+    [progress, live],
+  );
+  const onProgress = useCallback(
+    (sec: number) => {
+      let current = gate.current;
+      if (current.kind === 'seek' && Math.abs(sec - current.target) <= 1) {
+        // The engine is at the start position even without its seek report.
+        current = { kind: 'first' };
+      }
+      if (current.kind === 'seek' || current.kind === 'load') {
+        // Before the start position: never shown as progress, never written (no pre-seek t=0).
+        return;
+      }
+      setPositionSec(prev => (prev === sec ? prev : sec));
+      if (current.kind === 'first') {
+        gate.current = { kind: 'started' };
+      }
+      reportRef.current('tick', sec);
+    },
+    [reportRef],
+  );
   const onSeekDone = useCallback(
     (sec: number) => {
       setPositionSec(sec);
+      const current = gate.current;
+      if (current.kind === 'seek') {
+        // The initial seek: reporting starts here (its own report is the baseline).
+        gate.current = { kind: 'started' };
+        reportRef.current('tick', sec);
+        return;
+      }
       seek.seekDone(sec);
     },
-    [seek],
+    [seek, reportRef],
   );
   const onEnd = useCallback(() => {
     // No autoplay and no Ended flow before Story 4.5: stay paused at the end;
-    // a later play starts over from 0.
+    // a later play starts over from 0. The final position is written (finished).
+    const { durationSec: d, positionSec: p } = live.current;
+    reportRef.current('end', Math.max(d, p));
     ended.current = true;
     setPaused(true);
     showOverlay();
-  }, [showOverlay]);
+  }, [showOverlay, live, reportRef]);
   const onError = useCallback(() => {
     seek.reset();
     setFailedResolution(resolution);
@@ -543,7 +688,7 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit }: PlayerScreenP
         onPress={onSurfacePress}
         style={styles.surface}
       >
-        {ready !== null && !failed ? (
+        {ready !== null && !failed && progressReady ? (
           <PlayerEngineView
             key={ready.resolution}
             ref={engine}
@@ -605,7 +750,7 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit }: PlayerScreenP
               testID={PLAYER_BACK_ID}
               kind="secondary"
               label={t('common.back')}
-              onPress={onExit}
+              onPress={exitPlayer}
               onFocus={onBackFocus}
               style={styles.action}
             />

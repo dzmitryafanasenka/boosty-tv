@@ -13,6 +13,7 @@ export {
   feedPath,
   mergePosts,
   postPath,
+  type E8Options,
 } from './postRepository';
 export {
   blockKey,
@@ -56,5 +57,6 @@ export type {
   PostKind,
   PostPage,
   PostResult,
+  ServerProgressSink,
   VideoRow,
 } from './types';

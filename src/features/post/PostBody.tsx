@@ -1,8 +1,16 @@
 import { memo, useCallback, useState } from 'react';
-import { Image, StyleSheet, View, type ImageLoadEvent } from 'react-native';
+import {
+  Image,
+  StyleSheet,
+  View,
+  type ImageLoadEvent,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import type { MediaRef, PlaceholderKind, PostBodyItem, VideoRow } from '../../shared/entities/post';
 import { useZoneItem } from '../../shared/focus';
 import { t, tf } from '../../shared/i18n';
+import type { ProgressStatus } from '../../shared/services/progress';
 import {
   Button,
   FocusableSurface,
@@ -231,14 +239,19 @@ export function PostBody({
   );
 }
 
+/** How the Player is opened (Story 4.2): `beginning` for «С начала». */
+export type OpenPlayer = (ref: MediaRef, focusId: string, start?: 'beginning') => void;
+
 type VideoRowStopProps = {
   id: string;
   row: VideoRow;
   playable: boolean;
+  /** Story 4.2: the row's progress status (only while playable). */
+  status: ProgressStatus | null;
   onView: (id: string, view: HostView | null) => void;
   onFocus: (id: string) => void;
   /** OK (only while playable): the Player for `ref`, opened from the focus id `id`. */
-  onOpen: (ref: MediaRef, focusId: string) => void;
+  onOpen: OpenPlayer;
 };
 
 /**
@@ -251,6 +264,7 @@ const VideoRowStop = memo(function VideoRowStopView({
   id,
   row,
   playable,
+  status,
   onView,
   onFocus,
   onOpen,
@@ -276,6 +290,7 @@ const VideoRowStop = memo(function VideoRowStopView({
       testID={id}
       row={row}
       playable={playable}
+      status={status}
       onPress={handlePress}
       onFocus={handleFocus}
       style={styles.gap}
@@ -289,10 +304,12 @@ export type PostVideoRowsProps = {
   idPrefix: string;
   /** `phaseFlags.player`, from the route (features cannot import `app`). */
   playable: boolean;
+  /** Story 4.2: each row's progress status, by index (none while not playable). */
+  statuses: readonly (ProgressStatus | null)[];
   onRowView: (id: string, view: HostView | null) => void;
   onRowFocus: (id: string) => void;
   /** OK on a row (while playable): the Player for that video. */
-  onOpenPlayer: (ref: MediaRef, focusId: string) => void;
+  onOpenPlayer: OpenPlayer;
 };
 
 /**
@@ -304,18 +321,20 @@ export function PostVideoRows({
   rows,
   idPrefix,
   playable,
+  statuses,
   onRowView,
   onRowFocus,
   onOpenPlayer,
 }: PostVideoRowsProps) {
   return (
     <>
-      {rows.map(row => (
+      {rows.map((row, i) => (
         <VideoRowStop
           key={row.ref.mediaId}
           id={`${idPrefix}${row.ref.mediaId}`}
           row={row}
           playable={playable}
+          status={playable ? statuses[i] ?? null : null}
           onView={onRowView}
           onFocus={onRowFocus}
           onOpen={onOpenPlayer}
@@ -328,22 +347,31 @@ export function PostVideoRows({
 export type PostPrimaryActionProps = {
   /** `post/<postId>/primary` */
   id: string;
-  /** The post's MediaRows; the button targets the first (Story 4.1). */
-  rows: readonly VideoRow[];
+  /** `post/<postId>/restart` */
+  restartId: string;
+  /** The post has several MediaRows: the label names the target («· Видео N»). */
+  multi: boolean;
+  /** The first unfinished video (all finished: the first one). */
+  target: VideoRow;
+  /** The target has progress > 0: «Продолжить» and «С начала». */
+  resume: boolean;
   onView: (id: string, view: HostView | null) => void;
   onFocus: (id: string) => void;
-  onOpenPlayer: (ref: MediaRef, focusId: string) => void;
+  onOpenPlayer: OpenPlayer;
 };
 
-/**
- * The primary «Смотреть» under the header (Story 4.1, owner decision
- * 2026-10-27, option A): a primary Button in its own row, before the
- * MediaRows. It opens the first video (Story 4.2 makes it target the first
- * unfinished one and adds «Продолжить» / «С начала»); a post with several
- * videos names it («Смотреть · Видео 1»). A content zone item and a column
- * stop like the rows.
- */
-export function PostPrimaryAction({ id, rows, onView, onFocus, onOpenPlayer }: PostPrimaryActionProps) {
+type ColumnButtonProps = {
+  id: string;
+  label: string;
+  kind: 'primary' | 'secondary';
+  onPress: () => void;
+  onView: (id: string, view: HostView | null) => void;
+  onFocus: (id: string) => void;
+  style?: StyleProp<ViewStyle>;
+};
+
+/** A button that is a content zone item and a column stop (like the rows). */
+function ColumnButton({ id, label, kind, onPress, onView, onFocus, style }: ColumnButtonProps) {
   const zone = useZoneItem(id);
   const zoneRef = zone.ref;
   const ref = useCallback(
@@ -357,20 +385,68 @@ export function PostPrimaryAction({ id, rows, onView, onFocus, onOpenPlayer }: P
     zone.onFocus();
     onFocus(id);
   }, [zone, onFocus, id]);
-  const target = rows[0];
-  const onPress = useCallback(() => {
-    if (target) {
-      onOpenPlayer(target.ref, id);
-    }
-  }, [target, onOpenPlayer, id]);
-  if (!target) {
-    return null;
-  }
-  const label =
-    rows.length > 1 ? tf('post.watchVideo', { label: mediaRowLabel(target) }) : t('post.watch');
+  return (
+    <Button
+      ref={ref}
+      testID={id}
+      kind={kind}
+      label={label}
+      onPress={onPress}
+      onFocus={handleFocus}
+      style={style}
+    />
+  );
+}
+
+/**
+ * The primary action under the header (Story 4.1, owner decision
+ * 2026-10-27, option A): a primary Button in its own row, before the
+ * MediaRows. Story 4.2: it targets the first unfinished video; «Продолжить»
+ * when that one has progress, else «Смотреть» (all finished: «Смотреть» on
+ * the first video, which starts at 0); several videos name the target
+ * («Продолжить · Видео 2»). «С начала» (owner decision 2026-10-28) sits in
+ * the same row, to its right, only when the target has progress; it starts
+ * that video at 0. ← → move between them, ↓ from either reaches the first
+ * MediaRow, ↑ the author (native focus in the one column).
+ */
+export function PostPrimaryAction({
+  id,
+  restartId,
+  multi,
+  target,
+  resume,
+  onView,
+  onFocus,
+  onOpenPlayer,
+}: PostPrimaryActionProps) {
+  const targetRef = target.ref;
+  const onPress = useCallback(() => onOpenPlayer(targetRef, id), [onOpenPlayer, targetRef, id]);
+  const onRestart = useCallback(
+    () => onOpenPlayer(targetRef, restartId, 'beginning'),
+    [onOpenPlayer, targetRef, restartId],
+  );
+  const video = mediaRowLabel(target);
+  const label = resume
+    ? multi
+      ? tf('post.continueVideo', { label: video })
+      : t('post.continue')
+    : multi
+      ? tf('post.watchVideo', { label: video })
+      : t('post.watch');
   return (
     <View testID={`${id}-row`} style={styles.primaryRow}>
-      <Button ref={ref} testID={id} kind="primary" label={label} onPress={onPress} onFocus={handleFocus} />
+      <ColumnButton id={id} kind="primary" label={label} onPress={onPress} onView={onView} onFocus={onFocus} />
+      {resume ? (
+        <ColumnButton
+          id={restartId}
+          kind="secondary"
+          label={t('post.restart')}
+          onPress={onRestart}
+          onView={onView}
+          onFocus={onFocus}
+          style={styles.restart}
+        />
+      ) : null}
     </View>
   );
 }
@@ -395,6 +471,10 @@ const styles = StyleSheet.create({
   primaryRow: {
     flexDirection: 'row',
     marginBottom: spacing['8'],
+  },
+  // «С начала» to the right of the primary (owner decision 2026-10-28).
+  restart: {
+    marginLeft: spacing['6'],
   },
   gap: {
     marginBottom: spacing['6'],

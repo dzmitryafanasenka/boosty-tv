@@ -129,3 +129,10 @@ export type VideoRow = {
   durationSec: number | null;
   previewUrl: string | null;
 };
+
+/**
+ * Story 4.2: receives a video's server progress (`ok_video.timeCode`, whole
+ * seconds) from an E8. Only the ProgressRepository provides one; the value
+ * never enters the Post entity, a query cache value, a route or a log.
+ */
+export type ServerProgressSink = (mediaId: string, positionSec: number) => void;
