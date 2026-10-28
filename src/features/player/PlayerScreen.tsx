@@ -1168,6 +1168,17 @@ export function PlayerScreen({
     onNoAccessRef.current();
   }, [noAccessExit, isActive, reportRef, onNoAccessRef]);
 
+  // Story 4.7 (owner decision 2026-10-28): a locked answer the session check
+  // verified (E1 ok; never offline; also the no-access exit above, after its
+  // exit report) or an unavailable video (E8 404 / the video gone) drops the
+  // video's local progress, so it leaves the Continue row. No request.
+  const goneForGood = state.kind === 'unavailable' || (state.kind === 'locked' && state.verified);
+  useEffect(() => {
+    if (goneForGood) {
+      progress?.forget(mediaRef.mediaId);
+    }
+  }, [goneForGood, progress, mediaRef.mediaId]);
+
   // --------------------------------------------------------------- render
 
   const retryable = phase === 'error';

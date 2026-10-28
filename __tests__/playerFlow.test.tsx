@@ -421,6 +421,14 @@ describe('a locked fresh E8 checks the session first (Epic 3 retro A6)', () => {
    * player. `timers` only for the AD-6 backoff and the reset to A11.
    */
   async function playDead({ timers = false } = {}): Promise<Root> {
+    // Story 4.7: a local entry that only a confirmed locked answer may drop.
+    progressStore.put({
+      ref: { blogUrl: FEED_BLOG, postId: POST, mediaId: 'v1' },
+      positionSec: 120,
+      durationSec: 600,
+      updatedAt: Date.now(),
+      meta: { title: 'Title v1', postTitle: `Title of ${POST}`, authorName: 'redacted', previewUrl: null, durationSec: 600 },
+    });
     const root = await openPost();
     expect(transport.callsTo(E1)).toHaveLength(1);
     dead = true;
@@ -453,6 +461,8 @@ describe('a locked fresh E8 checks the session first (Epic 3 retro A6)', () => {
     expect(engine.props?.source.format).toBe('hls');
     expect(playerText(root)).not.toContain('Нет доступа к этому видео');
     expect(lastFocusTarget()).toBe(SURFACE);
+    // Story 4.7: not locked after all: the local entry stays.
+    expect(progressStore.get('v1')).toBeDefined();
     await unmount(root);
   });
 
@@ -465,6 +475,8 @@ describe('a locked fresh E8 checks the session first (Epic 3 retro A6)', () => {
     expect(e8Calls()).toHaveLength(3);
     expect(playerText(root)).toContain('Нет доступа к этому видео');
     expect(lastFocusTarget()).toBe(BACK);
+    // Story 4.7 (owner decision 2026-10-28): confirmed locked drops the local entry.
+    expect(progressStore.get('v1')).toBeUndefined();
     await press(root, BACK);
     expect(currentRoute()).toBe('Post');
     await press(root, VIDEO('v1'));
@@ -503,6 +515,8 @@ describe('a locked fresh E8 checks the session first (Epic 3 retro A6)', () => {
     expect(currentRoute()).toBe('Player');
     expect(playerText(root)).toContain('Нет доступа к этому видео');
     expect(lastFocusTarget()).toBe(BACK);
+    // Story 4.7: the session check could not run: the local entry stays.
+    expect(progressStore.get('v1')).toBeDefined();
     await unmount(root);
   });
 });

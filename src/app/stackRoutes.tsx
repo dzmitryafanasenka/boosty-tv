@@ -362,19 +362,23 @@ export function PlayerRoute({ navigation, route }: StackScreenProps<RootStackPar
   const isActive = useCallback(() => navigation.isFocused(), [navigation]);
   /** Story 4.5: the return focus after a natural end (else the origin element). */
   const endedFocus = useRef<string | null>(null);
+  // Story 4.7: a Главная origin (a Continue card) is the Shell's `home`
+  // section. After a natural end its card is gone (finished): Главная's
+  // return picks the neighbour by the kept index, else the first feed card.
+  const originSection = origin.sectionId ?? MAIN_SECTION;
   useEffect(
     () =>
       navigation.addListener('beforeRemove', () => {
-        const kept = focusRestoration.peek(origin.routeKey, MAIN_SECTION);
+        const kept = focusRestoration.peek(origin.routeKey, originSection);
         focusRestoration.remember(
           origin.routeKey,
-          MAIN_SECTION,
+          originSection,
           endedFocus.current ?? origin.focusId,
           kept?.scrollOffset ?? 0,
           kept?.index,
         );
       }),
-    [navigation, origin.routeKey, origin.focusId],
+    [navigation, origin.routeKey, origin.focusId, originSection],
   );
   const onExit = useCallback(() => {
     if (navigation.isFocused()) {

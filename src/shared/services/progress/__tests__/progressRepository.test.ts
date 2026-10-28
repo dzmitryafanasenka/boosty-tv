@@ -23,6 +23,7 @@ import {
   MAX_PROGRESS_ENTRIES,
   PROGRESS_STORAGE_KEY,
   createProgressStore,
+  persistablePreviewUrl,
   type ProgressMeta,
   type ProgressStore,
 } from '../progressStore';
@@ -592,6 +593,86 @@ describe('local store', () => {
     expect(store.isReady()).toBe(true);
     expect(store.entries()).toHaveLength(1);
     expect(repo.resumePoint(REF, 600)).toBe(120);
+  });
+
+  it('Story 4.7: a preview URL with a query (a CDN token) never reaches the disk; memory keeps it', async () => {
+    const { store, kv } = setup();
+    await store.ready();
+    const signed = 'https://example.invalid/videoPreview?id=1&tkn=secret';
+    store.put({ ref: REF, positionSec: 10, durationSec: 600, updatedAt: 2, meta: { ...META, previewUrl: signed } });
+    store.put({ ref: REF2, positionSec: 10, durationSec: 600, updatedAt: 1, meta: META }, { flush: true });
+    await flush();
+    const raw = kv.data.get(PROGRESS_STORAGE_KEY) ?? '';
+    expect(raw).not.toContain('tkn');
+    const disk = JSON.parse(raw).entries;
+    expect(disk.map((e: { meta: ProgressMeta }) => e.meta.previewUrl)).toEqual([null, META.previewUrl]);
+    expect(store.get('v1')?.meta.previewUrl).toBe(signed);
+  });
+
+  it('Story 4.7: a stored preview URL with a query (written before 4.7) is dropped on load', async () => {
+    const kv = memoryKv();
+    kv.data.set(
+      PROGRESS_STORAGE_KEY,
+      JSON.stringify({
+        v: 1,
+        entries: [
+          { ref: REF, positionSec: 120, durationSec: 600, updatedAt: 5, meta: { ...META, previewUrl: 'https://example.invalid/p?tkn=x' } },
+        ],
+      }),
+    );
+    const { store } = setup(kv);
+    await store.ready();
+    expect(store.get('v1')?.meta.previewUrl).toBeNull();
+    // The disk is rewritten at once: the token does not stay there.
+    await store.flush();
+    expect(kv.data.get(PROGRESS_STORAGE_KEY)).not.toContain('tkn');
+    expect(JSON.parse(kv.data.get(PROGRESS_STORAGE_KEY) ?? '{}').entries[0].positionSec).toBe(120);
+  });
+
+  it('Story 4.7: only a preview URL without a query or a fragment is persistable', () => {
+    expect(persistablePreviewUrl('https://example.invalid/p.jpg')).toBe('https://example.invalid/p.jpg');
+    expect(persistablePreviewUrl('https://example.invalid/p.jpg?tkn=x')).toBeNull();
+    expect(persistablePreviewUrl('https://example.invalid/p.jpg#tkn=x')).toBeNull();
+    expect(persistablePreviewUrl(null)).toBeNull();
+  });
+
+  it('Story 4.7: forget drops the local entry (memory and disk) and the server value; the session writes nothing more, no request', async () => {
+    const { repo, store, kv, net } = setup();
+    await repo.ready();
+    repo.begin(REF, META);
+    repo.onServerProgress('v1', 50);
+    repo.report(REF, 100, 'tick', 600);
+    repo.report(REF, 110, 'pause', 600);
+    await flush();
+    const sent = net.calls.length;
+    const listener = jest.fn();
+    store.subscribe(listener);
+    repo.forget('v1');
+    expect(store.get('v1')).toBeUndefined();
+    expect(store.snapshot('v1')).toBeNull();
+    expect(listener).toHaveBeenCalled();
+    // The removal reaches the disk at once (no debounce): a kill cannot bring it back.
+    await flush();
+    expect(JSON.parse(kv.data.get(PROGRESS_STORAGE_KEY) ?? '{"entries":[]}').entries).toEqual([]);
+    repo.report(REF, 130, 'exit', 600);
+    await advance(DISK_DEBOUNCE_MS);
+    expect(store.get('v1')).toBeUndefined();
+    expect(JSON.parse(kv.data.get(PROGRESS_STORAGE_KEY) ?? '{"entries":[]}').entries).toEqual([]);
+    expect(net.calls).toHaveLength(sent);
+    // A later player session for the video starts over normally.
+    repo.begin(REF, META);
+    repo.report(REF, 0, 'tick', 600);
+    repo.report(REF, 12, 'pause', 600);
+    expect(store.get('v1')?.positionSec).toBe(12);
+  });
+
+  it('Story 4.7: subscribers are told when the disk was read, also when it was empty', async () => {
+    const { store } = setup();
+    const listener = jest.fn();
+    store.subscribe(listener);
+    await store.ready();
+    expect(store.isReady()).toBe(true);
+    expect(listener).toHaveBeenCalledTimes(1);
   });
 
   it('a corrupt disk value loads nothing and never throws', async () => {

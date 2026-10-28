@@ -68,6 +68,13 @@ export type ProgressRepository = {
   resumePoint(ref: MediaRef, durationSec?: number | null): number;
   /** The E8 sink: a video's server `timeCode` (never stored on the post). */
   onServerProgress(mediaId: string, positionSec: number): void;
+  /**
+   * Story 4.7 (owner decision 2026-10-28): the video's post is locked
+   * (session checked) or gone: drop its local entry (it leaves the Continue
+   * row) and its writer, so this player session writes nothing more. No
+   * request is sent.
+   */
+  forget(mediaId: string): void;
   /** Stops listening to the session and drops timers (tests). */
   dispose(): void;
 };
@@ -358,6 +365,14 @@ export function createProgressRepository({
     },
     onServerProgress(mediaId, positionSec) {
       store.setServerPosition(mediaId, wholeSec(positionSec));
+    },
+    forget(mediaId) {
+      const writer = writers.get(mediaId);
+      if (writer !== undefined) {
+        clearRetry(writer);
+        writers.delete(mediaId);
+      }
+      store.remove(mediaId);
     },
     dispose() {
       unsubscribeSession();

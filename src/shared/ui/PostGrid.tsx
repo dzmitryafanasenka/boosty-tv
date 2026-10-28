@@ -9,6 +9,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactElement,
   type Ref,
   type RefObject,
 } from 'react';
@@ -679,6 +680,12 @@ export type PostGridProps = {
   testIDPrefix: string;
   /** The load-more error line, from the i18n catalog. */
   loadMoreErrorLabel: string;
+  /**
+   * Content above the first row that scrolls with the grid (Главная's
+   * «Продолжить просмотр» row, Story 4.7). Keep its element type stable so
+   * it updates in place instead of remounting.
+   */
+  header?: ReactElement | null;
 };
 
 /**
@@ -703,6 +710,7 @@ export function PostGrid({
   retryId,
   testIDPrefix,
   loadMoreErrorLabel,
+  header,
 }: PostGridProps) {
   const canLoadMore = hasNextPage && !isFetchingNextPage && !loadMoreFailed;
   const state = useRef({ canLoadMore, count: posts.length, onLoadMore });
@@ -779,6 +787,7 @@ export function PostGrid({
         scrollEventThrottle={100}
         onEndReached={onEndReached}
         onEndReachedThreshold={1}
+        ListHeaderComponent={header ?? undefined}
         ListFooterComponent={GridFooter}
         initialScrollIndex={initialRow}
         drawDistance={POST_GRID_DRAW_DISTANCE}

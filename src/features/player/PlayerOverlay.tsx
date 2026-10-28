@@ -1,5 +1,6 @@
 import type { Ref } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { isGenericVideoTitle } from '../../shared/entities/post';
 import { tf, t } from '../../shared/i18n';
 import { formatDuration } from '../../shared/i18n/format';
 import {
@@ -41,8 +42,6 @@ const BAND_DARK = colors.scrim;
 /** Whole seconds → `m:ss` / `h:mm:ss`. */
 const time = (sec: number) => formatDuration(sec);
 
-/** A generic block title («Video», «Видео», «Видео 2»; any case) says nothing. */
-const GENERIC_VIDEO_TITLE = /^(video|видео)(\s+\d+)?$/i;
 
 /**
  * The overlay shows the video title only when it adds something (owner
@@ -51,7 +50,7 @@ const GENERIC_VIDEO_TITLE = /^(video|видео)(\s+\d+)?$/i;
  */
 export function isDistinctVideoTitle(videoTitle: string, postTitle: string): boolean {
   const title = videoTitle.trim();
-  return title.length > 0 && !GENERIC_VIDEO_TITLE.test(title) && title !== postTitle.trim();
+  return !isGenericVideoTitle(title) && title !== postTitle.trim();
 }
 
 /** «Позиция 1:23 из 12:34» (or without the duration when it is unknown). */

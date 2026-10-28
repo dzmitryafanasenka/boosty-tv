@@ -8,9 +8,10 @@
  * not native focus movement or decoder behavior (device checks,
  * docs/testing.md).
  */
+import { createAsyncStorage } from '@react-native-async-storage/async-storage';
 import { notifyManager } from '@tanstack/react-query';
 import { act } from 'react';
-import { AppState } from 'react-native';
+import { AppState, StyleSheet } from 'react-native';
 import App, { navigationRef } from '../src/app/App';
 import { QUERY_STALE_TIME_MS, queryClient, resetQueryCache } from '../src/app/queryClient';
 import { queryKeys } from '../src/shared/api';
@@ -21,6 +22,9 @@ import {
 } from '../src/shared/api/fixtureTransport';
 import { focusRestoration } from '../src/shared/focus';
 import { logger } from '../src/shared/services/logger';
+import { progressStore } from '../src/shared/services/progress';
+import { engine } from '../src/test/playerEngineMock';
+import { e8Locked, e8MissingReply, paragraph, postDetail } from '../src/test/postFixtures';
 import { t } from '../src/shared/i18n';
 import { requestHostFocus } from '../src/shared/ui/requestHostFocus';
 import type { Root } from 'test-renderer';
@@ -69,6 +73,11 @@ jest.mock('react-native/Libraries/Utilities/BackHandler', () =>
 jest.mock('react-native/Libraries/Components/TV/TVFocusGuideView', () =>
   require('../src/test/flow').recordingFocusGuideModule(),
 );
+// Story 4.7: a Continue card opens the Player (its engine and raw keys mocked).
+jest.mock('react-native/Libraries/Components/TV/TVEventHandler', () =>
+  require('../src/test/tvEventMock'),
+);
+jest.mock('../src/shared/platform/PlayerEngineView', () => require('../src/test/playerEngineMock'));
 
 /** PostCard renders per testID (the production memo, around a counter). */
 const mockCardRenders = new Map<string, number>();
@@ -112,6 +121,8 @@ const E1 = '/v1/user/current';
 
 type Reply = FixtureReply | Promise<FixtureReply> | undefined;
 let feed: (req: FixtureRequest) => Reply;
+/** Story 4.7: other endpoints (E8, E9) a test answers; undefined: none. */
+let other: (req: FixtureRequest) => Reply;
 let transport: FixtureTransport;
 
 const WITH_TIMERS = { timerRounds: 30 };
@@ -138,6 +149,8 @@ beforeEach(() => {
   resetKeychain({ 'boostytv.session': STORED });
   installNativeModules({ AppInfo: { versionName: '1.0' } });
   feed = () => ({ status: 200, body: e5Page() });
+  other = () => undefined;
+  engine.reset();
   transport = installFixtureTransport(req => {
     if (req.path === E1) {
       return { status: 200, body: e1Ok.body };
@@ -145,11 +158,13 @@ beforeEach(() => {
     if (req.path === E5_PATH) {
       return feed(req);
     }
-    return undefined;
+    return other(req);
   });
 });
 
 afterEach(async () => {
+  // Story 4.7: no local progress leaks between tests.
+  await progressStore.reset();
   await resetQueryCache();
   clearNativeModules();
   focusRestoration.clear();
@@ -1796,6 +1811,491 @@ describe('refresh on resume (spec-feed-refresh-on-resume, AD-7)', () => {
     expect(feedCalls()).toHaveLength(3);
     expect(visible(root, 'home/feed/empty')).toBe(true);
     expect(visible(root, 'home/feed/list')).toBe(false);
+    await unmount(root);
+  });
+});
+
+describe('Story 4.7: «Продолжить просмотр» on Главная', () => {
+  const PREFIX = 'home/continue/';
+  const BLOG = 'synthetic-blog-1';
+  const cwRef = (n: number) => ({ blogUrl: BLOG, postId: `cw-post-${n}`, mediaId: `cw-v${n}` });
+  const card = (n: number) => `${PREFIX}cw-v${n}`;
+  const SURFACE = 'player/surface';
+  const E8_RE = /^\/v1\/blog\/([^/]+)\/post\/cw-post-(\d+)$/;
+  const E9_RE = /^\/v1\/viewstat\/video\/([^/]+)\/timecode\/$/;
+  const DURATION = 3600;
+  /** A test's own E8 answer for the Continue posts (null: the playable post). */
+  let cwE8: ((blogUrl: string, n: string) => Reply) | null = null;
+
+  /** A local entry (Story 4.2 shape) for video `n`. */
+  function seed(n: number, positionSec: number, ageMs: number, meta: Record<string, unknown> = {}) {
+    progressStore.put({
+      ref: cwRef(n),
+      positionSec,
+      durationSec: DURATION,
+      updatedAt: Date.now() - ageMs,
+      meta: {
+        title: `Lesson ${n}`,
+        postTitle: `Post ${n}`,
+        authorName: `Author ${n}`,
+        previewUrl: null,
+        durationSec: DURATION,
+        ...meta,
+      },
+    });
+  }
+  const rowIds = (root: Root) => focusableIds(root).filter(id => id.startsWith(PREFIX));
+  const currentRoute = () => navigationRef.getCurrentRoute()?.name;
+  const e9Sent = () =>
+    transport.calls
+      .filter(c => c.method === 'PUT' && E9_RE.test(c.path))
+      .map(c => `${E9_RE.exec(c.path)?.[1]}@${(c.form as Record<string, string>).time_code}`);
+
+  async function fire<K extends 'onLoad' | 'onProgress' | 'onSeekDone' | 'onEnd' | 'onBuffering'>(
+    name: K,
+    ...args: Parameters<NonNullable<NonNullable<typeof engine.props>[K]>>
+  ) {
+    await act(async () => {
+      const handler = engine.props?.[name] as ((...a: unknown[]) => void) | undefined;
+      expect(handler).toBeDefined();
+      handler?.(...args);
+    });
+    await settle();
+  }
+  async function advance(ms: number) {
+    await act(async () => {
+      jest.advanceTimersByTime(ms);
+    });
+    await settle();
+  }
+  /** OK on a Continue card → the Player, loaded, started at `startSec` (seek done). */
+  async function openFromCard(root: Root, id: string, startSec: number) {
+    await focusOn(root, id);
+    await press(root, id);
+    expect(currentRoute()).toBe('Player');
+    await focusOn(root, SURFACE);
+    await advance(600);
+    await fire('onLoad', { durationSec: DURATION });
+    await fire('onBuffering', false);
+    await fire('onSeekDone', startSec);
+  }
+
+  beforeEach(() => {
+    cwE8 = null;
+    other = req => {
+      const single = E8_RE.exec(req.path);
+      if (single && cwE8) {
+        return cwE8(decodeURIComponent(single[1]), single[2]);
+      }
+      if (single) {
+        const n = single[2];
+        return {
+          status: 200,
+          body: postDetail(decodeURIComponent(single[1]), `cw-post-${n}`, [
+            {
+              type: 'ok_video',
+              id: `cw-v${n}`,
+              title: `Video ${n}`,
+              duration: DURATION,
+              playerUrls: [{ type: 'hls', url: 'https://example.invalid/player' }],
+            },
+            ...paragraph('Body'),
+          ]),
+        };
+      }
+      if (req.method === 'PUT' && E9_RE.test(req.path)) {
+        return { status: 200 };
+      }
+      return undefined;
+    };
+  });
+
+  it('matrix «Empty»: no unfinished entries → no row; the feed title on top; focus on the first feed card', async () => {
+    seed(1, 3590, 1000); // finished (< 30 s left)
+    seed(2, 0, 2000); // never started
+    const root = await renderApp();
+    expect(visible(root, 'home/continue')).toBe(false);
+    expect(rowIds(root)).toEqual([]);
+    expect(text(root)).toContain(t('home.feed.title'));
+    expect(lastFocusTarget()).toBe(`home/feed/${e5Posts()[0].id}`);
+    await unmount(root);
+  });
+
+  it('matrix «Shown»: 3 unfinished + 1 finished → 3 cards, newest first, above the feed; focus on the first card', async () => {
+    seed(1, 600, 3000);
+    seed(2, 720, 2000, { title: 'Видео 2' });
+    seed(3, 1800, 1000);
+    seed(4, 3500, 500); // ≥ 95 %: finished
+    const root = await renderApp();
+    expect(rowIds(root)).toEqual([card(3), card(2), card(1)]);
+    expect(lastFocusTarget()).toBe(card(3));
+    // The section title with its scope, then the row, then «Новое в подписках» (in the grid's header).
+    const header = byTestId(root, 'home/header')[0];
+    expect(text(header)).toContain(t('home.continue.title'));
+    expect(text(header)).toContain(t('home.feed.title'));
+    expect(text(header).indexOf(t('home.continue.title'))).toBeLessThan(text(header).indexOf(t('home.feed.title')));
+    // Title (a generic video title → the post title), author, «Осталось N мин», the progress line.
+    expect(one(root, card(3)).props.accessibilityLabel).toBe('Lesson 3. Author 3. Осталось 30 мин');
+    expect(one(root, card(2)).props.accessibilityLabel).toBe('Post 2. Author 2. Осталось 48 мин');
+    expect(text(byTestId(root, `${card(2)}/left`)[0])).toContain('Осталось 48 мин');
+    expect(visible(root, `${card(2)}/progress`)).toBe(true);
+    // No preview stored and none in memory: a neutral plate.
+    expect(visible(root, `${card(2)}/preview-placeholder`)).toBe(true);
+    await unmount(root);
+  });
+
+  it('a started video without a known duration: no remaining time and no progress line (never a fake status)', async () => {
+    progressStore.put({
+      ref: cwRef(1),
+      positionSec: 300,
+      durationSec: null,
+      updatedAt: Date.now(),
+      meta: { title: 'Lesson 1', postTitle: 'Post 1', authorName: 'Author 1', previewUrl: 'https://example.invalid/p.jpg', durationSec: null },
+    });
+    const root = await renderApp();
+    expect(one(root, card(1)).props.accessibilityLabel).toBe('Lesson 1. Author 1');
+    expect(visible(root, `${card(1)}/left`)).toBe(false);
+    expect(visible(root, `${card(1)}/progress`)).toBe(false);
+    expect(byTestId(root, `${card(1)}/preview`)[0].props.source).toEqual({ uri: 'https://example.invalid/p.jpg' });
+    await unmount(root);
+  });
+
+  it('matrix «Cap»: 25 unfinished → 20 cards', async () => {
+    for (let n = 1; n <= 25; n += 1) {
+      seed(n, 100, n * 1000);
+    }
+    const root = await renderApp();
+    expect(rowIds(root)).toHaveLength(20);
+    expect(rowIds(root)[0]).toBe(card(1));
+    await unmount(root);
+  });
+
+  it('matrix «Open»: OK on a card at 12:00 of 60:00 → the Player for that video, which starts at 12:00', async () => {
+    seed(1, 720, 1000);
+    const root = await renderApp();
+    expect(lastFocusTarget()).toBe(card(1));
+    await press(root, card(1));
+    expect(currentRoute()).toBe('Player');
+    // Ids only: the media identity and the origin (Главная's restoration section).
+    expect(navigationRef.getCurrentRoute()?.params).toEqual({
+      ref: cwRef(1),
+      origin: { routeKey: 'shell', sectionId: 'home', focusId: card(1) },
+    });
+    await focusOn(root, SURFACE);
+    await advance(600);
+    await fire('onLoad', { durationSec: DURATION });
+    expect(engine.seek).toHaveBeenCalledWith(720);
+    await unmount(root);
+  });
+
+  it('matrix «Return»: Back from that player → focus on the same card, now first', async () => {
+    seed(1, 600, 1000);
+    seed(2, 720, 2000);
+    const root = await renderApp();
+    expect(rowIds(root)).toEqual([card(1), card(2)]);
+    await openFromCard(root, card(2), 720);
+    for (let sec = 720; sec <= 732; sec += 1) {
+      await fire('onProgress', sec);
+    }
+    expect(e9Sent()).toContain('cw-v2@730');
+    focusMock.mockClear();
+    await back();
+    expect(currentRoute()).toBe('Shell');
+    expect(rowIds(root)).toEqual([card(2), card(1)]);
+    expect(lastFocusTarget()).toBe(card(2));
+    await unmount(root);
+  });
+
+  it('matrix «Finished at end»: the video ends → its card is gone; focus on the next card', async () => {
+    seed(1, 600, 1000);
+    seed(2, 720, 2000);
+    seed(3, 900, 3000);
+    const root = await renderApp();
+    expect(rowIds(root)).toEqual([card(1), card(2), card(3)]);
+    await openFromCard(root, card(2), 720);
+    await fire('onProgress', 3599);
+    focusMock.mockClear();
+    await fire('onEnd');
+    expect(currentRoute()).toBe('Shell');
+    expect(rowIds(root)).toEqual([card(1), card(3)]);
+    expect(lastFocusTarget()).toBe(card(3));
+    await unmount(root);
+  });
+
+  it('«Finished at end» on the last card → the previous card; on the only card → the first feed card', async () => {
+    seed(1, 600, 1000);
+    seed(2, 720, 2000);
+    const root = await renderApp();
+    await openFromCard(root, card(2), 720);
+    await fire('onProgress', 3599);
+    focusMock.mockClear();
+    await fire('onEnd');
+    expect(rowIds(root)).toEqual([card(1)]);
+    expect(lastFocusTarget()).toBe(card(1));
+
+    await openFromCard(root, card(1), 600);
+    await fire('onProgress', 3599);
+    focusMock.mockClear();
+    await fire('onEnd');
+    expect(currentRoute()).toBe('Shell');
+    expect(visible(root, 'home/continue')).toBe(false);
+    expect(lastFocusTarget()).toBe(`home/feed/${e5Posts()[0].id}`);
+    await unmount(root);
+  });
+
+  const lockedCwPost = (blogUrl: string, n: string) => ({
+    status: 200,
+    body: { ...e8Locked(), id: `cw-post-${n}`, user: { ...(e8Locked().user as object), blogUrl } },
+  });
+
+  it('owner decision 2026-10-28: the post is locked (session checked) → the entry is dropped; back on Главная the card is gone, focus on its neighbour', async () => {
+    seed(1, 600, 1000);
+    seed(2, 720, 2000);
+    seed(3, 900, 3000);
+    const root = await renderApp();
+    cwE8 = lockedCwPost;
+    await focusOn(root, card(2));
+    await press(root, card(2));
+    expect(currentRoute()).toBe('Player');
+    expect(text(byTestId(root, 'player/page')[0])).toContain('Нет доступа к этому видео');
+    expect(progressStore.get('cw-v2')).toBeUndefined();
+    focusMock.mockClear();
+    await press(root, 'player/error/back');
+    expect(currentRoute()).toBe('Shell');
+    expect(rowIds(root)).toEqual([card(1), card(3)]);
+    expect(lastFocusTarget()).toBe(card(3));
+    expect(e9Sent()).toEqual([]);
+    await unmount(root);
+  });
+
+  it('owner decision 2026-10-28: the video is unavailable (E8 404) → the only card is dropped; focus on the first feed card', async () => {
+    seed(1, 600, 1000);
+    const root = await renderApp();
+    cwE8 = () => e8MissingReply();
+    await press(root, card(1));
+    expect(text(byTestId(root, 'player/page')[0])).toContain('Видео недоступно');
+    expect(progressStore.get('cw-v1')).toBeUndefined();
+    focusMock.mockClear();
+    await back();
+    expect(currentRoute()).toBe('Shell');
+    expect(visible(root, 'home/continue')).toBe(false);
+    expect(lastFocusTarget()).toBe(`home/feed/${e5Posts()[0].id}`);
+    await unmount(root);
+  });
+
+  it('owner decision 2026-10-28: the 4.4 no-access exit (locked on the recovery E8 after playback) drops the entry; Главная focuses the neighbour', async () => {
+    seed(1, 600, 1000);
+    seed(2, 720, 2000);
+    const root = await renderApp();
+    await openFromCard(root, card(2), 720);
+    for (let sec = 720; sec <= 732; sec += 1) {
+      await fire('onProgress', sec);
+    }
+    expect(progressStore.get('cw-v2')?.positionSec).toBe(730);
+    cwE8 = lockedCwPost;
+    focusMock.mockClear();
+    await act(async () => {
+      (engine.props?.onError as ((code: string | null) => void) | undefined)?.('decoder');
+    });
+    await settle();
+    expect(currentRoute()).toBe('Shell');
+    expect(progressStore.get('cw-v2')).toBeUndefined();
+    expect(rowIds(root)).toEqual([card(1)]);
+    expect(lastFocusTarget()).toBe(card(1));
+    await unmount(root);
+  });
+
+  it('both titles and the author empty: «Без названия»; the label leaves the author out', async () => {
+    seed(1, 720, 1000, { title: '', postTitle: '', authorName: '' });
+    const root = await renderApp();
+    expect(one(root, card(1)).props.accessibilityLabel).toBe('Без названия. Осталось 48 мин');
+    expect(text(byTestId(root, `${card(1)}/title`)[0])).toContain('Без названия');
+    await unmount(root);
+  });
+
+  it('a focused card that leaves in the same update as a reorder → its neighbour by id; the row guide agrees', async () => {
+    seed(1, 600, 3000);
+    seed(2, 600, 2000);
+    seed(3, 600, 1000);
+    const root = await renderApp();
+    expect(rowIds(root)).toEqual([card(3), card(2), card(1)]);
+    await focusOn(root, card(2));
+    focusMock.mockClear();
+    await act(async () => {
+      seed(2, 3500, 0); // finished: leaves
+      seed(1, 650, 0); // watched: moves first
+    });
+    await settle();
+    expect(rowIds(root)).toEqual([card(1), card(3)]);
+    // Card 2's next card in the previous order was card 1 (index 1 now holds card 3).
+    expect(lastFocusTarget()).toBe(card(1));
+    expect(destinationIds('home/continue/guide')).toEqual([card(1)]);
+    await unmount(root);
+  });
+
+  it('a resume refresh with a new feed head keeps focus on the Continue card the page focused', async () => {
+    let handlers: Array<(state: string) => void> = [];
+    jest.spyOn(AppState, 'addEventListener').mockImplementation(((
+      _type: string,
+      listener: (state: string) => void,
+    ) => {
+      handlers.push(listener);
+      return {
+        remove: () => {
+          handlers = handlers.filter(h => h !== listener);
+        },
+      };
+    }) as unknown as typeof AppState.addEventListener);
+    const appState = async (state: string) => {
+      await act(async () => {
+        for (const h of [...handlers]) {
+          h(state);
+        }
+      });
+      await settle();
+    };
+    const pages = syntheticFeed({ total: 30 });
+    let head: FixtureReply | null = null;
+    feed = req => (cursorOf(req.url) === null && head ? head : pages(req));
+    seed(1, 600, 1000);
+    const root = await renderApp();
+    expect(lastFocusTarget()).toBe(card(1));
+    focusMock.mockClear();
+    head = {
+      status: 200,
+      body: {
+        data: {
+          posts: [feedPost(1000, { id: 'new-0' }), ...Array.from({ length: 9 }, (_, i) => feedPost(i))],
+          blogs: [],
+          counters: {},
+        },
+        extra: { offset: cursorFor(9), isLast: false },
+      },
+    };
+    await appState('background');
+    jest.setSystemTime(Date.now() + QUERY_STALE_TIME_MS + 1_000);
+    await appState('active');
+    expect(gridPosts(root)[0].id).toBe('new-0');
+    expect(focusTargets()).toEqual([]);
+    expect(lastFocusTarget()).toBeUndefined();
+    await unmount(root);
+  });
+
+  it('an entry only on disk (cold start): the first card takes the initial focus', async () => {
+    await createAsyncStorage('boostytv-account').setItem(
+      'progress.v1',
+      JSON.stringify({
+        v: 1,
+        entries: [
+          {
+            ref: cwRef(7),
+            positionSec: 720,
+            durationSec: DURATION,
+            updatedAt: 1,
+            meta: { title: 'Lesson 7', postTitle: 'Post 7', authorName: 'Author 7', previewUrl: null, durationSec: DURATION },
+          },
+        ],
+      }),
+    );
+    const root = await renderApp();
+    expect(rowIds(root)).toEqual([card(7)]);
+    expect(lastFocusTarget()).toBe(card(7));
+    await unmount(root);
+  });
+
+  it('matrix «Reset»: the history is wiped (sign-out / account switch) → the row is empty; a focused card → the first feed card', async () => {
+    seed(1, 600, 1000);
+    const root = await renderApp();
+    expect(lastFocusTarget()).toBe(card(1));
+    await focusOn(root, card(1)); // native focus arrived
+    focusMock.mockClear();
+    await act(async () => {
+      await progressStore.reset();
+    });
+    await settle();
+    expect(visible(root, 'home/continue')).toBe(false);
+    expect(visible(root, 'home/feed/list')).toBe(true);
+    expect(lastFocusTarget()).toBe(`home/feed/${e5Posts()[0].id}`);
+    await unmount(root);
+  });
+
+  it('matrix «↑ ↓»: the row guide points at the remembered card (↑ from the feed lands there); the columns line up with the grid', async () => {
+    seed(1, 600, 1000);
+    seed(2, 600, 2000);
+    seed(3, 600, 3000);
+    seed(4, 600, 4000);
+    const root = await renderApp();
+    expect(destinationIds('home/continue/guide')).toEqual([card(1)]);
+    await focusOn(root, card(2));
+    expect(destinationIds('home/continue/guide')).toEqual([card(2)]);
+    // ↓ to the feed and back ↑: the guide still names card 2.
+    await focusOn(root, `home/feed/${e5Posts()[1].id}`);
+    expect(destinationIds('home/continue/guide')).toEqual([card(2)]);
+    // Geometry: with the row flush at the left, card i starts where grid column i starts.
+    const step = (id: string) => StyleSheet.flatten(one(root, id).props.style) as Record<string, number>;
+    const first = step(card(1));
+    const next = step(card(2));
+    const outer = first.paddingLeft + 221 + first.paddingRight;
+    expect(first.paddingLeft).toBe(12);
+    expect(outer + next.marginLeft).toBe(221 + 16);
+    // Flush at the right: card 3 of the visible three ends 12 dp before the 720 dp edge.
+    expect(720 - first.paddingRight - (12 + 2 * (221 + 16) + 221)).toBe(0);
+    await unmount(root);
+  });
+
+  it('reacts to the store while shown: a newer entry moves first with focus kept; a finished focused card → its neighbour', async () => {
+    seed(1, 600, 3000);
+    seed(2, 600, 2000);
+    seed(3, 600, 1000);
+    const root = await renderApp();
+    expect(rowIds(root)).toEqual([card(3), card(2), card(1)]);
+    await focusOn(root, card(2));
+    focusMock.mockClear();
+    await act(async () => {
+      seed(1, 650, 0);
+    });
+    await settle();
+    expect(rowIds(root)).toEqual([card(1), card(3), card(2)]);
+    expect(focusMock).not.toHaveBeenCalled();
+    await act(async () => {
+      seed(2, 3500, 0);
+    });
+    await settle();
+    expect(rowIds(root)).toEqual([card(1), card(3)]);
+    // card 2 was at index 2 (the last): its neighbour is the previous card.
+    expect(lastFocusTarget()).toBe(card(3));
+    await unmount(root);
+  });
+
+  it('a preview URL comes from the stored entry, else from the in-memory feed post', async () => {
+    const post = feedPost(1, {
+      data: [
+        {
+          type: 'ok_video',
+          id: 'feed-video',
+          title: '',
+          duration: DURATION,
+          preview: 'https://example.invalid/mem.jpg',
+          playerUrls: [],
+        },
+      ],
+    });
+    progressStore.put({
+      ref: { blogUrl: BLOG, postId: post.id as string, mediaId: 'feed-video' },
+      positionSec: 100,
+      durationSec: DURATION,
+      updatedAt: Date.now(),
+      meta: { title: '', postTitle: 'P', authorName: 'A', previewUrl: null, durationSec: DURATION },
+    });
+    feed = () => {
+      const body = e5Page() as { data: { posts: unknown[] } };
+      body.data.posts = [post, ...body.data.posts];
+      return { status: 200, body };
+    };
+    const root = await renderApp();
+    expect(byTestId(root, `${PREFIX}feed-video/preview`)[0].props.source).toEqual({
+      uri: 'https://example.invalid/mem.jpg',
+    });
     await unmount(root);
   });
 });
