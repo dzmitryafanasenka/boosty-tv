@@ -23,6 +23,12 @@ import {
   useZoneItem,
 } from '../../shared/focus';
 import { t } from '../../shared/i18n';
+import {
+  progressStatus,
+  useProgress,
+  useProgressRepository,
+  type ProgressStatus,
+} from '../../shared/services/progress';
 import { StateView, requestHostFocus, spacing, type HostView } from '../../shared/ui';
 import {
   PostBody,
@@ -45,8 +51,31 @@ export const postBlockId = (postId: string, blockKey: string) =>
 export const postVideoPrefix = (postId: string) => `post/${postId}/video/`;
 export const postVideoId = (postId: string, mediaId: string) =>
   `${postVideoPrefix(postId)}${mediaId}`;
-/** «Смотреть» under the header (Story 4.1). */
+/** «Смотреть» / «Продолжить» under the header (Story 4.1, 4.2). */
 export const postPrimaryId = (postId: string) => `post/${postId}/primary`;
+/** «С начала», to the right of the primary (Story 4.2, owner decision 2026-10-28). */
+export const postRestartId = (postId: string) => `post/${postId}/restart`;
+
+/**
+ * The primary's target (Story 4.2): the first unfinished video; `resume`
+ * when it has progress > 0 («Продолжить», «С начала»). All finished: the
+ * first video, no resume («Смотреть», it starts at 0). Null without rows.
+ */
+export function primaryTarget(
+  rows: readonly VideoRow[],
+  statuses: readonly (ProgressStatus | null)[],
+): { row: VideoRow; resume: boolean } | null {
+  for (let i = 0; i < rows.length; i += 1) {
+    const status = statuses[i];
+    if (status?.kind !== 'watched') {
+      return {
+        row: rows[i],
+        resume: status?.kind === 'inProgress' || status?.kind === 'unknown',
+      };
+    }
+  }
+  return rows.length > 0 ? { row: rows[0], resume: false } : null;
+}
 
 const NO_DESTINATIONS: HostView[] = [];
 
@@ -105,10 +134,11 @@ export type PostScreenProps = {
   /** OK on the author row: open Автор for this blog. */
   onOpenAuthor: (blogUrl: string) => void;
   /**
-   * OK on «Смотреть» or a MediaRow (Story 4.1): open the Player for `ref`;
+   * OK on the primary or a MediaRow (Story 4.1): open the Player for `ref`;
    * `focusId` is the element that opened it (exit returns focus there).
+   * «С начала» (Story 4.2) passes `beginning`: the video starts at 0.
    */
-  onOpenPlayer: (ref: MediaRef, focusId: string) => void;
+  onOpenPlayer: (ref: MediaRef, focusId: string, start?: 'beginning') => void;
   /**
    * `phaseFlags.player` (AD-20), passed by the route: off → no «Смотреть»
    * and the MediaRows have no action.
@@ -127,9 +157,12 @@ type Phase = 'unavailable' | 'error' | 'loading' | 'ready';
  * (each a ParagraphStop) and neutral non-focusable placeholders, the text
  * capped at `spacing['text-measure']`. With the player on (Story 4.1), a
  * post with videos shows «Смотреть» right under the header (before the
- * rows) and OK on it or on a row opens the Player. Not here yet: progress,
- * «Продолжить» / «С начала» (Story 4.2), styles, collapse and real blocks
- * (Epic 6). A locked post (Story 3.6) shows its header, the no-access copy
+ * rows) and OK on it or on a row opens the Player. Story 4.2: the primary
+ * targets the first unfinished video («Продолжить» when it has progress,
+ * «С начала» to its right), and each MediaRow shows its status, all from
+ * `useProgress` (the local entry, else the server `timeCode` that this
+ * screen's E8 hands to the ProgressRepository). Not here yet: styles,
+ * collapse and real blocks (Epic 6). A locked post (Story 3.6) shows its header, the no-access copy
  * (`LockedNotice`, with the level name when known; never a price or a
  * subscribe action), then its teaser: images, paragraphs and placeholders
  * (no rows). A locked post is never an error; `usePost` first asks the
@@ -166,7 +199,8 @@ export function PostScreen({
   onOpenPlayer,
   playerEnabled,
 }: PostScreenProps) {
-  const state = usePost(http, blogUrl, postId);
+  const progress = useProgressRepository();
+  const state = usePost(http, blogUrl, postId, progress?.onServerProgress);
   const { post } = state;
   const phase: Phase = state.unavailable
     ? 'unavailable'
@@ -181,6 +215,7 @@ export function PostScreen({
   const videoPrefix = postVideoPrefix(postId);
   const contentPrefix = postIdPrefix(postId);
   const primaryId = postPrimaryId(postId);
+  const restartId = postRestartId(postId);
 
   // The MediaRows (an accessible post's videos with an id, deduped) and the
   // body: the other blocks of an accessible post, the teaser of a locked one
@@ -197,6 +232,23 @@ export function PostScreen({
   );
   /** «Смотреть» (Story 4.1): an accessible post with a video, while the player is on. */
   const showPrimary = playerEnabled && rows.length > 0;
+  // Story 4.2: each row's progress (the local entry, else the server
+  // `timeCode`), only through `useProgress`; the row's own duration applies
+  // when the local entry has none.
+  const refs = useMemo(() => rows.map(row => row.ref), [rows]);
+  const snapshots = useProgress(refs);
+  const statuses = useMemo(
+    () =>
+      rows.map((row, i) => {
+        const snap = snapshots[i] ?? null;
+        return progressStatus(snap?.positionSec ?? null, snap?.durationSec ?? row.durationSec);
+      }),
+    [rows, snapshots],
+  );
+  const primary = useMemo(() => primaryTarget(rows, statuses), [rows, statuses]);
+  /** «С начала»: only when the primary's target has progress > 0. */
+  const showRestart = showPrimary && primary !== null && primary.resume;
+
   /**
    * The first stop below the header: «Смотреть», else the first MediaRow,
    * else the first paragraph.
@@ -309,7 +361,7 @@ export function PostScreen({
   }, [authorZone, authorId, onStopFocus]);
   useEffect(() => {
     refreshColumnTarget();
-  }, [rows, items, showPrimary, initialId, refreshColumnTarget]);
+  }, [rows, items, showPrimary, showRestart, initialId, refreshColumnTarget]);
 
   const stateAction = useZoneItem(POST_STATE_ACTION_ID);
   const stateActionView = useRef<HostView | null>(null);
@@ -348,6 +400,8 @@ export function PostScreen({
   }, [contentPrefix]);
 
   const phaseRef = useLatestRef(phase);
+  const restartRef = useLatestRef(restartId);
+  const primaryRef = useLatestRef(primaryId);
 
   // First focus of the route and every return to it (Автор on top popped).
   // Declared before the phase effect: on the first focus it only covers the
@@ -364,10 +418,19 @@ export function PostScreen({
         return;
       }
       const current = info.current();
+      // «С начала» opened the player and is gone now (that video is
+      // finished): the primary instead (Story 4.2).
+      if (current === restartRef.current && !views.current.has(current)) {
+        const primaryView = views.current.get(primaryRef.current);
+        if (primaryView) {
+          requestHostFocus(primaryView);
+          return;
+        }
+      }
       if (!(current !== null && current !== info.sectionItemId && info.focusZoneTarget())) {
         info.focusSidebar();
       }
-    }, [phaseRef]),
+    }, [phaseRef, restartRef, primaryRef]),
   );
 
   usePhaseChange(phase, () => {
@@ -391,7 +454,9 @@ export function PostScreen({
   });
 
   // A refetch changed the blocks and the focused row or paragraph is gone:
-  // the initial target (its view is already unmounted when this runs).
+  // the initial target (its view is already unmounted when this runs). A
+  // focused «С начала» that disappears (Story 4.2) falls back to the
+  // primary, which is the initial target whenever «С начала» exists.
   useEffect(() => {
     const info = focusRef.current;
     const current = info.current();
@@ -399,7 +464,10 @@ export function PostScreen({
       phaseRef.current === 'ready' &&
       info.isActive() &&
       current !== null &&
-      (current.startsWith(blockPrefix) || current.startsWith(videoPrefix) || current === primaryId) &&
+      (current.startsWith(blockPrefix) ||
+        current.startsWith(videoPrefix) ||
+        current === primaryId ||
+        current === restartId) &&
       !views.current.has(current)
     ) {
       if (lastFocused.current === current) {
@@ -407,7 +475,7 @@ export function PostScreen({
       }
       focusInitial();
     }
-  }, [rows, items, showPrimary, blockPrefix, videoPrefix, primaryId, focusInitial, phaseRef]);
+  }, [rows, items, showPrimary, showRestart, blockPrefix, videoPrefix, primaryId, restartId, focusInitial, phaseRef]);
 
   const authorBlogUrl = post?.author.blogUrl ?? null;
   const onAuthorPress = useCallback(() => {
@@ -468,10 +536,13 @@ export function PostScreen({
             {post.hasAccess ? null : (
               <LockedNotice levelName={post.levelName} onLayout={onCopyLayout} />
             )}
-            {showPrimary ? (
+            {showPrimary && primary !== null ? (
               <PostPrimaryAction
                 id={primaryId}
-                rows={rows}
+                restartId={restartId}
+                multi={rows.length > 1}
+                target={primary.row}
+                resume={showRestart}
                 onView={onStopView}
                 onFocus={onStopFocus}
                 onOpenPlayer={onOpenPlayer}
@@ -481,6 +552,7 @@ export function PostScreen({
               rows={rows}
               idPrefix={videoPrefix}
               playable={playerEnabled}
+              statuses={statuses}
               onRowView={onStopView}
               onRowFocus={onStopFocus}
               onOpenPlayer={onOpenPlayer}

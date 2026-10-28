@@ -24,6 +24,7 @@ import { videoRowsOf, type Post } from '../src/shared/entities/post';
 import { focusRestoration } from '../src/shared/focus';
 import { t } from '../src/shared/i18n';
 import { logger } from '../src/shared/services/logger';
+import { progressStore } from '../src/shared/services/progress';
 import { colors, spacing } from '../src/shared/ui';
 import { requestHostFocus } from '../src/shared/ui/requestHostFocus';
 import backHandler from '../src/test/backHandlerMock';
@@ -190,6 +191,8 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  // Story 4.2: no progress (local entries, server values, held writes) leaks between tests.
+  await progressStore.reset();
   await resetQueryCache();
   clearNativeModules();
   focusRestoration.clear();
@@ -1347,6 +1350,52 @@ describe('media rows (Story 3.5, focus-map §4 F)', () => {
       expect(one(on, VIDEO(id, 'v1')).props.accessibilityRole).toBe('button');
       expect(one(on, `post/${id}/primary`).props.accessibilityLabel).toBe('Смотреть · Видео 1');
       await unmount(on);
+    } finally {
+      mockPlayerFlag.on = false;
+    }
+  });
+
+  it('Story 4.2: the server `timeCode` shows a status and «Продолжить» only while the player is on', async () => {
+    withData([
+      { type: 'ok_video', id: 'v1', title: 'Часть первая', duration: 600, timeCode: 590 },
+      { type: 'ok_video', id: 'v2', title: '', duration: 600, timeCode: 120 },
+      ...paragraph('Текст'),
+    ]);
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    for (const forbidden of ['Продолжить', 'С начала', 'Не начато', 'Осталось', 'Просмотрено']) {
+      expect(pageText(root)).not.toContain(forbidden);
+    }
+    expect(visible(root, `${VIDEO(id, 'v1')}/progress`)).toBe(false);
+    await unmount(root);
+    mockPlayerFlag.on = true;
+    try {
+      const on = await openFromHome();
+      expect(one(on, `post/${id}/primary`).props.accessibilityLabel).toBe('Продолжить · Видео 2');
+      expect(one(on, `post/${id}/restart`).props.accessibilityLabel).toBe('С начала');
+      expect(lineOf(on, `${VIDEO(id, 'v1')}/status`)).toBe('Просмотрено');
+      expect(lineOf(on, `${VIDEO(id, 'v2')}/status`)).toBe('Осталось 8 мин');
+      expect(visible(on, `${VIDEO(id, 'v1')}/progress`)).toBe(true);
+      // Initial focus stays on the primary; «С начала» is its right neighbour.
+      expect(lastFocusTarget()).toBe(`post/${id}/primary`);
+      await unmount(on);
+    } finally {
+      mockPlayerFlag.on = false;
+    }
+  });
+
+  it('Story 4.2: a started video without a duration: «Продолжить» and «С начала», no status, no line, no status in the label', async () => {
+    withData([{ type: 'ok_video', id: 'v1', title: 'Часть первая', timeCode: 120 }, ...paragraph('Текст')]);
+    mockPlayerFlag.on = true;
+    try {
+      const root = await openFromHome();
+      const id = FEED_ID(0);
+      expect(one(root, `post/${id}/primary`).props.accessibilityLabel).toBe('Продолжить');
+      expect(visible(root, `post/${id}/restart`)).toBe(true);
+      expect(visible(root, `${VIDEO(id, 'v1')}/status`)).toBe(false);
+      expect(visible(root, `${VIDEO(id, 'v1')}/progress`)).toBe(false);
+      expect(one(root, VIDEO(id, 'v1')).props.accessibilityLabel).toBe('Видео 1. Часть первая');
+      await unmount(root);
     } finally {
       mockPlayerFlag.on = false;
     }

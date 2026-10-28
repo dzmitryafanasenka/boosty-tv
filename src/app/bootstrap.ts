@@ -2,6 +2,7 @@ import { authFlowAccountStore } from '../features/auth';
 import { accountScope } from '../shared/account';
 import { focusRestorationAccountStore } from '../shared/focus';
 import { loggerAccountStore } from '../shared/services/logger';
+import { progressAccountStore } from '../shared/services/progress';
 import { queryCacheAccountStore } from './queryClient';
 import { session, sessionAccountStore } from './session';
 
@@ -35,6 +36,7 @@ accountScope.register(
   authFlowAccountStore,
   loggerAccountStore,
   queryCacheAccountStore,
+  progressAccountStore,
 );
 accountScope.seal();
 session.setAccountSwitchHook(accountSwitchHook);

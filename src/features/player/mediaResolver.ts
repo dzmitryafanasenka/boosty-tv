@@ -12,8 +12,10 @@ import {
 import {
   PostRepository,
   type MediaRef,
+  type ServerProgressSink,
   type VideoSource,
 } from '../../shared/entities/post';
+import type { ProgressMeta } from '../../shared/services/progress';
 import { postCardTitle } from '../../shared/ui';
 
 /**
@@ -95,8 +97,12 @@ export type PlayerMeta = {
 
 export type MediaSourceState =
   | { kind: 'loading' }
-  /** A playable source; `resolution` changes with every fresh E8 (engine reload). */
-  | { kind: 'ready'; source: VideoSource; meta: PlayerMeta; resolution: number }
+  /**
+   * A playable source; `resolution` changes with every fresh E8 (engine
+   * reload). `progress` is what the ProgressRepository's `begin` gets (no URL
+   * but the unsigned preview).
+   */
+  | { kind: 'ready'; source: VideoSource; meta: PlayerMeta; progress: ProgressMeta; resolution: number }
   /** The fresh E8 says the post is locked: «Нет доступа к этому видео», no retry. */
   | { kind: 'locked' }
   /** E8 404 or the video is gone from the post: «Видео недоступно», no retry. */
@@ -125,13 +131,22 @@ export type MediaSource = {
  * silent token refresh made it accessible: the video plays), `expired`
  * opens A11 through the app's status listener.
  */
-export function useMediaSource(http: HttpClient, ref: MediaRef): MediaSource {
+export function useMediaSource(
+  http: HttpClient,
+  ref: MediaRef,
+  onServerProgress?: ServerProgressSink,
+): MediaSource {
+  const sinkRef = useRef(onServerProgress);
+  sinkRef.current = onServerProgress;
   const refetchRef = useRef<() => void>(() => {});
   const checkLocked = useLockedSessionCheck(SESSION_CHECK_KEYS.player, () => refetchRef.current());
   const query = useQuery({
     queryKey: queryKeys.mediaSource(ref.blogUrl, ref.postId, ref.mediaId),
     queryFn: async () => {
-      const result = await PostRepository.videoSources(http, ref);
+      // The fresh E8's `timeCode` goes to the ProgressRepository (Story 4.2).
+      const result = await PostRepository.videoSources(http, ref, {
+        onServerProgress: (mediaId, sec) => sinkRef.current?.(mediaId, sec),
+      });
       if (result.kind === 'locked') {
         checkLocked();
       }
@@ -189,18 +204,28 @@ export function useMediaSource(http: HttpClient, ref: MediaRef): MediaSource {
     if (source === null) {
       return { kind: 'noSource' };
     }
+    const block = data.post.blocks.find(b => b.type === 'ok_video' && b.id === ref.mediaId);
+    const video = block?.type === 'ok_video' ? block : null;
+    const postTitle = postCardTitle(data.post);
     return {
       kind: 'ready',
       source,
       meta: {
         authorName: data.post.author.name,
         authorAvatarUrl: data.post.author.avatarUrl,
-        postTitle: postCardTitle(data.post),
+        postTitle,
         videoTitle: data.videoTitle,
+      },
+      progress: {
+        title: data.videoTitle,
+        postTitle,
+        authorName: data.post.author.name,
+        previewUrl: video?.previewUrl ?? null,
+        durationSec: video?.durationSec !== null && video?.durationSec !== undefined && video.durationSec > 0 ? Math.floor(video.durationSec) : null,
       },
       resolution,
     };
-  }, [data, heldError, dataError, resolution]);
+  }, [data, heldError, dataError, resolution, ref.mediaId]);
 
   return {
     state,

@@ -31,6 +31,8 @@ const DEV_MARKERS = [
   'demo-post-',
   'demo-blog-',
   'demo-video-',
+  // Story 4.2: the demo's in-memory progress storage.
+  'createDemoKeyValueStore',
 ];
 
 jest.setTimeout(240_000);

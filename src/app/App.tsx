@@ -38,9 +38,11 @@ import {
   type ValidateResult,
 } from '../shared/api';
 import { ModalHostProvider, useModal, type ModalApi } from '../shared/focus';
+import { ProgressContext } from '../shared/services/progress';
 import { t } from '../shared/i18n';
 import { Text, colors, components, spacing, type HostView } from '../shared/ui';
 import type * as DevFocusModule from './dev/devFocus';
+import { progress } from './progress';
 import { queryClient, resetQueryCache } from './queryClient';
 import type { RootStackParamList } from './routes';
 import { DEMO_ACTIVE, session } from './session';
@@ -292,6 +294,9 @@ function DemoBadge() {
  * Covered screens stay mounted; each screen traps focus (`Screen`). The one
  * modal host sits above the stack (AD-13).
  *
+ * Story 4.2: `ProgressContext` provides the app's ProgressRepository
+ * (`./progress`, the active session's client) to the player and Пост.
+ *
  * Epic 3 retro A6: the SessionCheck port (`SessionCheckContext`) lets the
  * player, the Post screen and Главная run E1 before they trust a «locked»
  * answer (a dead token reads as anonymous, api-contract §7). An `expired`
@@ -411,45 +416,47 @@ function App() {
         <QueryClientProvider client={queryClient}>
           <SessionUiContext.Provider value={ui}>
             <SessionCheckContext.Provider value={sessionCheck}>
-              <ModalHostProvider>
-                <ModalBridge apiRef={modalApi} />
-                <NavigationContainer
-                  ref={navigationRef}
-                  theme={theme}
-                  onReady={onNavigationReady}
-                >
-                  <Stack.Navigator
-                    initialRouteName={boot.initial}
-                    detachInactiveScreens={false}
-                    screenOptions={{ headerShown: false, gestureEnabled: false }}
+              <ProgressContext.Provider value={progress}>
+                <ModalHostProvider>
+                  <ModalBridge apiRef={modalApi} />
+                  <NavigationContainer
+                    ref={navigationRef}
+                    theme={theme}
+                    onReady={onNavigationReady}
                   >
-                    <Stack.Screen
-                      name="Welcome"
-                      component={Welcome}
-                      initialParams={{ signInAgain: boot.signInAgain }}
-                    />
-                    <Stack.Screen name="Phone" component={Phone} />
-                    <Stack.Screen name="Code" component={Code} />
-                    <Stack.Screen name="Shell" component={ShellRoute} />
-                    <Stack.Screen name="Author" component={AuthorRoute} />
-                    <Stack.Screen name="Post" component={PostRoute} />
-                    <Stack.Screen name="Player" component={PlayerRoute} />
-                    <Stack.Screen name="Expired" component={Expired} />
-                    {__DEV__ && dev ? (
-                      <>
-                        <Stack.Screen
-                          name="DevFocus"
-                          component={dev.DevFocusRoute}
-                        />
-                        <Stack.Screen
-                          name="DevFocusDetail"
-                          component={dev.DevFocusDetailRoute}
-                        />
-                      </>
-                    ) : null}
-                  </Stack.Navigator>
-                </NavigationContainer>
-              </ModalHostProvider>
+                    <Stack.Navigator
+                      initialRouteName={boot.initial}
+                      detachInactiveScreens={false}
+                      screenOptions={{ headerShown: false, gestureEnabled: false }}
+                    >
+                      <Stack.Screen
+                        name="Welcome"
+                        component={Welcome}
+                        initialParams={{ signInAgain: boot.signInAgain }}
+                      />
+                      <Stack.Screen name="Phone" component={Phone} />
+                      <Stack.Screen name="Code" component={Code} />
+                      <Stack.Screen name="Shell" component={ShellRoute} />
+                      <Stack.Screen name="Author" component={AuthorRoute} />
+                      <Stack.Screen name="Post" component={PostRoute} />
+                      <Stack.Screen name="Player" component={PlayerRoute} />
+                      <Stack.Screen name="Expired" component={Expired} />
+                      {__DEV__ && dev ? (
+                        <>
+                          <Stack.Screen
+                            name="DevFocus"
+                            component={dev.DevFocusRoute}
+                          />
+                          <Stack.Screen
+                            name="DevFocusDetail"
+                            component={dev.DevFocusDetailRoute}
+                          />
+                        </>
+                      ) : null}
+                    </Stack.Navigator>
+                  </NavigationContainer>
+                </ModalHostProvider>
+              </ProgressContext.Provider>
             </SessionCheckContext.Provider>
           </SessionUiContext.Provider>
         </QueryClientProvider>

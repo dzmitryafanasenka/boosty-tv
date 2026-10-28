@@ -8,7 +8,7 @@ import {
   type AppErrorKind,
   type HttpClient,
 } from '../../shared/api';
-import { PostRepository, type Post } from '../../shared/entities/post';
+import { PostRepository, type Post, type ServerProgressSink } from '../../shared/entities/post';
 
 export type PostState = {
   /** The post (E8 200, accessible or locked); null while loading, failed or unavailable. */
@@ -34,13 +34,24 @@ export type PostState = {
  * stays shown meanwhile; `refetch` reloads E8 once, `expired` opens A11
  * through the app's status listener.
  */
-export function usePost(http: HttpClient, blogUrl: string, postId: string): PostState {
+export function usePost(
+  http: HttpClient,
+  blogUrl: string,
+  postId: string,
+  onServerProgress?: ServerProgressSink,
+): PostState {
   const refetchRef = useRef<() => void>(() => {});
+  const sinkRef = useRef(onServerProgress);
+  sinkRef.current = onServerProgress;
   const checkLocked = useLockedSessionCheck(SESSION_CHECK_KEYS.post, () => refetchRef.current());
   const query = useQuery({
     queryKey: queryKeys.post(blogUrl, postId),
     queryFn: async () => {
-      const result = await PostRepository.post(http, blogUrl, postId);
+      // Story 4.2: each video's `timeCode` goes to the ProgressRepository
+      // (the MediaRow status, «Продолжить»), never into the post or the cache.
+      const result = await PostRepository.post(http, blogUrl, postId, {
+        onServerProgress: (mediaId, sec) => sinkRef.current?.(mediaId, sec),
+      });
       if (result.kind === 'ok' && !result.post.hasAccess) {
         checkLocked();
       }
