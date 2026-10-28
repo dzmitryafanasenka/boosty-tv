@@ -13,6 +13,7 @@ import { createLogger } from '../../services/logger';
 import { feedPost, lockedPost } from '../../../test/feedFixtures';
 import { AuthorCard } from '../AuthorCard';
 import { Button } from '../Button';
+import { ContinueCard } from '../ContinueCard';
 import { MediaRow } from '../MediaRow';
 import { NavItem } from '../NavItem';
 import { PostCard } from '../PostCard';
@@ -45,6 +46,20 @@ const consumers: Array<[string, () => ReactElement]> = [
           durationSec: 60,
           previewUrl: 'https://example.invalid/preview',
         }}
+      />
+    ),
+  ],
+  [
+    'ContinueCard',
+    () => (
+      <ContinueCard
+        testID={ID}
+        resetKey="m"
+        title="t"
+        authorName="a"
+        previewUrl="https://example.invalid/preview"
+        status={{ kind: 'inProgress', minutesLeft: 5, fraction: 0.5 }}
+        width={221}
       />
     ),
   ],

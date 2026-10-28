@@ -39,6 +39,7 @@ import {
   type ValidateResult,
 } from '../shared/api';
 import { ModalHostProvider, useModal, type ModalApi } from '../shared/focus';
+import type { MediaRef } from '../shared/entities/post';
 import { ProgressContext } from '../shared/services/progress';
 import { t } from '../shared/i18n';
 import { Text, colors, components, spacing, type HostView } from '../shared/ui';
@@ -46,6 +47,7 @@ import type * as DevFocusModule from './dev/devFocus';
 import { progress } from './progress';
 import { queryClient, resetQueryCache } from './queryClient';
 import type { RootStackParamList } from './routes';
+import { phaseFlags } from './phaseFlags';
 import { DEMO_ACTIVE, session } from './session';
 import { SessionUiContext, useSessionUi, type SessionUi } from './sessionUi';
 import { Shell } from './Shell';
@@ -219,6 +221,20 @@ function ShellRoute({
     },
     [navigation],
   );
+  // OK on a «Продолжить просмотр» card (Story 4.7): the Player at the
+  // resume point; the origin is Главная's FocusRestoration section, so the
+  // exit (or a natural end) returns to that card (or its neighbour).
+  const onOpenPlayer = useCallback(
+    (ref: MediaRef, focusId: string) => {
+      if (navigation.isFocused()) {
+        navigation.push('Player', {
+          ref,
+          origin: { routeKey: SHELL_RESTORATION_KEY, sectionId: 'home', focusId },
+        });
+      }
+    },
+    [navigation],
+  );
   const modal = useModal();
   const onOpenSignOut = useCallback(
     (initiator: RefObject<HostView | null>) => {
@@ -250,6 +266,7 @@ function ShellRoute({
       }
       onOpenAuthor={onOpenAuthor}
       onOpenPost={onOpenPost}
+      onOpenPlayer={phaseFlags.player ? onOpenPlayer : undefined}
       takePendingSection={takePendingShellSection}
     />
   );

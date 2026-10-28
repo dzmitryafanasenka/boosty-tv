@@ -30,6 +30,13 @@ export {
   type PostCardProps,
 } from './PostCard';
 export {
+  ContinueCard,
+  ContinueCardView,
+  continueCardA11yLabel,
+  continueCardLeft,
+  type ContinueCardProps,
+} from './ContinueCard';
+export {
   AUTHOR_CARD_HEIGHT,
   AuthorAvatar,
   AuthorCard,

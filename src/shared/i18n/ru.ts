@@ -95,6 +95,16 @@ export const ru = {
       errorTitle: 'Не удалось загрузить ленту',
       loadMoreError: 'Не удалось загрузить следующие посты.',
     },
+    // «Продолжить просмотр» (Story 4.7, FR15): the local history of this
+    // device (scope label, EXPERIENCE › Voice). `{left}` is «Осталось N мин»
+    // (`post.video.status.left`); without a known duration it is left out.
+    continue: {
+      title: 'Продолжить просмотр · на этом устройстве',
+      metaLeft: ' · {left}',
+      a11y: '{title}. {author}. {left}',
+      a11yNoLeft: '{title}. {author}',
+      a11yNoAuthor: '{title}. {left}',
+    },
     // Cold start with a stored session and no network (Story 2.5). The
     // session is kept; this is never «Сессия истекла».
     offline: {

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { FlashListRef } from '@shopify/flash-list';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import type { HttpClient } from '../../shared/api';
+import { videoDisplayTitle, type MediaRef, type Post } from '../../shared/entities/post';
 import {
   focusRestoration,
   mayTakeScreenFocus,
@@ -12,6 +13,12 @@ import {
   useZoneItem,
 } from '../../shared/focus';
 import { t } from '../../shared/i18n';
+import {
+  entryDurationSec,
+  progressStatus,
+  useContinueEntries,
+  type ProgressEntry,
+} from '../../shared/services/progress';
 import {
   PostCardSkeleton,
   StateView,
@@ -37,6 +44,13 @@ import {
   feedCardId,
   gridListAdapter,
 } from './FeedGrid';
+import {
+  CONTINUE_CARD_PREFIX,
+  ContinueRow,
+  continueCardId,
+  continueNeighbour,
+  type ContinueItem,
+} from './ContinueRow';
 import { useSubscriptionFeed } from './useSubscriptionFeed';
 
 /** Focus id of «Повторить» on the offline StateView (docs/focus-map.md §3). */
@@ -94,7 +108,37 @@ export type HomeScreenProps = {
   focus: HomeFocusInfo;
   /** OK on a feed card: open Пост (Story 3.4) by its identity. */
   onOpenPost?: (blogUrl: string, postId: string) => void;
+  /**
+   * OK on a «Продолжить просмотр» card (Story 4.7): open the Player for
+   * that video at its resume point; `focusId` is the card (the return
+   * focus). Absent (the player phase is off): no Continue row.
+   */
+  onOpenPlayer?: (ref: MediaRef, focusId: string) => void;
 };
+
+/**
+ * The preview of a video in the in-memory post data (the feed's posts):
+ * the Continue card's fallback when the stored entry has none (a preview
+ * URL with a query is never persisted, Story 4.7).
+ */
+function feedPreviewUrl(posts: readonly Post[], ref: MediaRef): string | null {
+  const post = posts.find(p => p.id === ref.postId);
+  const block = post?.blocks.find(b => b.type === 'ok_video' && b.id === ref.mediaId);
+  return block?.type === 'ok_video' ? block.previewUrl : null;
+}
+
+function continueItem(entry: ProgressEntry, posts: readonly Post[]): ContinueItem {
+  const { ref, meta } = entry;
+  return {
+    id: continueCardId(ref.mediaId),
+    ref,
+    // Both titles empty: «Без названия», as an untitled post card.
+    title: videoDisplayTitle(meta.title, meta.postTitle) || t('postCard.untitled'),
+    authorName: meta.authorName,
+    previewUrl: meta.previewUrl ?? feedPreviewUrl(posts, ref),
+    status: progressStatus(entry.positionSec, entryDurationSec(entry)),
+  };
+}
 
 type Phase = 'offline' | 'loading' | 'error' | 'empty' | 'grid';
 
@@ -137,6 +181,7 @@ export function HomeScreen({
   focusOnMount = false,
   focus,
   onOpenPost,
+  onOpenPlayer,
 }: HomeScreenProps) {
   const offlineRetry = useZoneItem(HOME_OFFLINE_RETRY_ID);
   const offlineRetryView = useRef<HostView | null>(null);
@@ -148,10 +193,23 @@ export function HomeScreen({
     [offlineRetry],
   );
   const feed = useSubscriptionFeed(http, !offline);
+  // «Продолжить просмотр» (Story 4.7): the local history, only while the
+  // player is on (`onOpenPlayer`).
+  const continueView = useContinueEntries();
+  const continueEnabled = onOpenPlayer !== undefined;
+  const continueItems = useMemo(
+    () => (continueEnabled ? continueView.entries.map(entry => continueItem(entry, feed.posts)) : []),
+    [continueEnabled, continueView.entries, feed.posts],
+  );
+  const continueIds = useMemo(() => continueItems.map(item => item.id), [continueItems]);
+  const continueIdsRef = useLatestRef(continueIds);
+  const showContinue = continueItems.length > 0;
   const windowHeight = useWindowDimensions().height;
   // A bounded viewport (Story 2.4 device lesson): the content zone's height
-  // (window − 2 × safe-y) minus the header and the grid's top gap.
-  const listHeight = windowHeight - 2 * spacing['safe-y'] - HEADER_HEIGHT - FEED_LIST_TOP_GAP;
+  // (window − 2 × safe-y) minus the header and the grid's top gap. With the
+  // Continue row, the feed title scrolls with the grid (the list header).
+  const listHeight =
+    windowHeight - 2 * spacing['safe-y'] - (showContinue ? 0 : HEADER_HEIGHT) - FEED_LIST_TOP_GAP;
 
   const listRef = useRef<FlashListRef<FeedRowItem>>(null);
   // The grid's posts (`useShownGridPosts` over PostGrid's
@@ -226,7 +284,8 @@ export function HomeScreen({
       current === null ||
       current === info.sectionItemId ||
       current === HOME_STATE_ACTION_ID ||
-      current.startsWith(FEED_CARD_PREFIX)
+      current.startsWith(FEED_CARD_PREFIX) ||
+      current.startsWith(CONTINUE_CARD_PREFIX)
     );
   }, []);
 
@@ -239,9 +298,16 @@ export function HomeScreen({
     canFocus,
   });
 
+  // The grid waits for the local history's first read too (a disk read),
+  // so the initial focus can go to the first Continue card. Only the first:
+  // a later re-read (after a reset) never brings the skeleton back.
+  const continueRead = useRef(false);
+  if (continueView.ready) {
+    continueRead.current = true;
+  }
   const phase: Phase = offline
     ? 'offline'
-    : feed.isPending
+    : feed.isPending || (continueEnabled && !continueRead.current)
       ? 'loading'
       : feed.firstPageError !== null
         ? 'error'
@@ -250,21 +316,66 @@ export function HomeScreen({
           : 'grid';
 
   const pendingMountFocus = useRef(focusOnMount);
+  /**
+   * The page's last automatic content focus was a Continue card: a head
+   * refresh then never moves focus to the new first post (the row is above
+   * the grid and stays where it is).
+   */
+  const autoContinue = useRef(false);
+
+  /**
+   * A remembered Continue card (Story 4.7): that card by id at its current
+   * position; gone (finished) → its neighbour by the remembered index (the
+   * next card, else the previous one); the row empty → the first feed card.
+   * The grid's remembered scroll offset is restored first.
+   */
+  const restoreContinue = useCallback(() => {
+    const entry = focusRestoration.peek(routeKey, HOME_SECTION);
+    const rowIds = continueIdsRef.current;
+    if (rowIds.length === 0) {
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+      autoContinue.current = false;
+      latch.auto(idsRef.current[0]);
+      restoration.focusInitial();
+      return;
+    }
+    listRef.current?.scrollToOffset({ offset: entry?.scrollOffset ?? 0, animated: false });
+    const found = entry ? rowIds.indexOf(entry.focusId) : -1;
+    const index = found >= 0 ? found : Math.min(entry?.index ?? 0, rowIds.length - 1);
+    autoContinue.current = true;
+    latch.auto(rowIds[index]);
+    restoration.focusItem(rowIds[index]);
+  }, [latch, restoration, routeKey, continueIdsRef]);
 
   /**
    * Главная takes its content focus by itself: the remembered card
-   * (FocusRestoration, fallback chain), else the first card. Arms "not
-   * moved": where focus was (`nav/home`, the StateView action) and the
-   * target are automatic, so their late native events are not moves.
+   * (FocusRestoration, fallback chain; a Continue card by its own rule),
+   * else the first Continue card (Story 4.7), else the first feed card.
+   * Arms "not moved": where focus was (`nav/home`, the StateView action)
+   * and the target are automatic, so their late native events are not
+   * moves.
    */
   const takeContentFocus = useCallback(() => {
     const info = focusRef.current;
     latch.arm([info.sectionItemId, info.current()]);
+    const remembered = focusRestoration.peek(routeKey, HOME_SECTION)?.focusId;
+    if (remembered?.startsWith(CONTINUE_CARD_PREFIX)) {
+      restoreContinue();
+      return;
+    }
+    const firstContinue = continueIdsRef.current[0];
+    if (remembered === undefined && firstContinue !== undefined) {
+      autoContinue.current = true;
+      latch.auto(firstContinue);
+      restoration.focusItem(firstContinue);
+      return;
+    }
+    autoContinue.current = false;
     const target = restoreElseFirst(restoration, () => latch.auto(idsRef.current[0]));
     if (target.kind === 'item') {
       latch.auto(target.id);
     }
-  }, [latch, restoration]);
+  }, [latch, restoration, routeKey, restoreContinue, continueIdsRef]);
 
   /**
    * Главная focuses a StateView action (empty/error) or the offline
@@ -344,6 +455,12 @@ export function HomeScreen({
     const info = focusRef.current;
     const unregister = info.setReturnFocus?.(() => {
       const remembered = focusRestoration.peek(routeKey, HOME_SECTION)?.focusId;
+      if (phaseRef.current === 'grid' && remembered?.startsWith(CONTINUE_CARD_PREFIX)) {
+        // Back or a natural end in the Player (Story 4.7): the same card,
+        // else its neighbour, else the first feed card.
+        restoreContinue();
+        return true;
+      }
       if (
         phaseRef.current !== 'grid' ||
         remembered === undefined ||
@@ -356,7 +473,7 @@ export function HomeScreen({
       return true;
     });
     return () => unregister?.();
-  }, [restoration, routeKey, phaseRef]);
+  }, [restoration, routeKey, phaseRef, restoreContinue]);
 
   const postsRef = useRef(shownPosts);
   postsRef.current = shownPosts;
@@ -374,6 +491,67 @@ export function HomeScreen({
     [latch],
   );
 
+  // OK on a Continue card (Story 4.7): the Player at the resume point (a
+  // move for the head-follow rule).
+  const continueItemsRef = useLatestRef(continueItems);
+  const onOpenPlayerRef = useLatestRef(onOpenPlayer);
+  const onContinuePress = useCallback(
+    (id: string) => {
+      latch.move();
+      const item = continueItemsRef.current.find(i => i.id === id);
+      if (item) {
+        onOpenPlayerRef.current?.(item.ref, item.id);
+      }
+    },
+    [latch, continueItemsRef, onOpenPlayerRef],
+  );
+
+  // The row reacts to the store (Story 4.7: a finished video leaves it, a
+  // just-watched one moves first). A focused card keeps focus by id (its
+  // view is keyed by the media id); a focused card that is gone → its
+  // neighbour (the next card, else the previous one), else the first feed
+  // card. Never while covered or when focus is elsewhere (`canFocus`).
+  const lastContinueIds = useRef(continueIds);
+  useLayoutEffect(() => {
+    const previous = lastContinueIds.current;
+    lastContinueIds.current = continueIds;
+    if (previous === continueIds) {
+      return;
+    }
+    const current = focusRef.current.current();
+    if (
+      current === null ||
+      !current.startsWith(CONTINUE_CARD_PREFIX) ||
+      continueIds.includes(current) ||
+      !canFocus()
+    ) {
+      return;
+    }
+    // The neighbour by id in the previous list (a reorder in the same
+    // update must not pick an arbitrary card); an automatic move, like the
+    // other moves the page makes by itself.
+    const neighbour = continueNeighbour(previous, current, continueIds);
+    if (neighbour !== null) {
+      autoContinue.current = true;
+      latch.auto(neighbour);
+      restoration.focusItem(neighbour);
+    } else if (idsRef.current.length > 0) {
+      autoContinue.current = false;
+      latch.auto(idsRef.current[0]);
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+      restoration.focusInitial();
+    }
+  }, [continueIds, canFocus, restoration, latch]);
+
+  // A Continue card the page focused by itself is never left for the head.
+  const followHead = useCallback(
+    (focused: string | null) =>
+      !autoContinue.current &&
+      !(focused?.startsWith(CONTINUE_CARD_PREFIX) ?? false) &&
+      latch.followHead(focused),
+    [latch],
+  );
+
   // A resume refresh changed the shown cards other than by an append
   // (shared rule, `useHeadChangeRefocus`): while the user has not moved
   // since Главная took its content focus by itself, the new first post
@@ -387,7 +565,7 @@ export function HomeScreen({
     canFocus,
     restoration,
     list: adapterRef,
-    followHead: latch.followHead,
+    followHead,
     onFollowHead: latch.onFollowHead,
   });
 
@@ -421,9 +599,11 @@ export function HomeScreen({
 
   return (
     <View testID="home/feed" style={styles.root}>
-      <Text variant="section" accessibilityRole="header" style={styles.header}>
-        {t('home.feed.title')}
-      </Text>
+      {phase === 'grid' && showContinue ? null : (
+        <Text variant="section" accessibilityRole="header" style={styles.header}>
+          {t('home.feed.title')}
+        </Text>
+      )}
       {phase === 'loading' ? (
         <View
           testID="home/feed/skeleton"
@@ -491,13 +671,45 @@ export function HomeScreen({
           onRetry={onRetryLoadMore}
           initialRow={initialRow}
           onCardPress={onCardPress}
+          header={
+            showContinue ? (
+              <ContinueHeader
+                items={continueItems}
+                restoration={restoration}
+                onCardPress={onContinuePress}
+              />
+            ) : null
+          }
         />
       ) : null}
     </View>
   );
 }
 
+/**
+ * The grid's list header with the Continue row (Story 4.7): the row, then
+ * «Новое в подписках» (it scrolls with the grid here).
+ */
+function ContinueHeader(props: {
+  items: readonly ContinueItem[];
+  restoration: ReturnType<typeof useFocusRestoration>;
+  onCardPress: (id: string) => void;
+}) {
+  return (
+    <View testID="home/header">
+      <ContinueRow {...props} />
+      <Text variant="section" accessibilityRole="header" style={styles.feedTitle}>
+        {t('home.feed.title')}
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  feedTitle: {
+    height: HEADER_HEIGHT,
+    marginTop: spacing['4'],
+  },
   root: {
     flex: 1,
   },

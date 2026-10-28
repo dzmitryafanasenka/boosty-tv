@@ -86,13 +86,13 @@ describe('createSessionCheck', () => {
     [{ kind: 'failed', error: 'Network' }],
     [{ kind: 'failed', error: 'Server' }],
     [{ kind: 'skipped' }],
-  ])('%j → `locked` for every sharer, and the window is dropped: the next check sends E1 again', async result => {
+  ])('%j → `unverified` for every sharer, and the window is dropped: the next check sends E1 again', async result => {
     const { validate, resolveLast } = fakeValidate();
     const port = createSessionCheck({ validate, now });
     const a = port.check('post');
     const b = port.check('post');
     resolveLast(result);
-    await expect(Promise.all([a, b])).resolves.toEqual(['locked', 'locked']);
+    await expect(Promise.all([a, b])).resolves.toEqual(['unverified', 'unverified']);
     const next = port.check('post');
     expect(validate).toHaveBeenCalledTimes(2);
     resolveLast({ kind: 'ok' });
@@ -123,12 +123,12 @@ describe('createSessionCheck', () => {
     await expect(second).resolves.toBe('refetch');
   });
 
-  it('a rejecting validate (never expected) is `locked`', async () => {
+  it('a rejecting validate (never expected) is `unverified`', async () => {
     const port = createSessionCheck({
       validate: () => Promise.reject(new Error('x')),
       now,
     });
-    await expect(port.check('post')).resolves.toBe('locked');
+    await expect(port.check('post')).resolves.toBe('unverified');
   });
 
   it('reset(): the next check sends a new E1; a check in flight across it gives no `refetch`', async () => {

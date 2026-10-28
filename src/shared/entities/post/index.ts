@@ -26,6 +26,7 @@ export {
   type PostBodyItem,
 } from './postBody';
 export { mediaRefsOf, videoRowsOf } from './mediaRows';
+export { isGenericVideoTitle, videoDisplayTitle } from './videoTitle';
 export {
   videoSourceOf,
   videoSourcesOf,

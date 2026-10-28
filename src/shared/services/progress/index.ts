@@ -18,10 +18,18 @@ export {
   type ProgressSession,
 } from './progressRepository';
 export {
+  MAX_CONTINUE_ENTRIES,
+  continueEntries,
+  entryDurationSec,
+  useContinueEntries,
+  type ContinueView,
+} from './continueEntries';
+export {
   DISK_DEBOUNCE_MS,
   MAX_PROGRESS_ENTRIES,
   PROGRESS_STORAGE_KEY,
   createProgressStore,
+  persistablePreviewUrl,
   progressAccountStore,
   progressStore,
   setProgressKeyValueStore,

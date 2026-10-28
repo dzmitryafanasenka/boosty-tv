@@ -31,6 +31,17 @@ const META_HEIGHT = AVATAR;
 const LOCKED_PREVIEW_OPACITY = 0.4;
 const LOCK = { body: 14, shackle: 10 } as const;
 
+/**
+ * The text block under the thumb (title, then the meta row). Shared with
+ * ContinueCard (Story 4.7), which has the same height as a feed card.
+ */
+export const POST_CARD_TEXT = {
+  titleGap: TITLE_GAP,
+  titleHeight: TITLE_HEIGHT,
+  metaGap: META_GAP,
+  metaHeight: META_HEIGHT,
+} as const;
+
 /** Card width for `columns` cards in `contentWidth`, with focus headroom on both sides. */
 export function postCardWidth(contentWidth: number, columns: number): number {
   const inner = contentWidth - 2 * spacing['focus-headroom'] - (columns - 1) * spacing['card-gap-x'];

@@ -185,9 +185,10 @@ export type MediaSourceState =
    * The fresh E8 says the post is locked: «Нет доступа к этому видео», no
    * retry. `confirmed`: the SessionCheck port (A6) is done with this answer
    * and it stays locked (E1 ok or failed; a failed refetch keeps it too);
-   * false while E1 or its one refetch runs.
+   * false while E1 or its one refetch runs. `verified` (Story 4.7): E1
+   * said the session is fine (not offline), so the post is really locked.
    */
-  | { kind: 'locked'; confirmed: boolean }
+  | { kind: 'locked'; confirmed: boolean; verified: boolean }
   /** E8 404 or the video is gone from the post: «Видео недоступно», no retry. */
   | { kind: 'unavailable' }
   /** No usable URL (all empty or unknown): «Не удалось воспроизвести видео» + «Повторить». */
@@ -235,6 +236,8 @@ export function useMediaSource(
   const checkLocked = useLockedSessionCheck(SESSION_CHECK_KEYS.player, () => refetchRef.current());
   /** The locked E8 result the session check is done with (Story 4.4). */
   const [confirmedLocked, setConfirmedLocked] = useState<unknown>(null);
+  /** The locked E8 result E1 verified (session fine, Story 4.7). */
+  const [verifiedLocked, setVerifiedLocked] = useState<unknown>(null);
   const query = useQuery({
     queryKey: queryKeys.mediaSource(ref.blogUrl, ref.postId, ref.mediaId),
     queryFn: async () => {
@@ -245,8 +248,11 @@ export function useMediaSource(
       if (result.kind === 'locked') {
         // `locked` from the check: this answer stays locked (confirmed).
         checkLocked(outcome => {
-          if (outcome === 'locked') {
+          if (outcome === 'locked' || outcome === 'unverified') {
             setConfirmedLocked(result);
+          }
+          if (outcome === 'locked') {
+            setVerifiedLocked(result);
           }
         });
       }
@@ -301,8 +307,10 @@ export function useMediaSource(
     }
     if (data.kind === 'locked') {
       // A failed refetch after E1 ok keeps the locked answer: done as well.
-      const confirmed = confirmedLocked === data || (status === 'error' && !isFetching);
-      return { kind: 'locked', confirmed };
+      const failedRefetch = status === 'error' && !isFetching;
+      const confirmed = confirmedLocked === data || failedRefetch;
+      // A refetch only follows an E1 ok: its failure is verified too.
+      return { kind: 'locked', confirmed, verified: verifiedLocked === data || failedRefetch };
     }
     if (data.kind === 'unavailable') {
       return { kind: 'unavailable' };
@@ -338,7 +346,7 @@ export function useMediaSource(
       },
       resolution,
     };
-  }, [data, heldError, dataError, resolution, ref.mediaId, preference, keep, confirmedLocked, status, isFetching]);
+  }, [data, heldError, dataError, resolution, ref.mediaId, preference, keep, confirmedLocked, verifiedLocked, status, isFetching]);
 
   return {
     state,

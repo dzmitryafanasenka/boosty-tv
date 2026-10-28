@@ -264,6 +264,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-4-2-progress-is-saved-and-playback-resumes.md`
   summary: Check whether `ok_video.preview` URLs carry a CDN token before Story 4.7 renders the stored `meta.previewUrl`; if signed, store none and re-read the preview from E8.
   evidence: Unverified (medium if true): the progress store persists `meta.previewUrl`; settle by inspecting one live E8 preview URL shape (redacted).
+  note: Resolved in Story 4.7 (2026-10-28, debug build, names only): `preview` URLs had no query; the `defaultPreview` fallback carries `tkn`. A preview URL with any query is never written to (or read back from) disk; the card falls back to the in-memory feed post, else a neutral plate (docs/testing.md «Story 4.7»).
 - source_spec: `_bmad-output/implementation-artifacts/spec-4-3-choose-video-quality.md`
   summary: Story 4.3 device checks still open — the physical remote, TalkBack, ±10 quick-press accumulation and +10 near the end, the side sheet's native focus trap at its edges, a pick the decoder cannot play (1440p). Sheet, list, «Авто · 1080p», a 720p pick at the same second, Back order, cold-start preference, icons and −10 passed over adb (2026-10-28).
   evidence: docs/testing.md «Story 4.3» (agent, adb).
@@ -286,3 +287,14 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-4-4-recover-from-expired-links-and-playback-errors.md`
   summary: The no-access exit applies only after a source of this opening was ready (a recovery or a retry). A locked answer on the player's first E8 still shows «Нет доступа к этому видео» + «Назад» (Story 4.1 behavior); a locked retry after an E8 failure before any playback does too. The exit shows no message of its own: the Post's refetched locked notice is the message.
   evidence: `PlayerScreen` `everReady` / `noAccessExit`; spec Decisions «Fresh E8 results during recovery».
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-7-continue-watching-row-on-the-home-screen.md`
+  summary: The Continue row is shown only with the feed grid (it is the grid's list header). With an empty feed («Новых постов нет»), a feed error or the offline view, the row is hidden even when the history has entries.
+  evidence: `HomeScreen` renders `ContinueHeader` only in the `grid` phase.
+  note: Owner decision 2026-10-28: the row shows only together with the feed (kept as built). Not an open question.
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-7-continue-watching-row-on-the-home-screen.md`
+  summary: Story 4.7 device rows still open — a locked or unavailable post opened from a Continue card, a natural end from a Continue card (focus → the neighbour), «Return» with a card that is not first (it moves first), more than 3 real entries (only in-memory copies were scrolled), reset by sign-out with entries on screen, the physical remote and TalkBack. The owner's screenshot review of Главная with the row is pending.
+  evidence: docs/testing.md «Story 4.7» (agent, adb); these rows would write progress for videos the owner has not approved, so they stay host-tested until the owner picks videos.
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-7-continue-watching-row-on-the-home-screen.md`
+  summary: A Continue entry whose post later becomes locked or is deleted stays in the row until its player is opened (no E8 per card, spec decision).
+  evidence: Spec Decisions «No E8 per card».
+  note: Owner decision 2026-10-28, implemented (host-tested): when the player's E8 says locked (session checked; also the 4.4 no-access exit) or unavailable (E8 404 / the video gone), `ProgressRepository.forget` drops the entry (no request), so the card leaves the row and Главная focuses its neighbour, else the first feed card. Not run on the device.

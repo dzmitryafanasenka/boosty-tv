@@ -52,7 +52,12 @@ export const SESSION_CHECK_KEYS = {
 export type SessionCheckKey =
   (typeof SESSION_CHECK_KEYS)[keyof typeof SESSION_CHECK_KEYS];
 
-export type SessionCheckOutcome = 'expired' | 'refetch' | 'locked';
+/**
+ * `locked`: E1 said the session is fine, so the answer is really locked.
+ * `unverified` (Story 4.7): E1 failed or was skipped (offline): treated as
+ * locked for now, but nothing irreversible may follow from it.
+ */
+export type SessionCheckOutcome = 'expired' | 'refetch' | 'locked' | 'unverified';
 
 /** What features see: one check per «locked» answer. Never rejects. */
 export type SessionCheck = {
@@ -132,7 +137,7 @@ export function createSessionCheck({
           current.refetchGiven = true;
           return 'refetch';
         }
-        return 'locked';
+        return result.kind === 'ok' ? 'locked' : 'unverified';
       });
     },
     reset() {

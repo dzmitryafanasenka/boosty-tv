@@ -35,7 +35,10 @@ export type ProgressMeta = {
   title: string;
   postTitle: string;
   authorName: string;
-  /** The preview image URL (unsigned, as the post gives it); never a media URL. */
+  /**
+   * The preview image URL as the post gives it; never a media URL. Kept on
+   * disk only when it has no query (`persistablePreviewUrl`, Story 4.7).
+   */
   previewUrl: string | null;
   durationSec: number | null;
 };
@@ -67,6 +70,11 @@ export type ProgressStore = {
   put(entry: ProgressEntry, options?: { flush?: boolean }): void;
   /** Every entry, newest first (Story 4.7). */
   entries(): ProgressEntry[];
+  /**
+   * Drops one video's local entry and server value (Story 4.7: its post is
+   * locked or gone). Memory now; disk debounced.
+   */
+  remove(mediaId: string): void;
   serverPosition(mediaId: string): number | undefined;
   setServerPosition(mediaId: string, positionSec: number): void;
   /** The local entry, else the server value, else null. Stable until it changes. */
@@ -109,6 +117,24 @@ const entrySchema = z.object({
 });
 
 const diskSchema = z.object({ v: z.literal(1), entries: z.array(z.unknown()) });
+
+/**
+ * Story 4.7 preview check (debug build on the pinned device, 2026-10-28,
+ * query parameter names only): `ok_video.preview` URLs carry no query, but
+ * the `defaultPreview` fallback carries `tkn` (a CDN token). A preview URL
+ * with any query (or fragment) is therefore never written to disk (nor read back from
+ * it); it lives in memory only, and the Continue card falls back to the
+ * in-memory post data, else a neutral plate.
+ */
+export function persistablePreviewUrl(url: string | null): string | null {
+  return url !== null && !url.includes('?') && !url.includes('#') ? url : null;
+}
+
+/** The disk form of an entry: no preview URL with a query. */
+function diskEntry(entry: ProgressEntry): ProgressEntry {
+  const previewUrl = persistablePreviewUrl(entry.meta.previewUrl);
+  return previewUrl === entry.meta.previewUrl ? entry : { ...entry, meta: { ...entry.meta, previewUrl } };
+}
 
 /** Newest first, at most `MAX_PROGRESS_ENTRIES`. */
 function capped(entries: Iterable<ProgressEntry>): ProgressEntry[] {
@@ -165,20 +191,29 @@ export function createProgressStore({
         logger.warn('progress', 'load', { outcome: 'invalid' });
         return;
       }
+      let sanitized = false;
       for (const item of disk.data.entries) {
         const entry = entrySchema.safeParse(item);
         // Memory wins: an entry written before the load landed is newer.
         if (entry.success && !local.has(entry.data.ref.mediaId)) {
-          local.set(entry.data.ref.mediaId, entry.data);
+          // A preview with a query written before Story 4.7 is not trusted.
+          const clean = diskEntry(entry.data);
+          sanitized ||= clean !== entry.data;
+          local.set(entry.data.ref.mediaId, clean);
         }
       }
       trim();
-      notify(null);
+      if (sanitized) {
+        // Rewrite the disk at once: the token must not stay there.
+        schedule(true);
+      }
     } catch {
       logger.warn('progress', 'load', { outcome: 'failed' });
     } finally {
       if (started === epoch) {
         loaded = true;
+        // Also for an empty disk: readers of `isReady` (the Continue view) update.
+        notify(null);
       }
     }
   }
@@ -187,7 +222,7 @@ export function createProgressStore({
   async function writeOnce(): Promise<void> {
     const started = epoch;
     const generation = scope.generation();
-    const value = JSON.stringify({ v: 1, entries: capped(local.values()) });
+    const value = JSON.stringify({ v: 1, entries: capped(local.values()).map(diskEntry) });
     try {
       await kv().set(PROGRESS_STORAGE_KEY, value);
       if (started !== epoch || generation !== scope.generation()) {
@@ -252,6 +287,18 @@ export function createProgressStore({
       schedule(flush);
     },
     entries: () => capped(local.values()),
+    remove(mediaId) {
+      const hadLocal = local.delete(mediaId);
+      const hadServer = server.delete(mediaId);
+      if (!hadLocal && !hadServer) {
+        return;
+      }
+      notify(mediaId);
+      if (hadLocal) {
+        // At once: a kill or sleep must not bring the forgotten card back.
+        schedule(true);
+      }
+    },
     serverPosition: mediaId => server.get(mediaId),
     setServerPosition(mediaId, positionSec) {
       if (server.get(mediaId) === positionSec) {

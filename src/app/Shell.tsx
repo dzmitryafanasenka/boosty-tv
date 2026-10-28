@@ -12,6 +12,7 @@ import { HomeScreen, type HomeFocusInfo, type HomeScreenProps } from '../feature
 import { SETTINGS_VERSION_ID, SettingsScreen } from '../features/settings';
 import { SubscriptionsScreen, type SubscriptionsFocusInfo } from '../features/subscriptions';
 import type { HttpClient } from '../shared/api';
+import type { MediaRef } from '../shared/entities/post';
 import { FocusZone, Screen, type FocusZoneHandle } from '../shared/focus';
 import { requestHostFocus, type HostView } from '../shared/ui';
 import { enabledSections, type SectionId } from './phaseFlags';
@@ -46,6 +47,8 @@ export type ShellProps = {
   onOpenAuthor?: (blogUrl: string) => void;
   /** Главная: OK on a feed card opens Пост (Story 3.4). */
   onOpenPost?: (blogUrl: string, postId: string) => void;
+  /** Главная: OK on a «Продолжить просмотр» card opens the Player (Story 4.7). */
+  onOpenPlayer?: (ref: MediaRef, focusId: string) => void;
   /**
    * A section to open when the Shell is the focused route again: OK on a
    * sidebar item of a screen on top (Автор, owner decision 2026-10-27)
@@ -97,6 +100,7 @@ export function Shell({
   homeOffline,
   onOpenAuthor,
   onOpenPost,
+  onOpenPlayer,
   takePendingSection,
 }: ShellProps) {
   const sections = useMemo(() => enabledSections(), []);
@@ -314,6 +318,7 @@ export function Shell({
           homeOffline={homeOffline}
           onOpenAuthor={onOpenAuthor}
           onOpenPost={onOpenPost}
+          onOpenPlayer={onOpenPlayer}
         />
       </FocusZone>
     </Screen>
@@ -335,6 +340,7 @@ function SectionContent({
   homeOffline,
   onOpenAuthor,
   onOpenPost,
+  onOpenPlayer,
 }: {
   section: SectionId;
   routeKey: string;
@@ -350,6 +356,7 @@ function SectionContent({
   homeOffline?: HomeScreenProps['offline'];
   onOpenAuthor?: (blogUrl: string) => void;
   onOpenPost?: (blogUrl: string, postId: string) => void;
+  onOpenPlayer?: (ref: MediaRef, focusId: string) => void;
 }) {
   switch (section) {
     case 'home':
@@ -361,6 +368,7 @@ function SectionContent({
           focusOnMount={focusContent}
           focus={homeFocus}
           onOpenPost={onOpenPost}
+          onOpenPlayer={onOpenPlayer}
         />
       );
     case 'settings':
