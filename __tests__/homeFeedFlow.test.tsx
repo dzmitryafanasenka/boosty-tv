@@ -16,18 +16,19 @@ import App, { navigationRef } from '../src/app/App';
 import { HomeScreen, type HomeFocusInfo } from '../src/features/home';
 import type { HttpClient } from '../src/shared/api';
 import { QUERY_STALE_TIME_MS, queryClient, resetQueryCache } from '../src/app/queryClient';
+import { DEFAULT_FILTER, filtersStore, getFilter } from '../src/shared/filters';
 import { queryKeys } from '../src/shared/api';
 import {
   type FixtureReply,
   type FixtureRequest,
   type FixtureTransport,
 } from '../src/shared/api/fixtureTransport';
-import { focusRestoration } from '../src/shared/focus';
+import { ModalHostProvider, focusRestoration } from '../src/shared/focus';
 import { logger } from '../src/shared/services/logger';
 import { progressStore } from '../src/shared/services/progress';
 import { engine } from '../src/test/playerEngineMock';
 import { e8Locked, e8MissingReply, paragraph, postDetail } from '../src/test/postFixtures';
-import { t } from '../src/shared/i18n';
+import { t, tf, tp } from '../src/shared/i18n';
 import { requestHostFocus } from '../src/shared/ui/requestHostFocus';
 import type { Root } from 'test-renderer';
 import backHandler from '../src/test/backHandlerMock';
@@ -168,6 +169,8 @@ beforeEach(() => {
 afterEach(async () => {
   // Story 4.7: no local progress leaks between tests.
   await progressStore.reset();
+  // Story 5.3: nor a Filter.
+  filtersStore.getState().clear();
   await resetQueryCache();
   clearNativeModules();
   focusRestoration.clear();
@@ -209,10 +212,11 @@ describe('first load (matrix «First load», «User moved during load»)', () =>
     const ids = e5Posts().map(p => `home/feed/${p.id}`);
     expect(cardIds(root)).toEqual(ids);
     expect(lastFocusTarget()).toBe(ids[0]);
-    // One E5 request, with the content profile and comments off.
+    // One E5 request, with the content profile, comments off and the
+    // default «Доступные мне» access params (Story 5.3).
     expect(feedCalls()).toHaveLength(1);
     expect(feedCalls()[0].url).toBe(
-      'https://api.boosty.to/v1/feed/post/?limit=10&comments_limit=0&reply_limit=0',
+      'https://api.boosty.to/v1/feed/post/?limit=10&comments_limit=0&reply_limit=0&only_allowed=true&only_bought=false',
     );
     expect(feedCalls()[0].headers['X-App']).toBeUndefined();
     expect(transport.calls.every(c => !c.path.includes('comment'))).toBe(true);
@@ -491,7 +495,9 @@ describe('empty and full-load failure (matrix «Empty feed», «Full-load failur
     expect(visible(root, 'home/feed/empty')).toBe(true);
     expect(text(root)).toContain(t('home.feed.emptyTitle'));
     const content = byTestId(root, 'shell/content/home')[0];
-    expect(focusableIds(root, content)).toEqual(['state/home/action']);
+    // Story 5.3: the «Фильтры» chip above the empty view (an empty
+    // «Доступные мне» feed may have posts under «Все посты»).
+    expect(focusableIds(root, content)).toEqual(['home/filters', 'state/home/action']);
     expect(one(root, 'state/home/action').props.accessibilityLabel).toBe(t('home.feed.refresh'));
     expect(lastFocusTarget()).toBe('nav/home');
     // → from the sidebar reaches the action (zone destination).
@@ -1147,7 +1153,7 @@ describe('review pass 2', () => {
     expect(visible(root, 'auth/welcome')).toBe(true);
     page.resolve({ status: 200, body: e5Page() });
     await settle();
-    expect(queryClient.getQueryData(queryKeys.subscriptionFeed())).toBeUndefined();
+    expect(queryClient.getQueryData(queryKeys.subscriptionFeed(DEFAULT_FILTER))).toBeUndefined();
     expect(cardIds(root)).toEqual([]);
     await unmount(root);
   });
@@ -1859,7 +1865,9 @@ describe('Story 5.1: «Обновить» in the feed title row', () => {
     expect(text(root)).toContain(t('home.feed.title'));
     expect(button(root).props.accessibilityLabel).toBe(t('home.refreshA11y'));
     expect(text(button(root))).toContain(t('home.refresh'));
-    expect(destinationIds('home/title-row')).toEqual([REFRESH]);
+    // Story 5.3: no title-row control focused yet → the row guides to the
+    // «Фильтры» chip (the first control); after «Обновить» had focus, to it.
+    expect(destinationIds('home/title-row')).toEqual(['home/filters']);
     // Not on the button: the ↓ band is no guide (↑ from a card is not caught by it).
     expect(destinationIds('home/refresh/down-guide')).toEqual([]);
     await unmount(root);
@@ -1958,7 +1966,7 @@ describe('Story 5.1: «Обновить» in the feed title row', () => {
     expect(visible(root, `${REFRESH}/error`)).toBe(true);
     jest.setSystemTime(Date.now() + 1_000);
     await act(async () => {
-      queryClient.setQueryData(queryKeys.subscriptionFeed(), (data: any) => ({
+      queryClient.setQueryData(queryKeys.subscriptionFeed(DEFAULT_FILTER), (data: any) => ({
         ...data,
         pages: [{ ...data.pages[0], posts: [...data.pages[0].posts] }, ...data.pages.slice(1)],
       }));
@@ -1972,9 +1980,10 @@ describe('Story 5.1: «Обновить» in the feed title row', () => {
     const root = await onTheButton(2);
     expect(visible(root, 'home/continue')).toBe(false);
     await focusOn(root, 'home/feed/feed-post-1');
-    // ↑ from the first row: the title row (above the grid) guides to the button.
+    // ↑ from the first row: the title row (above the grid) guides to the
+    // button, the row's last focused control (Story 5.3: else the chip).
     expect(destinationIds('home/title-row')).toEqual([REFRESH]);
-    expect(focusableIds(root, byTestId(root, 'home/title-row')[0])).toEqual([REFRESH]);
+    expect(focusableIds(root, byTestId(root, 'home/title-row')[0])).toEqual(['home/filters', REFRESH]);
     await focusOn(root, REFRESH);
     expect(destinationIds('home/refresh/down-guide')).toEqual(['home/feed/feed-post-1']);
     await unmount(root);
@@ -1994,7 +2003,9 @@ describe('Story 5.1: «Обновить» in the feed title row', () => {
     };
     const screen = (offline?: { retrying: boolean; onRetry: () => void }) => (
       <QueryClientProvider client={queryClient}>
-        <HomeScreen http={{} as HttpClient} routeKey="shell" focus={info} offline={offline} />
+        <ModalHostProvider>
+          <HomeScreen http={{} as HttpClient} routeKey="shell" focus={info} offline={offline} />
+        </ModalHostProvider>
       </QueryClientProvider>
     );
     const root = await render(screen());
@@ -2523,17 +2534,442 @@ describe('Story 4.7: «Продолжить просмотр» on Главная
     // The title row is in the list header, under the Continue row.
     const header = byTestId(root, 'home/header')[0];
     expect(focusableIds(root, header)).not.toContain('home/refresh');
+    // Story 5.3: nor is the chip.
+    expect(focusableIds(root, header)).not.toContain('home/filters');
     expect(byTestId(root, 'home/title-row').length).toBeGreaterThan(0);
     expect(destinationIds('home/title-row')).toEqual([]);
     expect(destinationIds('home/refresh/down-guide')).toEqual([]);
-    // ↓ to the first feed row (native), then ↑: the row guides to the button.
+    expect(destinationIds('home/filters/down-guide')).toEqual([]);
+    // ↓ to the first feed row (native), then ↑: the row guides to the chip
+    // (no title-row control focused yet, Story 5.3).
     await focusOn(root, `home/feed/${e5Posts()[1].id}`);
     expect(focusableIds(root, header)).toContain('home/refresh');
-    expect(destinationIds('home/title-row')).toEqual(['home/refresh']);
+    expect(focusableIds(root, header)).toContain('home/filters');
+    expect(destinationIds('home/title-row')).toEqual(['home/filters']);
     // On the button: ↓ → the remembered feed card; ↑ → the Continue row's remembered card.
     await focusOn(root, 'home/refresh');
     expect(destinationIds('home/refresh/down-guide')).toEqual([`home/feed/${e5Posts()[1].id}`]);
     expect(destinationIds('home/continue/guide')).toEqual([card(1)]);
+    // Back to the feed: ↑ now guides to «Обновить» (the row's last control).
+    await focusOn(root, `home/feed/${e5Posts()[1].id}`);
+    expect(destinationIds('home/title-row')).toEqual(['home/refresh']);
+    await unmount(root);
+  });
+});
+
+describe('Story 5.3: filter the feed by access', () => {
+  const CHIP = 'home/filters';
+  const REFRESH = 'home/refresh';
+  const SHEET = 'filters/sheet';
+  const ALLOWED = 'filters/access/allowed';
+  const ALL = 'filters/access/all';
+  const BOUGHT = 'filters/access/bought';
+  const RESET = 'filters/reset';
+  const ACTION = 'state/home/action';
+  const ALL_PARAMS = 'only_allowed=false&only_bought=false';
+  /** The access a request asked for (by its E5 params). */
+  const accessOf = (url: string) =>
+    /only_bought=true/.test(url)
+      ? 'bought'
+      : /only_allowed=true/.test(url)
+        ? 'allowed'
+        : /only_allowed=false/.test(url)
+          ? 'all'
+          : 'none';
+  const allPage = (): FixtureReply => ({
+    status: 200,
+    body: {
+      data: { posts: Array.from({ length: 10 }, (_, i) => feedPost(i, { id: `all-${i}` })), blogs: [], counters: {} },
+      extra: { offset: 'redacted', isLast: true },
+    },
+  });
+  const emptyPage = (): FixtureReply => ({
+    status: 200,
+    body: { data: { posts: [], blogs: [], counters: {} }, extra: { isLast: true } },
+  });
+  /** The E5 answer per access value (the test may replace one). */
+  let byAccess: Record<string, () => Reply>;
+  const chip = (root: Root) => one(root, CHIP);
+  const firstCard = () => `home/feed/${e5Posts()[0].id}`;
+
+  beforeEach(() => {
+    byAccess = {
+      allowed: () => ({ status: 200, body: e5Page() }),
+      all: allPage,
+      bought: emptyPage,
+    };
+    feed = req => byAccess[accessOf(req.url)]?.();
+    other = req => (req.path === E2_PATH ? { status: 200, body: e2Body() } : undefined);
+  });
+
+  /** Главная loaded (default Filter), the user on card `n`, then OK on «Фильтры». */
+  async function openSheet(n = 0) {
+    const root = await renderApp();
+    await focusOn(root, `home/feed/${e5Posts()[n].id}`);
+    await focusOn(root, CHIP);
+    focusMock.mockClear();
+    await press(root, CHIP);
+    expect(visible(root, SHEET)).toBe(true);
+    return root;
+  }
+
+  it('matrix «Open»: the chip reads «Фильтры · Доступные мне» (no count); OK → the sheet with focus on the selected value', async () => {
+    const root = await renderApp();
+    expect(text(chip(root))).toContain(tf('filters.chip', { value: t('filters.access.allowed') }));
+    expect(chip(root).props.accessibilityLabel).toBe(
+      tf('filters.chipA11y', { value: t('filters.access.allowed') }),
+    );
+    expect(byTestId(root, `${CHIP}/count`)).toHaveLength(0);
+    await unmount(root);
+
+    const sheet = await openSheet();
+    expect(text(byTestId(sheet, SHEET)[0])).toContain(t('filters.title'));
+    // The three values, no «Сбросить» (the default); the sheet is the only
+    // focusable content in the modal (the host's trap holds it).
+    expect(
+      byTestId(sheet, 'modal/content')[0]
+        .queryAll(n => n.props.focusable === true)
+        .map(n => n.props.testID),
+    ).toEqual([ALLOWED, ALL, BOUGHT]);
+    expect(focusTargets()).toContain(ALLOWED);
+    expect(one(sheet, ALLOWED).props.accessibilityState).toEqual(
+      expect.objectContaining({ selected: true }),
+    );
+    expect(one(sheet, ALL).props.accessibilityState).toEqual(
+      expect.objectContaining({ selected: false }),
+    );
+    // No E5 by opening.
+    expect(feedCalls()).toHaveLength(1);
+    await unmount(sheet);
+  });
+
+  it('matrix «Select»: «Все посты» → one E5 page 1 with both flags false; focus stays in the sheet; «Сбросить» appears; the chip counts 1', async () => {
+    const root = await openSheet();
+    focusMock.mockClear();
+    await press(root, ALL);
+    expect(feedCalls()).toHaveLength(2);
+    expect(feedCalls()[1].url).toContain(ALL_PARAMS);
+    expect(cursorOf(feedCalls()[1].url)).toBeNull();
+    // Nothing requested focus: it stays on «Все посты» in the sheet.
+    expect(focusTargets()).toEqual([]);
+    expect(visible(root, SHEET)).toBe(true);
+    expect(one(root, ALL).props.accessibilityState).toEqual(expect.objectContaining({ selected: true }));
+    expect(visible(root, RESET)).toBe(true);
+    // Behind the sheet: the «Все посты» feed and the chip with its count.
+    expect(cardIds(root)[0]).toBe('home/feed/all-0');
+    expect(text(chip(root))).toContain(tf('filters.chip', { value: t('filters.access.all') }));
+    expect(text(byTestId(root, `${CHIP}/count`)[0])).toContain('1');
+    expect(chip(root).props.accessibilityLabel).toBe(
+      tf('filters.chipA11yCount', {
+        value: t('filters.access.all'),
+        count: `1 ${tp('filters.activeCount', 1)}`,
+      }),
+    );
+    // The same value again: nothing.
+    await press(root, ALL);
+    expect(feedCalls()).toHaveLength(2);
+    await unmount(root);
+  });
+
+  it('matrix «Select», E5 fails: the error state behind; the sheet stays usable', async () => {
+    byAccess.all = () => ({ status: 403, body: {} });
+    const root = await openSheet();
+    await press(root, ALL);
+    expect(visible(root, 'home/feed/error')).toBe(true);
+    expect(visible(root, SHEET)).toBe(true);
+    // The chip stays above the error view (the sheet's initiator).
+    expect(byTestId(root, CHIP).length).toBeGreaterThan(0);
+    // The page took no focus out of the sheet.
+    expect(focusTargets()).not.toContain(ACTION);
+    await press(root, BOUGHT);
+    expect(visible(root, 'home/feed/filtered-empty')).toBe(true);
+    expect(visible(root, SHEET)).toBe(true);
+    await back();
+    expect(visible(root, SHEET)).toBe(false);
+    expect(lastFocusTarget()).toBe(CHIP);
+    await unmount(root);
+  });
+
+  it('reopened under «Все посты»: the sheet opens on «Все посты», not on «Доступные мне»', async () => {
+    const root = await openSheet();
+    await press(root, ALL);
+    await back();
+    expect(lastFocusTarget()).toBe(CHIP);
+    focusMock.mockClear();
+    await press(root, CHIP);
+    expect(visible(root, SHEET)).toBe(true);
+    expect(focusTargets()).toContain(ALL);
+    expect(focusTargets()).not.toContain(ALLOWED);
+    await unmount(root);
+  });
+
+  it('matrix «Reset»: OK «Сбросить» → the default from the cache (no E5); focus → «Доступные мне»', async () => {
+    const root = await openSheet();
+    await press(root, ALL);
+    expect(feedCalls()).toHaveLength(2);
+    await focusOn(root, RESET);
+    focusMock.mockClear();
+    await press(root, RESET);
+    expect(feedCalls()).toHaveLength(2);
+    expect(byTestId(root, RESET)).toHaveLength(0);
+    expect(lastFocusTarget()).toBe(ALLOWED);
+    expect(one(root, ALLOWED).props.accessibilityState).toEqual(expect.objectContaining({ selected: true }));
+    expect(cardIds(root)[0]).toBe(firstCard());
+    expect(byTestId(root, `${CHIP}/count`)).toHaveLength(0);
+    expect(getFilter('feed')).toEqual(DEFAULT_FILTER);
+    await unmount(root);
+  });
+
+  it('matrix «Back»: Back closes the sheet; focus → the chip; Back again → nav/home', async () => {
+    const root = await openSheet();
+    await press(root, ALL);
+    focusMock.mockClear();
+    await back();
+    expect(visible(root, SHEET)).toBe(false);
+    expect(lastFocusTarget()).toBe(CHIP);
+    // The Filter stays (no Apply button).
+    expect(getFilter('feed')).toEqual({ access: 'all' });
+    await focusOn(root, CHIP);
+    await back();
+    expect(lastFocusTarget()).toBe('nav/home');
+    await unmount(root);
+  });
+
+  it('matrix «Empty»: «Только купленные», no posts → «Ничего не найдено» + «Сбросить фильтры»; OK → the default, focus → the first card', async () => {
+    const root = await openSheet();
+    await press(root, BOUGHT);
+    expect(feedCalls()[1].url).toContain('only_allowed=false&only_bought=true');
+    expect(visible(root, 'home/feed/filtered-empty')).toBe(true);
+    expect(visible(root, 'home/feed/empty')).toBe(false);
+    expect(text(root)).toContain(t('home.feed.filteredEmptyTitle'));
+    expect(one(root, ACTION).props.accessibilityLabel).toBe(t('home.feed.filteredEmptyReset'));
+    // Focus stayed in the sheet (the page takes no focus behind it).
+    expect(focusTargets()).not.toContain(ACTION);
+    await back();
+    expect(lastFocusTarget()).toBe(CHIP);
+    // ↓ to the action (native), OK.
+    await focusOn(root, ACTION);
+    focusMock.mockClear();
+    await press(root, ACTION);
+    expect(getFilter('feed')).toEqual(DEFAULT_FILTER);
+    expect(feedCalls()).toHaveLength(2);
+    expect(cardIds(root)[0]).toBe(firstCard());
+    expect(lastFocusTarget()).toBe(firstCard());
+    await unmount(root);
+  });
+
+  it('«Сбросить фильтры» with no cached default feed: the view stays (busy) until the cards arrive, then the first card', async () => {
+    const root = await openSheet();
+    await press(root, BOUGHT);
+    await back();
+    await act(async () => {
+      queryClient.removeQueries({ queryKey: queryKeys.subscriptionFeed(DEFAULT_FILTER) });
+    });
+    const page = deferred();
+    byAccess.allowed = () => page.promise;
+    await focusOn(root, ACTION);
+    focusMock.mockClear();
+    await press(root, ACTION);
+    expect(feedCalls()).toHaveLength(3);
+    expect(visible(root, 'home/feed/skeleton')).toBe(false);
+    expect(visible(root, 'home/feed/filtered-empty')).toBe(true);
+    expect(one(root, ACTION).props.accessibilityState).toEqual(expect.objectContaining({ busy: true }));
+    page.resolve({ status: 200, body: e5Page() });
+    await settle();
+    expect(lastFocusTarget()).toBe(firstCard());
+    await unmount(root);
+  });
+
+  it('«Сбросить фильтры» and the default feed is empty too: «Новых постов нет»; focus stays on the action', async () => {
+    byAccess.allowed = emptyPage;
+    const root = await renderApp();
+    expect(visible(root, 'home/feed/empty')).toBe(true);
+    await focusOn(root, CHIP);
+    await press(root, CHIP);
+    await press(root, BOUGHT);
+    await back();
+    expect(visible(root, 'home/feed/filtered-empty')).toBe(true);
+    await focusOn(root, ACTION);
+    focusMock.mockClear();
+    await press(root, ACTION);
+    expect(visible(root, 'home/feed/empty')).toBe(true);
+    expect(text(root)).toContain(t('home.feed.emptyTitle'));
+    // The same action view: nothing re-focuses it, nothing else takes focus.
+    expect(focusTargets()).toEqual([]);
+    await unmount(root);
+  });
+
+  it('matrix «Account»: sign-out → the Filter is back to the default', async () => {
+    const root = await openSheet();
+    await press(root, ALL);
+    await back();
+    expect(getFilter('feed')).toEqual({ access: 'all' });
+    await press(root, 'nav/settings');
+    await press(root, 'settings/row/signout');
+    await press(root, 'dialog/signout/confirm');
+    expect(visible(root, 'auth/welcome')).toBe(true);
+    expect(getFilter('feed')).toEqual(DEFAULT_FILTER);
+    await unmount(root);
+  });
+
+  it('«Обновить» refreshes the active Filter’s feed (one E5 page 1 with its params)', async () => {
+    const root = await openSheet();
+    await press(root, ALL);
+    await back();
+    await focusOn(root, REFRESH);
+    await press(root, REFRESH);
+    expect(feedCalls()).toHaveLength(3);
+    expect(feedCalls()[2].url).toContain(ALL_PARAMS);
+    expect(cursorOf(feedCalls()[2].url)).toBeNull();
+    await unmount(root);
+  });
+
+  it('the session check runs only under «Доступные мне»: an all-locked «Все посты» page sends no E1', async () => {
+    byAccess.all = () => ({
+      status: 200,
+      body: {
+        data: { posts: [1, 2, 3].map(n => ({ ...lockedPost(), id: `locked-${n}` })), blogs: [], counters: {} },
+        extra: { isLast: true },
+      },
+    });
+    const root = await openSheet();
+    const e1 = transport.callsTo(E1).length;
+    await press(root, ALL);
+    await settle(WITH_TIMERS);
+    expect(cardIds(root)).toEqual(['home/feed/locked-1', 'home/feed/locked-2', 'home/feed/locked-3']);
+    expect(transport.callsTo(E1)).toHaveLength(e1);
+    expect(feedCalls()).toHaveLength(2);
+    await unmount(root);
+  });
+
+  it('the title row: «Фильтры» between the title and «Обновить» (← →); ↓ from the chip → the remembered card; ↑ from the feed → the last focused control', async () => {
+    const root = await renderApp();
+    const row = byTestId(root, 'home/title-row')[0];
+    expect(focusableIds(root, row)).toEqual([CHIP, REFRESH]);
+    // Nothing focused in the row yet: ↑ → the chip.
+    expect(destinationIds('home/title-row')).toEqual([CHIP]);
+    await focusOn(root, `home/feed/${e5Posts()[2].id}`);
+    await focusOn(root, CHIP);
+    expect(destinationIds('home/filters/down-guide')).toEqual([`home/feed/${e5Posts()[2].id}`]);
+    expect(destinationIds('home/refresh/down-guide')).toEqual([]);
+    await focusOn(root, REFRESH);
+    expect(destinationIds('home/filters/down-guide')).toEqual([]);
+    expect(destinationIds('home/refresh/down-guide')).toEqual([`home/feed/${e5Posts()[2].id}`]);
+    await focusOn(root, CHIP);
+    await focusOn(root, `home/feed/${e5Posts()[0].id}`);
+    expect(destinationIds('home/title-row')).toEqual([CHIP]);
+    await unmount(root);
+  });
+
+  it('a filter skeleton keeps the chip (the first load’s skeleton has none)', async () => {
+    const page = deferred();
+    byAccess.all = () => page.promise;
+    const root = await openSheet();
+    await press(root, ALL);
+    expect(visible(root, 'home/feed/skeleton')).toBe(true);
+    expect(byTestId(root, CHIP).length).toBeGreaterThan(0);
+    await back();
+    expect(lastFocusTarget()).toBe(CHIP);
+    page.resolve(allPage());
+    await settle();
+    // The cards arrived while the user is on the chip: focus stays there.
+    expect(cardIds(root)[0]).toBe('home/feed/all-0');
+    expect(focusTargets().filter(id => id?.startsWith('home/feed/'))).toEqual([]);
+    await unmount(root);
+  });
+
+  describe('matrix «Resume»', () => {
+    let appStateHandlers: Array<(state: string) => void> = [];
+
+    beforeEach(() => {
+      appStateHandlers = [];
+      jest.spyOn(AppState, 'addEventListener').mockImplementation(((
+        _type: string,
+        listener: (state: string) => void,
+      ) => {
+        appStateHandlers.push(listener);
+        return {
+          remove: () => {
+            appStateHandlers = appStateHandlers.filter(h => h !== listener);
+          },
+        };
+      }) as unknown as typeof AppState.addEventListener);
+    });
+
+    async function changeAppState(state: string) {
+      await act(async () => {
+        for (const h of [...appStateHandlers]) {
+          h(state);
+        }
+      });
+      await settle();
+    }
+
+    it('a non-default Filter: the resume head refresh sends that Filter’s page 1 only; the default cache is untouched', async () => {
+      const root = await openSheet();
+      await press(root, ALL);
+      await back();
+      const defaultState = queryClient.getQueryState(queryKeys.subscriptionFeed(DEFAULT_FILTER));
+      expect(feedCalls()).toHaveLength(2);
+      await changeAppState('background');
+      jest.setSystemTime(Date.now() + QUERY_STALE_TIME_MS + 1_000);
+      await changeAppState('active');
+      expect(feedCalls()).toHaveLength(3);
+      expect(feedCalls()[2].url).toContain(ALL_PARAMS);
+      expect(cursorOf(feedCalls()[2].url)).toBeNull();
+      expect(queryClient.getQueryState(queryKeys.subscriptionFeed(DEFAULT_FILTER))?.dataUpdatedAt).toBe(
+        defaultState?.dataUpdatedAt,
+      );
+      await unmount(root);
+    });
+  });
+
+  it('switching back to a stale Filter sends one E5 page 1 (the left feed keeps its first page only)', async () => {
+    const pages = syntheticFeed({ total: 30 });
+    byAccess.allowed = () => undefined;
+    feed = req => (accessOf(req.url) === 'allowed' ? pages(req) : byAccess[accessOf(req.url)]?.());
+    const root = await renderApp();
+    await focusOn(root, 'home/feed/feed-post-8');
+    await focusOn(root, 'home/feed/feed-post-13');
+    expect(feedCalls()).toHaveLength(2);
+    await focusOn(root, CHIP);
+    await press(root, CHIP);
+    await press(root, ALL);
+    expect(feedCalls()).toHaveLength(3);
+    // The default feed left behind: page 1 only, its age kept.
+    const data = queryClient.getQueryData<{ pages: unknown[] }>(queryKeys.subscriptionFeed(DEFAULT_FILTER));
+    expect(data?.pages).toHaveLength(1);
+    jest.setSystemTime(Date.now() + QUERY_STALE_TIME_MS + 1_000);
+    await press(root, ALLOWED);
+    expect(feedCalls()).toHaveLength(4);
+    expect(accessOf(feedCalls()[3].url)).toBe('allowed');
+    expect(cursorOf(feedCalls()[3].url)).toBeNull();
+    expect(cardIds(root)[0]).toBe('home/feed/feed-post-0');
+    await unmount(root);
+  });
+
+  it('phase flag off: no chip, the default Filter (whatever the store holds)', async () => {
+    // The default feed cached by a first run, then Главная alone with the flag off.
+    const app = await renderApp();
+    await unmount(app);
+    filtersStore.getState().setAccess('feed', 'all');
+    const info: HomeFocusInfo = {
+      isActive: () => true,
+      current: () => null,
+      sectionItemId: 'nav/home',
+      focusSidebar: () => {},
+      onFocusChange: () => () => {},
+    };
+    const root = await render(
+      <QueryClientProvider client={queryClient}>
+        <ModalHostProvider>
+          <HomeScreen http={{} as HttpClient} routeKey="shell" focus={info} filtersEnabled={false} />
+        </ModalHostProvider>
+      </QueryClientProvider>,
+    );
+    expect(byTestId(root, CHIP)).toHaveLength(0);
+    expect(cardIds(root)[0]).toBe(firstCard());
+    expect(feedCalls()).toHaveLength(1);
     await unmount(root);
   });
 });

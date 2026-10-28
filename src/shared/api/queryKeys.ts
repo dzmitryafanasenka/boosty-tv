@@ -1,3 +1,5 @@
+import type { Filter } from '../filters/filter';
+
 /**
  * TanStack Query keys (AD-7): the only place that builds them. The query
  * cache is account-scoped (cleared by AccountScope on sign-out and account
@@ -5,8 +7,15 @@
  * a cursor in a key: an infinite query keeps its cursors as page params.
  */
 export const queryKeys = {
-  /** E5 «Новое в подписках» (Story 3.1), an infinite query. */
-  subscriptionFeed: () => ['feed', 'subscriptions'] as const,
+  /**
+   * E5 «Новое в подписках» (Story 3.1), an infinite query, one per Filter
+   * (Story 5.3, AD-18: the symbolic Filter, never request params). Every
+   * feed path (page loads, the resume head refresh, «Обновить») uses the
+   * active `feed` Filter's key.
+   */
+  subscriptionFeed: (filter: Filter) => ['feed', 'subscriptions', filter] as const,
+  /** Every Filter's E5 feed query (a prefix of `subscriptionFeed`). */
+  allSubscriptionFeeds: () => ['feed', 'subscriptions'] as const,
   /** E2 the subscribed authors (Story 3.2), one request, no paging. */
   subscriptions: () => ['subscriptions'] as const,
   /**

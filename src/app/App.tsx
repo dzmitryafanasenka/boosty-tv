@@ -38,6 +38,7 @@ import {
   type SignInResult,
   type ValidateResult,
 } from '../shared/api';
+import { getFilter } from '../shared/filters';
 import { ModalHostProvider, useModal, type ModalApi } from '../shared/focus';
 import type { MediaRef } from '../shared/entities/post';
 import { ProgressContext } from '../shared/services/progress';
@@ -370,12 +371,13 @@ function App() {
       // Resume: E1 again; only a success changes anything (offline → the
       // feed, and a stale cached feed gets its head refreshed: one E5 page 1,
       // AD-7; so do the posts of every Author route in the stack: one E4
-      // page 1 each, spec-author-posts-refresh). Failures send nothing more.
+      // page 1 each, spec-author-posts-refresh). The feed is the active
+      // `feed` Filter's (Story 5.3). Failures send nothing more.
       session.onAppStateChange(state)?.then(result => {
         if (alive.current && result.kind === 'ok') {
           setHomeOffline(false);
           const now = Date.now();
-          refreshFeedHead(queryClient, session.http, now).catch(() => {});
+          refreshFeedHead(queryClient, session.http, getFilter('feed'), now).catch(() => {});
           refreshAuthorPostsHeads(queryClient, session.http, now).catch(() => {});
         }
       });

@@ -1,7 +1,12 @@
-import { QueryClient } from '@tanstack/react-query';
+import { InfiniteQueryObserver, QueryClient } from '@tanstack/react-query';
 import { AppError, QUERY_STALE_TIME_MS, queryKeys } from '../../../api';
 import { createLogger } from '../../../services/logger';
-import { mergePostsHead, refreshPostsHead, type PostsData } from '../postsHeadRefresh';
+import {
+  mergePostsHead,
+  refreshPostsHead,
+  trimPostsToFirstPage,
+  type PostsData,
+} from '../postsHeadRefresh';
 import type { Post, PostPage } from '../types';
 
 const KEY_A = queryKeys.authorPosts('blog-a');
@@ -348,5 +353,54 @@ describe('refreshPostsHead force (Story 5.1, «Обновить»)', () => {
     expect(await refreshPostsHead(client, KEY_A, fetch, T0, createLogger(), undefined, opts)).toBe('failed');
     fetch.mockResolvedValue(page(range(0, 20), 'c20'));
     expect(await refreshPostsHead(client, KEY_A, fetch, T0, undefined, undefined, opts)).toBe('unchanged');
+  });
+});
+
+describe('trimPostsToFirstPage (Story 5.3)', () => {
+  it('keeps the first page and its cursor, with the original age', async () => {
+    seed(KEY_A);
+    await trimPostsToFirstPage(client, KEY_A);
+    const data = client.getQueryData<PostsData>(KEY_A);
+    expect(ids(data)).toEqual(range(0, 20));
+    expect(data?.pageParams).toEqual([null]);
+    expect(data?.pages[0].nextCursor).toBe('c20');
+    expect(client.getQueryState(KEY_A)?.dataUpdatedAt).toBe(T0);
+  });
+
+  it('no data, or a single page: nothing changes', async () => {
+    await trimPostsToFirstPage(client, KEY_A);
+    expect(client.getQueryData(KEY_A)).toBeUndefined();
+    const one: PostsData = { pages: [page(range(0, 5), null)], pageParams: [null] };
+    seed(KEY_B, one);
+    await trimPostsToFirstPage(client, KEY_B);
+    expect(client.getQueryData(KEY_B)).toBe(one);
+  });
+
+  it('cancels an in-flight next-page fetch first: when it resolves, the cache still has one page', async () => {
+    const next = deferred<PostPage>();
+    const observer = new InfiniteQueryObserver<PostPage, Error, PostsData, readonly unknown[], string | null>(client, {
+      queryKey: KEY_A,
+      queryFn: ({ pageParam }) =>
+        pageParam === null ? Promise.resolve(page(range(0, 20), 'c20')) : next.promise,
+      initialPageParam: null,
+      getNextPageParam: last => last.nextCursor,
+    });
+    const unsubscribe = observer.subscribe(() => {});
+    await observer.refetch();
+    seed(KEY_A, twoPages());
+    const fetching = observer.fetchNextPage().catch(() => undefined);
+    expect(client.getQueryState(KEY_A)?.fetchStatus).toBe('fetching');
+    await trimPostsToFirstPage(client, KEY_A);
+    next.resolve(page(range(40, 60), 'c60'));
+    await fetching;
+    expect(client.getQueryData<PostsData>(KEY_A)?.pages).toHaveLength(1);
+    unsubscribe();
+  });
+
+  it('only that key', async () => {
+    seed(KEY_A);
+    seed(KEY_B);
+    await trimPostsToFirstPage(client, KEY_A);
+    expect(client.getQueryData<PostsData>(KEY_B)?.pages).toHaveLength(2);
   });
 });

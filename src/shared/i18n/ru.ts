@@ -94,6 +94,10 @@ export const ru = {
       refresh: 'Обновить',
       errorTitle: 'Не удалось загрузить ленту',
       loadMoreError: 'Не удалось загрузить следующие посты.',
+      // A non-default filter and an empty page 1 (Story 5.3, FILTER-01).
+      filteredEmptyTitle: 'Ничего не найдено',
+      filteredEmptyBody: 'С этими фильтрами постов нет.',
+      filteredEmptyReset: 'Сбросить фильтры',
     },
     // «Обновить» in the feed's title row (Story 5.1, FEED-03): a forced head
     // refresh of the feed and the subscriptions. The label reads
@@ -119,6 +123,23 @@ export const ru = {
       title: 'Нет подключения к интернету',
       body: 'Проверьте подключение телевизора к сети и попробуйте снова.',
     },
+  },
+  // The filter sheet and its chip (Story 5.3, FILTER-01; AD-18). Every
+  // change applies at once (no Apply button). `{value}` is the access
+  // label, `{count}` the active filters with its plural word.
+  filters: {
+    title: 'Фильтры',
+    chip: 'Фильтры · {value}',
+    chipA11y: 'Фильтры: {value}',
+    chipA11yCount: 'Фильтры: {value}. {count}',
+    activeCount: ['активный фильтр', 'активных фильтра', 'активных фильтров'] as RuPluralForms,
+    accessTitle: 'Доступ',
+    access: {
+      allowed: 'Доступные мне',
+      all: 'Все посты',
+      bought: 'Только купленные',
+    },
+    reset: 'Сбросить',
   },
   // Подписки (Story 3.2, E2; docs/focus-map.md §3 C1–C3). Empty: no CTA
   // (C3). `{n}` is the number of tiles shown.

@@ -5,15 +5,25 @@ import { StyleSheet, TVFocusGuideView, View, useWindowDimensions } from 'react-n
 import type { HttpClient } from '../../shared/api';
 import { videoDisplayTitle, type MediaRef, type Post } from '../../shared/entities/post';
 import {
+  DEFAULT_FILTER,
+  FilterSheet,
+  activeFilterCount,
+  filtersStore,
+  isDefaultFilter,
+  useFilter,
+  type Filter,
+} from '../../shared/filters';
+import {
   focusRestoration,
   mayTakeScreenFocus,
   restoreElseFirst,
   useFocusRestoration,
   useLatestRef,
+  useModal,
   usePhaseChange,
   useZoneItem,
 } from '../../shared/focus';
-import { t } from '../../shared/i18n';
+import { t, tf, tp } from '../../shared/i18n';
 import {
   entryDurationSec,
   progressStatus,
@@ -22,6 +32,7 @@ import {
 } from '../../shared/services/progress';
 import {
   Button,
+  FilterChip,
   PostCardSkeleton,
   StateView,
   Text,
@@ -66,6 +77,8 @@ export const HOME_STATE_ACTION_ID = 'state/home/action';
 export const HOME_SECTION = 'home';
 /** «Обновить» in the feed's title row (Story 5.1, docs/focus-map.md §3 B). */
 export const HOME_REFRESH_ID = 'home/refresh';
+/** «Фильтры» in the feed's title row (Story 5.3, docs/focus-map.md §3 B). */
+export const HOME_FILTERS_ID = 'home/filters';
 
 const SKELETON_ROWS = 2;
 const HEADER_HEIGHT = typography.section.lineHeight;
@@ -79,8 +92,10 @@ const DOWN_GUIDE_HEIGHT = spacing['2'];
 const TITLE_ROW_HEIGHT =
   Math.max(HEADER_HEIGHT, components['button-small'].height) + DOWN_GUIDE_HEIGHT;
 
-/** Where the last Shell focus was, for the title row's guides (Story 5.1). */
-type TitleFocus = 'refresh' | 'continue' | 'other';
+/** Where the last Shell focus was, for the title row's guides (Stories 5.1, 5.3). */
+type TitleFocus = 'refresh' | 'filters' | 'continue' | 'other';
+/** The title row's controls (the ↑ guide goes to the last focused one). */
+type TitleControl = 'refresh' | 'filters';
 type RefreshState = 'idle' | 'busy' | 'failed';
 
 /** What the Shell tells Главная about focus (it owns the zones). */
@@ -134,7 +149,26 @@ export type HomeScreenProps = {
    * focus). Absent (the player phase is off): no Continue row.
    */
   onOpenPlayer?: (ref: MediaRef, focusId: string) => void;
+  /**
+   * The «Фильтры» chip (Story 5.3, `phaseFlags.filters`). Off: no chip and
+   * the feed uses the default Filter.
+   */
+  filtersEnabled?: boolean;
 };
+
+/** The chip's visible label and TalkBack label for a Filter. */
+function chipLabels(filter: Filter): { label: string; a11y: string; count: number } {
+  const value = t(`filters.access.${filter.access}`);
+  const count = activeFilterCount(filter);
+  return {
+    label: tf('filters.chip', { value }),
+    a11y:
+      count > 0
+        ? tf('filters.chipA11yCount', { value, count: `${count} ${tp('filters.activeCount', count)}` })
+        : tf('filters.chipA11y', { value }),
+    count,
+  };
+}
 
 /**
  * The preview of a video in the in-memory post data (the feed's posts):
@@ -202,6 +236,7 @@ export function HomeScreen({
   focus,
   onOpenPost,
   onOpenPlayer,
+  filtersEnabled = false,
 }: HomeScreenProps) {
   const offlineRetry = useZoneItem(HOME_OFFLINE_RETRY_ID);
   const offlineRetryView = useRef<HostView | null>(null);
@@ -212,7 +247,32 @@ export function HomeScreen({
     },
     [offlineRetry],
   );
-  const feed = useSubscriptionFeed(http, !offline);
+  // The `feed` Filter (Story 5.3): the default while the chip is off.
+  const storedFilter = useFilter('feed');
+  const filter = filtersEnabled ? storedFilter : DEFAULT_FILTER;
+  const filtered = !isDefaultFilter(filter);
+  // The Filter changed while Главная is mounted: a filter skeleton keeps the
+  // chip (the sheet's initiator), unlike the first load's skeleton.
+  const initialFilter = useRef(filter);
+  const filterTouched = useRef(false);
+  if (filter !== initialFilter.current) {
+    filterTouched.current = true;
+  }
+  const feed = useSubscriptionFeed(http, !offline, filter);
+  // «Сбросить фильтры» on the filtered empty view (Story 5.3): while the
+  // default feed is not loaded yet, that view stays (its action busy) instead
+  // of the skeleton, so focus stays on the action until the cards arrive.
+  const [resetHold, setResetHold] = useState(false);
+  useEffect(() => {
+    if (resetHold && !feed.isPending) {
+      setResetHold(false);
+    }
+  }, [resetHold, feed.isPending]);
+  // The filtered empty copy (Story 5.3): a non-default Filter, or the reset
+  // still loading the default feed.
+  const filteredEmpty = filtered || (resetHold && feed.isPending);
+  /** The next grid takes focus on the first feed card (after «Сбросить фильтры»). */
+  const focusFirstAfterReset = useRef(false);
   // «Продолжить просмотр» (Story 4.7): the local history, only while the
   // player is on (`onOpenPlayer`).
   const continueView = useContinueEntries();
@@ -327,13 +387,15 @@ export function HomeScreen({
   }
   const phase: Phase = offline
     ? 'offline'
-    : feed.isPending || (continueEnabled && !continueRead.current)
-      ? 'loading'
-      : feed.firstPageError !== null
-        ? 'error'
-        : feed.posts.length === 0
-          ? 'empty'
-          : 'grid';
+    : feed.isPending && resetHold
+      ? 'empty'
+      : feed.isPending || (continueEnabled && !continueRead.current)
+        ? 'loading'
+        : feed.firstPageError !== null
+          ? 'error'
+          : feed.posts.length === 0
+            ? 'empty'
+            : 'grid';
 
   const pendingMountFocus = useRef(focusOnMount);
   /**
@@ -434,12 +496,26 @@ export function HomeScreen({
     if (phase === 'offline') {
       // Opened with OK while offline: «Повторить» (Story 2.5 behavior; the
       // Shell leaves Главная's content focus to this screen).
-      // Also when «Обновить» had focus and went away with the grid.
+      // Also when «Обновить» or «Фильтры» had focus and went away with the grid.
+      const current = focusRef.current.current();
       if (
         (mountFocus && mayTakeFocus()) ||
-        (focusRef.current.isActive() && focusRef.current.current() === HOME_REFRESH_ID)
+        (focusRef.current.isActive() &&
+          (current === HOME_REFRESH_ID || current === HOME_FILTERS_ID))
       ) {
         takeActionFocus(HOME_OFFLINE_RETRY_ID, offlineRetryView.current);
+      }
+    } else if (phase === 'grid' && focusFirstAfterReset.current) {
+      // «Сбросить фильтры» (Story 5.3): the first feed card, while focus is
+      // still on that action (else it stays where the user put it).
+      focusFirstAfterReset.current = false;
+      if (mayTakeFocus()) {
+        const info = focusRef.current;
+        latch.arm([info.sectionItemId, info.current()]);
+        autoContinue.current = false;
+        latch.auto(idsRef.current[0]);
+        listRef.current?.scrollToOffset({ offset: 0, animated: false });
+        restoration.focusInitial();
       }
     } else if (phase === 'grid') {
       // Mounted with cached cards (Back to Главная, a section switch): focus
@@ -465,6 +541,10 @@ export function HomeScreen({
       // StateView action had focus (its view was replaced), or «Обновить»
       // had it and went away with the grid (an empty last page 1, Story 5.1).
       takeActionFocus(HOME_STATE_ACTION_ID, stateActionView.current);
+    }
+    if (phase !== 'grid' && phase !== 'empty') {
+      // The reset's empty view went away without a grid (an error).
+      focusFirstAfterReset.current = false;
     }
     pendingMountFocus.current = false;
   });
@@ -619,6 +699,7 @@ export function HomeScreen({
     };
   }, []);
   const httpRef = useLatestRef(http);
+  const filterRef = useLatestRef(filter);
   // The inline error is about the last press only: new feed data (any
   // write, e.g. a later resume refresh) or leaving the grid clears it.
   useEffect(() => {
@@ -632,7 +713,7 @@ export function HomeScreen({
     // OK on «Обновить» is a move (the head-follow rule never takes it).
     latch.move();
     setRefresh('busy');
-    manualRefreshFeed(queryClient, httpRef.current, Date.now())
+    manualRefreshFeed(queryClient, httpRef.current, filterRef.current, Date.now())
       .catch(() => 'failed' as const)
       .then(result => {
         refreshRunning.current = false;
@@ -640,7 +721,30 @@ export function HomeScreen({
           setRefresh(result === 'failed' ? 'failed' : 'idle');
         }
       });
-  }, [latch, queryClient, httpRef]);
+  }, [latch, queryClient, httpRef, filterRef]);
+
+  // «Фильтры» (Story 5.3, FILTER-01): OK opens the filter sheet in the one
+  // modal host (focus trapped, opens on the selected value; Back closes it
+  // and focus returns to the chip, its initiator). A change applies at once
+  // and the feed behind refetches; focus stays in the sheet.
+  const modal = useModal();
+  const chipView = useRef<HostView | null>(null);
+  const filtersZone = useZoneItem(HOME_FILTERS_ID);
+  const onOpenFilters = useCallback(() => {
+    if (modal.isOpen()) {
+      return;
+    }
+    // OK on the chip is a move (the head-follow rule never takes it).
+    latch.move();
+    modal.open(<FilterSheet scope="feed" />, chipView, { placement: 'end' });
+  }, [latch, modal]);
+  // «Сбросить фильтры» on the filtered empty view: the default Filter; the
+  // first feed card takes focus when it arrives.
+  const onResetFilters = useCallback(() => {
+    focusFirstAfterReset.current = true;
+    setResetHold(true);
+    filtersStore.getState().reset('feed');
+  }, []);
 
   // The title row's focus moves (docs/focus-map.md §3 B, Story 5.1):
   // - ↑ from the first feed row → «Обновить»: the row is a guide whose
@@ -652,6 +756,7 @@ export function HomeScreen({
   // - while a Continue card has focus the row is no guide and the button is
   //   not focusable, so ↓ from the row keeps its column (Story 4.7).
   const [titleFocus, setTitleFocus] = useState<TitleFocus>('other');
+  const [lastTitleControl, setLastTitleControl] = useState<TitleControl | null>(null);
   const lastFeedCard = useRef<{ id: string; index: number } | null>(null);
   if (lastFeedCard.current === null) {
     const entry = focusRestoration.peek(routeKey, HOME_SECTION);
@@ -666,12 +771,17 @@ export function HomeScreen({
           const index = idsRef.current.indexOf(focusId);
           lastFeedCard.current = { id: focusId, index: Math.max(index, 0) };
         }
+        if (focusId === HOME_REFRESH_ID || focusId === HOME_FILTERS_ID) {
+          setLastTitleControl(focusId === HOME_REFRESH_ID ? 'refresh' : 'filters');
+        }
         setTitleFocus(
           focusId === HOME_REFRESH_ID
             ? 'refresh'
-            : focusId.startsWith(CONTINUE_CARD_PREFIX)
-              ? 'continue'
-              : 'other',
+            : focusId === HOME_FILTERS_ID
+              ? 'filters'
+              : focusId.startsWith(CONTINUE_CARD_PREFIX)
+                ? 'continue'
+                : 'other',
         );
       }),
     [focus],
@@ -684,9 +794,16 @@ export function HomeScreen({
   // the grid's cards, so → from the sidebar would land on it instead of a
   // card (focus-map §3 B: → returns to the remembered card).
   const refreshRef = useCallback((view: HostView | null) => setRefreshView(view), []);
+  // The chip, like the button: focus reported to the zone, the view not
+  // registered there (→ from the sidebar returns to the remembered card).
+  const [filtersView, setFiltersView] = useState<HostView | null>(null);
+  const filtersRef = useCallback((view: HostView | null) => {
+    chipView.current = view;
+    setFiltersView(view);
+  }, []);
   const [downTarget, setDownTarget] = useState<HostView | null>(null);
   useEffect(() => {
-    if (titleFocus !== 'refresh') {
+    if (titleFocus !== 'refresh' && titleFocus !== 'filters') {
       setDownTarget(null);
       return;
     }
@@ -710,6 +827,32 @@ export function HomeScreen({
     return () => cancelAnimationFrame(frame);
   }, [titleFocus, ids, restoration]);
 
+  // The chip (Story 5.3): in the grid's title row, and above the empty and
+  // error views (an empty «Доступные мне» feed may still have posts under
+  // «Все посты»). Above a skeleton only after a Filter change or with a
+  // non-default Filter: the first load's skeleton has nothing focusable.
+  const chip = filtersEnabled ? chipLabels(filter) : null;
+  const showChip =
+    chip !== null &&
+    (phase === 'grid' ||
+      phase === 'empty' ||
+      phase === 'error' ||
+      (phase === 'loading' && (filtered || filterTouched.current)));
+  const chipProps =
+    chip !== null && showChip
+      ? {
+          label: chip.label,
+          a11y: chip.a11y,
+          count: chip.count,
+          onPress: onOpenFilters,
+          ref: filtersRef,
+          onFocus: filtersZone.onFocus,
+        }
+      : null;
+  // ↑ from the first feed row: the row's last focused control, else the chip
+  // (else «Обновить» when there is no chip).
+  const rowControl =
+    lastTitleControl === 'refresh' || chipProps === null ? refreshView : filtersView;
   const titleRow =
     phase === 'grid' ? (
       <FeedTitleRow
@@ -717,10 +860,21 @@ export function HomeScreen({
         onRefresh={onRefresh}
         buttonRef={refreshRef}
         onButtonFocus={refreshZone.onFocus}
-        buttonFocusable={titleFocus !== 'continue'}
-        rowDestination={titleFocus === 'continue' ? null : refreshView}
-        downDestination={titleFocus === 'refresh' ? downTarget : null}
+        chip={chipProps}
+        controlsFocusable={titleFocus !== 'continue'}
+        rowDestination={titleFocus === 'continue' ? null : rowControl}
+        refreshDownDestination={titleFocus === 'refresh' ? downTarget : null}
+        chipDownDestination={titleFocus === 'filters' ? downTarget : null}
         inList={showContinue}
+      />
+    ) : chipProps !== null ? (
+      <FeedTitleRow
+        chip={chipProps}
+        controlsFocusable
+        rowDestination={null}
+        refreshDownDestination={null}
+        chipDownDestination={null}
+        inList={false}
       />
     ) : null;
 
@@ -750,6 +904,8 @@ export function HomeScreen({
         showContinue ? null : (
           titleRow
         )
+      ) : titleRow !== null ? (
+        titleRow
       ) : (
         <Text variant="section" accessibilityRole="header" style={styles.header}>
           {t('home.feed.title')}
@@ -793,14 +949,19 @@ export function HomeScreen({
         </View>
       ) : null}
       {phase === 'empty' ? (
-        <View testID="home/feed/empty" style={styles.state}>
+        // One element for both copies, so the action keeps its view (and
+        // focus) when a reset lands on an empty default feed.
+        <View
+          testID={filteredEmpty ? 'home/feed/filtered-empty' : 'home/feed/empty'}
+          style={styles.state}
+        >
           <StateView
-            title={t('home.feed.emptyTitle')}
-            body={t('home.feed.emptyBody')}
+            title={t(filteredEmpty ? 'home.feed.filteredEmptyTitle' : 'home.feed.emptyTitle')}
+            body={t(filteredEmpty ? 'home.feed.filteredEmptyBody' : 'home.feed.emptyBody')}
             action={{
-              label: t('home.feed.refresh'),
-              onPress: feed.refetch,
-              busy: feed.isFetching,
+              label: t(filteredEmpty ? 'home.feed.filteredEmptyReset' : 'home.feed.refresh'),
+              onPress: filteredEmpty ? onResetFilters : feed.refetch,
+              busy: filteredEmpty ? resetHold : feed.isFetching,
               testID: HOME_STATE_ACTION_ID,
               ref: stateActionRef,
               onFocus: stateAction.onFocus,
@@ -859,36 +1020,59 @@ function ContinueHeader({
   );
 }
 
+/** The «Фильтры» chip's props in the title row (Story 5.3). */
+type TitleChip = {
+  label: string;
+  a11y: string;
+  count: number;
+  onPress: () => void;
+  ref: (view: HostView | null) => void;
+  onFocus: () => void;
+};
+
 /**
- * The feed's title row in the grid phase (Story 5.1): «Новое в подписках»,
- * the secondary small «Обновить» (busy: «Обновляем…») and, after a failed
- * refresh, a short inline error. The row is a focus guide to the button
- * (↑ from the first feed row); the band under it is a guide to the
- * remembered feed card (↓ from the button). See HomeScreen for the rules.
+ * The feed's title row (Story 5.1; Story 5.3 adds the chip): «Новое в
+ * подписках», the «Фильтры» chip (when the filters phase is on), the
+ * secondary small «Обновить» (grid only; busy: «Обновляем…») and, after a
+ * failed refresh, a short inline error. The row is a focus guide to its
+ * last focused control, else the chip (↑ from the first feed row); the band
+ * under each control is a guide to the remembered feed card (↓ from it).
+ * ← → move between the chip and «Обновить» (native, one row); → from
+ * «Обновить» does nothing. Outside the grid only the title and the chip are
+ * shown, with no guides. See HomeScreen for the rules.
  */
 function FeedTitleRow({
   refresh,
   onRefresh,
   buttonRef,
   onButtonFocus,
-  buttonFocusable,
+  chip,
+  controlsFocusable,
   rowDestination,
-  downDestination,
+  refreshDownDestination,
+  chipDownDestination,
   inList,
 }: {
-  refresh: RefreshState;
-  onRefresh: () => void;
-  buttonRef: (view: HostView | null) => void;
-  onButtonFocus: () => void;
-  buttonFocusable: boolean;
+  /** Absent: no «Обновить» (outside the grid). */
+  refresh?: RefreshState;
+  onRefresh?: () => void;
+  buttonRef?: (view: HostView | null) => void;
+  onButtonFocus?: () => void;
+  chip: TitleChip | null;
+  controlsFocusable: boolean;
   rowDestination: HostView | null;
-  downDestination: HostView | null;
+  refreshDownDestination: HostView | null;
+  chipDownDestination: HostView | null;
   inList: boolean;
 }) {
   const rowDestinations = useMemo(() => (rowDestination ? [rowDestination] : []), [rowDestination]);
-  const downDestinations = useMemo(
-    () => (downDestination ? [downDestination] : []),
-    [downDestination],
+  const refreshDown = useMemo(
+    () => (refreshDownDestination ? [refreshDownDestination] : []),
+    [refreshDownDestination],
+  );
+  const chipDown = useMemo(
+    () => (chipDownDestination ? [chipDownDestination] : []),
+    [chipDownDestination],
   );
   return (
     <TVFocusGuideView
@@ -905,32 +1089,53 @@ function FeedTitleRow({
         </Text>
       </View>
       {/*
-        The ↓ band sits right under the button with the button's width:
+        Each ↓ band sits right under its control with the control's width:
         Android's focus search weighs the distance between centers, so a
-        full-width band would lose to the card under the button (device
+        full-width band would lose to the card under the control (device
         check, Story 5.1).
       */}
-      <View style={styles.refreshColumn}>
-        <Button
-          ref={buttonRef}
-          testID={HOME_REFRESH_ID}
-          kind="secondary"
-          size="small"
-          label={t('home.refresh')}
-          busyLabel={t('home.refreshing')}
-          busyAccessibilityLabel={t('home.refreshingA11y')}
-          accessibilityLabel={t('home.refreshA11y')}
-          busy={refresh === 'busy'}
-          focusable={buttonFocusable}
-          onPress={onRefresh}
-          onFocus={onButtonFocus}
-        />
-        <TVFocusGuideView
-          testID="home/refresh/down-guide"
-          destinations={downDestinations}
-          style={styles.downGuide}
-        />
-      </View>
+      {chip !== null ? (
+        <View style={styles.controlColumn}>
+          <FilterChip
+            ref={chip.ref}
+            testID={HOME_FILTERS_ID}
+            label={chip.label}
+            count={chip.count}
+            accessibilityLabel={chip.a11y}
+            focusable={controlsFocusable}
+            onPress={chip.onPress}
+            onFocus={chip.onFocus}
+          />
+          <TVFocusGuideView
+            testID="home/filters/down-guide"
+            destinations={chipDown}
+            style={styles.downGuide}
+          />
+        </View>
+      ) : null}
+      {refresh !== undefined ? (
+        <View style={styles.controlColumn}>
+          <Button
+            ref={buttonRef}
+            testID={HOME_REFRESH_ID}
+            kind="secondary"
+            size="small"
+            label={t('home.refresh')}
+            busyLabel={t('home.refreshing')}
+            busyAccessibilityLabel={t('home.refreshingA11y')}
+            accessibilityLabel={t('home.refreshA11y')}
+            busy={refresh === 'busy'}
+            focusable={controlsFocusable}
+            onPress={onRefresh}
+            onFocus={onButtonFocus}
+          />
+          <TVFocusGuideView
+            testID="home/refresh/down-guide"
+            destinations={refreshDown}
+            style={styles.downGuide}
+          />
+        </View>
+      ) : null}
       {refresh === 'failed' ? (
         <View style={styles.titleBox}>
           <Text
@@ -965,7 +1170,7 @@ const styles = StyleSheet.create({
     height: components['button-small'].height,
     justifyContent: 'center',
   },
-  refreshColumn: {
+  controlColumn: {
     marginLeft: spacing['6'],
   },
   refreshError: {

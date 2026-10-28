@@ -246,7 +246,7 @@ All of these are under `https://api.boosty.to` and use a Bearer token.
 | E2 | `GET /v1/user/subscriptions` | Subscriptions | `limit=30`, `with_follow=true` | `data[].blog{title, blogUrl, owner{name, avatarUrl?}}` (1.16.0 stopped parsing price fields after a crash). No pagination is used. Possible top-level `offset/limit/total` are commented out. |
 | E3 | `GET /v1/blog/{blogUrl}` | Blog header (Story 5.2: Подписки also sends it for the own blog, with the Author page's query key, to decide and draw «Мой блог»; `unavailable` or a failure → no tile) | — | `title`, `blogUrl`, `owner{name, avatarUrl}` |
 | E4 | `GET /v1/blog/{blogUrl}/post/` | Blog posts (Story 5.2: Подписки sends page 1 for the own blog, with the Author page's params and query key, to decide «Мой блог»; the reference's `limit=1` is not used. A failed own-blog E1/E3/E4 is not re-sent when Подписки mounts again. While Подписки is mounted, the resume head refresh also refreshes this page 1, because it observes `authorPosts(ownBlogUrl)`) | `limit` (20), `offset?` (opaque string), `comments_limit=0`, `reply_limit=0`, `is_only_allowed?`, `only_bought?`, `from_ts?`, `to_ts?` (epoch s), `tags_ids?` (comma-joined) | `data[]: Post`, `extra{offset, isLast}`. A pinned post (`isPinned: true`) comes first, out of date order (seen live on 2 of 3 blogs, 2026-10-27); the app keeps that order and marks the card with a pin badge on the Author page |
-| E5 | `GET /v1/feed/post/` | Feed | `limit` (10), `offset?`, `comments_limit=0`, `reply_limit=0`, `only_allowed?`, `only_bought?`, `tags_ids?`, `from_ts?`, `to_ts?` | `data.posts[]: Post`, `extra` |
+| E5 | `GET /v1/feed/post/` | Feed (Story 5.3: Главная always sends the access params of the active `feed` Filter, see «E5 access params (LIVE)» below) | `limit` (10), `offset?`, `comments_limit=0`, `reply_limit=0`, `only_allowed?`, `only_bought?`, `tags_ids?`, `from_ts?`, `to_ts?` | `data.posts[]: Post`, `extra` |
 | E6 | `GET /v1/search/feed/post/` | Feed search | E5 params + `search_query` | `data.searchPosts[].post: Post`, `extra` |
 | E7 | `GET /v1/search/blog/post/` | Blog search | `blog_url`, `search_query`, E4 params (with `is_only_allowed`) | `data.searchPosts[].post: Post`, `extra` |
 | E8 | `GET /v1/blog/{blogUrl}/post/{postId}` | Single post (the reference uses it to refresh media URLs and `timeCode`) | `comments_limit`, `reply_limit` (the reference sends 20. **We must send 0**. 0 is accepted: `LIVE`, Story 1.5) | `Post` (top level, no `data` wrapper) |
@@ -288,6 +288,29 @@ Excluded by product scope; **never call**:
 |---|---|
 | `GET /v1/blog/{blogUrl}/post/{postId}/comment/` (`limit`, `reply_limit`, `order=top`, `offset`, `parent_id`) | Comments are excluded (CLAUDE.md) |
 | GitHub `GET api.github.com/repos/slartus/BoostBuddy/releases/latest` | Reference self-update. Not a Boosty API and not our release channel |
+
+### E5 access params (`LIVE`, Story 5.3)
+
+The reference (`FeedRepository`, 1.16.0) sends `only_allowed = (access == Allowed)` and `only_bought = (access == Bought)`, each only when not null; Boosty TV always sends both, after `reply_limit`:
+
+| Filter value | Params |
+|---|---|
+| «Доступные мне» (default) | `only_allowed=true&only_bought=false` |
+| «Все посты» | `only_allowed=false&only_bought=false` |
+| «Только купленные» | `only_allowed=false&only_bought=true` |
+
+The opaque `offset` follows them on later pages. Before Story 5.3 the app sent no access params.
+
+Live check (debug build with a temporary counts-only log, removed before the commit; Chromecast with Google TV 4K, the owner's session, 2026-10-28; HTTP 200 for every request; only counts and booleans were logged, never ids, titles or URLs):
+
+| Request | Page 1 | Locked (`hasAccess: false`) | `extra` |
+|---|---|---|---|
+| No access params | 10 posts | 0 | `isLast: false`, `offset` present |
+| «Доступные мне» | 10 posts, the **same 10 posts** as without params | 0 (page 2: 0 of 10) | `isLast: false` |
+| «Все посты» | 10 posts, 6 of them shared with the no-params page | 4 (page 2: 8 of 10) | `isLast: false` |
+| «Только купленные» | 1 post (not on the no-params page 1) | 0 | `isLast: true`, `offset` present |
+
+So the server's default without params behaved like «Доступные мне» on page 1 for this account, «Все посты» adds locked posts (never an error), and «Только купленные» returned the purchased post as a one-post last page. One account, one run; the no-params comparison covered page 1 only. Locked posts under «Все посты» are ordinary (`hasAccess: false`), so the all-locked session check (§7) runs only under «Доступные мне». An empty «Только купленные» page (no purchases) was not seen live (this account has one); it is host-tested with the existing empty-page shape. Shape fixture: `src/test/fixtures/boosty/e5-feed-only-bought.json` (a one-post last page built from the sanitized `e5-feed.json` post; the live run logged counts only, no body was captured).
 
 ## 4. Post object (`REF`)
 
@@ -467,7 +490,7 @@ These are not `playerUrls`: the URL is the block `url` plus `Post.signedQuery` (
 | 403, 410, 429 (content), 5xx | **Not observed.** A locked post is a 200 with `hasAccess=false`, not a 403. 429 was seen only on the phone-auth send (§2.2) | unverified. **Do not treat 403 as an expired session.** Map unobserved 4xx to a generic non-retried error |
 | Network failure | Generic | — |
 
-Client handling of «locked» (Epic 3 retro A6, `src/shared/api/sessionCheck.ts`): because a dead token answers 200 as anonymous, three trigger points run E1 (`SessionManager.validate()`, single-flight) before they trust a locked answer: the player's fresh E8, the Post screen's E8, and Главная's page 1 when it has posts and every one is `hasAccess: false` (owner decision 2026-10-27; the Author page is excluded, a blog whose posts are all locked is ordinary). E1 → 401 → refresh 400 `invalid_grant` → `expired` → A11. E1 200 (also after a silent refresh) → the locked query is refetched **once**. A failure (`Network`, 5xx…) → the locked state as before. A window (at most one E1 per trigger point per 5 min, one refetch per window, handed only to a caller that is still mounted) is kept only after `ok` or `expired`; a failed or skipped E1 drops it, so the next locked answer checks again. A clock that moved back ends the window; every session status change resets the windows. A failed post-`ok` refetch keeps the locked state (no error copy). The locked UI stays on screen while E1 runs. `hasAccess: false` or a 403 alone is never treated as an expired session. **Known gap:** the window is per trigger point, so a session that dies within 5 min after an `ok` at that trigger point is noticed only after the window (or on the next resume E1). E5 with a dead token is still inferred, not observed (only E8 was checked live).
+Client handling of «locked» (Epic 3 retro A6, `src/shared/api/sessionCheck.ts`): because a dead token answers 200 as anonymous, three trigger points run E1 (`SessionManager.validate()`, single-flight) before they trust a locked answer: the player's fresh E8, the Post screen's E8, and Главная's page 1 when it has posts and every one is `hasAccess: false` (owner decision 2026-10-27; the Author page is excluded, a blog whose posts are all locked is ordinary; Story 5.3: only under the «Доступные мне» Filter, an all-locked page under «Все посты» or «Только купленные» is ordinary). E1 → 401 → refresh 400 `invalid_grant` → `expired` → A11. E1 200 (also after a silent refresh) → the locked query is refetched **once**. A failure (`Network`, 5xx…) → the locked state as before. A window (at most one E1 per trigger point per 5 min, one refetch per window, handed only to a caller that is still mounted) is kept only after `ok` or `expired`; a failed or skipped E1 drops it, so the next locked answer checks again. A clock that moved back ends the window; every session status change resets the windows. A failed post-`ok` refetch keeps the locked state (no error copy). The locked UI stays on screen while E1 runs. `hasAccess: false` or a 403 alone is never treated as an expired session. **Known gap:** the window is per trigger point, so a session that dies within 5 min after an `ok` at that trigger point is noticed only after the window (or on the next resume E1). E5 with a dead token is still inferred, not observed (only E8 was checked live).
 
 Retry policy for Boosty TV (our policy, not the reference's):
 - Idempotent GETs: bounded retry with backoff for network errors and 5xx.

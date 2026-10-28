@@ -15,6 +15,7 @@ import { StyleSheet } from 'react-native';
 import App, { navigationRef } from '../src/app/App';
 import { queryClient, resetQueryCache } from '../src/app/queryClient';
 import { QUERY_STALE_TIME_MS, queryKeys } from '../src/shared/api';
+import { DEFAULT_FILTER } from '../src/shared/filters';
 import {
   type FixtureReply,
   type FixtureRequest,
@@ -980,7 +981,7 @@ describe('Back to the origin card (matrix «Back»)', () => {
     const root = await openFromHome(5);
     await act(async () => {
       type Data = { pages: Array<{ posts: Array<{ id: string }> }> };
-      queryClient.setQueryData<Data>(queryKeys.subscriptionFeed(), data =>
+      queryClient.setQueryData<Data>(queryKeys.subscriptionFeed(DEFAULT_FILTER), data =>
         data
           ? { ...data, pages: data.pages.map(p => ({ ...p, posts: p.posts.filter(x => x.id !== FEED_ID(5)) })) }
           : data,

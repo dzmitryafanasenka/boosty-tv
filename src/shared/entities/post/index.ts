@@ -37,6 +37,7 @@ export {
 export {
   mergePostsHead,
   refreshPostsHead,
+  trimPostsToFirstPage,
   type PostsData,
   type PostsHeadRefreshLog,
   type PostsHeadRefreshResult,

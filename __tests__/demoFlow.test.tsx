@@ -89,14 +89,21 @@ test('fixture-backed Shell with the «ДЕМО» badge; SecureStore and the netw
   const focusable = root.container
     .queryAll(n => n.props.focusable === true)
     .map(n => n.props.testID as string);
-  // Then «Обновить» in the feed's title row (Story 5.1).
-  expect(focusable.slice(0, 4)).toEqual(['nav/home', 'nav/subs', 'nav/settings', 'home/refresh']);
-  // Demo posts in order. (FlashList's Jest measurements report the list
-  // end at once, so further demo pages may already be loaded.)
-  expect(focusable.slice(4, 13)).toEqual(
-    Array.from({ length: 9 }, (_, i) => `home/feed/demo-post-${i}`),
+  // Then «Фильтры» (Story 5.3) and «Обновить» (Story 5.1) in the feed's title row.
+  expect(focusable.slice(0, 5)).toEqual([
+    'nav/home',
+    'nav/subs',
+    'nav/settings',
+    'home/filters',
+    'home/refresh',
+  ]);
+  // Demo posts in order, under the default «Доступные мне» (Story 5.3: the
+  // locked demo-post-6 is not in it). (FlashList's Jest measurements report
+  // the list end at once, so further demo pages may already be loaded.)
+  expect(focusable.slice(5, 14)).toEqual(
+    [0, 1, 2, 3, 4, 5, 7, 8, 9].map(i => `home/feed/demo-post-${i}`),
   );
-  expect(focusable.slice(4).every(id => id.startsWith('home/feed/demo-post-'))).toBe(true);
+  expect(focusable.slice(5).every(id => id.startsWith('home/feed/demo-post-'))).toBe(true);
   // The demo's E1 is answered by FixtureTransport: no real request, no keychain.
   expect(fetchMock).not.toHaveBeenCalled();
   expect(keychain.getGenericPassword).not.toHaveBeenCalled();

@@ -11,6 +11,9 @@
  *
  * `myBlog` (Story 5.2) is an in-screen entry point, not a section: while it
  * is off, Подписки sends no profile E1 and shows no «Мой блог» tile.
+ *
+ * `filters` (Story 5.3) is the «Фильтры» chip on Главная: while it is off,
+ * there is no chip and the feed uses the default Filter.
  */
 export const phaseFlags = {
   home: true,
@@ -20,6 +23,7 @@ export const phaseFlags = {
   settings: true,
   player: true,
   myBlog: true,
+  filters: true,
 } as const satisfies Record<string, boolean>;
 
 export type Capability = keyof typeof phaseFlags;

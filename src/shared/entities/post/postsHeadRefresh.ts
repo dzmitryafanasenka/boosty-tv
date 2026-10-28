@@ -264,3 +264,26 @@ export async function refreshPostsHead(
   inFlight.set(hash, run);
   return run;
 }
+
+/**
+ * A paged post list the screen no longer shows (Главная's feed under another
+ * Filter, Story 5.3) keeps only its first page, with its original age: a
+ * later switch back to it while stale makes TanStack refetch every cached
+ * page in a row (a key change ignores `refetchOnMount: false`), so at most
+ * one E5 request is sent instead. A fetch of that list still running is
+ * cancelled first (its result would bring the pages back). No data or a
+ * single page: nothing changes.
+ */
+export async function trimPostsToFirstPage(client: QueryClient, key: QueryKey): Promise<void> {
+  await client.cancelQueries({ queryKey: key, exact: true });
+  const data = client.getQueryData<PostsData>(key);
+  const updatedAt = client.getQueryState(key)?.dataUpdatedAt;
+  if (!data || data.pages.length <= 1 || updatedAt === undefined) {
+    return;
+  }
+  client.setQueryData<PostsData>(
+    key,
+    { pages: data.pages.slice(0, 1), pageParams: data.pageParams.slice(0, 1) },
+    { updatedAt },
+  );
+}
