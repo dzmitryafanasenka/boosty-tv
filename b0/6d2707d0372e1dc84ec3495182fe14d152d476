@@ -1,0 +1,121 @@
+__mocks__/@react-native-async-storage/async-storage.js
+  s_67d3a4bcdb9d96::t_0cf917b38b1471 1-81
+__tests__/accountScopeRegistry.test.js
+  s_67d3a4bcdb9d96::t_c90b2ee12d8727 53
+__tests__/demoFlow.test.tsx
+  s_67d3a4bcdb9d96::t_6a850e07d05ea6 13-14,16,203-205,273-306
+__tests__/playerFlow.test.tsx
+  s_67d3a4bcdb9d96::t_3d454840d66080 11,14,21,98-100,147,160-163,169-170,1365-1708
+__tests__/postFlow.test.tsx
+  s_67d3a4bcdb9d96::t_d6e198256ccd97 27,194-195,1358-1403
+__tests__/releaseBundle.test.js
+  s_67d3a4bcdb9d96::t_b3a87cd147d4dd 34-35
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_67d3a4bcdb9d96::t_15c1ca17f89606 246-263
+_bmad-output/implementation-artifacts/spec-4-2-progress-is-saved-and-playback-resumes.md
+  s_67d3a4bcdb9d96::t_0b0612ff940b6f 1-126
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_67d3a4bcdb9d96::t_a58b682478df8e 32,71
+docs/api-contract.md
+  s_67d3a4bcdb9d96::t_4b04c738d4b01d 33,253,433-447
+docs/feature-parity.md
+  s_67d3a4bcdb9d96::t_fa201e5af009c0 83,108-109
+docs/focus-map.md
+  s_67d3a4bcdb9d96::t_4bf8a8c1035319 224,255-260,283
+docs/testing.md
+  s_67d3a4bcdb9d96::t_2da46db8663384 870-895
+package-lock.json
+  s_67d3a4bcdb9d96::t_2724eba885abc3 11,2814-2826,7355-7360
+package.json
+  s_67d3a4bcdb9d96::t_8a18c295337f99 14
+src/app/App.tsx
+  s_67d3a4bcdb9d96::t_96f461a74c4d4f 41,45,297-299,419-425,427-459
+src/app/bootstrap.ts
+  s_67d3a4bcdb9d96::t_d3ee0ca20ac68a 5,39
+src/app/dev/demo.ts
+  s_67d3a4bcdb9d96::t_9f24a4e3c342fe 8,25-27,154-155,231-250,253-256
+src/app/progress.ts
+  s_67d3a4bcdb9d96::t_7ee6a7f45df6dc 1-11
+src/app/routes.ts
+  s_67d3a4bcdb9d96::t_32d0d851bd31eb 39-40,42-46
+src/app/session.ts
+  s_67d3a4bcdb9d96::t_b469704741fb8f 3,32-37
+src/app/stackRoutes.tsx
+  s_67d3a4bcdb9d96::t_ea20126b800d4c 294,296,298-302,356,379-385
+src/features/player/PlayerScreen.tsx
+  s_67d3a4bcdb9d96::t_19b5ae6cf38b70 14,19,59-75,85-86,115-121,123-142,205-209,212,335-372,388-395,399-402,406,508,565,569,586,590,595-638,642-648,651,655-657,661,691,753
+src/features/player/mediaResolver.ts
+  s_67d3a4bcdb9d96::t_86208125200105 15,18,100-105,134-140,146-149,207-209,216,219-225,228
+src/features/post/PostBody.tsx
+  s_67d3a4bcdb9d96::t_e2cb926168ebf3 2-9,13,242-244,249-250,254,267,293,307-308,312,324,331,337,350-357,360,363-374,388-435,438-449,475-478
+src/features/post/PostScreen.tsx
+  s_67d3a4bcdb9d96::t_d1c0d28876bee1 26-31,54,56-78,137,139,141,160-165,202-203,218,235-251,364,403-404,421-429,433,457-459,467-470,478,539,542-545,555
+src/features/post/index.ts
+  s_67d3a4bcdb9d96::t_0e4ea28f1e538f 6-8
+src/features/post/usePost.ts
+  s_67d3a4bcdb9d96::t_5554def8e43e5f 11,37-42,44-45,50-54
+src/shared/api/dto/post.ts
+  s_67d3a4bcdb9d96::t_2e9c3ab46005c6 20-24,148-160
+src/shared/entities/post/index.ts
+  s_67d3a4bcdb9d96::t_0dd02e4d2c85ee 16,60
+src/shared/entities/post/postRepository.ts
+  s_67d3a4bcdb9d96::t_0f2b7cc3f21d65 3,8,130,132,136-160,164-166,173,183-187,210,212
+src/shared/entities/post/types.ts
+  s_67d3a4bcdb9d96::t_4a68a9ee962c62 132-138
+src/shared/i18n/ru.ts
+  s_67d3a4bcdb9d96::t_36648e5266c504 161-163,170-175,178-180,183-185
+src/shared/platform/appLifecycle.ts
+  s_67d3a4bcdb9d96::t_233405988f878f 1-20
+src/shared/services/progress/__tests__/progressRepository.test.ts
+  s_67d3a4bcdb9d96::t_2fbd170de6c808 1-705
+src/shared/services/progress/index.ts
+  s_67d3a4bcdb9d96::t_5928e0f91914a1 1-34
+src/shared/services/progress/progressRepository.ts
+  s_67d3a4bcdb9d96::t_c39812c5da23d3 1-381
+src/shared/services/progress/progressStore.ts
+  s_67d3a4bcdb9d96::t_9baf1e17ef194b 1-342
+src/shared/services/progress/useProgress.ts
+  s_67d3a4bcdb9d96::t_062a4bf21ed4c0 1-55
+src/shared/ui/MediaRow.tsx
+  s_67d3a4bcdb9d96::t_f2359623b783be 4-5,15-19,32-35,42-71,91-92,103,107-108,116,141-146,161-184,199,214-233
+_bmad-output/implementation-artifacts/epic-4-context.md
+  s_dbd6ee8e283fa9::t_ca4963ade757d1 7,21-27,29,33-42,46-52,57-59
+src/shared/platform/asyncKeyValueStore.ts
+  s_bee46b665ad682::t_d4f3349a640aa3 1-38
+src/shared/platform/keyValueStore.ts
+  s_bee46b665ad682::t_983baff0595787 1-25
+src/shared/services/progress/finished.ts
+  s_bee46b665ad682::t_c81d0095ca7aa5 1-55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "b06d2707d0372e1dc84ec3495182fe14d152d476",
+  "prompts": {},
+  "sessions": {
+    "s_67d3a4bcdb9d96": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e93f6f61-902b-4690-b071-9acc2f500329",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_bee46b665ad682": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a6c470fa909b762c1",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_dbd6ee8e283fa9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a9c4a898d234de324",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
