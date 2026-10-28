@@ -11,7 +11,7 @@ import type { HttpClient } from '../../shared/api';
 import type { MediaRef } from '../../shared/entities/post';
 import { useLatestRef, useModal } from '../../shared/focus';
 import { t } from '../../shared/i18n';
-import { subscribeAppBackground } from '../../shared/platform/appLifecycle';
+import { subscribeAppBackground, subscribeAppForeground } from '../../shared/platform/appLifecycle';
 import { playbackArbiter } from '../../shared/platform/playbackArbiter';
 import type { PlayerEngineHandle } from '../../shared/platform/playerEngine';
 import { PlayerEngineView } from '../../shared/platform/PlayerEngineView';
@@ -70,6 +70,14 @@ export const ENTRY_GUARD_MS = 500;
 export const SKIP_STEP_SEC = 10;
 /** A held ← → seeks at most this often (Android repeats a held key every ≈ 50 ms). */
 export const HOLD_REPEAT_MS = 200;
+
+/**
+ * Story 4.6: a source older than this (client clock, since its E8) is
+ * re-resolved (one fresh E8, the Story 4.4 path) before play: the signed
+ * URLs carry `expires` 24 h ahead (api-contract §6); how the CDN answers an
+ * expired URL is unverified, so this only avoids the error path.
+ */
+export const SOURCE_REFRESH_AGE_MS = 23 * 60 * 60 * 1000;
 
 type HWEvent = Parameters<Parameters<typeof useTVEventHandler>[0]>[0];
 
@@ -333,6 +341,14 @@ export function PlayerScreen({
    * (`recovery.ts`).
    */
   const budget = useRef(createRecoveryBudget());
+  /**
+   * Story 4.6: the app went to the background or another app took audio
+   * focus since the user last pressed play: every new source starts paused
+   * (react-native-video's `onHostResume` would otherwise start it).
+   */
+  const heldByLifecycle = useRef(false);
+  /** When the current source was resolved (Story 4.6: re-resolve before play when it is ≥ 23 h old). */
+  const resolvedAt = useRef(Date.now());
 
   // A new resolution (a fresh E8) starts the engine over. A recovery or a
   // retry starts at the broken source's position through the start gate.
@@ -340,6 +356,7 @@ export function PlayerScreen({
     if (readyResolution === null) {
       return;
     }
+    resolvedAt.current = Date.now();
     const continued = nextStart.current;
     nextStart.current = null;
     gate.current = { kind: 'load', ...(continued?.target !== undefined ? { target: continued.target } : {}) };
@@ -348,7 +365,7 @@ export function PlayerScreen({
     scrubWasPlaying.current = false;
     ended.current = false;
     // A recovery or a retry keeps the paused state of the error (Story 4.4).
-    setPaused(continued?.paused ?? false);
+    setPaused((continued?.paused ?? false) || heldByLifecycle.current);
     setPositionSec(continued?.target ?? 0);
     setDurationSec(0);
     setBuffering(true);
@@ -566,8 +583,40 @@ export function PlayerScreen({
     }
   }, [progress, readyResolution, readyProgressRef, live]);
 
-  // Background: a forced write (best effort; the app may be stopped).
-  useEffect(() => subscribeAppBackground(() => reportRef.current('background')), [reportRef]);
+  /**
+   * Story 4.6: the lifecycle (background, sleep, audio-focus loss) pauses:
+   * a hold-scrub will not resume playback when it ends, and the next source
+   * (a recovery, a retry) starts paused until the user presses play.
+   */
+  const pauseForLifecycle = useCallback(() => {
+    heldByLifecycle.current = true;
+    scrubWasPlaying.current = false;
+    if (nextStart.current !== null) {
+      nextStart.current = { ...nextStart.current, paused: true };
+    }
+    setPaused(true);
+  }, []);
+  // Background (device sleep included): a forced write (best effort; the
+  // app may be stopped), then the player pauses itself (Story 4.6), so
+  // react-native-video's `onHostResume` does not restart playback; a pending
+  // seek target is dropped without seeking, the settings sheet closes.
+  const onBackgroundRef = useLatestRef(() => {
+    reportRef.current('background');
+    // Every phase: a source still loading or recovering starts paused too.
+    pauseForLifecycle();
+    seek.reset();
+    closeSheet(false);
+    // Hidden now, so the foreground's overlay is a change: focus → the timeline.
+    setOverlay(false);
+  });
+  useEffect(() => subscribeAppBackground(() => onBackgroundRef.current()), [onBackgroundRef]);
+  // Foreground (Story 4.6): paused, the overlay shown (focus → the timeline).
+  const onForegroundRef = useLatestRef(() => {
+    if (live.current.phase === 'playing') {
+      showOverlay();
+    }
+  });
+  useEffect(() => subscribeAppForeground(() => onForegroundRef.current()), [onForegroundRef]);
   // Unmount (any exit path): a forced write, not awaited.
   useEffect(() => () => reportRef.current('exit'), [reportRef]);
 
@@ -662,6 +711,25 @@ export function PlayerScreen({
   /** Play or pause; playing after the end starts over from 0 (the ended engine never restarts by itself). */
   const setPlaying = useCallback(
     (play: boolean) => {
+      const current = live.current.ready;
+      if (play && current !== null && Date.now() - resolvedAt.current >= SOURCE_REFRESH_AGE_MS) {
+        // Story 4.6: the signed URL is (nearly) expired: one fresh E8 first
+        // (the Story 4.4 path, «Восстанавливаем…», same quality, same
+        // second), then play. Not an error: the recovery budget is untouched.
+        logger.info('player', 'source is old; re-resolving before play');
+        nextStart.current = {
+          target: recoveryTarget(gate.current, seek.target(), live.current.positionSec),
+          paused: false,
+        };
+        seek.reset();
+        setKeepQuality(qualityOf(current.source));
+        setRecovery({ from: current.resolution });
+        media.retry();
+        return;
+      }
+      if (play) {
+        heldByLifecycle.current = false;
+      }
       if (play && ended.current) {
         ended.current = false;
         // A replay after the end is a new progress session from 0 (a short
@@ -682,7 +750,7 @@ export function PlayerScreen({
       setPaused(!play);
       showOverlay();
     },
-    [showOverlay, reportProgress, live, progress, readyProgressRef],
+    [showOverlay, reportProgress, live, progress, readyProgressRef, seek, media],
   );
   const togglePause = useCallback(() => setPlaying(live.current.paused), [live, setPlaying]);
   /**
@@ -1077,6 +1145,19 @@ export function PlayerScreen({
   // (`expired` opens A11 by itself): leave for the Post at once, with the
   // usual exit report; the Post refetches and shows its own locked notice.
   const noAccessExit = state.kind === 'locked' && state.confirmed && everReady.current;
+  /** Story 4.6: another app took audio focus: a user pause (the 4.2 `pause` write). */
+  const onAudioFocusLost = useCallback(() => {
+    const wasPlaying = live.current.phase === 'playing' && (!live.current.paused || scrubWasPlaying.current);
+    if (wasPlaying && !live.current.paused) {
+      // A user pause: the 4.2 `pause` write and the overlay.
+      setPlaying(false);
+    }
+    // Also during a hold-scrub, a load or a recovery: nothing resumes by itself.
+    pauseForLifecycle();
+    if (wasPlaying) {
+      showOverlay();
+    }
+  }, [live, setPlaying, pauseForLifecycle, showOverlay]);
   const onNoAccessRef = useLatestRef(onNoAccess ?? onExit);
   useEffect(() => {
     if (!noAccessExit || !isActive()) {
@@ -1126,6 +1207,7 @@ export function PlayerScreen({
             onEnd={onEnd}
             onError={onError}
             onResolution={setAutoHeight}
+            onAudioFocusLost={onAudioFocusLost}
           />
         ) : null}
       </Pressable>

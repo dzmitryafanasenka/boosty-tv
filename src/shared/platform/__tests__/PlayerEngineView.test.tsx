@@ -124,4 +124,23 @@ describe('PlayerEngineView (react-native-video adapter)', () => {
     expect(mockVideo.props?.reportBandwidth).toBe(false);
     await act(async () => other.unmount());
   });
+
+  it('Story 4.6: onAudioFocusLost on a focus loss only (full or transient), not on a gain', async () => {
+    const onAudioFocusLost = jest.fn();
+    let root!: Root;
+    await act(async () => {
+      root = createRoot();
+      root.render(
+        <PlayerEngineView source={{ uri: URL, format: 'hls' }} paused={false} onAudioFocusLost={onAudioFocusLost} />,
+      );
+    });
+    await act(async () => {
+      mockVideo.props?.onAudioFocusChanged({ hasAudioFocus: false });
+      mockVideo.props?.onAudioFocusChanged({ hasAudioFocus: true });
+    });
+    expect(onAudioFocusLost).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      root.unmount();
+    });
+  });
 });

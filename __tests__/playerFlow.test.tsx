@@ -212,7 +212,9 @@ async function key(eventType: string, action = 1) {
 }
 
 /** Engine events through the mocked port. */
-async function fire<K extends 'onLoad' | 'onProgress' | 'onBuffering' | 'onSeekDone' | 'onEnd' | 'onError' | 'onResolution'>(
+async function fire<
+  K extends 'onLoad' | 'onProgress' | 'onBuffering' | 'onSeekDone' | 'onEnd' | 'onError' | 'onResolution' | 'onAudioFocusLost',
+>(
   name: K,
   ...args: Parameters<NonNullable<NonNullable<typeof engine.props>[K]>>
 ) {
@@ -2676,3 +2678,158 @@ describe('debug-only broken next video URL (Story 4.4 device check)', () => {
     await unmount(root);
   });
 });
+
+describe('sleep, background and audio focus (Story 4.6)', () => {
+  const RECOVERING = 'player/state/recovering';
+  const E9 = /^\/v1\/viewstat\/video\/([^/]+)\/timecode\/$/;
+  const e9Sent = () =>
+    transport.calls.filter(c => c.method === 'PUT' && E9.test(c.path)).map(c => `${E9.exec(c.path)?.[1]}@${c.form.time_code}`);
+  let appState: Array<(state: string) => void> = [];
+  beforeEach(() => {
+    appState = [];
+    jest.spyOn(AppState, 'addEventListener').mockImplementation(((_type: string, listener: (s: string) => void) => {
+      appState.push(listener);
+      return {
+        remove: () => {
+          appState = appState.filter(h => h !== listener);
+        },
+      };
+    }) as unknown as typeof AppState.addEventListener);
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+  async function lifecycle(state: string) {
+    await act(async () => {
+      for (const h of [...appState]) {
+        h(state);
+      }
+    });
+    await settle();
+  }
+  async function ticks(from: number, to: number) {
+    for (let sec = from; sec <= to; sec += 1) {
+      await fire('onProgress', sec);
+    }
+  }
+
+  it('background (sleep) pauses and writes; the foreground shows the overlay, still paused, focus on the timeline', async () => {
+    const root = await openPlayer();
+    await ticks(0, 14);
+    expect(engine.props?.paused).toBe(false);
+    await lifecycle('background');
+    expect(engine.props?.paused).toBe(true);
+    expect(e9Sent()).toContain('v1@14');
+    focusMock.mockClear();
+    await lifecycle('active');
+    expect(engine.props?.paused).toBe(true);
+    expect(visible(root, 'player/overlay')).toBe(true);
+    expect(lastFocusTarget()).toBe(TIMELINE);
+    await unmount(root);
+  });
+
+  it('audio focus loss pauses (a user pause: the progress write) and shows the overlay', async () => {
+    const root = await openPlayer();
+    await ticks(0, 12);
+    await fire('onAudioFocusLost');
+    expect(engine.props?.paused).toBe(true);
+    expect(visible(root, 'player/overlay')).toBe(true);
+    expect(e9Sent()).toEqual(['v1@10', 'v1@12']);
+    await unmount(root);
+  });
+
+  it('play on a source resolved ≥ 23 h ago re-resolves first (one E8, «Восстанавливаем…»), then plays at the same second', async () => {
+    const root = await openPlayer();
+    await ticks(0, 40);
+    await key('down'); // the overlay
+    await focusOn(root, PLAYPAUSE);
+    await press(root, PLAYPAUSE); // pause
+    expect(engine.props?.paused).toBe(true);
+    const before = e8Calls().length;
+    const mounts = engine.mounts;
+    jest.setSystemTime(Date.now() + 23 * 60 * 60 * 1000);
+    await press(root, PLAYPAUSE); // play
+    expect(e8Calls()).toHaveLength(before + 1);
+    expect(visible(root, RECOVERING)).toBe(true);
+    expect(engine.mounts).toBe(mounts + 1);
+    await fire('onLoad', { durationSec: 600 });
+    expect(engine.seek).toHaveBeenLastCalledWith(40);
+    await fire('onSeekDone', 40);
+    expect(visible(root, RECOVERING)).toBe(false);
+    expect(engine.props?.paused).toBe(false);
+    await unmount(root);
+  });
+
+  it('background with the sheet open and a pending seek: the sheet closes, no seek is made; the foreground focuses the timeline', async () => {
+    const root = await openPlayer();
+    await ticks(0, 14);
+    await key('down'); // the overlay
+    await focusOn(root, SETTINGS);
+    await press(root, SETTINGS);
+    expect(visible(root, 'player/sheet')).toBe(true);
+    await lifecycle('background');
+    expect(visible(root, 'player/sheet')).toBe(false);
+    expect(engine.props?.paused).toBe(true);
+    focusMock.mockClear();
+    await lifecycle('active');
+    expect(visible(root, 'player/overlay')).toBe(true);
+    expect(lastFocusTarget()).toBe(TIMELINE);
+    // A pending seek target is dropped without seeking.
+    await key('right');
+    await lifecycle('background');
+    await advance(1_000);
+    expect(engine.seek).not.toHaveBeenCalled();
+    await unmount(root);
+  });
+
+  it('background during a recovery: the recovered source starts paused (no autoplay on return)', async () => {
+    const root = await openPlayer();
+    await ticks(0, 30);
+    await fire('onError', 'http');
+    expect(visible(root, RECOVERING)).toBe(true);
+    await lifecycle('background');
+    await lifecycle('active');
+    await fire('onLoad', { durationSec: 600 });
+    await fire('onSeekDone', 30);
+    expect(engine.props?.paused).toBe(true);
+    await unmount(root);
+  });
+
+  it('audio focus lost during a hold-scrub: the scrub ending does not resume playback', async () => {
+    installNativeModules({ SeekKeys: { setEnabled: jest.fn() } });
+    const native = async (action: 'down' | 'up', repeat = 0) => {
+      await act(async () => {
+        DeviceEventEmitter.emit('seekKey', { key: 'right', action, repeat });
+      });
+      await settle();
+    };
+    const root = await openPlayer();
+    await ticks(0, 12);
+    await native('down', 0);
+    for (let i = 1; i <= 6; i += 1) {
+      await advance(50);
+      await native('down', i);
+    }
+    await native('up');
+    expect(engine.props?.paused).toBe(true); // the hold-scrub pause
+    await fire('onAudioFocusLost');
+    await back(); // cancels the held target: the scrub ends
+    expect(engine.props?.paused).toBe(true);
+    await unmount(root);
+  });
+
+  it('a younger source plays at once (no E8)', async () => {
+    const root = await openPlayer();
+    await ticks(0, 5);
+    await key('down'); // the overlay
+    await focusOn(root, PLAYPAUSE);
+    await press(root, PLAYPAUSE);
+    const before = e8Calls().length;
+    jest.setSystemTime(Date.now() + 60 * 60 * 1000);
+    await press(root, PLAYPAUSE);
+    expect(e8Calls()).toHaveLength(before);
+    expect(engine.props?.paused).toBe(false);
+    await unmount(root);
+  });
+});
+

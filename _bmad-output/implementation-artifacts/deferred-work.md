@@ -64,6 +64,7 @@
   summary: Production player: act on D-pad key up for seek, ignore a key up whose key down happened before the player got focus, and accumulate the target of repeated presses during an in-flight seek.
   evidence: Story 1.6 device run: the physical remote delivers only key up for left/right to useTVEventHandler; moving focus onto the player fired a seek; presses during a seek were computed from a stale position.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-6-spike-authorized-playback-expiry-and-progress-round-trip.md`
+  status: Done 2026-10-28: Story 4.6 (pause on background/sleep, overlay paused on return) and Story 4.2 (no E9 before the start position).
   summary: Production player: stay paused after the app returns from background or device sleep, and do not write E9 or keep a position until a new source has reached its start position.
   evidence: Story 1.6: after KEYCODE_WAKEUP playback resumed by itself; during a quality switch the spike wrote time_code=0 before the seek-after-load (fixed in the spike only).
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-6-spike-authorized-playback-expiry-and-progress-round-trip.md`
