@@ -116,7 +116,7 @@ motion:
   spinner:      { duration: 900ms, easing: linear }
 components:
   focusable-surface: { ringColor: '{colors.focus-ring}', ringWidth: '{focus.ring-width}', ringOffset: '{focus.ring-offset}', transition: '{motion.focus}' }
-  nav-item: { width: 120, height: 36, radius: '{rounded.md}', currentBg: '{colors.surface-current}', currentMark: '{colors.accent}', focusBg: '{colors.surface-focus-row}', text: '{typography.button}' }
+  nav-item: { width: 136, insetX: 16, paddingLeft: 32, height: 36, radius: '{rounded.md}', currentBg: '{colors.surface-current}', currentMark: '{colors.accent}', focusBg: '{colors.surface-focus-row}', text: '{typography.button}' }
   button-primary: { height: 40, paddingX: 20, radius: '{rounded.lg}', bg: '{colors.accent}', bgFocus: '{colors.accent-focus}', text: '{colors.accent-ink}', scaleFocus: '{focus.scale-button}' }
   button-secondary: { height: 40, paddingX: 20, radius: '{rounded.lg}', bg: '{colors.surface-raised}', bgFocus: '{colors.surface-focus-button}', text: '{colors.text}' }
   button-small: { height: 32, paddingX: 14, text: '{typography.button-s}' }
