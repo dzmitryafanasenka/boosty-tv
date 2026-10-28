@@ -29,6 +29,7 @@ import {
 } from '../features/auth';
 import { refreshAuthorPostsHeads } from '../features/author';
 import { refreshFeedHead } from '../features/home';
+import { debugBreakNextVideoSource } from '../features/player';
 import { SignOutDialog } from '../features/settings';
 import { accountScope } from '../shared/account';
 import {
@@ -241,6 +242,7 @@ function ShellRoute({
       }
       onCheckSession={__DEV__ ? ui.onCheckSession : undefined}
       onExpireSession={__DEV__ ? ui.onExpireSession : undefined}
+      onBreakNextVideoUrl={__DEV__ ? debugBreakNextVideoSource : undefined}
       homeOffline={
         ui.homeOffline
           ? { retrying: ui.retrying, onRetry: ui.onRetry }

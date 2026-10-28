@@ -19,7 +19,8 @@ import { type FixtureReply, type FixtureRequest, type FixtureTransport } from '.
 import { focusRestoration } from '../src/shared/focus';
 import { logger } from '../src/shared/services/logger';
 import { progressStore } from '../src/shared/services/progress';
-import { QUALITY_PREFERENCE_KEY, qualityPreference } from '../src/features/player';
+import { QUALITY_PREFERENCE_KEY, debugBreakNextVideoSource, qualityPreference } from '../src/features/player';
+import { resetBreakSource } from '../src/features/player/debugBreakSource';
 import { playbackArbiter } from '../src/shared/platform/playbackArbiter';
 import { requestHostFocus } from '../src/shared/ui/requestHostFocus';
 import backHandler from '../src/test/backHandlerMock';
@@ -103,6 +104,8 @@ let e8: (req: FixtureRequest, blogUrl: string, postId: string) => Reply;
 const E9_RE = /^\/v1\/viewstat\/video\/([^/]+)\/timecode\/$/;
 let e9: (req: FixtureRequest) => Reply;
 let transport: FixtureTransport;
+/** Story 4.4: E1 held by a test (the session check still running); null: 200 at once. */
+let e1Hold: Promise<FixtureReply> | null;
 
 const okVideo = (id: string, playerUrls: unknown[], more: Record<string, unknown> = {}) => ({
   type: 'ok_video',
@@ -149,10 +152,11 @@ beforeEach(() => {
   installNativeModules({ AppInfo: { versionName: '1.0' } });
   withData(ONE);
   e9 = () => ({ status: 200 });
+  e1Hold = null;
   const feed = syntheticFeed({ total: 3 });
   transport = installFixtureTransport((req: FixtureRequest): Reply => {
     if (req.path === E1) {
-      return { status: 200, body: e1Ok.body };
+      return e1Hold ?? { status: 200, body: e1Ok.body };
     }
     if (req.path === E5_PATH) {
       return feed(req);
@@ -174,6 +178,8 @@ afterEach(async () => {
   await progressStore.reset();
   // Story 4.3: nor the device's quality preference.
   qualityPreference.forget();
+  // Story 4.4: the debug-only broken-source flag.
+  resetBreakSource();
   await createAsyncStorage('boostytv-device').clear();
   await resetQueryCache();
   clearNativeModules();
@@ -216,6 +222,17 @@ async function fire<K extends 'onLoad' | 'onProgress' | 'onBuffering' | 'onSeekD
     handler?.(...args);
   });
   await settle();
+}
+
+/**
+ * Story 4.4: the first engine error recovers by itself (one fresh E8, a new
+ * engine); the recovered source's error within 30 s shows the error state.
+ */
+async function failPastRecovery(code: string | null = 'decoder') {
+  const mounts = engine.mounts;
+  await fire('onError', code);
+  expect(engine.mounts).toBe(mounts + 1);
+  await fire('onError', code);
 }
 
 /** Главная → OK on the first card → Пост. */
@@ -561,19 +578,26 @@ describe('error states (matrix «No usable URL», «Locked on fresh E8», «E8 f
     await unmount(root);
   });
 
-  it('a start failure (engine error): the error state; Повторить → one fresh E8 and a new engine; Back exits', async () => {
+  it('an engine error: one automatic recovery (Story 4.4); the second error: the error state; Повторить → one fresh E8 and a new engine; Back exits', async () => {
     const root = await openPlayer();
     expect(engine.mounts).toBe(1);
     const before = e8Calls().length;
     await fire('onError', '22004');
+    expect(e8Calls()).toHaveLength(before + 1);
+    expect(engine.mounts).toBe(2);
+    await fire('onError', '22004');
     expect(engine.props).toBeNull();
+    expect(e8Calls()).toHaveLength(before + 1);
     expect(playerText(root)).toContain('Не удалось воспроизвести видео');
     expect(lastFocusTarget()).toBe(RETRY);
     await press(root, RETRY);
-    expect(e8Calls()).toHaveLength(before + 1);
-    expect(engine.mounts).toBe(2);
+    expect(e8Calls()).toHaveLength(before + 2);
+    expect(engine.mounts).toBe(3);
     expect(engine.props?.paused).toBe(false);
+    // The budget is still used (no 30 s of playback): the error state, no E8.
     await fire('onError', null);
+    expect(e8Calls()).toHaveLength(before + 2);
+    expect(visible(root, RETRY)).toBe(true);
     await back();
     expect(currentRoute()).toBe('Post');
     await unmount(root);
@@ -1370,7 +1394,7 @@ describe('review fixes (Story 4.1)', () => {
 
   it('a retry whose fresh E8 fails shows that error kind (not the generic copy)', async () => {
     const root = await openPlayer();
-    await fire('onError', null);
+    await failPastRecovery(null);
     expect(playerText(root)).toContain('Попробуйте ещё раз или вернитесь к посту.');
     e8 = () => ({ status: 503, body: {} });
     await press(root, RETRY, { settle: { timerRounds: 30 } });
@@ -1765,7 +1789,7 @@ describe('progress and resume (Story 4.2)', () => {
       await ticks(0, 120);
     }
     expect(e9Sent()).toContain('v1@120');
-    await fire('onError', 'decoder');
+    await failPastRecovery();
     expect(visible(root, RETRY)).toBe(true);
     engine.reset();
     await press(root, RETRY);
@@ -2025,7 +2049,7 @@ describe('quality (Story 4.3)', () => {
     await openSheet(root);
     await press(root, QUALITY);
     await press(root, Q(1080));
-    await fire('onError', 'decoder');
+    await failPastRecovery();
     expect(visible(root, RETRY)).toBe(true);
     expect(await device().getItem(QUALITY_PREFERENCE_KEY)).toBeNull();
     await unmount(root);
@@ -2185,7 +2209,7 @@ describe('quality (Story 4.3)', () => {
     }
   });
 
-  it('a start failure with the sheet open closes it; the error takes focus («Повторить»)', async () => {
+  it('an engine error with the sheet open closes it; the recovery takes focus (the surface), a second error («Повторить»)', async () => {
     withData([okVideo('v1', MIXED)]);
     const root = await openPlayer();
     await openSheet(root);
@@ -2193,6 +2217,9 @@ describe('quality (Story 4.3)', () => {
     await fire('onError', 'decoder');
     await advance(50);
     expect(visible(root, SHEET)).toBe(false);
+    expect(lastFocusTarget()).toBe(SURFACE);
+    await fire('onError', 'decoder');
+    await advance(50);
     expect(visible(root, RETRY)).toBe(true);
     expect(lastFocusTarget()).toBe(RETRY);
     await unmount(root);
@@ -2208,6 +2235,440 @@ describe('quality (Story 4.3)', () => {
     const stored = await device().getItem(QUALITY_PREFERENCE_KEY);
     expect(stored).toBe('1080');
     expect(JSON.stringify(logger.entries())).not.toContain('example.invalid');
+    await unmount(root);
+  });
+});
+
+describe('recovery (Story 4.4)', () => {
+  const RECOVERING = 'player/state/recovering';
+  const AUTHOR = `post/${POST}/author`;
+  const device = () => createAsyncStorage('boostytv-device');
+  const e9Sent = () =>
+    transport.calls
+      .filter(c => c.method === 'PUT' && E9_RE.test(c.path))
+      .map(c => `${E9_RE.exec(c.path)?.[1]}@${c.form.time_code}`);
+  const focusables = (root: Root) =>
+    byTestId(root, 'player/page')[0]
+      .queryAll(n => n.props.focusable === true)
+      .map(n => n.props.testID as string);
+  async function ticks(from: number, to: number) {
+    for (let sec = from; sec <= to; sec += 1) {
+      await fire('onProgress', sec);
+    }
+  }
+  /** HLS + 720p + 1080p + 1440p, each with its own URL and the E8's number (`-n`). */
+  const sourcesOf = (n: number, types = ['hls', 'high', 'full_hd', 'quad_hd']) =>
+    types.map(type => ({ type, url: `${URL}-${type}-${n}` }));
+  /** Every E8 answers with URLs of its own number (Пост: 1, the player: 2, the recovery: 3 …). */
+  function numberedE8(types?: string[]) {
+    let n = 0;
+    e8 = (_req, blogUrl, postId) => {
+      n += 1;
+      return { status: 200, body: postDetail(blogUrl, postId, [okVideo('v1', sourcesOf(n, types))]) };
+    };
+  }
+  const lockedE8 = (): FixtureReply => ({
+    status: 200,
+    body: { ...e8Locked(), id: POST, user: { ...(e8Locked().user as object), blogUrl: FEED_BLOG } },
+  });
+  /** The player at `at` s (the start reached, 0 → `at` played). */
+  async function playTo(at: number) {
+    const root = await openPlayer();
+    await ticks(0, at);
+    return root;
+  }
+
+  it('matrix «Expired URL» and «Integration»: at 5:12 an engine error → «Восстанавливаем…» (no action, focus on the surface), exactly one fresh E8, the new source seeks to 312 and plays; no E9 for the error, the session continues', async () => {
+    numberedE8();
+    const root = await playTo(312);
+    expect(engine.props?.source.uri).toBe(`${URL}-hls-2`);
+    expect(e9Sent()).toContain('v1@310');
+    const sentBefore = e9Sent().length;
+    const before = e8Calls().length;
+    const pending = deferred();
+    const answer = e8;
+    e8 = (req, blogUrl, postId) => pending.promise.then(() => answer(req, blogUrl, postId) as FixtureReply);
+    focusMock.mockClear();
+    await fire('onError', 'http');
+    expect(e8Calls()).toHaveLength(before + 1);
+    expect(engine.props).toBeNull();
+    expect(visible(root, RECOVERING)).toBe(true);
+    expect(playerText(root)).toContain('Восстанавливаем воспроизведение…');
+    expect(visible(root, 'player/spinner')).toBe(true);
+    expect(focusables(root)).toEqual([SURFACE]);
+    expect(lastFocusTarget()).toBe(SURFACE);
+    expect(visible(root, RETRY)).toBe(false);
+    // TalkBack announces the copy.
+    expect(byTestId(root, RECOVERING)[0].queryAll(n => n.props.accessibilityLiveRegion === 'polite')).not.toHaveLength(0);
+    pending.resolve({ status: 200 });
+    await settle();
+    // The fresh E8's own URL (the second engine of this opening); the copy
+    // stays until the new source reached its start position.
+    expect(engine.props?.source.uri).toBe(`${URL}-hls-3`);
+    expect(visible(root, RECOVERING)).toBe(true);
+    expect(focusables(root)).toEqual([SURFACE]);
+    expect(e8Calls()).toHaveLength(before + 1);
+    engine.seek.mockClear();
+    await fire('onProgress', 0);
+    await fire('onLoad', { durationSec: 600 });
+    expect(engine.seek).toHaveBeenCalledTimes(1);
+    expect(engine.seek).toHaveBeenCalledWith(312);
+    expect(visible(root, RECOVERING)).toBe(true);
+    await fire('onSeekDone', 312);
+    expect(visible(root, RECOVERING)).toBe(false);
+    expect(visible(root, 'player/overlay')).toBe(false);
+    expect(lastFocusTarget()).toBe(SURFACE);
+    await ticks(313, 321);
+    expect(engine.props?.paused).toBe(false);
+    // No E9 of the error, none of the new source's t=0; 10 s after the last write (310).
+    expect(e9Sent().slice(sentBefore)).toEqual(['v1@320']);
+    expect(e9Sent()).not.toContain('v1@0');
+    expect(e8Calls()).toHaveLength(before + 1);
+    // The player's recovery logs carry no URL, id or position.
+    const playerLogs = logger.entries().filter(entry => entry.scope === 'player');
+    expect(playerLogs.map(entry => entry.message)).toContain('playback failed; recovering');
+    expect(JSON.stringify(playerLogs)).not.toMatch(/example\.invalid|312|v1/);
+    expect(JSON.stringify(logger.entries())).not.toContain('example.invalid');
+    await unmount(root);
+  });
+
+  it('matrix «Second error»: the recovered source errors within 30 s → the error state, «Повторить» focused; no more E8', async () => {
+    const root = await playTo(100);
+    const before = e8Calls().length;
+    await fire('onError', 'http');
+    expect(e8Calls()).toHaveLength(before + 1);
+    await fire('onLoad', { durationSec: 600 });
+    await fire('onSeekDone', 100);
+    await ticks(101, 125);
+    focusMock.mockClear();
+    await fire('onError', 'http');
+    await advance(50);
+    expect(e8Calls()).toHaveLength(before + 1);
+    expect(playerText(root)).toContain('Не удалось воспроизвести видео');
+    expect(focusables(root)).toEqual([RETRY, BACK]);
+    expect(lastFocusTarget()).toBe(RETRY);
+    await unmount(root);
+  });
+
+  it('matrix «Budget back»: the recovered source plays 30 s, then errors → one more automatic recovery', async () => {
+    const root = await playTo(100);
+    const before = e8Calls().length;
+    await fire('onError', 'http');
+    await fire('onLoad', { durationSec: 600 });
+    await fire('onSeekDone', 100);
+    // A seek jump does not count as playback.
+    await ticks(101, 110);
+    await fire('onSeekDone', 300);
+    // 10 + 18 s of playback: still under 30 s.
+    await ticks(301, 318);
+    await fire('onError', 'http');
+    expect(visible(root, RETRY)).toBe(true);
+    await unmount(root);
+
+    const again = await playTo(100);
+    const start = e8Calls().length;
+    expect(start).toBe(before + 2);
+    await fire('onError', 'http');
+    await fire('onLoad', { durationSec: 600 });
+    await fire('onSeekDone', 100);
+    await ticks(101, 130);
+    engine.seek.mockClear();
+    await fire('onError', 'http');
+    expect(e8Calls()).toHaveLength(start + 2);
+    expect(visible(again, RETRY)).toBe(false);
+    await fire('onLoad', { durationSec: 600 });
+    expect(engine.seek).toHaveBeenCalledWith(130);
+    await unmount(again);
+  });
+
+  it('matrix «Recovery E8 fails»: Network on the fresh E8 → the error state «Повторить» / «Назад»; Повторить → one E8, plays at the same position', async () => {
+    const root = await playTo(200);
+    e8 = () => ({ network: true });
+    await fire('onError', 'http');
+    await settle({ timerRounds: 30 });
+    expect(playerText(root)).toContain('Не удалось воспроизвести видео');
+    expect(focusables(root)).toEqual([RETRY, BACK]);
+    expect(lastFocusTarget()).toBe(RETRY);
+    withData(ONE);
+    const before = e8Calls().length;
+    await press(root, RETRY);
+    expect(e8Calls()).toHaveLength(before + 1);
+    engine.seek.mockClear();
+    await fire('onLoad', { durationSec: 600 });
+    expect(engine.seek).toHaveBeenCalledWith(200);
+    expect(engine.props?.source.format).toBe('hls');
+    await unmount(root);
+  });
+
+  it('matrix «Same quality»: 720p chosen, the fresh E8 has 720p → plays 720p', async () => {
+    await device().setItem(QUALITY_PREFERENCE_KEY, '720');
+    numberedE8();
+    const root = await playTo(50);
+    expect(engine.props?.source.uri).toBe(`${URL}-high-2`);
+    await fire('onError', 'http');
+    expect(engine.props?.source.uri).toBe(`${URL}-high-3`);
+    await unmount(root);
+  });
+
+  it('matrix «Quality gone»: 720p chosen, the fresh E8 has no 720p → the default order; the preference is kept', async () => {
+    await device().setItem(QUALITY_PREFERENCE_KEY, '720');
+    numberedE8();
+    const root = await playTo(50);
+    expect(engine.props?.source.uri).toBe(`${URL}-high-2`);
+    numberedE8(['full_hd', 'hls']);
+    await fire('onError', 'http');
+    expect(engine.props?.source.format).toBe('hls');
+    expect(qualityPreference.peek()).toBe(720);
+    expect(await device().getItem(QUALITY_PREFERENCE_KEY)).toBe('720');
+    await unmount(root);
+  });
+
+  it.each([
+    ['the recovered source fails again', 'second'],
+    ['the recovery E8 fails', 'e8'],
+  ])('matrix «Bad pick» (%s): 1440p picked fails → error; «Повторить» → the default order, in-memory `auto`, the stored value unchanged', async (_name, how) => {
+    await device().setItem(QUALITY_PREFERENCE_KEY, '720');
+    numberedE8();
+    const root = await playTo(80);
+    await key('up');
+    await focusOn(root, SETTINGS);
+    await press(root, SETTINGS);
+    await advance(50);
+    await press(root, 'player/sheet/quality');
+    await press(root, 'player/sheet/quality/1440');
+    expect(engine.props?.source.uri).toBe(`${URL}-quad_hd-2`);
+    if (how === 'second') {
+      await fire('onError', 'decoder');
+      // The recovery keeps the picked quality.
+      expect(engine.props?.source.uri).toBe(`${URL}-quad_hd-3`);
+      await fire('onError', 'decoder');
+    } else {
+      const answer = e8;
+      e8 = () => ({ status: 503, body: {} });
+      await fire('onError', 'decoder');
+      await settle({ timerRounds: 30 });
+      e8 = answer;
+    }
+    expect(visible(root, RETRY)).toBe(true);
+    engine.seek.mockClear();
+    await press(root, RETRY);
+    expect(engine.props?.source.format).toBe('hls');
+    expect(qualityPreference.peek()).toBe('auto');
+    expect(await device().getItem(QUALITY_PREFERENCE_KEY)).toBe('720');
+    await fire('onLoad', { durationSec: 600 });
+    expect(engine.seek).toHaveBeenCalledWith(80);
+    expect(await device().getItem(QUALITY_PREFERENCE_KEY)).toBe('720');
+    await unmount(root);
+  });
+
+  it('matrix «Start failure»: an error before the first onLoad → the recovery starts at the pending start (the resume point)', async () => {
+    withData([okVideo('v1', ALL, { timeCode: 300 }), ...paragraph('Body')]);
+    const root = await openPlayer(VIDEO('v1'), { load: false });
+    await focusOn(root, SURFACE);
+    await advance(600);
+    const before = e8Calls().length;
+    await fire('onError', 'source');
+    expect(e8Calls()).toHaveLength(before + 1);
+    engine.seek.mockClear();
+    await fire('onProgress', 0);
+    await fire('onLoad', { durationSec: 600 });
+    expect(engine.seek).toHaveBeenCalledWith(300);
+    await fire('onSeekDone', 300);
+    expect(text(byTestId(root, 'player/page')[0])).not.toContain('Не удалось');
+    await unmount(root);
+  });
+
+  it('a start failure of «С начала» recovers to 0 (the pending start), never the resume point', async () => {
+    withData([okVideo('v1', ALL, { timeCode: 300 }), ...paragraph('Body')]);
+    const root = await openPost();
+    await press(root, `post/${POST}/restart`);
+    await focusOn(root, SURFACE);
+    await advance(600);
+    await fire('onError', 'source');
+    engine.seek.mockClear();
+    await fire('onLoad', { durationSec: 600 });
+    expect(engine.seek).not.toHaveBeenCalled();
+    await unmount(root);
+  });
+
+  it('matrix «Unavailable»: the fresh E8 404 → «Видео недоступно» + «Назад», no retry', async () => {
+    const root = await playTo(40);
+    e8 = () => e8MissingReply();
+    await fire('onError', 'http');
+    expect(playerText(root)).toContain('Видео недоступно');
+    expect(focusables(root)).toEqual([BACK]);
+    expect(lastFocusTarget()).toBe(BACK);
+    await unmount(root);
+  });
+
+  it('matrix «No access»: the fresh E8 locked, session ok (E1 200) → exit to the Post at once; the Post refetches, its locked notice, focus on the author', async () => {
+    const root = await playTo(40);
+    const e1Before = transport.callsTo(E1).length;
+    const postE8Before = e8Calls().length;
+    e8 = () => lockedE8();
+    focusMock.mockClear();
+    await fire('onError', 'http');
+    await advance(50);
+    // The session was checked (E1) before the locked answer was trusted.
+    expect(transport.callsTo(E1).length).toBeGreaterThan(e1Before);
+    expect(currentRoute()).toBe('Post');
+    expect(routeNames()).toEqual(['Shell', 'Post']);
+    // The player's fresh E8, its one refetch after E1 ok, then the Post's own refetch.
+    expect(e8Calls().length).toBeGreaterThanOrEqual(postE8Before + 3);
+    expect(text(byTestId(root, 'post/page')[0])).toContain('Нет доступа. Этот пост доступен');
+    expect(visible(root, VIDEO('v1'))).toBe(false);
+    expect(lastFocusTarget()).toBe(AUTHOR);
+    await unmount(root);
+  });
+
+  it('«Повторить» after the error state whose fresh E8 is locked (session ok): the same exit to the Post', async () => {
+    const root = await playTo(40);
+    await failPastRecovery('http');
+    expect(visible(root, RETRY)).toBe(true);
+    e8 = () => lockedE8();
+    await press(root, RETRY);
+    await advance(50);
+    expect(currentRoute()).toBe('Post');
+    expect(text(byTestId(root, 'post/page')[0])).toContain('Нет доступа. Этот пост доступен');
+    expect(lastFocusTarget()).toBe(AUTHOR);
+    await unmount(root);
+  });
+
+  it('an error while paused: the recovery keeps the pause (no play after it); the paused player shows its overlay; «Повторить» keeps it too', async () => {
+    const root = await playTo(200);
+    await focusOn(root, SURFACE);
+    await press(root, SURFACE);
+    expect(engine.props?.paused).toBe(true);
+    await fire('onError', 'http');
+    expect(engine.props?.paused).toBe(true);
+    await fire('onLoad', { durationSec: 600 });
+    await fire('onSeekDone', 200);
+    expect(visible(root, RECOVERING)).toBe(false);
+    expect(engine.props?.paused).toBe(true);
+    expect(visible(root, 'player/overlay')).toBe(true);
+    // A second error while paused → «Повторить» → still paused.
+    await fire('onError', 'http');
+    expect(visible(root, RETRY)).toBe(true);
+    await press(root, RETRY);
+    expect(engine.props?.paused).toBe(true);
+    await unmount(root);
+  });
+
+  it('matrix «No access»: after playback, the fresh E8 locked, E1 200, the one refetch fails → Пост with its locked notice; nothing of the recovery left', async () => {
+    const root = await playTo(40);
+    let n = 0;
+    e8 = () => {
+      n += 1;
+      // The recovery's E8: locked; the check's one refetch: fails; then (Пост) locked.
+      return n === 2 ? { status: 400, body: { error: 'bad_request' } } : lockedE8();
+    };
+    await fire('onError', 'http');
+    await advance(50);
+    expect(currentRoute()).toBe('Post');
+    expect(routeNames()).toEqual(['Shell', 'Post']);
+    expect(visible(root, RECOVERING)).toBe(false);
+    expect(visible(root, 'player')).toBe(false);
+    expect(text(byTestId(root, 'post/page')[0])).toContain('Нет доступа. Этот пост доступен');
+    expect(lastFocusTarget()).toBe(AUTHOR);
+    await unmount(root);
+  });
+
+  it('«Повторить» answered locked: busy (not pressable) while the session check runs, then the exit to the Post', async () => {
+    const root = await playTo(40);
+    await failPastRecovery('http');
+    const check = deferred();
+    e8 = () => lockedE8();
+    // Hold the check's E1.
+    e1Hold = check.promise;
+    await press(root, RETRY);
+    expect(currentRoute()).toBe('Player');
+    expect(one(root, RETRY).props.accessibilityState).toMatchObject({ busy: true });
+    const e8Before = e8Calls().length;
+    await press(root, RETRY);
+    expect(e8Calls()).toHaveLength(e8Before);
+    e1Hold = null;
+    check.resolve({ status: 200, body: e1Ok.body });
+    await settle();
+    await advance(50);
+    expect(currentRoute()).toBe('Post');
+    await unmount(root);
+  });
+
+  it('matrix «Back while recovering»: Back exits the player with the exit report; keys other than Back are ignored', async () => {
+    const root = await playTo(312);
+    const pending = deferred();
+    e8 = () => pending.promise;
+    await fire('onError', 'http');
+    expect(visible(root, RECOVERING)).toBe(true);
+    engine.seek.mockClear();
+    const sentBefore = e9Sent().length;
+    await key('right');
+    await key('playPause');
+    await key('menu');
+    await key('up');
+    await advance(700);
+    expect(visible(root, RECOVERING)).toBe(true);
+    expect(visible(root, 'player/overlay')).toBe(false);
+    expect(visible(root, 'player/sheet')).toBe(false);
+    expect(e9Sent()).toHaveLength(sentBefore);
+    await back();
+    expect(currentRoute()).toBe('Post');
+    expect(e9Sent().slice(sentBefore)).toEqual(['v1@312']);
+    expect(lastFocusTarget()).toBe(VIDEO('v1'));
+    pending.resolve({ status: 200, body: postDetail(FEED_BLOG, POST, ONE) });
+    await settle();
+    await unmount(root);
+  });
+});
+
+describe('debug-only broken next video URL (Story 4.4 device check)', () => {
+  const BROKEN = 'boostytv-debug-broken';
+
+  it('the Настройки row arms it: exactly one resolution plays a broken URL; the recovery\'s fresh E8 plays normally; nothing logged with a URL', async () => {
+    let n = 0;
+    e8 = (_req, blogUrl, postId) => {
+      n += 1;
+      return { status: 200, body: postDetail(blogUrl, postId, [okVideo('v1', [{ type: 'hls', url: `${URL}-${n}` }])]) };
+    };
+    const root = await render(<App />);
+    await press(root, 'nav/settings');
+    expect(one(root, 'settings/row/break-video').props.accessibilityLabel).toBe('Сломать следующую ссылку видео');
+    await press(root, 'settings/row/break-video');
+    await press(root, 'nav/home');
+    await focusOn(root, FEED_CARD);
+    await press(root, FEED_CARD);
+    await press(root, VIDEO('v1'));
+    expect(currentRoute()).toBe('Player');
+    // Пост's E8 is #1, the player's #2: only its URL is broken (its host becomes the reserved `boostytv-debug-broken.invalid`).
+    expect(engine.props?.source.uri).toBe(`https://${BROKEN}.invalid/player-2`);
+    const before = e8Calls().length;
+    await fire('onError', 'http');
+    expect(e8Calls()).toHaveLength(before + 1);
+    expect(engine.props?.source.uri).toBe(`${URL}-3`);
+    expect(JSON.stringify(logger.entries())).not.toMatch(/example\.invalid|boostytv-debug-broken/);
+    await back();
+    expect(currentRoute()).toBe('Post');
+    for (let i = 0; i < 10 && engine.props !== null; i += 1) {
+      await advance(50);
+    }
+    // The next opening is not broken (one-shot).
+    await press(root, VIDEO('v1'));
+    expect(engine.props?.source.uri).toBe(`${URL}-4`);
+    await unmount(root);
+  });
+
+  it('not armed: no URL is touched', async () => {
+    const root = await openPlayer();
+    expect(engine.props?.source.uri).toBe(URL);
+    await unmount(root);
+  });
+
+  it('armed directly: the first resolution is broken and stays broken across its re-renders', async () => {
+    debugBreakNextVideoSource();
+    const root = await openPlayer();
+    expect(engine.props?.source.uri).toContain(BROKEN);
+    await key('up');
+    expect(engine.props?.source.uri).toContain(BROKEN);
     await unmount(root);
   });
 });

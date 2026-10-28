@@ -16,6 +16,7 @@ import { playbackArbiter } from '../../shared/platform/playbackArbiter';
 import type { PlayerEngineHandle } from '../../shared/platform/playerEngine';
 import { PlayerEngineView } from '../../shared/platform/PlayerEngineView';
 import { subscribeSeekKeys, type SeekKeyEvent } from '../../shared/platform/seekKeys';
+import { logger } from '../../shared/services/logger';
 import { useProgressRepository, type ProgressEvent } from '../../shared/services/progress';
 import {
   Button,
@@ -41,6 +42,13 @@ import {
   type SettingsSheetData,
 } from './PlayerSettingsSheet';
 import { qualityPreference } from './qualityPreference';
+import {
+  countPlayback,
+  createRecoveryBudget,
+  recoveryTarget,
+  takeRecovery,
+  type StartGate,
+} from './recovery';
 import { createSeekController, type SeekDirection } from './seekController';
 
 /** Focus ids (docs/focus-map.md §1.5). */
@@ -68,26 +76,20 @@ type HWEvent = Parameters<Parameters<typeof useTVEventHandler>[0]>[0];
 /** Android KeyEvent.ACTION_UP: raw keys act on key up only (device: Story 1.6). */
 const KEY_UP = 1;
 
-type Phase = 'loading' | 'playing' | 'error' | 'locked' | 'unavailable';
+type Phase = 'loading' | 'playing' | 'recovering' | 'error' | 'locked' | 'unavailable';
 
 /** Where playback starts (Story 4.2): the resume point, or 0 («С начала»). */
 export type PlayerStart = 'resume' | 'beginning';
 
 /**
- * The start-position gate of one source (Story 4.2): no progress is
- * reported before the start position is reached (never a pre-seek `t=0`).
- * - `load`: waiting for `onLoad` (and the local store); `target` is an
- *   explicit start (a quality switch, Story 4.3: the current or pending
- *   position), else the resume point (or 0 for «С начала»);
- * - `seek`: the initial seek to `target` is in flight (until its `onSeekDone`);
- * - `first`: starting at 0, the first progress event starts reporting;
- * - `started`: reports flow.
+ * Where a source that broke was (Story 4.4), for the recovery and a manual
+ * retry: `target` is the explicit start of the next source (undefined: the
+ * pending start, i.e. the resume point or 0 for «С начала», when the error
+ * came before the start was reached); `key` the quality to keep; `byQuality`
+ * whether a non-`auto` quality had chosen it; `paused` whether playback was
+ * paused at the error (the next source keeps it).
  */
-type StartGate =
-  | { kind: 'load'; target?: number }
-  | { kind: 'seek'; target: number }
-  | { kind: 'first' }
-  | { kind: 'started' };
+type Failure = { target: number | undefined; key: QualityKey; byQuality: boolean; paused: boolean };
 
 export type PlayerScreenProps = {
   /** The active session's content client (from the route; never a singleton). */
@@ -98,6 +100,12 @@ export type PlayerScreenProps = {
   isActive: () => boolean;
   /** Leave the player: the route pops and focus returns to the origin element. */
   onExit: () => void;
+  /**
+   * Story 4.4: a fresh E8 during a recovery or a retry says locked and the
+   * session check confirmed it: leave for the Post, which refetches and shows
+   * its own locked notice. Default: `onExit`.
+   */
+  onNoAccess?: () => void;
   /** Story 4.2: `resume` (default) starts at the resume point, `beginning` at 0. */
   start?: PlayerStart;
 };
@@ -107,9 +115,18 @@ export type PlayerScreenProps = {
  *
  * - A fresh E8 (MediaResolver) picks the source: HLS, else DASH, else the
  *   highest progressive within the device cap. A locked post on that E8 →
- *   «Нет доступа к этому видео» + «Назад»; no usable URL, an E8 failure or
- *   a start failure → «Не удалось воспроизвести видео» + «Повторить» (one
- *   fresh E8) / «Назад». Full recovery is Story 4.4.
+ *   «Нет доступа к этому видео» + «Назад»; no usable URL or an E8 failure
+ *   → «Не удалось воспроизвести видео» + «Повторить» (one fresh E8) /
+ *   «Назад».
+ * - Recovery (Story 4.4): the first engine error (also before `onLoad`)
+ *   shows «Восстанавливаем воспроизведение…» (no action, focus on the
+ *   surface, Back exits, other keys ignored) and sends one fresh E8 that
+ *   keeps the quality key and continues at the broken source's position
+ *   through the start gate; the progress session continues. A second error
+ *   before the recovered source played 30 s, or a failed recovery E8, shows
+ *   the error state; its «Повторить» continues the same way, but drops a
+ *   non-`auto` quality for this run. A locked fresh E8 after playback
+ *   (session checked) leaves for the Post (`onNoAccess`).
  * - Playback goes through the PlayerEngine port; the player holds the one
  *   PlaybackArbiter slot while it plays, and unmount releases both.
  * - Remote (`useTVEventHandler`, key up only): ← → seek (`seekController`:
@@ -145,7 +162,7 @@ export type PlayerScreenProps = {
  *   `pickSource` on every open.
  * - No autoplay of the next video (Story 4.5).
  */
-export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume' }: PlayerScreenProps) {
+export function PlayerScreen({ http, mediaRef, isActive, onExit, onNoAccess, start = 'resume' }: PlayerScreenProps) {
   const progress = useProgressRepository();
   // The device's quality preference (Story 4.3): read once per app run;
   // the engine waits for it, so the first source is the preferred one.
@@ -165,7 +182,15 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
     };
   }, [preference]);
   const preferenceReady = preference !== undefined;
-  const media = useMediaSource(http, mediaRef, progress?.onServerProgress, preference ?? null);
+  /**
+   * The quality a recovery or a retry keeps (Story 4.4): the broken source's
+   * key, picked instead of the preference while the video has it. Cleared by
+   * a quality pick.
+   */
+  const [keepQuality, setKeepQuality] = useState<QualityKey | null>(null);
+  const media = useMediaSource(http, mediaRef, progress?.onServerProgress, preference ?? null, {
+    keep: keepQuality,
+  });
   // The local store is loaded before the engine starts, so the resume point
   // is known at `onLoad` (a cold start reads the persisted entry).
   const [progressReady, setProgressReady] = useState(() => progress === null || progress.store.isReady());
@@ -188,17 +213,41 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
   /** The resolution whose playback failed to start or broke. */
   const [failedResolution, setFailedResolution] = useState<number | null>(null);
   const failed = ready !== null && failedResolution === ready.resolution;
+  /**
+   * The automatic recovery in progress (Story 4.4): the broken source's
+   * resolution; done when the recovered source reached its start position
+   * (or the recovery ends in an error, «Видео недоступно» or the no-access
+   * exit).
+   */
+  const [recovery, setRecovery] = useState<{ from: number } | null>(null);
+  /** A source of this opening was ready once: a locked E8 after that leaves for the Post. */
+  const everReady = useRef(false);
+  if (ready !== null) {
+    everReady.current = true;
+  }
+  // «Восстанавливаем воспроизведение…» stays while the fresh E8 runs and
+  // while the recovered source loads and seeks to its start.
+  const recovering =
+    recovery !== null &&
+    ((ready !== null && (ready.resolution === recovery.from || !failed)) ||
+      (state.kind === 'locked' && everReady.current));
   const phase: Phase =
     state.kind === 'loading'
       ? 'loading'
-      : state.kind === 'locked'
-        ? 'locked'
-        : state.kind === 'unavailable'
-          ? 'unavailable'
-          : state.kind === 'ready' && !failed
-            ? 'playing'
-            : 'error';
+      : recovering
+        ? 'recovering'
+        : state.kind === 'locked'
+          ? // A locked retry after playback waits for its session check, then leaves.
+            everReady.current
+            ? 'error'
+            : 'locked'
+          : state.kind === 'unavailable'
+            ? 'unavailable'
+            : state.kind === 'ready' && !failed
+              ? 'playing'
+              : 'error';
   const resolution = ready?.resolution ?? 0;
+  const readyResolution = ready?.resolution ?? null;
 
   const [paused, setPaused] = useState(false);
   const [positionSec, setPositionSec] = useState(0);
@@ -256,19 +305,57 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
   const gate = useRef<StartGate>({ kind: 'load' });
   /** The first source of this player opening starts at `start`; a later one (retry) resumes. */
   const startMode = useRef<PlayerStart>(start);
+  /**
+   * The next resolution's start (Story 4.4, a recovery or a retry): its
+   * `target` goes into the start gate (undefined: the pending start). Null:
+   * no broken source to continue from.
+   */
+  const nextStart = useRef<{ target: number | undefined; paused: boolean } | null>(null);
+  /** The last broken source (Story 4.4): what a manual retry continues from. */
+  const lastFailure = useRef<Failure | null>(null);
+  /**
+   * The automatic recovery's budget (Story 4.4): one per error episode; it
+   * comes back once the recovered source played `RECOVERY_BUDGET_SEC`
+   * (`recovery.ts`).
+   */
+  const budget = useRef(createRecoveryBudget());
 
-  // A new resolution (a fresh E8) starts the engine over.
+  // A new resolution (a fresh E8) starts the engine over. A recovery or a
+  // retry starts at the broken source's position through the start gate.
   useEffect(() => {
-    gate.current = { kind: 'load' };
+    if (readyResolution === null) {
+      return;
+    }
+    const continued = nextStart.current;
+    nextStart.current = null;
+    gate.current = { kind: 'load', ...(continued?.target !== undefined ? { target: continued.target } : {}) };
+    budget.current.last = null;
     seek.reset();
     scrubWasPlaying.current = false;
     ended.current = false;
-    setPaused(false);
-    setPositionSec(0);
+    // A recovery or a retry keeps the paused state of the error (Story 4.4).
+    setPaused(continued?.paused ?? false);
+    setPositionSec(continued?.target ?? 0);
     setDurationSec(0);
     setBuffering(true);
     setAutoHeight(null);
-  }, [resolution, seek]);
+  }, [readyResolution, seek]);
+
+  // The recovery ends with a new source, an error or «Видео недоступно»
+  // (a locked answer waits for its session check: see the no-access exit).
+  useEffect(() => {
+    if (recovery === null) {
+      return;
+    }
+    if (
+      (state.kind === 'ready' && state.resolution !== recovery.from && failedResolution === state.resolution) ||
+      state.kind === 'error' ||
+      state.kind === 'noSource' ||
+      state.kind === 'unavailable'
+    ) {
+      setRecovery(null);
+    }
+  }, [recovery, state, failedResolution]);
 
   // The one playback slot (AD-19): claimed while playing, released on
   // leaving that phase and on unmount. Another holder is stopped.
@@ -397,7 +484,8 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
   // the device only the late request stuck); both requests only while the
   // player is still the focused route (a locked E8's session check can end in A11
   // within those frames: Epic 3 retro A6).
-  const surfaceFocusable = phase === 'loading' || (playing && !overlay);
+  // «Восстанавливаем воспроизведение…» has no action: focus on the surface (Story 4.4).
+  const surfaceFocusable = phase === 'loading' || phase === 'recovering' || (playing && !overlay);
   const errorTarget = phase === 'error' ? 'retry' : phase === 'locked' || phase === 'unavailable' ? 'back' : null;
   useEffect(() => {
     const [view, id] =
@@ -451,12 +539,15 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
   );
   const reportRef = useLatestRef(reportProgress);
 
-  // `begin` once per source (a fresh E8: a new resolution), with the video's meta.
-  const readyResolution = ready?.resolution ?? null;
+  // `begin` once per player opening (the first ready source), with the
+  // video's meta. A recovery or a retry continues the session (Story 4.4:
+  // no `begin`, the short-visit rule is not restarted).
   const readyProgressRef = useLatestRef(ready?.progress ?? null);
+  const begun = useRef(false);
   useEffect(() => {
     const meta = readyProgressRef.current;
-    if (progress !== null && readyResolution !== null && meta !== null) {
+    if (progress !== null && readyResolution !== null && meta !== null && !begun.current) {
+      begun.current = true;
       progress.begin(live.current.mediaRef, meta);
     }
   }, [progress, readyResolution, readyProgressRef, live]);
@@ -478,6 +569,8 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
     (key: QualityKey) => {
       const current = live.current.ready;
       setPreference(key);
+      // A pick replaces the quality a recovery kept (Story 4.4).
+      setKeepQuality(null);
       // This run uses the pick at once; the device store gets it only once
       // the switched source loaded (a pick the decoder cannot play is never
       // stored, so later opens are not broken by it).
@@ -800,6 +893,22 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
 
   // --------------------------------------------------------------- engine
 
+  const recoveryRef = useLatestRef(recovery);
+  /**
+   * The source reached its start position (the gate is `started`). A
+   * recovery ends here (Story 4.4): «Восстанавливаем…» goes; a recovery
+   * that kept a pause shows the paused player with its overlay.
+   */
+  const startReached = useCallback(() => {
+    gate.current = { kind: 'started' };
+    if (recoveryRef.current !== null) {
+      setRecovery(null);
+      if (pausedRef.current) {
+        showOverlay();
+      }
+    }
+  }, [recoveryRef, pausedRef, showOverlay]);
+
   const onLoad = useCallback(
     ({ durationSec: d }: { durationSec: number }) => {
       setDurationSec(d);
@@ -830,11 +939,15 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
         gate.current = { kind: 'seek', target };
         setPositionSec(target);
         engine.current?.seek(target);
+      } else if (live.current.paused) {
+        // Starting at 0 while paused (a recovery or retry kept the pause):
+        // no progress event comes, and there is no pre-seek t=0 to skip.
+        startReached();
       } else {
         gate.current = { kind: 'first' };
       }
     },
-    [progress, live],
+    [progress, live, startReached],
   );
   const onProgress = useCallback(
     (sec: number) => {
@@ -849,25 +962,29 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
       }
       setPositionSec(prev => (prev === sec ? prev : sec));
       if (current.kind === 'first') {
-        gate.current = { kind: 'started' };
+        startReached();
       }
+      // The recovery budget (Story 4.4) counts playback of the started source.
+      countPlayback(budget.current, sec);
       reportRef.current('tick', sec);
     },
-    [reportRef],
+    [reportRef, startReached],
   );
   const onSeekDone = useCallback(
     (sec: number) => {
       setPositionSec(sec);
       const current = gate.current;
+      // A seek is not playback: the budget counts from here.
+      budget.current.last = sec;
       if (current.kind === 'seek') {
         // The initial seek: reporting starts here (its own report is the baseline).
-        gate.current = { kind: 'started' };
+        startReached();
         reportRef.current('tick', sec);
         return;
       }
       seek.seekDone(sec);
     },
-    [seek, reportRef],
+    [seek, reportRef, startReached],
   );
   const onEnd = useCallback(() => {
     // No autoplay and no Ended flow before Story 4.5: stay paused at the end;
@@ -878,12 +995,76 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
     setPaused(true);
     showOverlay();
   }, [showOverlay, live, reportRef]);
+  /**
+   * An engine error (Story 4.4: an expired signed URL, a CDN or decoder
+   * failure, also before the first `onLoad`). With the budget left: the
+   * automatic recovery, one fresh E8 (content profile) that keeps the
+   * quality and continues at the broken source's position through the start
+   * gate («Восстанавливаем воспроизведение…»). Otherwise the error state
+   * («Повторить» focused). No E9 for the error itself.
+   */
   const onError = useCallback(() => {
     // A switched source that failed before `onLoad` is never stored.
     pendingPreferenceWrite.current = null;
+    const current = live.current.ready;
+    const target = recoveryTarget(gate.current, seek.target(), live.current.positionSec);
+    // Paused by the user at the error (a hold-scrub pause of a playing video is not).
+    const pausedAtError = live.current.paused && !(seek.isHeld() && scrubWasPlaying.current);
     seek.reset();
     setFailedResolution(resolution);
-  }, [resolution, seek]);
+    if (current === null) {
+      return;
+    }
+    const failure: Failure = { target, key: qualityOf(current.source), byQuality: current.byQuality, paused: pausedAtError };
+    lastFailure.current = failure;
+    if (!takeRecovery(budget.current)) {
+      logger.info('player', 'playback failed again; waiting for the user');
+      return;
+    }
+    logger.info('player', 'playback failed; recovering');
+    nextStart.current = { target, paused: pausedAtError };
+    setKeepQuality(failure.key);
+    setRecovery({ from: resolution });
+    media.retry();
+  }, [resolution, seek, live, media]);
+
+  /**
+   * «Повторить» (one fresh E8). After a broken source it continues from
+   * there like a recovery (Story 4.4): the same position; the same quality,
+   * unless a non-`auto` quality had chosen the broken source: then the
+   * default order, and this run's choice becomes `auto` (memory only, the
+   * stored value is kept). The budget stays used until a source plays 30 s.
+   */
+  const onRetry = useCallback(() => {
+    const failure = lastFailure.current;
+    if (failure !== null) {
+      if (failure.byQuality) {
+        qualityPreference.remember('auto');
+        setPreference('auto');
+        setKeepQuality(null);
+      } else {
+        setKeepQuality(failure.key);
+      }
+      nextStart.current = { target: failure.target, paused: failure.paused };
+      budget.current.played = 0;
+    }
+    media.retry();
+  }, [media]);
+
+  // Story 4.4 (owner decision 2026-10-28): a fresh E8 after playback (a
+  // recovery or a retry) says locked and the session check is done with it
+  // (`expired` opens A11 by itself): leave for the Post at once, with the
+  // usual exit report; the Post refetches and shows its own locked notice.
+  const noAccessExit = state.kind === 'locked' && state.confirmed && everReady.current;
+  const onNoAccessRef = useLatestRef(onNoAccess ?? onExit);
+  useEffect(() => {
+    if (!noAccessExit || !isActive()) {
+      return;
+    }
+    logger.info('player', 'no access after a fresh source request; leaving');
+    reportRef.current('exit');
+    onNoAccessRef.current();
+  }, [noAccessExit, isActive, reportRef, onNoAccessRef]);
 
   // --------------------------------------------------------------- render
 
@@ -927,7 +1108,7 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
           />
         ) : null}
       </Pressable>
-      {phase === 'loading' || spinner ? (
+      {phase === 'loading' || phase === 'recovering' || spinner ? (
         <View testID="player/spinner" style={styles.center} pointerEvents="none">
           <View style={styles.spinnerScale}>
             <Spinner />
@@ -952,6 +1133,13 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
           settingsRef={settingsView}
         />
       ) : null}
+      {phase === 'recovering' ? (
+        <View testID="player/state/recovering" style={styles.recovering} pointerEvents="none">
+          <Text variant="title-m" accessibilityRole="header" accessibilityLiveRegion="polite">
+            {t('player.recovering')}
+          </Text>
+        </View>
+      ) : null}
       {errorTarget !== null ? (
         <View testID={`player/state/${phase}`} style={styles.state}>
           <Text variant="title-l" accessibilityRole="header">
@@ -967,8 +1155,10 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
                 testID={PLAYER_RETRY_ID}
                 kind="primary"
                 label={t('common.retry')}
-                busy={media.isFetching}
-                onPress={media.retry}
+                // A locked answer whose session check still runs is not
+                // done yet: «Повторить» stays busy until it exits or stays.
+                busy={media.isFetching || (state.kind === 'locked' && !state.confirmed)}
+                onPress={onRetry}
                 onFocus={onRetryFocus}
                 style={styles.action}
               />
@@ -1022,6 +1212,13 @@ const styles = StyleSheet.create({
   },
   spinnerScale: {
     transform: [{ scale: 2 }],
+  },
+  recovering: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // Under the centered spinner.
+    paddingTop: spacing['safe-x'] * 3,
   },
   state: {
     ...StyleSheet.absoluteFill,

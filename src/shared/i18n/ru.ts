@@ -203,6 +203,8 @@ export const ru = {
     noAccessBody: 'Этот пост сейчас недоступен для вашей подписки.',
     unavailableTitle: 'Видео недоступно',
     unavailableBody: 'Этого видео больше нет в посте.',
+    // Story 4.4: the one automatic recovery after an engine error (no action).
+    recovering: 'Восстанавливаем воспроизведение…',
     settings: 'Настройки',
     // The ±10 s controls (Story 4.3 owner decision 2026-10-28).
     back10: 'Назад на 10 секунд',
@@ -324,6 +326,11 @@ export const ru = {
     // Debug-only A11 trigger (Story 2.6): `expired` in memory only.
     expiredCheck: {
       row: 'Проверка: сессия истекла',
+    },
+    // Debug-only player recovery check (Story 4.4): the next video source
+    // gets a broken URL in memory (one engine error → the recovery).
+    breakVideo: {
+      row: 'Сломать следующую ссылку видео',
     },
   },
   error: {

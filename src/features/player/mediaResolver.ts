@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   SESSION_CHECK_KEYS,
   isAppError,
@@ -17,6 +17,24 @@ import {
 } from '../../shared/entities/post';
 import type { ProgressMeta } from '../../shared/services/progress';
 import { postCardTitle } from '../../shared/ui';
+import type * as DebugBreakModule from './debugBreakSource';
+
+/**
+ * Debug builds only (Story 4.4 device check): `__DEV__` is a constant in
+ * Metro bundles, so in release the require is folded away and the module is
+ * not bundled. Keep this a local, unexported binding (as `sessionManager`'s
+ * debug hooks; __tests__/releaseBundle.test.js).
+ */
+const debugBreak: typeof DebugBreakModule | null = __DEV__ ? require('./debugBreakSource') : null;
+
+/**
+ * Debug builds only: the next source resolution the player plays gets a
+ * corrupted URL (one engine error → the automatic recovery). A no-op in
+ * release.
+ */
+export function debugBreakNextVideoSource(): void {
+  debugBreak?.armBreakNextSource();
+}
 
 /**
  * MediaResolver (Story 4.1): a fresh E8 for the video to play
@@ -122,6 +140,16 @@ export function qualityOf(source: VideoSource): QualityKey {
   return source.format === 'progressive' ? source.height : 'auto';
 }
 
+/**
+ * The source was chosen by a non-`auto` quality (Story 4.4): `preference`
+ * is a height and the source is that height's progressive file. A manual
+ * retry after a failed recovery drops such a choice for this run (the
+ * default order instead), since the decoder may be what fails on it.
+ */
+export function chosenByQuality(source: VideoSource, preference: QualityKey | null): boolean {
+  return typeof preference === 'number' && source.format === 'progressive' && source.height === preference;
+}
+
 /** The overlay's top band (DESIGN.md Player overlay). */
 export type PlayerMeta = {
   authorName: string;
@@ -140,16 +168,26 @@ export type MediaSourceState =
    */
   | {
       kind: 'ready';
-      /** The source to play: `pickSource` with the quality preference. */
+      /**
+       * The source to play: `pickSource` with the quality key (the kept
+       * quality of a recovery, Story 4.4, else the quality preference).
+       */
       source: VideoSource;
+      /** `source` was chosen by a non-`auto` quality preference (`chosenByQuality`). */
+      byQuality: boolean;
       /** Every usable source of this video (the settings sheet's list, Story 4.3). */
       sources: readonly VideoSource[];
       meta: PlayerMeta;
       progress: ProgressMeta;
       resolution: number;
     }
-  /** The fresh E8 says the post is locked: «Нет доступа к этому видео», no retry. */
-  | { kind: 'locked' }
+  /**
+   * The fresh E8 says the post is locked: «Нет доступа к этому видео», no
+   * retry. `confirmed`: the SessionCheck port (A6) is done with this answer
+   * and it stays locked (E1 ok or failed; a failed refetch keeps it too);
+   * false while E1 or its one refetch runs.
+   */
+  | { kind: 'locked'; confirmed: boolean }
   /** E8 404 or the video is gone from the post: «Видео недоступно», no retry. */
   | { kind: 'unavailable' }
   /** No usable URL (all empty or unknown): «Не удалось воспроизвести видео» + «Повторить». */
@@ -161,8 +199,16 @@ export type MediaSource = {
   state: MediaSourceState;
   /** An E8 is in flight (the first one or a retry). */
   isFetching: boolean;
-  /** One fresh E8 («Повторить»). */
+  /** One fresh E8 («Повторить», or the player's automatic recovery, Story 4.4). */
   retry: () => void;
+};
+
+export type MediaSourceOptions = {
+  /**
+   * The quality to keep (Story 4.4, a recovery or a retry): picked instead of
+   * `preference` when set; the default order when this video lacks it.
+   */
+  keep?: QualityKey | null;
 };
 
 /**
@@ -181,11 +227,14 @@ export function useMediaSource(
   ref: MediaRef,
   onServerProgress?: ServerProgressSink,
   preference: QualityKey | null = null,
+  { keep = null }: MediaSourceOptions = {},
 ): MediaSource {
   const sinkRef = useRef(onServerProgress);
   sinkRef.current = onServerProgress;
   const refetchRef = useRef<() => void>(() => {});
   const checkLocked = useLockedSessionCheck(SESSION_CHECK_KEYS.player, () => refetchRef.current());
+  /** The locked E8 result the session check is done with (Story 4.4). */
+  const [confirmedLocked, setConfirmedLocked] = useState<unknown>(null);
   const query = useQuery({
     queryKey: queryKeys.mediaSource(ref.blogUrl, ref.postId, ref.mediaId),
     queryFn: async () => {
@@ -194,7 +243,12 @@ export function useMediaSource(
         onServerProgress: (mediaId, sec) => sinkRef.current?.(mediaId, sec),
       });
       if (result.kind === 'locked') {
-        checkLocked();
+        // `locked` from the check: this answer stays locked (confirmed).
+        checkLocked(outcome => {
+          if (outcome === 'locked') {
+            setConfirmedLocked(result);
+          }
+        });
       }
       return result;
     },
@@ -219,6 +273,8 @@ export function useMediaSource(
     resolutions.current = { data, count: resolutions.current.count + 1 };
   }
   const resolution = resolutions.current.count;
+  /** This hook instance, for the debug-only one-shot broken source. */
+  const debugOwner = useRef({});
   // A retry of a failed E8 (no data) puts the query back to `pending`: the
   // error stays shown, its «Повторить» busy (focus kept).
   const heldError = useHeldError({ empty: data === undefined, status, error, isFetching });
@@ -243,19 +299,29 @@ export function useMediaSource(
     if (data === undefined) {
       return { kind: 'loading' };
     }
-    if (data.kind === 'locked' || data.kind === 'unavailable') {
-      return { kind: data.kind };
+    if (data.kind === 'locked') {
+      // A failed refetch after E1 ok keeps the locked answer: done as well.
+      const confirmed = confirmedLocked === data || (status === 'error' && !isFetching);
+      return { kind: 'locked', confirmed };
     }
-    const source = pickSource(data.sources, { preference });
-    if (source === null) {
+    if (data.kind === 'unavailable') {
+      return { kind: 'unavailable' };
+    }
+    const picked = pickSource(data.sources, { preference: keep ?? preference });
+    if (picked === null) {
       return { kind: 'noSource' };
     }
+    const source =
+      debugBreak !== null && debugBreak.isBroken(debugOwner.current, resolution)
+        ? { ...picked, url: debugBreak.breakUrl(picked.url) }
+        : picked;
     const block = data.post.blocks.find(b => b.type === 'ok_video' && b.id === ref.mediaId);
     const video = block?.type === 'ok_video' ? block : null;
     const postTitle = postCardTitle(data.post);
     return {
       kind: 'ready',
       source,
+      byQuality: chosenByQuality(source, preference),
       sources: data.sources,
       meta: {
         authorName: data.post.author.name,
@@ -272,7 +338,7 @@ export function useMediaSource(
       },
       resolution,
     };
-  }, [data, heldError, dataError, resolution, ref.mediaId, preference]);
+  }, [data, heldError, dataError, resolution, ref.mediaId, preference, keep, confirmedLocked, status, isFetching]);
 
   return {
     state,

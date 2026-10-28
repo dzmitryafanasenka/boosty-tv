@@ -1,10 +1,12 @@
 import { useFocusEffect } from '@react-navigation/native';
 import type { StackNavigationProp, StackScreenProps } from '@react-navigation/stack';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { BackHandler } from 'react-native';
 import { AuthorScreen } from '../features/author';
 import { PlayerScreen } from '../features/player';
 import { PostScreen } from '../features/post';
+import { queryKeys } from '../shared/api';
 import type { MediaRef } from '../shared/entities/post';
 import {
   FocusZone,
@@ -374,6 +376,18 @@ export function PlayerRoute({ navigation, route }: StackScreenProps<RootStackPar
       navigation.goBack();
     }
   }, [navigation]);
+  // Story 4.4 (owner decision 2026-10-28): a recovery's fresh E8 says locked
+  // (session checked): the Post's E8 is invalidated, so it refetches and
+  // shows its own locked notice; the pop returns to it (the remembered row is
+  // gone there, so the Post's vanished-focus fallback picks the author).
+  const queryClient = useQueryClient();
+  const onNoAccess = useCallback(() => {
+    if (!navigation.isFocused()) {
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: queryKeys.post(ref.blogUrl, ref.postId) }).catch(() => {});
+    navigation.goBack();
+  }, [navigation, queryClient, ref.blogUrl, ref.postId]);
   return (
     <Screen testID="player">
       <PlayerScreen
@@ -381,6 +395,7 @@ export function PlayerRoute({ navigation, route }: StackScreenProps<RootStackPar
         mediaRef={ref}
         isActive={isActive}
         onExit={onExit}
+        onNoAccess={onNoAccess}
         start={start ?? 'resume'}
       />
     </Screen>

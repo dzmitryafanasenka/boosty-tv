@@ -15,6 +15,7 @@ export {
   PLAYER_SETTINGS_ID,
   PLAYER_TIMELINE_ID,
 } from './PlayerOverlay';
+export { debugBreakNextVideoSource } from './mediaResolver';
 export { PLAYER_SHEET_ID, PLAYER_SHEET_QUALITY_ID, qualityRowId } from './PlayerSettingsSheet';
 export {
   QUALITY_PREFERENCE_KEY,

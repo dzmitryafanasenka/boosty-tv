@@ -16,6 +16,8 @@ export const SETTINGS_FOCUS_CHECK_ID = 'settings/row/focus-check';
 export const SETTINGS_SESSION_CHECK_ID = __DEV__ ? 'settings/row/session-check' : '';
 /** Debug builds only (Story 2.6), folded to '' in release like the one above. */
 export const SETTINGS_EXPIRED_CHECK_ID = __DEV__ ? 'settings/row/expired-check' : '';
+/** Debug builds only (Story 4.4), folded to '' in release like the ones above. */
+export const SETTINGS_BREAK_VIDEO_ID = __DEV__ ? 'settings/row/break-video' : '';
 
 export type SettingsScreenProps = {
   /**
@@ -42,6 +44,13 @@ export type SettingsScreenProps = {
    * given; the app passes it under `__DEV__`.
    */
   onExpireSession?: () => void;
+  /**
+   * Debug builds only (Story 4.4): «Сломать следующую ссылку видео» arms a
+   * one-shot flag, so the next video source the player resolves fails in
+   * the engine (the automatic recovery's device check). Rendered only when
+   * given; the app passes it under `__DEV__`.
+   */
+  onBreakNextVideoUrl?: () => void;
 };
 
 /**
@@ -55,11 +64,13 @@ export function SettingsScreen({
   onOpenFocusCheck,
   onCheckSession,
   onExpireSession,
+  onBreakNextVideoUrl,
 }: SettingsScreenProps) {
   const version = useZoneItem(SETTINGS_VERSION_ID);
   const focusCheck = useZoneItem(SETTINGS_FOCUS_CHECK_ID);
   const sessionCheck = useZoneItem(SETTINGS_SESSION_CHECK_ID);
   const expiredCheck = useZoneItem(SETTINGS_EXPIRED_CHECK_ID);
+  const breakVideo = useZoneItem(SETTINGS_BREAK_VIDEO_ID);
   const signOut = useZoneItem(SETTINGS_SIGN_OUT_ID);
   /** The row's host view, the dialog's initiator. */
   const signOutView = useRef<HostView | null>(null);
@@ -122,6 +133,16 @@ export function SettingsScreen({
             label={t('dev.expiredCheck.row')}
             onPress={onExpireSession}
             onFocus={expiredCheck.onFocus}
+          />
+        ) : null}
+        {__DEV__ && onBreakNextVideoUrl ? (
+          <SettingRow
+            ref={breakVideo.ref}
+            testID={SETTINGS_BREAK_VIDEO_ID}
+            kind="nav"
+            label={t('dev.breakVideo.row')}
+            onPress={onBreakNextVideoUrl}
+            onFocus={breakVideo.onFocus}
           />
         ) : null}
       </View>

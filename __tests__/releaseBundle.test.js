@@ -33,6 +33,10 @@ const DEV_MARKERS = [
   'demo-video-',
   // Story 4.2: the demo's in-memory progress storage.
   'createDemoKeyValueStore',
+  // Story 4.4: the debug-only broken-next-video-URL trigger.
+  'settings/row/break-video',
+  'boostytv-debug-broken',
+  'debug: next video source will be broken',
 ];
 
 jest.setTimeout(240_000);
@@ -87,4 +91,7 @@ test('control: the debug bundle contains the dev routes', () => {
   expect(debug).toContain('demo-post-');
   expect(debug).toContain('demo-blog-');
   expect(debug).toContain('demo-video-');
+  expect(debug).toContain('settings/row/break-video');
+  expect(debug).toContain('boostytv-debug-broken');
+  expect(debug).toContain('debug: next video source will be broken');
 });

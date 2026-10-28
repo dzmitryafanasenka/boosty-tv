@@ -1,7 +1,7 @@
 import { videoSourcesOf, type VideoSource } from '../../../shared/entities/post';
 // eslint-disable-next-line boundaries/dependencies -- test-only fixtures
 import { e8Accessible } from '../../../test/postFixtures';
-import { PROGRESSIVE_MAX_HEIGHT, pickSource, qualityOf, qualityOptions } from '../mediaResolver';
+import { PROGRESSIVE_MAX_HEIGHT, chosenByQuality, pickSource, qualityOf, qualityOptions } from '../mediaResolver';
 
 const URL = 'https://example.invalid/player';
 const hls = (type = 'hls'): VideoSource => ({ format: 'hls', type, url: URL });
@@ -83,5 +83,24 @@ describe('qualityOptions / qualityOf (Story 4.3)', () => {
     expect(qualityOf(hls())).toBe('auto');
     expect(qualityOf(dash())).toBe('auto');
     expect(qualityOf(mp4(720))).toBe(720);
+  });
+});
+
+describe('recovery pick (Story 4.4)', () => {
+  it('the kept quality key: the same key when the fresh E8 has it, else the default order', () => {
+    const fresh = [hls(), mp4(720, 'high'), mp4(1080)];
+    expect(pickSource(fresh, { preference: qualityOf(mp4(720)) })).toMatchObject({ type: 'high' });
+    expect(pickSource(fresh, { preference: qualityOf(hls('live_hls')) })).toMatchObject({ type: 'hls' });
+    // 720p gone from the fresh E8: HLS, else DASH, else the nearest progressive ≤ 1080p.
+    expect(pickSource([dash(), mp4(1080)], { preference: 720 })).toMatchObject({ format: 'dash' });
+    expect(pickSource([mp4(1440), mp4(1080), mp4(360)], { preference: 720 })).toMatchObject({ height: 1080 });
+  });
+
+  it('chosenByQuality: only a progressive source of the preferred height', () => {
+    expect(chosenByQuality(mp4(1440), 1440)).toBe(true);
+    expect(chosenByQuality(mp4(1080), 720)).toBe(false);
+    expect(chosenByQuality(hls(), 'auto')).toBe(false);
+    expect(chosenByQuality(mp4(1080), null)).toBe(false);
+    expect(chosenByQuality(mp4(1080), 'auto')).toBe(false);
   });
 });
