@@ -3,6 +3,7 @@ import { blogPostsPageDtoSchema, feedPageDtoSchema } from '../../api/dto/feed';
 import { blockTypeDtoSchema, okVideoTimeCodeDtoSchema } from '../../api/dto/post';
 import { blogUrlSchema } from '../../api/dto/subscriptions';
 import type { HttpClient } from '../../api/httpClient';
+import type { Filter } from '../../filters/filter';
 import { logger as appLogger, type Logger } from '../../services/logger';
 import { mapPost } from './mapPost';
 import type { MediaRef, Post, PostPage, PostResult, ServerProgressSink } from './types';
@@ -18,11 +19,24 @@ import { videoSourcesOf, type VideoSourcesResult } from './videoSources';
 export const FEED_PAGE_SIZE = 10;
 
 /**
- * E5 path. Comments are always off (`comments_limit=0&reply_limit=0`). The
- * opaque cursor goes back verbatim, URL-encoded (api-contract §5).
+ * E5 access params (Story 5.3, FILTER-01, the reference's `FeedRepository`):
+ * «Доступные мне» → `only_allowed=true&only_bought=false`, «Все посты» →
+ * both `false`, «Только купленные» → `only_allowed=false&only_bought=true`.
+ * Always sent, so the default is explicit (api-contract §3 E5).
  */
-export function feedPath(cursor: string | null): string {
-  const base = `/v1/feed/post/?limit=${FEED_PAGE_SIZE}&comments_limit=0&reply_limit=0`;
+function feedAccessParams(filter: Filter): string {
+  const onlyAllowed = filter.access === 'allowed';
+  const onlyBought = filter.access === 'bought';
+  return `only_allowed=${onlyAllowed}&only_bought=${onlyBought}`;
+}
+
+/**
+ * E5 path. Comments are always off (`comments_limit=0&reply_limit=0`); the
+ * Filter's access params follow. The opaque cursor goes back verbatim,
+ * URL-encoded (api-contract §5).
+ */
+export function feedPath(cursor: string | null, filter: Filter): string {
+  const base = `/v1/feed/post/?limit=${FEED_PAGE_SIZE}&comments_limit=0&reply_limit=0&${feedAccessParams(filter)}`;
   return cursor === null ? base : `${base}&offset=${encodeURIComponent(cursor)}`;
 }
 
@@ -70,17 +84,18 @@ function toPage(
 }
 
 /**
- * One E5 page. Rejects with `AppError` (from HttpClient; `Parse` when the
- * page shape is wrong). A malformed post is dropped by the mapper; the
- * page never fails for one post. Paging stops on `isLast` or a missing
- * `extra`/`offset`.
+ * One E5 page with the Filter's params (Story 5.3). Rejects with `AppError`
+ * (from HttpClient; `Parse` when the page shape is wrong). A malformed post
+ * is dropped by the mapper; the page never fails for one post. Paging stops
+ * on `isLast` or a missing `extra`/`offset`.
  */
 async function feedPage(
   http: HttpClient,
   cursor: string | null,
+  filter: Filter,
   logger: Logger = appLogger,
 ): Promise<PostPage> {
-  const { body } = await http.get(feedPath(cursor), feedPageDtoSchema);
+  const { body } = await http.get(feedPath(cursor, filter), feedPageDtoSchema);
   return toPage(body.data.posts, body.extra, logger);
 }
 

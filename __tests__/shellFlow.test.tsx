@@ -131,8 +131,9 @@ describe('Shell', () => {
 
     const content = byTestId(root, 'shell/content/home')[0];
     expect(visible(root, 'home/feed')).toBe(true);
-    // «Обновить» (Story 5.1), then the cards.
+    // «Фильтры» (Story 5.3), «Обновить» (Story 5.1), then the cards.
     expect(focusableIds(root, content)).toEqual([
+      'home/filters',
       'home/refresh',
       ...e5Posts().map(p => `home/feed/${p.id}`),
     ]);

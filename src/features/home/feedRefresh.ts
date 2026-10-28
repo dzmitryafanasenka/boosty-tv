@@ -8,6 +8,7 @@ import {
   type PostsData,
   type PostsHeadRefreshResult,
 } from '../../shared/entities/post';
+import type { Filter } from '../../shared/filters';
 import { logger as appLogger, type Logger } from '../../shared/services/logger';
 
 /**
@@ -45,20 +46,23 @@ export function mergeFeedHead(
 }
 
 /**
- * Refresh the feed head (`refreshPostsHead` on the feed key with E5 page 1;
- * failures logged as `feed` / `resume refresh failed`, the kind only).
- * The caller runs it only after the resume `validate()` returned `ok`.
+ * Refresh the feed head (`refreshPostsHead` on the key of the active `feed`
+ * Filter with that Filter's E5 page 1, Story 5.3; the other Filters'
+ * caches are left alone; failures logged as `feed` / `resume refresh
+ * failed`, the kind only). The caller runs it only after the resume
+ * `validate()` returned `ok`.
  */
 export function refreshFeedHead(
   client: QueryClient,
   http: HttpClient,
+  filter: Filter,
   now: number,
   logger: Logger = appLogger,
 ): Promise<FeedRefreshResult> {
   return refreshPostsHead(
     client,
-    queryKeys.subscriptionFeed(),
-    () => PostRepository.feedPage(http, null),
+    queryKeys.subscriptionFeed(filter),
+    () => PostRepository.feedPage(http, null, filter),
     now,
     logger,
     { scope: 'feed', message: 'resume refresh failed' },
@@ -76,7 +80,8 @@ const manualRunning = new WeakMap<QueryClient, Promise<FeedRefreshResult>>();
  * merged into the cached feed, loaded pages kept, never a refetch of the
  * infinite query, ADR 0010), and an invalidation of exactly the
  * subscriptions query (E2, refetched once when it is cached, even with no
- * observer; not awaited). Single-flight: a call while one runs returns the
+ * observer; not awaited). The feed is the active `feed` Filter's (Story
+ * 5.3). Single-flight: a call while one runs returns the
  * same promise; a resume refresh already running is joined, not
  * duplicated. The result is the feed's (`failed`: the cache stays, the kind
  * is logged as `feed` / `manual refresh failed`); an E2 failure is the
@@ -85,6 +90,7 @@ const manualRunning = new WeakMap<QueryClient, Promise<FeedRefreshResult>>();
 export function manualRefreshFeed(
   client: QueryClient,
   http: HttpClient,
+  filter: Filter,
   now: number,
   logger: Logger = appLogger,
 ): Promise<FeedRefreshResult> {
@@ -101,8 +107,8 @@ export function manualRefreshFeed(
     try {
       return await refreshPostsHead(
         client,
-        queryKeys.subscriptionFeed(),
-        () => PostRepository.feedPage(http, null),
+        queryKeys.subscriptionFeed(filter),
+        () => PostRepository.feedPage(http, null, filter),
         now,
         logger,
         { scope: 'feed', message: 'manual refresh failed' },

@@ -12,6 +12,7 @@ import { AppState } from 'react-native';
 import { type Root } from 'test-renderer';
 import App, { SHELL_RESTORATION_KEY } from '../src/app/App';
 import { QUERY_GC_TIME_MS, queryClient, resetQueryCache } from '../src/app/queryClient';
+import { DEFAULT_FILTER } from '../src/shared/filters';
 import { queryKeys } from '../src/shared/api';
 import { authFlow } from '../src/features/auth/authFlow';
 import { session } from '../src/app/session';
@@ -506,22 +507,22 @@ describe('re-login', () => {
   it('same account: the query cache is reset at sign-in, so the feed loads fresh with the new token', async () => {
     // This file's settle runs timers, which would also fire the 10 min
     // gcTime of the feed hidden behind A11 (ADR 0010): keep it for this test.
-    queryClient.setQueryDefaults(queryKeys.subscriptionFeed(), { gcTime: Infinity });
+    queryClient.setQueryDefaults(queryKeys.allSubscriptionFeeds(), { gcTime: Infinity });
     try {
       await sameAccountReloginResetsTheCache();
     } finally {
-      queryClient.setQueryDefaults(queryKeys.subscriptionFeed(), { gcTime: QUERY_GC_TIME_MS });
+      queryClient.setQueryDefaults(queryKeys.allSubscriptionFeeds(), { gcTime: QUERY_GC_TIME_MS });
     }
   });
 
   async function sameAccountReloginResetsTheCache() {
     const root = await renderApp();
     expect(transport.callsTo(E5_PATH)).toHaveLength(1);
-    expect(queryClient.getQueryData(queryKeys.subscriptionFeed())).toBeDefined();
+    expect(queryClient.getQueryData(queryKeys.subscriptionFeed(DEFAULT_FILTER))).toBeDefined();
     await expireOnResume();
     expect(topScreen(root)).toBe('auth/expired');
     // The feed fetched before the expiry is still cached behind A11.
-    expect(queryClient.getQueryData(queryKeys.subscriptionFeed())).toBeDefined();
+    expect(queryClient.getQueryData(queryKeys.subscriptionFeed(DEFAULT_FILTER))).toBeDefined();
     // After the re-login, E5 answers with one post only (a fresh page).
     const fresh = e5Page();
     (fresh.data as { posts: unknown[] }).posts = e5Posts().slice(0, 1);

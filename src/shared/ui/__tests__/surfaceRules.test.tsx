@@ -14,6 +14,7 @@ import { feedPost, lockedPost } from '../../../test/feedFixtures';
 import { AuthorCard } from '../AuthorCard';
 import { Button } from '../Button';
 import { ContinueCard } from '../ContinueCard';
+import { FilterChip } from '../FilterChip';
 import { MediaRow } from '../MediaRow';
 import { NavItem } from '../NavItem';
 import { PostCard } from '../PostCard';
@@ -26,6 +27,7 @@ const asPost = (raw: unknown) => mapPost(raw, createLogger()) as Post;
 const consumers: Array<[string, () => ReactElement]> = [
   ['Button primary', () => <Button testID={ID} label="x" />],
   ['Button secondary small busy', () => <Button testID={ID} label="x" kind="secondary" size="small" busy />],
+  ['FilterChip with a count', () => <FilterChip testID={ID} label="x" count={1} />],
   ['NavItem current', () => <NavItem testID={ID} label="x" current />],
   ['NavItem', () => <NavItem testID={ID} label="x" current={false} />],
   ['SettingRow nav', () => <SettingRow testID={ID} kind="nav" label="x" />],

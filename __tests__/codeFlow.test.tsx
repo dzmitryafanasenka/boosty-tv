@@ -55,7 +55,8 @@ const SEND_URL = 'https://api.boosty.to/auth/phone/verification_code/send';
 const CONFIRM_URL = 'https://api.boosty.to/auth/phone/verification_code/confirm';
 const E1_URL = 'https://api.boosty.to/v1/user/current';
 /** Story 3.1: Главная's first feed page. */
-const E5_URL = 'https://api.boosty.to/v1/feed/post/?limit=10&comments_limit=0&reply_limit=0';
+const E5_URL =
+  'https://api.boosty.to/v1/feed/post/?limit=10&comments_limit=0&reply_limit=0&only_allowed=true&only_bought=false';
 
 const sendBody = (code: string) => ({
   data: { phoneCode: { code, expiresIn: 604800, phone: PHONE, sentTransport: 'gate' } },
@@ -385,7 +386,7 @@ describe('confirm and session creation', () => {
     for (const personal of ['291234567', '1001', '•']) {
       expect(sidebar).not.toContain(personal);
     }
-    // The sidebar, then «Обновить» (Story 5.1) and the feed cards.
+    // The sidebar, then «Фильтры» (Story 5.3), «Обновить» (Story 5.1) and the feed cards.
     expect(
       root.container
         .queryAll(node => node.props.focusable === true)
@@ -394,6 +395,7 @@ describe('confirm and session creation', () => {
       'nav/home',
       'nav/subs',
       'nav/settings',
+      'home/filters',
       'home/refresh',
       ...e5Posts().map(p => `home/feed/${p.id}`),
     ]);

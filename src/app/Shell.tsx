@@ -369,6 +369,7 @@ function SectionContent({
           focus={homeFocus}
           onOpenPost={onOpenPost}
           onOpenPlayer={onOpenPlayer}
+          filtersEnabled={phaseFlags.filters}
         />
       );
     case 'settings':

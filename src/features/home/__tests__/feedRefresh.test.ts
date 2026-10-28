@@ -3,9 +3,12 @@ import { AppError, queryKeys, type HttpClient } from '../../../shared/api';
 import { PostRepository, type Post, type PostPage } from '../../../shared/entities/post';
 import { createLogger } from '../../../shared/services/logger';
 import { manualRefreshFeed, mergeFeedHead, refreshFeedHead, type FeedData } from '../feedRefresh';
+import { DEFAULT_FILTER } from '../../../shared/filters';
+
+const F = DEFAULT_FILTER;
 
 const STALE = 60_000;
-const KEY = queryKeys.subscriptionFeed();
+const KEY = queryKeys.subscriptionFeed(DEFAULT_FILTER);
 const http = {} as HttpClient;
 
 const post = (id: string) => ({ id }) as Post;
@@ -97,36 +100,36 @@ describe('mergeFeedHead', () => {
 
 describe('refreshFeedHead', () => {
   it('no feed cached: nothing sent', async () => {
-    expect(await refreshFeedHead(client, http, T0 + STALE)).toBe('skipped');
+    expect(await refreshFeedHead(client, http, F, T0 + STALE)).toBe('skipped');
     expect(feedPage).not.toHaveBeenCalled();
   });
 
   it('younger than staleTime: nothing sent', async () => {
     seed();
-    expect(await refreshFeedHead(client, http, T0 + STALE - 1)).toBe('skipped');
+    expect(await refreshFeedHead(client, http, F, T0 + STALE - 1)).toBe('skipped');
     expect(feedPage).not.toHaveBeenCalled();
   });
 
   it('stale: one page-1 request (no cursor); merged on top; updatedAt = now', async () => {
     seed();
     feedPage.mockResolvedValue(page(['n1', 'n2', ...range(0, 8)], 'c8'));
-    expect(await refreshFeedHead(client, http, T0 + STALE)).toBe('prepended');
+    expect(await refreshFeedHead(client, http, F, T0 + STALE)).toBe('prepended');
     expect(feedPage).toHaveBeenCalledTimes(1);
-    expect(feedPage).toHaveBeenCalledWith(http, null);
+    expect(feedPage).toHaveBeenCalledWith(http, null, DEFAULT_FILTER);
     expect(ids(cached())?.slice(0, 3)).toEqual(['n1', 'n2', 'p0']);
     expect(cached()?.pages).toHaveLength(2);
     expect(cached()?.pageParams).toEqual([null, 'c10']);
     const state = client.getQueryCache().find({ queryKey: KEY })!.state;
     expect(state.dataUpdatedAt).toBe(T0 + STALE);
     // Fresh now: an immediate second resume sends nothing.
-    expect(await refreshFeedHead(client, http, state.dataUpdatedAt + 1)).toBe('skipped');
+    expect(await refreshFeedHead(client, http, F, state.dataUpdatedAt + 1)).toBe('skipped');
     expect(feedPage).toHaveBeenCalledTimes(1);
   });
 
   it('a gap: the cache becomes page 1 alone', async () => {
     seed();
     feedPage.mockResolvedValue(page(range(100, 110), 'c110'));
-    expect(await refreshFeedHead(client, http, T0 + STALE)).toBe('replaced');
+    expect(await refreshFeedHead(client, http, F, T0 + STALE)).toBe('replaced');
     expect(ids(cached())).toEqual(range(100, 110));
     expect(cached()?.pageParams).toEqual([null]);
   });
@@ -138,7 +141,7 @@ describe('refreshFeedHead', () => {
     const edited = { id: 'p0', title: 'Edited' } as unknown as Post;
     fresh.posts[0] = edited;
     feedPage.mockResolvedValue(fresh);
-    expect(await refreshFeedHead(client, http, T0 + STALE)).toBe('unchanged');
+    expect(await refreshFeedHead(client, http, F, T0 + STALE)).toBe('unchanged');
     expect(ids(cached())).toEqual(ids(data));
     expect(cached()?.pages).toHaveLength(2);
     expect(cached()?.pageParams).toEqual([null, 'c10']);
@@ -150,7 +153,7 @@ describe('refreshFeedHead', () => {
     seed(data);
     const logger = createLogger({ console: false });
     feedPage.mockRejectedValue(new AppError('Network'));
-    expect(await refreshFeedHead(client, http, T0 + STALE, logger)).toBe('failed');
+    expect(await refreshFeedHead(client, http, F, T0 + STALE, logger)).toBe('failed');
     expect(cached()).toBe(data);
     expect(logger.entries()).toEqual([
       expect.objectContaining({
@@ -166,8 +169,8 @@ describe('refreshFeedHead', () => {
     seed();
     const reply = deferred<PostPage>();
     feedPage.mockReturnValue(reply.promise);
-    const first = refreshFeedHead(client, http, T0 + STALE);
-    expect(await refreshFeedHead(client, http, T0 + STALE)).toBe('skipped');
+    const first = refreshFeedHead(client, http, F, T0 + STALE);
+    expect(await refreshFeedHead(client, http, F, T0 + STALE)).toBe('skipped');
     reply.resolve(page(['n1', ...range(0, 9)], 'c9'));
     expect(await first).toBe('prepended');
     expect(feedPage).toHaveBeenCalledTimes(1);
@@ -176,7 +179,7 @@ describe('refreshFeedHead', () => {
   it('the feed query is fetching (a page append): nothing sent', async () => {
     seed();
     client.getQueryCache().find({ queryKey: KEY })!.setState({ fetchStatus: 'fetching' });
-    expect(await refreshFeedHead(client, http, T0 + STALE)).toBe('skipped');
+    expect(await refreshFeedHead(client, http, F, T0 + STALE)).toBe('skipped');
     expect(feedPage).not.toHaveBeenCalled();
   });
 
@@ -185,7 +188,7 @@ describe('refreshFeedHead', () => {
     seed(data);
     const reply = deferred<PostPage>();
     feedPage.mockReturnValue(reply.promise);
-    const run = refreshFeedHead(client, http, T0 + STALE);
+    const run = refreshFeedHead(client, http, F, T0 + STALE);
     const query = client.getQueryCache().find({ queryKey: KEY })!;
     query.setState({ fetchStatus: 'fetching' });
     reply.resolve(page(['n1', ...range(0, 9)], 'c9'));
@@ -199,18 +202,18 @@ describe('refreshFeedHead', () => {
     const data = twoPages();
     seed(data);
     feedPage.mockResolvedValue(page([], 'c0'));
-    expect(await refreshFeedHead(client, http, T0 + STALE)).toBe('unchanged');
+    expect(await refreshFeedHead(client, http, F, T0 + STALE)).toBe('unchanged');
     expect(ids(cached())).toEqual(ids(data));
     expect(client.getQueryState(KEY)?.dataUpdatedAt).toBe(T0 + STALE);
     // Fresh now: the next resume within a staleTime sends nothing.
-    expect(await refreshFeedHead(client, http, T0 + STALE + 1)).toBe('skipped');
+    expect(await refreshFeedHead(client, http, F, T0 + STALE + 1)).toBe('skipped');
     expect(feedPage).toHaveBeenCalledTimes(1);
   });
 
   it('an empty last page 1 (no next cursor): the cache is replaced (a truly empty feed)', async () => {
     seed();
     feedPage.mockResolvedValue(page([], null));
-    expect(await refreshFeedHead(client, http, T0 + STALE)).toBe('replaced');
+    expect(await refreshFeedHead(client, http, F, T0 + STALE)).toBe('replaced');
     expect(cached()).toEqual({ pages: [page([], null)], pageParams: [null] });
   });
 
@@ -219,13 +222,13 @@ describe('refreshFeedHead', () => {
     seed(data);
     const query = client.getQueryCache().find({ queryKey: KEY })!;
     query.setState({ status: 'error', error: new AppError('Network') });
-    expect(await refreshFeedHead(client, http, T0 + STALE)).toBe('skipped');
+    expect(await refreshFeedHead(client, http, F, T0 + STALE)).toBe('skipped');
     expect(feedPage).not.toHaveBeenCalled();
 
     query.setState({ status: 'success', error: null });
     const reply = deferred<PostPage>();
     feedPage.mockReturnValue(reply.promise);
-    const run = refreshFeedHead(client, http, T0 + STALE);
+    const run = refreshFeedHead(client, http, F, T0 + STALE);
     query.setState({ status: 'error', error: new AppError('Network') });
     reply.resolve(page(['n1', ...range(0, 9)], 'c9'));
     expect(await run).toBe('skipped');
@@ -236,7 +239,7 @@ describe('refreshFeedHead', () => {
     seed();
     const reply = deferred<PostPage>();
     feedPage.mockReturnValue(reply.promise);
-    const run = refreshFeedHead(client, http, T0 + STALE);
+    const run = refreshFeedHead(client, http, F, T0 + STALE);
     client.clear();
     // A new account's feed arrives first.
     seed({ pages: [page(['other'], null)], pageParams: [null] }, T0 + STALE);
@@ -259,9 +262,9 @@ describe('manualRefreshFeed (Story 5.1, «Обновить»)', () => {
     const subs = jest.fn().mockResolvedValue(['blog']);
     await seedSubscriptions(subs);
     feedPage.mockResolvedValue(page(['n1', ...range(0, 9)], 'c9'));
-    expect(await manualRefreshFeed(client, http, T0 + 1)).toBe('prepended');
+    expect(await manualRefreshFeed(client, http, F, T0 + 1)).toBe('prepended');
     expect(feedPage).toHaveBeenCalledTimes(1);
-    expect(feedPage).toHaveBeenCalledWith(http, null);
+    expect(feedPage).toHaveBeenCalledWith(http, null, DEFAULT_FILTER);
     expect(subs).toHaveBeenCalledTimes(1);
     expect(ids(cached())?.slice(0, 2)).toEqual(['n1', 'p0']);
     expect(cached()?.pages).toHaveLength(2);
@@ -273,8 +276,8 @@ describe('manualRefreshFeed (Story 5.1, «Обновить»)', () => {
     await seedSubscriptions(subs);
     const reply = deferred<PostPage>();
     feedPage.mockReturnValue(reply.promise);
-    const first = manualRefreshFeed(client, http, T0);
-    const second = manualRefreshFeed(client, http, T0);
+    const first = manualRefreshFeed(client, http, F, T0);
+    const second = manualRefreshFeed(client, http, F, T0);
     expect(second).toBe(first);
     reply.resolve(page(range(0, 10), 'c10'));
     expect(await first).toBe('unchanged');
@@ -286,8 +289,8 @@ describe('manualRefreshFeed (Story 5.1, «Обновить»)', () => {
     seed();
     const reply = deferred<PostPage>();
     feedPage.mockReturnValue(reply.promise);
-    const resume = refreshFeedHead(client, http, T0 + STALE);
-    const manual = manualRefreshFeed(client, http, T0 + STALE);
+    const resume = refreshFeedHead(client, http, F, T0 + STALE);
+    const manual = manualRefreshFeed(client, http, F, T0 + STALE);
     reply.resolve(page(['n1', ...range(0, 9)], 'c9'));
     expect(await resume).toBe('prepended');
     expect(await manual).toBe('prepended');
@@ -302,13 +305,13 @@ describe('manualRefreshFeed (Story 5.1, «Обновить»)', () => {
     subs.mockRejectedValue(new AppError('Server'));
     const logger = createLogger();
     feedPage.mockRejectedValue(new AppError('Network'));
-    expect(await manualRefreshFeed(client, http, T0, logger)).toBe('failed');
+    expect(await manualRefreshFeed(client, http, F, T0, logger)).toBe('failed');
     expect(cached()).toBe(data);
     expect(logger.entries()).toEqual([
       expect.objectContaining({ scope: 'feed', message: 'manual refresh failed', fields: { kind: 'Network' } }),
     ]);
     feedPage.mockResolvedValue(page(range(0, 10), 'c10'));
-    expect(await manualRefreshFeed(client, http, T0, logger)).toBe('unchanged');
+    expect(await manualRefreshFeed(client, http, F, T0, logger)).toBe('unchanged');
   });
 
   it('a next-page fetch is running: waits for it, then one E5', async () => {
@@ -316,7 +319,7 @@ describe('manualRefreshFeed (Story 5.1, «Обновить»)', () => {
     const query = client.getQueryCache().find({ queryKey: KEY })!;
     query.setState({ fetchStatus: 'fetching' });
     feedPage.mockResolvedValue(page(['n1', ...range(0, 9)], 'c9'));
-    const run = manualRefreshFeed(client, http, T0);
+    const run = manualRefreshFeed(client, http, F, T0);
     await Promise.resolve();
     expect(feedPage).not.toHaveBeenCalled();
     query.setState({ fetchStatus: 'idle' });
@@ -330,7 +333,7 @@ describe('manualRefreshFeed (Story 5.1, «Обновить»)', () => {
     const query = client.getQueryCache().find({ queryKey: KEY })!;
     query.setState({ status: 'error', error: new AppError('Network') });
     feedPage.mockResolvedValue(page(['n1', ...range(0, 9)], 'c9'));
-    expect(await manualRefreshFeed(client, http, T0)).toBe('prepended');
+    expect(await manualRefreshFeed(client, http, F, T0)).toBe('prepended');
     expect(feedPage).toHaveBeenCalledTimes(1);
     expect(ids(cached())?.[0]).toBe('n1');
   });
@@ -339,7 +342,7 @@ describe('manualRefreshFeed (Story 5.1, «Обновить»)', () => {
     const data = twoPages();
     seed(data);
     feedPage.mockResolvedValue(page([], 'c0'));
-    expect(await manualRefreshFeed(client, http, T0)).toBe('unchanged');
+    expect(await manualRefreshFeed(client, http, F, T0)).toBe('unchanged');
     expect(cached()).toBe(data);
   });
 
@@ -354,7 +357,7 @@ describe('manualRefreshFeed (Story 5.1, «Обновить»)', () => {
     subs.mockReturnValue(e2.promise);
     feedPage.mockResolvedValue(page(range(0, 10), 'c10'));
     // Resolves while E2 is still pending.
-    expect(await manualRefreshFeed(client, http, T0)).toBe('unchanged');
+    expect(await manualRefreshFeed(client, http, F, T0)).toBe('unchanged');
     expect(subs).toHaveBeenCalledTimes(1);
     expect(other).not.toHaveBeenCalled();
     e2.resolve([]);
@@ -363,7 +366,7 @@ describe('manualRefreshFeed (Story 5.1, «Обновить»)', () => {
   it('no subscriptions cached: no E2 request', async () => {
     seed();
     feedPage.mockResolvedValue(page(range(0, 10), 'c10'));
-    expect(await manualRefreshFeed(client, http, T0)).toBe('unchanged');
+    expect(await manualRefreshFeed(client, http, F, T0)).toBe('unchanged');
     expect(client.getQueryState(SUBS)).toBeUndefined();
   });
 });

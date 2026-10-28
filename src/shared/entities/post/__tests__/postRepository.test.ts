@@ -11,6 +11,9 @@ import { e8Accessible, e8Locked, e8MissingReply } from '../../../../test/postFix
 import { PostRepository, blogPostsPath, feedPath, mergePosts, postPath } from '../postRepository';
 import { mapPost } from '../mapPost';
 import type { Post } from '../types';
+import { DEFAULT_FILTER } from '../../../filters';
+// eslint-disable-next-line boundaries/dependencies -- test-only fixtures
+import e5OnlyBought from '../../../../test/fixtures/boosty/e5-feed-only-bought.json';
 
 function client(handler: FixtureHandler) {
   const transport = createFixtureTransport(handler);
@@ -35,13 +38,21 @@ afterEach(() => {
 const post = (n: number) => mapPost(feedPost(n), createLogger()) as Post;
 
 describe('feedPath', () => {
-  it('E5 with comments off and no offset on the first page', () => {
-    expect(feedPath(null)).toBe('/v1/feed/post/?limit=10&comments_limit=0&reply_limit=0');
+  const BASE = '/v1/feed/post/?limit=10&comments_limit=0&reply_limit=0';
+
+  it('E5 with comments off, the default access params and no offset on the first page', () => {
+    expect(feedPath(null, DEFAULT_FILTER)).toBe(`${BASE}&only_allowed=true&only_bought=false`);
   });
 
-  it('passes the opaque cursor back verbatim, URL-encoded', () => {
-    expect(feedPath('a b&c=d/é:1')).toBe(
-      '/v1/feed/post/?limit=10&comments_limit=0&reply_limit=0&offset=a%20b%26c%3Dd%2F%C3%A9%3A1',
+  it('Story 5.3: each access value maps to the reference params («Все посты»: both false)', () => {
+    expect(feedPath(null, { access: 'allowed' })).toBe(`${BASE}&only_allowed=true&only_bought=false`);
+    expect(feedPath(null, { access: 'all' })).toBe(`${BASE}&only_allowed=false&only_bought=false`);
+    expect(feedPath(null, { access: 'bought' })).toBe(`${BASE}&only_allowed=false&only_bought=true`);
+  });
+
+  it('passes the opaque cursor back verbatim, URL-encoded, after the access params', () => {
+    expect(feedPath('a b&c=d/é:1', { access: 'all' })).toBe(
+      `${BASE}&only_allowed=false&only_bought=false&offset=a%20b%26c%3Dd%2F%C3%A9%3A1`,
     );
   });
 });
@@ -49,12 +60,12 @@ describe('feedPath', () => {
 describe('PostRepository.feedPage', () => {
   it('sends E5 with the content profile and maps the live page', async () => {
     const { http, transport } = client(() => ({ status: 200, body: e5Page({ isLast: false, offset: 'redacted' }) }));
-    const page = await PostRepository.feedPage(http, null);
+    const page = await PostRepository.feedPage(http, null, DEFAULT_FILTER);
     expect(page.posts).toHaveLength(10);
     expect(page.nextCursor).toBe('redacted');
     const [call] = transport.calls;
     expect(call.url).toBe(
-      'https://api.boosty.to/v1/feed/post/?limit=10&comments_limit=0&reply_limit=0',
+      'https://api.boosty.to/v1/feed/post/?limit=10&comments_limit=0&reply_limit=0&only_allowed=true&only_bought=false',
     );
     expect(call.headers.Authorization).toBe(`Bearer ${'t'.repeat(64)}`);
     expect(call.headers['X-App']).toBeUndefined();
@@ -63,16 +74,24 @@ describe('PostRepository.feedPage', () => {
     expect(transport.calls.every(c => !c.path.includes('comment'))).toBe(true);
   });
 
+  it('Story 5.3: «Только купленные» sends its params; a one-post last page (the live shape) ends the paging', async () => {
+    const { http, transport } = client(() => ({ status: 200, body: e5OnlyBought.body }));
+    const page = await PostRepository.feedPage(http, null, { access: 'bought' });
+    expect(transport.calls[0].url).toContain('&only_allowed=false&only_bought=true');
+    expect(page.posts).toHaveLength(1);
+    expect(page.nextCursor).toBeNull();
+  });
+
   it('the next request carries the cursor of the previous page', async () => {
     const { http, transport } = client(syntheticFeed({ total: 25 }));
-    const first = await PostRepository.feedPage(http, null);
+    const first = await PostRepository.feedPage(http, null, DEFAULT_FILTER);
     expect(first.nextCursor).toBe(cursorFor(10));
-    const second = await PostRepository.feedPage(http, first.nextCursor);
+    const second = await PostRepository.feedPage(http, first.nextCursor, DEFAULT_FILTER);
     expect(second.posts.map(p => p.id)).toEqual(
       Array.from({ length: 10 }, (_, i) => `feed-post-${10 + i}`),
     );
     expect(transport.calls[1].url).toContain('&offset=cursor%3A10');
-    const third = await PostRepository.feedPage(http, second.nextCursor);
+    const third = await PostRepository.feedPage(http, second.nextCursor, DEFAULT_FILTER);
     expect(third.posts).toHaveLength(5);
     expect(third.nextCursor).toBeNull();
   });
@@ -89,7 +108,7 @@ describe('PostRepository.feedPage', () => {
       body.extra = extra;
     }
     const { http } = client(() => ({ status: 200, body }));
-    expect((await PostRepository.feedPage(http, null)).nextCursor).toBeNull();
+    expect((await PostRepository.feedPage(http, null, DEFAULT_FILTER)).nextCursor).toBeNull();
   });
 
   it('drops a malformed post and keeps the page', async () => {
@@ -99,7 +118,7 @@ describe('PostRepository.feedPage', () => {
       status: 200,
       body: { data: { posts: [feedPost(0), bad, feedPost(2)] }, extra: { offset: 'c', isLast: false } },
     }));
-    const page = await PostRepository.feedPage(http, null);
+    const page = await PostRepository.feedPage(http, null, DEFAULT_FILTER);
     expect(page.posts.map(p => p.id)).toEqual(['feed-post-0', 'feed-post-2']);
   });
 
@@ -108,7 +127,7 @@ describe('PostRepository.feedPage', () => {
       status: 200,
       body: { data: { posts: [feedPost(0), feedPost(0), feedPost(1)] }, extra: { isLast: true } },
     }));
-    expect((await PostRepository.feedPage(http, null)).posts.map(p => p.id)).toEqual([
+    expect((await PostRepository.feedPage(http, null, DEFAULT_FILTER)).posts.map(p => p.id)).toEqual([
       'feed-post-0',
       'feed-post-1',
     ]);
@@ -116,7 +135,7 @@ describe('PostRepository.feedPage', () => {
 
   it('an empty feed is an empty last page', async () => {
     const { http } = client(() => ({ status: 200, body: { data: { posts: [] }, extra: { isLast: true } } }));
-    expect(await PostRepository.feedPage(http, null)).toEqual({ posts: [], nextCursor: null });
+    expect(await PostRepository.feedPage(http, null, DEFAULT_FILTER)).toEqual({ posts: [], nextCursor: null });
   });
 
   it.each([
@@ -127,12 +146,12 @@ describe('PostRepository.feedPage', () => {
     ['503', { status: 503, body: {} }, 'Server'],
   ])('a page with %s rejects with AppError', async (_name, reply, kind) => {
     const { http } = client(() => reply);
-    await expect(PostRepository.feedPage(http, null)).rejects.toEqual(new AppError(kind as never));
+    await expect(PostRepository.feedPage(http, null, DEFAULT_FILTER)).rejects.toEqual(new AppError(kind as never));
   });
 
   it('a network failure rejects with Network after the HttpClient retries', async () => {
     const { http, transport } = client(() => ({ network: true }));
-    await expect(PostRepository.feedPage(http, null)).rejects.toMatchObject({ kind: 'Network' });
+    await expect(PostRepository.feedPage(http, null, DEFAULT_FILTER)).rejects.toMatchObject({ kind: 'Network' });
     expect(transport.calls).toHaveLength(3);
   });
 });

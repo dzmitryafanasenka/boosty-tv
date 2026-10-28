@@ -1,0 +1,274 @@
+{
+  "case": "e5-feed-only-bought",
+  "status": 200,
+  "body": {
+    "data": {
+      "posts": [
+        {
+          "data": [
+            {
+              "type": "text",
+              "modificator": "",
+              "content": "[\"Sample text\",\"unstyled\",[]]"
+            },
+            {
+              "content": "",
+              "modificator": "BLOCK_END",
+              "type": "text"
+            },
+            {
+              "title": "redacted",
+              "rendition": "",
+              "size": 1536000,
+              "url": "https://example.invalid/image",
+              "isInvalid": null,
+              "type": "image",
+              "id": "synthetic-id-109",
+              "width": 3024,
+              "height": 4032
+            }
+          ],
+          "isShowcaseVisible": false,
+          "isDeleted": false,
+          "publishTime": 1700313200,
+          "forbiddenChangeHasAIContent": false,
+          "reactionsDisabled": false,
+          "donators": {
+            "extra": {
+              "isLast": true
+            },
+            "data": []
+          },
+          "reactionCounters": [
+            {
+              "count": 5,
+              "type": "like"
+            },
+            {
+              "type": "dislike",
+              "count": 0
+            },
+            {
+              "type": "fire",
+              "count": 5
+            },
+            {
+              "count": 0,
+              "type": "heart"
+            },
+            {
+              "type": "laugh",
+              "count": 0
+            },
+            {
+              "count": 0,
+              "type": "laught"
+            },
+            {
+              "count": 0,
+              "type": "wonder"
+            },
+            {
+              "count": 0,
+              "type": "sad"
+            },
+            {
+              "count": 0,
+              "type": "angry"
+            },
+            {
+              "type": "funny",
+              "count": 0
+            },
+            {
+              "count": 0,
+              "type": "check"
+            },
+            {
+              "count": 0,
+              "type": "thinking"
+            },
+            {
+              "type": "clown",
+              "count": 0
+            },
+            {
+              "count": 0,
+              "type": "swearing"
+            },
+            {
+              "count": 0,
+              "type": "applause"
+            },
+            {
+              "type": "call-me",
+              "count": 0
+            },
+            {
+              "type": "cold",
+              "count": 0
+            },
+            {
+              "type": "eggplant",
+              "count": 0
+            },
+            {
+              "count": 0,
+              "type": "blowing-up"
+            },
+            {
+              "type": "scream",
+              "count": 0
+            },
+            {
+              "count": 0,
+              "type": "crown"
+            },
+            {
+              "count": 0,
+              "type": "diamond"
+            },
+            {
+              "type": "melting",
+              "count": 0
+            },
+            {
+              "type": "money",
+              "count": 0
+            },
+            {
+              "count": 0,
+              "type": "nausea"
+            },
+            {
+              "type": "confetti",
+              "count": 0
+            },
+            {
+              "type": "banana",
+              "count": 0
+            },
+            {
+              "count": 0,
+              "type": "peach"
+            },
+            {
+              "count": 0,
+              "type": "pizza"
+            },
+            {
+              "count": 0,
+              "type": "love"
+            },
+            {
+              "count": 0,
+              "type": "rocket"
+            },
+            {
+              "count": 0,
+              "type": "splash"
+            },
+            {
+              "type": "lightning",
+              "count": 0
+            },
+            {
+              "type": "cry",
+              "count": 0
+            },
+            {
+              "count": 0,
+              "type": "folded-hands"
+            }
+          ],
+          "isCommentsDenied": false,
+          "intId": 1041,
+          "id": "synthetic-id-108",
+          "bundleIds": [],
+          "isBlocked": false,
+          "donations": 0,
+          "title": "redacted",
+          "comments": {
+            "extra": {
+              "isFirst": true,
+              "isLast": false
+            },
+            "data": []
+          },
+          "promo": null,
+          "sortOrder": 5,
+          "isMarketing": false,
+          "user": {
+            "id": 1006,
+            "blogUrl": "synthetic-blog-2",
+            "isOfficial": false,
+            "name": "redacted",
+            "flags": {
+              "showPostDonations": true
+            },
+            "currency": "redacted",
+            "hasAvatar": true,
+            "avatarUrl": "https://example.invalid/avatar"
+          },
+          "createdAt": 1700313200,
+          "isPublished": true,
+          "isRecord": false,
+          "price": 0,
+          "contentCounters": [
+            {
+              "size": 1536000,
+              "type": "image",
+              "count": 5
+            },
+            {
+              "size": 0,
+              "type": "text",
+              "count": 5
+            }
+          ],
+          "tags": [],
+          "hasAdultContent": false,
+          "showViewsCounter": false,
+          "isWaitingVideo": false,
+          "teaser": [],
+          "hasAccess": true,
+          "updatedAt": 1700313200,
+          "int_id": 1041,
+          "advertiserInfo": null,
+          "hasAIContent": false,
+          "signedQuery": "?sig=REDACTED",
+          "isPinned": false,
+          "currencyPrices": {
+            "USD": 0,
+            "RUB": 0,
+            "EUR": 0
+          },
+          "isLiked": false,
+          "count": {
+            "comments": 5,
+            "reactions": {
+              "dislike": 0,
+              "heart": 0,
+              "wonder": 0,
+              "fire": 5,
+              "sad": 0,
+              "laught": 0,
+              "angry": 0,
+              "like": 5
+            },
+            "likes": 0
+          },
+          "currencyDonations": {
+            "EUR": 0,
+            "RUB": 0,
+            "USD": 0
+          }
+        }
+      ]
+    },
+    "extra": {
+      "offset": "redacted",
+      "isLast": true
+    }
+  }
+}

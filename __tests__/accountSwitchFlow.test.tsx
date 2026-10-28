@@ -181,7 +181,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  queryClient.setQueryDefaults(queryKeys.subscriptionFeed(), { gcTime: QUERY_GC_TIME_MS });
+  queryClient.setQueryDefaults(queryKeys.allSubscriptionFeeds(), { gcTime: QUERY_GC_TIME_MS });
   await resetQueryCache();
   clearNativeModules();
   focusRestoration.clear();
@@ -310,7 +310,7 @@ describe('a different account', () => {
   it('from A11 mid-session: E1 → reset → phone write → session write; every store empty; fresh Главная', async () => {
     // The fake timers would run the 10 min gc of A's inactive feed query
     // at once; keep it so the switch itself must clear it.
-    queryClient.setQueryDefaults(queryKeys.subscriptionFeed(), { gcTime: Infinity });
+    queryClient.setQueryDefaults(queryKeys.allSubscriptionFeeds(), { gcTime: Infinity });
     const root = await renderApp();
     await rememberSettingsFocus(root);
     logger.info('test', OLD_LOG_LINE);

@@ -78,15 +78,29 @@ function demoPost(n: number, blog?: { blogUrl: string; index: number }) {
   };
 }
 
-/** The E5 page after `offset` (the demo cursor is the next post number). */
+/**
+ * The E5 page after `offset` (the demo cursor is the next index in the
+ * filtered list). Story 5.3: the access params are honoured, so every
+ * filter state can be shown: `only_allowed=true` or no access params (the
+ * live server default behaved like «Доступные мне», api-contract §3 E5) →
+ * the accessible posts only, `only_bought=true` → nothing (the demo account
+ * bought nothing), both `false` → every post.
+ */
 function demoFeedPage(url: string, total: number) {
   const match = /[?&]offset=([^&]*)/.exec(url);
   const start = match ? Number(decodeURIComponent(match[1])) || 0 : 0;
-  const end = Math.min(start + FEED_PAGE, total);
-  const posts = Array.from({ length: Math.max(0, end - start) }, (_, i) => demoPost(start + i));
+  const onlyAllowed = !/[?&]only_allowed=false(&|$)/.test(url);
+  const onlyBought = /[?&]only_bought=true(&|$)/.test(url);
+  const all = onlyBought
+    ? []
+    : Array.from({ length: total }, (_, n) => demoPost(n)).filter(
+        post => !onlyAllowed || post.hasAccess,
+      );
+  const end = Math.min(start + FEED_PAGE, all.length);
+  const posts = all.slice(start, end);
   return {
     data: { posts, blogs: [], counters: {} },
-    extra: { offset: String(end), isLast: end >= total },
+    extra: { offset: String(end), isLast: end >= all.length },
   };
 }
 
