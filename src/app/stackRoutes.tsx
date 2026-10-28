@@ -5,9 +5,9 @@ import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { BackHandler } from 'react-native';
 import { AuthorScreen } from '../features/author';
 import { PlayerScreen } from '../features/player';
-import { PostScreen } from '../features/post';
+import { PostScreen, endedReturnFocusId, postIdPrefix } from '../features/post';
 import { queryKeys } from '../shared/api';
-import type { MediaRef } from '../shared/entities/post';
+import type { MediaRef, PostResult } from '../shared/entities/post';
 import {
   FocusZone,
   MAIN_SECTION,
@@ -16,6 +16,7 @@ import {
   type FocusZoneHandle,
 } from '../shared/focus';
 import { requestHostFocus } from '../shared/ui';
+import { progress } from './progress';
 import type { RootStackParamList } from './routes';
 import { session } from './session';
 import { enabledSections, phaseFlags, type SectionId } from './phaseFlags';
@@ -351,12 +352,16 @@ export function PostRoute({ navigation, route }: StackScreenProps<RootStackParam
  * route's content zone is pointed at the element that opened the player
  * (FocusRestoration, route key + `main`), keeping that route's remembered
  * scroll offset and index, so the origin screen's return focus lands on it.
- * `setReturnFocus` is not used: the content zone reads with `peek`, so a
- * one-shot override would never be consumed there.
+ * After a natural end (Story 4.5) the Post gets the next unfinished
+ * MediaRow after the ended video, else its primary button, instead
+ * (`endedFocus`). `setReturnFocus` is not used: the content zone reads with
+ * `peek`, so a one-shot override would never be consumed there.
  */
 export function PlayerRoute({ navigation, route }: StackScreenProps<RootStackParamList, 'Player'>) {
   const { ref, origin, start } = route.params;
   const isActive = useCallback(() => navigation.isFocused(), [navigation]);
+  /** Story 4.5: the return focus after a natural end (else the origin element). */
+  const endedFocus = useRef<string | null>(null);
   useEffect(
     () =>
       navigation.addListener('beforeRemove', () => {
@@ -364,7 +369,7 @@ export function PlayerRoute({ navigation, route }: StackScreenProps<RootStackPar
         focusRestoration.remember(
           origin.routeKey,
           MAIN_SECTION,
-          origin.focusId,
+          endedFocus.current ?? origin.focusId,
           kept?.scrollOffset ?? 0,
           kept?.index,
         );
@@ -388,6 +393,23 @@ export function PlayerRoute({ navigation, route }: StackScreenProps<RootStackPar
     queryClient.invalidateQueries({ queryKey: queryKeys.post(ref.blogUrl, ref.postId) }).catch(() => {});
     navigation.goBack();
   }, [navigation, queryClient, ref.blogUrl, ref.postId]);
+  // Story 4.5 (focus-map G «Ended»): the video played to its real end. The
+  // Post (the origin) gets focus on the next unfinished MediaRow, else its
+  // primary button, through the same `remember` the exit uses (the Post
+  // reads restoration with `peek`, so a one-shot `setReturnFocus` would never
+  // be consumed). No autoplay.
+  const onEnded = useCallback(() => {
+    if (!navigation.isFocused()) {
+      return;
+    }
+    const cached = queryClient.getQueryData<PostResult>(queryKeys.post(ref.blogUrl, ref.postId));
+    if (cached?.kind === 'ok' && origin.focusId.startsWith(postIdPrefix(ref.postId))) {
+      endedFocus.current = endedReturnFocusId(cached.post, ref.mediaId, mediaId =>
+        progress.store.snapshot(mediaId),
+      );
+    }
+    navigation.goBack();
+  }, [navigation, queryClient, ref.blogUrl, ref.postId, ref.mediaId, origin.focusId]);
   return (
     <Screen testID="player">
       <PlayerScreen
@@ -396,6 +418,7 @@ export function PlayerRoute({ navigation, route }: StackScreenProps<RootStackPar
         isActive={isActive}
         onExit={onExit}
         onNoAccess={onNoAccess}
+        onEnded={onEnded}
         start={start ?? 'resume'}
       />
     </Screen>

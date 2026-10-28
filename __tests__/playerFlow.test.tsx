@@ -1284,14 +1284,54 @@ describe('overlay, keys and seeking (matrix «Seek», «Auto-hide», «Back», �
     await unmount(root);
   });
 
-  it('the end of the video: paused with the overlay, no autoplay of the next video', async () => {
+  it('Story 4.5: the end exits to the Post (no autoplay); focus on the next unfinished MediaRow', async () => {
     withData(TWO);
     const root = await openPlayer();
+    await fire('onProgress', 599);
+    focusMock.mockClear();
     await fire('onEnd');
-    expect(engine.props?.paused).toBe(true);
-    expect(visible(root, 'player/overlay')).toBe(true);
-    expect(currentRoute()).toBe('Player');
-    expect(navigationRef.getCurrentRoute()?.params).toMatchObject({ ref: { mediaId: 'v1' } });
+    expect(currentRoute()).toBe('Post');
+    expect(navigationRef.getRootState()?.routes.some(r => r.name === 'Player')).toBe(false);
+    expect(lastFocusTarget()).toBe(VIDEO('v2'));
+    await unmount(root);
+  });
+
+  it('Story 4.5: a finished next row is skipped; the first unfinished one after the ended video gets focus', async () => {
+    withData([okVideo('v1', ALL), okVideo('v2', ALL, { title: '' }), okVideo('v3', ALL, { title: '' }), ...paragraph('Body')]);
+    progressStore.put({
+      ref: { blogUrl: FEED_BLOG, postId: POST, mediaId: 'v2' },
+      positionSec: 590,
+      durationSec: 600,
+      updatedAt: Date.now(),
+      meta: { title: '', postTitle: '', authorName: '', previewUrl: null, durationSec: 600 },
+    });
+    const root = await openPlayer();
+    await fire('onProgress', 599);
+    focusMock.mockClear();
+    await fire('onEnd');
+    expect(currentRoute()).toBe('Post');
+    expect(lastFocusTarget()).toBe(VIDEO('v3'));
+    await unmount(root);
+  });
+
+  it('Story 4.5: the end of the last unfinished video returns focus to the primary', async () => {
+    withData(TWO);
+    const root = await openPlayer(VIDEO('v2'));
+    await fire('onProgress', 599);
+    focusMock.mockClear();
+    await fire('onEnd');
+    expect(currentRoute()).toBe('Post');
+    expect(lastFocusTarget()).toBe(PRIMARY);
+    await unmount(root);
+  });
+
+  it('Story 4.5: Back before the end still returns to the origin element', async () => {
+    withData(TWO);
+    const root = await openPlayer();
+    focusMock.mockClear();
+    await back();
+    expect(currentRoute()).toBe('Post');
+    expect(lastFocusTarget()).toBe(VIDEO('v1'));
     await unmount(root);
   });
 });
@@ -1345,19 +1385,6 @@ describe('PlaybackArbiter and logs (matrix «Arbiter», «CDN headers»)', () =>
 });
 
 describe('review fixes (Story 4.1)', () => {
-  it('play after the end starts over from 0 (the ended engine is sought to 0)', async () => {
-    const root = await openPlayer();
-    await fire('onProgress', 599);
-    await fire('onEnd');
-    expect(engine.props?.paused).toBe(true);
-    await focusOn(root, PLAYPAUSE);
-    await press(root, PLAYPAUSE);
-    expect(engine.seek).toHaveBeenCalledWith(0);
-    expect(engine.props?.paused).toBe(false);
-    expect(text(byTestId(root, 'player/elapsed')[0])).toContain('0:00');
-    await unmount(root);
-  });
-
   it('reopen of the same video within gcTime: no play of the cached URL; one more E8; the engine starts once with the new source', async () => {
     let n = 0;
     e8 = (_req, blogUrl, postId) => {
@@ -1666,8 +1693,7 @@ describe('progress and resume (Story 4.2)', () => {
     await fire('onProgress', 598);
     await fire('onEnd');
     expect(e9Sent()).toEqual(['v1@10', 'v1@14', 'v1@598', 'v1@600']);
-    await back();
-    await back();
+    // Story 4.5: the end exits to the Post by itself.
     expect(currentRoute()).toBe('Post');
     expect(statusOf(root, 'v1')).toContain('Просмотрено');
     expect(label(root, PRIMARY)).toBe('Смотреть');
@@ -1682,10 +1708,8 @@ describe('progress and resume (Story 4.2)', () => {
     await fire('onLoad', { durationSec: 600 });
     await fire('onProgress', 0);
     await fire('onProgress', 599);
-    await fire('onEnd');
     focusMock.mockClear();
-    await back();
-    await back();
+    await fire('onEnd');
     expect(currentRoute()).toBe('Post');
     expect(visible(root, RESTART)).toBe(false);
     expect(lastFocusTarget()).toBe(PRIMARY);
@@ -1749,26 +1773,6 @@ describe('progress and resume (Story 4.2)', () => {
     expect(e9Sent()).toEqual([]);
     expect(statusOf(root, 'v1')).toContain('Просмотрено');
     expect(progressStore.get('v1')?.positionSec).toBe(600);
-    await unmount(root);
-  });
-
-  it('a replay after the end is a new session: a short replay keeps «Просмотрено»', async () => {
-    const root = await openPlayer();
-    await ticks(0, 12);
-    await fire('onProgress', 599);
-    await fire('onEnd');
-    expect(e9Sent()).toEqual(['v1@10', 'v1@599', 'v1@600']);
-    await focusOn(root, PLAYPAUSE);
-    await press(root, PLAYPAUSE); // play after the end: seek to 0
-    expect(engine.seek).toHaveBeenLastCalledWith(0);
-    await fire('onProgress', 599); // the old position before the seek lands: ignored
-    await fire('onSeekDone', 0);
-    await ticks(1, 3);
-    await back();
-    await back();
-    expect(currentRoute()).toBe('Post');
-    expect(e9Sent()).toEqual(['v1@10', 'v1@599', 'v1@600']);
-    expect(statusOf(root, 'v1')).toContain('Просмотрено');
     await unmount(root);
   });
 
