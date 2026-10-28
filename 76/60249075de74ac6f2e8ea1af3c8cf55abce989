@@ -1,0 +1,19 @@
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_67d3a4bcdb9d96::t_4d7180fdc85ca1 32,72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "7660249075de74ac6f2e8ea1af3c8cf55abce989",
+  "prompts": {},
+  "sessions": {
+    "s_67d3a4bcdb9d96": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e93f6f61-902b-4690-b071-9acc2f500329",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
