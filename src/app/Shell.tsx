@@ -38,6 +38,8 @@ export type ShellProps = {
   onCheckSession?: () => void;
   /** Debug builds only: the in-memory A11 trigger row in Настройки. */
   onExpireSession?: () => void;
+  /** Debug builds only (Story 4.4): the broken-next-video-URL row in Настройки. */
+  onBreakNextVideoUrl?: () => void;
   /** Главная's offline StateView (Story 2.5); absent: the feed. */
   homeOffline?: HomeScreenProps['offline'];
   /** Подписки: OK on a tile opens the Author page (Story 3.3). */
@@ -91,6 +93,7 @@ export function Shell({
   onOpenFocusCheck,
   onCheckSession,
   onExpireSession,
+  onBreakNextVideoUrl,
   homeOffline,
   onOpenAuthor,
   onOpenPost,
@@ -307,6 +310,7 @@ export function Shell({
           onOpenFocusCheck={onOpenFocusCheck}
           onCheckSession={onCheckSession}
           onExpireSession={onExpireSession}
+          onBreakNextVideoUrl={onBreakNextVideoUrl}
           homeOffline={homeOffline}
           onOpenAuthor={onOpenAuthor}
           onOpenPost={onOpenPost}
@@ -327,6 +331,7 @@ function SectionContent({
   onOpenFocusCheck,
   onCheckSession,
   onExpireSession,
+  onBreakNextVideoUrl,
   homeOffline,
   onOpenAuthor,
   onOpenPost,
@@ -341,6 +346,7 @@ function SectionContent({
   onOpenFocusCheck?: () => void;
   onCheckSession?: () => void;
   onExpireSession?: () => void;
+  onBreakNextVideoUrl?: () => void;
   homeOffline?: HomeScreenProps['offline'];
   onOpenAuthor?: (blogUrl: string) => void;
   onOpenPost?: (blogUrl: string, postId: string) => void;
@@ -364,6 +370,7 @@ function SectionContent({
           onOpenFocusCheck={onOpenFocusCheck}
           onCheckSession={onCheckSession}
           onExpireSession={onExpireSession}
+          onBreakNextVideoUrl={onBreakNextVideoUrl}
         />
       );
     case 'subs':

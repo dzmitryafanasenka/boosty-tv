@@ -255,6 +255,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-4-2-progress-is-saved-and-playback-resumes.md`
   summary: A player retry («Повторить», a fresh E8) after «С начала» resumes from the local entry, which is written only after 10 s of movement or a pause; an error within the first seconds of a start over therefore resumes the older position.
   evidence: `PlayerScreen` `startMode` switches to `resume` after the first source's start.
+  note: Resolved in Story 4.4 (2026-10-28, host-tested): a recovery or a retry after an engine error continues at the broken source's position (or its pending start: 0 for «С начала» before the start was reached), not the local entry. A retry after an E8 failure with no source played yet still uses the start mode.
 - source_spec: `_bmad-output/implementation-artifacts/spec-4-2-progress-is-saved-and-playback-resumes.md`
   summary: Flow-test E9 hold-on-expiry through the real HttpClient and SessionManager (E9 401 → failed refresh → `expired` → no sends while expired → one E9 with the latest position after a same-account re-login).
   evidence: Only `progressRepository.test.ts` with a fake session covers it; the order of the E9 rejection vs the status change in the refresh coordinator is not pinned (review finding 9).
@@ -267,9 +268,19 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-4-3-choose-video-quality.md`
   summary: A picked height the decoder cannot play (e.g. 1440p AVC High on the pinned device) is not stored (the device store is written only after the picked source's `onLoad`), but it stays this run's in-memory choice: «Повторить» and later opens in the same app run re-play it, and the sheet is unreachable from the error state. A height that loaded and fails later (mid-stream decoder error) is stored. Story 4.4's recovery should fall back to the default order after a failure of a preferred source.
   evidence: Owner decision 2026-10-28 (a failing pick shows the existing start-failure error; recovery is Story 4.4); `PlayerScreen` `pickQuality`, `mediaResolver.pickSource`.
+  note: Resolved in Story 4.4 (2026-10-28, host-tested): the first error of a picked height recovers once with the same height; after a failed recovery «Повторить» plays the default order and this run's in-memory choice becomes `auto` (the stored value is untouched). The sheet stays unreachable from the error state.
 - source_spec: `_bmad-output/implementation-artifacts/spec-4-3-choose-video-quality.md`
   summary: The Menu and Info keys open the sheet but are unverified on a real remote (the pinned Chromecast remote has neither); no Settings key code exists on Android (react-native-tvos maps only `menu` and `info`).
   evidence: `ReactAndroidHWInputDeviceHelper.kt` key map; focus-map §4 G Story 4.3 notes.
 - source_spec: `_bmad-output/implementation-artifacts/spec-4-3-choose-video-quality.md`
   summary: A quality switch while the new source has not reached its start (the `load`/`seek` gate) writes no progress until that seek lands; an exit in that window keeps the last written position (≤ 10 s old), and a retry after a switch resumes from that position, not the exact switch second.
   evidence: `PlayerScreen` start gate (`{kind: 'load', target}`); the same rule as a fresh source (Story 4.2: never a pre-seek t=0).
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-4-recover-from-expired-links-and-playback-errors.md`
+  summary: Story 4.4 device checks still open — only one start-failure recovery was checked over adb with the debug trigger (2026-10-28). Open: a mid-playback recovery at the same second, the error state after a second failure, the «Восстанавливаем воспроизведение…» screenshot for the owner (the copy now stays until the start position), a recovery while paused, the no-access exit to the Post, and the physical remote. A real 24 h signed-URL expiry is not waited for (unverified, as in Story 1.6).
+  evidence: docs/testing.md «Story 4.4» (agent, adb + logcat + screencap, debug build); the debug trigger breaks only the player's next resolution, so mid-playback errors are host-tested only.
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-4-recover-from-expired-links-and-playback-errors.md`
+  summary: The recovery budget counts playback from progress steps (0 < Δ ≤ 5 s between progress events), not wall time; a stalled stream that reports no progress never gives the budget back, and a seek does not count. A manual «Повторить» does not refill the budget either (only 30 s of playback does).
+  evidence: `src/features/player/recovery.ts` (`countPlayback`, `takeRecovery`); spec Decisions «Budget».
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-4-recover-from-expired-links-and-playback-errors.md`
+  summary: The no-access exit applies only after a source of this opening was ready (a recovery or a retry). A locked answer on the player's first E8 still shows «Нет доступа к этому видео» + «Назад» (Story 4.1 behavior); a locked retry after an E8 failure before any playback does too. The exit shows no message of its own: the Post's refetched locked notice is the message.
+  evidence: `PlayerScreen` `everReady` / `noAccessExit`; spec Decisions «Fresh E8 results during recovery».

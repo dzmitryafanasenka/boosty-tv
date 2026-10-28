@@ -151,12 +151,15 @@ export const SessionCheckContext = createContext<SessionCheck>(NO_CHECK);
 /**
  * A trigger for one trigger point: call it when a fresh answer is locked.
  * On `refetch` it calls the latest `onRefetch` (while still mounted);
- * `expired` and `locked` change nothing here. Stable across renders.
+ * `expired` and `locked` change nothing here. `onOutcome` (optional, per
+ * call) hears the outcome while the caller is still mounted (Story 4.4:
+ * the player leaves for the Post once the check says `locked`). Stable
+ * across renders.
  */
 export function useLockedSessionCheck(
   key: SessionCheckKey,
   onRefetch: () => void,
-): () => void {
+): (onOutcome?: (outcome: SessionCheckOutcome) => void) => void {
   const port = useContext(SessionCheckContext);
   const portRef = useRef(port);
   portRef.current = port;
@@ -169,11 +172,15 @@ export function useLockedSessionCheck(
       mounted.current = false;
     };
   }, []);
-  return useCallback(() => {
+  return useCallback((onOutcome?: (outcome: SessionCheckOutcome) => void) => {
     portRef.current
       .check(key, () => mounted.current)
       .then(outcome => {
-        if (outcome === 'refetch' && mounted.current) {
+        if (!mounted.current) {
+          return;
+        }
+        onOutcome?.(outcome);
+        if (outcome === 'refetch') {
           refetchRef.current();
         }
       })
