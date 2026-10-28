@@ -9,7 +9,7 @@
  */
 import { notifyManager } from '@tanstack/react-query';
 import { act } from 'react';
-import App from '../src/app/App';
+import App, { navigationRef } from '../src/app/App';
 import { queryClient, resetQueryCache } from '../src/app/queryClient';
 import { accountScope } from '../src/shared/account';
 import { queryKeys } from '../src/shared/api';
@@ -20,11 +20,12 @@ import { logger } from '../src/shared/services/logger';
 import { requestHostFocus } from '../src/shared/ui/requestHostFocus';
 import backHandler from '../src/test/backHandlerMock';
 import { E5_PATH, e5Page } from '../src/test/feedFixtures';
-import e1Ok from '../src/test/fixtures/boosty/e1-user-current.json';
+import { e3Body, e3MissingReply, e3Path, e4Page, e4Path } from '../src/test/authorFixtures';
 import {
   E2_PATH,
   E2_URL,
   blogUrlOf,
+  e1NoBlogBody,
   e2Body,
   subscription,
   subscriptionsBody,
@@ -60,6 +61,21 @@ jest.mock('react-native/Libraries/Components/TV/TVFocusGuideView', () =>
   require('../src/test/flow').recordingFocusGuideModule(),
 );
 
+/** `phaseFlags.myBlog` (Story 5.2), switchable per test (the Shell reads it at render). */
+const mockMyBlogFlag = { on: true };
+jest.mock('../src/app/phaseFlags', () => {
+  const actual = jest.requireActual('../src/app/phaseFlags');
+  return {
+    ...actual,
+    phaseFlags: {
+      ...actual.phaseFlags,
+      get myBlog() {
+        return mockMyBlogFlag.on;
+      },
+    },
+  };
+});
+
 /** The real FlashList behind the recorder `lists` (`src/test/flow`; `onEndReached` held back). */
 jest.mock('@shopify/flash-list', () => require('../src/test/flow').recordingFlashListModule());
 
@@ -86,6 +102,10 @@ const TILE = (n: number) => `subs/tile/${blogUrlOf(n)}`;
 
 type Reply = FixtureReply | Promise<FixtureReply> | undefined;
 let subs: (req: FixtureRequest) => Reply;
+/** E1 (the cold-start validate and Подписки's profile E1): no `blogUrl` by default. */
+let e1: (req: FixtureRequest) => Reply;
+/** E3/E4 (any blog); unset: no answer (a test bug, a network failure). */
+let blog: (req: FixtureRequest) => Reply;
 let transport: FixtureTransport;
 
 beforeAll(() => {
@@ -109,10 +129,16 @@ beforeEach(() => {
   resetRecorders();
   resetKeychain({ 'boostytv.session': STORED });
   installNativeModules({ AppInfo: { versionName: '1.0' } });
+  mockMyBlogFlag.on = true;
   subs = () => ({ status: 200, body: subscriptionsBody(3) });
+  e1 = () => ({ status: 200, body: e1NoBlogBody() });
+  blog = () => undefined;
   transport = installFixtureTransport(req => {
     if (req.path === E1) {
-      return { status: 200, body: e1Ok.body };
+      return e1(req);
+    }
+    if (req.path.startsWith('/v1/blog/')) {
+      return blog(req);
     }
     if (req.path === E5_PATH) {
       return { status: 200, body: e5Page() };
@@ -135,7 +161,9 @@ afterEach(async () => {
 type Root = Awaited<ReturnType<typeof render>>;
 
 const subsCalls = () => transport.callsTo(E2_PATH);
-const tileIds = (root: Root) => focusableIds(root).filter(id => id.startsWith('subs/tile/'));
+/** The grid's tiles: author tiles and «Мой блог» (`subs/mine`, Story 5.2). */
+const tileIds = (root: Root) =>
+  focusableIds(root).filter(id => id.startsWith('subs/tile/') || id === 'subs/mine');
 /** The Подписки grid's FlashList props (last render). */
 function grid(): Record<string, any> {
   const props = lists.props.get('subs/list');
@@ -599,5 +627,314 @@ describe('account scope', () => {
     await unmount(root);
     await accountScope.reset();
     expect(queryClient.getQueryData(queryKeys.subscriptions())).toBeUndefined();
+  });
+});
+
+describe('«Мой блог» (Story 5.2, SUB-02, focus-map §3 C)', () => {
+  /** The account's own blog (not among `subscriptionsBody`'s blogs). */
+  const MINE = 'own-blog';
+  const MY_TILE = 'subs/mine';
+  const e1With = (blogUrl: string) => () => ({
+    status: 200,
+    body: { ...e1NoBlogBody(), blogUrl },
+  });
+  /** E3 for `MINE` (owner «Me», title «My blog title»), E4 page 1 the live page. */
+  const ownBlog = (e4: () => Reply = () => ({ status: 200, body: e4Page(1) })) =>
+    (req: FixtureRequest): Reply => {
+      if (req.path === e3Path(MINE)) {
+        return { status: 200, body: e3Body(MINE, { title: 'My blog title', owner: { name: 'Me' } }) };
+      }
+      if (req.path === e4Path(MINE)) {
+        return e4();
+      }
+      return undefined;
+    };
+  const profileCalls = () => transport.callsTo(E1);
+  /** The `me` query now names `blogUrl` (as a later E1 would), then settles. */
+  async function setMe(blogUrl: string) {
+    await act(async () => {
+      queryClient.setQueryData(queryKeys.me(), { id: '1001', blogUrl });
+    });
+    await settle();
+  }
+  /** The own blog's cached E4 page 1 now has `posts` (as a refetch would), then settles. */
+  async function setOwnPosts(blogUrl: string, posts: unknown[]) {
+    await act(async () => {
+      queryClient.setQueryData(queryKeys.authorPosts(blogUrl), {
+        pages: [{ posts, nextCursor: null }],
+        pageParams: [null],
+      });
+    });
+    await settle();
+  }
+  const e3Calls = () => transport.callsTo(e3Path(MINE));
+  const e4Calls = () => transport.callsTo(e4Path(MINE));
+
+  it('a blog with a post: «Мой блог» is the first tile, tinted label, initial focus; one E1, E3 and E4 page 1', async () => {
+    e1 = e1With(MINE);
+    blog = ownBlog();
+    const root = await openSubs();
+    expect(tileIds(root)).toEqual([MY_TILE, TILE(1), TILE(2), TILE(3)]);
+    expect(lastFocusTarget()).toBe(MY_TILE);
+    expect(text(byTestId(root, `${MY_TILE}/label`)[0])).toContain(t('subs.myBlog'));
+    expect(one(root, MY_TILE).props.accessibilityLabel).toBe('Мой блог. Me. My blog title');
+    // Other tiles carry no label.
+    expect(visible(root, `${TILE(1)}/label`)).toBe(false);
+    // The cold-start validate and the profile E1; the Author page's E3 and E4 page 1.
+    expect(profileCalls()).toHaveLength(2);
+    expect(e3Calls()).toHaveLength(1);
+    expect(e4Calls()).toHaveLength(1);
+    expect(e4Calls()[0].url).toBe(
+      `https://api.boosty.to/v1/blog/${MINE}/post/?limit=20&comments_limit=0&reply_limit=0`,
+    );
+    for (const call of [...profileCalls(), ...e3Calls(), ...e4Calls()]) {
+      expect(call.headers.Authorization).toBe(`Bearer ${'a'.repeat(64)}`);
+      expect(call.headers['X-App']).toBeUndefined();
+    }
+    expect(transport.calls.every(c => !c.path.includes('comment'))).toBe(true);
+    // The grid's first row starts with the own blog.
+    expect(gridBlogs()[0]).toBe(MINE);
+    await unmount(root);
+  });
+
+  it('the skeleton stays until the check settles; then «Мой блог» takes the initial focus', async () => {
+    e1 = e1With(MINE);
+    const e4 = deferred();
+    blog = ownBlog(() => e4.promise);
+    const root = await openSubs();
+    // E2 answered, E4 not yet: still the skeleton, focus on nav/subs.
+    expect(visible(root, 'subs/skeleton')).toBe(true);
+    expect(focusTargets()).toEqual([]);
+    e4.resolve({ status: 200, body: e4Page(1) });
+    await settle();
+    expect(tileIds(root)[0]).toBe(MY_TILE);
+    expect(lastFocusTarget()).toBe(MY_TILE);
+    await unmount(root);
+  });
+
+  it('no blogUrl in E1: no tile, no E3/E4; the grid as before', async () => {
+    const root = await openSubs();
+    expect(tileIds(root)).toEqual([TILE(1), TILE(2), TILE(3)]);
+    expect(lastFocusTarget()).toBe(TILE(1));
+    expect(transport.calls.filter(c => c.path.startsWith('/v1/blog/'))).toHaveLength(0);
+    await unmount(root);
+  });
+
+  it('an unsafe blogUrl in E1 is absent: no tile, no E3/E4', async () => {
+    e1 = e1With('../evil');
+    const root = await openSubs();
+    expect(tileIds(root)).toEqual([TILE(1), TILE(2), TILE(3)]);
+    expect(transport.calls.filter(c => c.path.startsWith('/v1/blog/'))).toHaveLength(0);
+    await unmount(root);
+  });
+
+  it('a blog without posts (empty E4 page 1): no tile, no error', async () => {
+    e1 = e1With(MINE);
+    blog = ownBlog(() => ({ status: 200, body: { data: [], extra: { isLast: true } } }));
+    const root = await openSubs();
+    expect(tileIds(root)).toEqual([TILE(1), TILE(2), TILE(3)]);
+    expect(lastFocusTarget()).toBe(TILE(1));
+    expect(visible(root, 'subs/error')).toBe(false);
+    await unmount(root);
+  });
+
+  it.each([
+    ['E1 404', 'e1' as const, (): FixtureReply => ({ status: 404, body: {} })],
+    ['E1 Parse', 'e1' as const, (): FixtureReply => ({ status: 200, body: { blogUrl: MINE } })],
+    ['E3 404 (blog_not_found)', 'e3' as const, () => e3MissingReply()],
+    ['E3 Parse', 'e3' as const, (): FixtureReply => ({ status: 200, body: { title: 'x' } })],
+    ['E4 404', 'e4' as const, (): FixtureReply => ({ status: 404, body: {} })],
+    ['E4 Parse', 'e4' as const, (): FixtureReply => ({ status: 200, body: { posts: [] } })],
+  ])('%s: no tile and no error; the grid as before', async (_name, step, reply) => {
+    let calls = 0;
+    // The first E1 is the cold-start validate: only the profile E1 fails.
+    e1 = step === 'e1' ? () => (calls++ === 0 ? e1With(MINE)() : reply()) : e1With(MINE);
+    const own = ownBlog(step === 'e4' ? reply : undefined);
+    blog = step === 'e3' ? req => (req.path === e3Path(MINE) ? reply() : own(req)) : own;
+    const root = await openSubs();
+    expect(tileIds(root)).toEqual([TILE(1), TILE(2), TILE(3)]);
+    expect(lastFocusTarget()).toBe(TILE(1));
+    expect(visible(root, 'subs/error')).toBe(false);
+    expect(visible(root, 'shell')).toBe(true);
+    await unmount(root);
+  });
+
+  it('E1 Network (AD-6 retries): no tile, the grid after the retries', async () => {
+    let calls = 0;
+    e1 = () => (calls++ === 0 ? e1With(MINE)() : { network: true });
+    const root = await openSubs(WITH_TIMERS);
+    expect(tileIds(root)).toEqual([TILE(1), TILE(2), TILE(3)]);
+    expect(visible(root, 'subs/error')).toBe(false);
+    await unmount(root);
+  });
+
+  it('the own blog is also a subscription: shown once, as «Мой блог», first', async () => {
+    e1 = e1With(blogUrlOf(2));
+    blog = req =>
+      req.path === e3Path(blogUrlOf(2))
+        ? { status: 200, body: e3Body(blogUrlOf(2)) }
+        : req.path === e4Path(blogUrlOf(2))
+          ? { status: 200, body: e4Page(1) }
+          : undefined;
+    const root = await openSubs();
+    expect(tileIds(root)).toEqual([MY_TILE, TILE(1), TILE(3)]);
+    expect(gridBlogs()).toEqual([blogUrlOf(2), blogUrlOf(1), blogUrlOf(3)]);
+    await unmount(root);
+  });
+
+  it('only the own blog and no subscriptions: the grid with «Мой блог» alone (not C3)', async () => {
+    e1 = e1With(MINE);
+    blog = ownBlog();
+    subs = () => ({ status: 200, body: { offset: 0, limit: 30, total: 0, data: [] } });
+    const root = await openSubs();
+    expect(visible(root, 'subs/empty')).toBe(false);
+    expect(tileIds(root)).toEqual([MY_TILE]);
+    expect(lastFocusTarget()).toBe(MY_TILE);
+    await unmount(root);
+  });
+
+  it('OK → Автор of the own blog from the cache (no new E3/E4); Back → the same tile', async () => {
+    e1 = e1With(MINE);
+    blog = ownBlog();
+    const root = await openSubs();
+    await press(root, MY_TILE);
+    expect(visible(root, 'author')).toBe(true);
+    expect(visible(root, 'author/header')).toBe(true);
+    // The Author page reused Подписки's E3 and E4 page 1.
+    expect(e3Calls()).toHaveLength(1);
+    expect(e4Calls()).toHaveLength(1);
+    focusMock.mockClear();
+    await back();
+    expect(navigationRef.getCurrentRoute()?.name).toBe('Shell');
+    expect(lastFocusTarget()).toBe(MY_TILE);
+    await unmount(root);
+  });
+
+  it('← from «Мой блог» (first column) leaves for nav/subs; Back → nav/subs', async () => {
+    e1 = e1With(MINE);
+    blog = ownBlog();
+    const root = await openSubs();
+    await focusOn(root, MY_TILE);
+    const [zone] = byTestId(root, 'shell/content/subs');
+    expect(zone.props.trapFocusLeft).toBeFalsy();
+    expect(destinationIds('shell/sidebar')).toEqual(['nav/subs']);
+    expect(destinationIds('shell/content/subs')).toEqual([MY_TILE]);
+    focusMock.mockClear();
+    await back();
+    expect(lastFocusTarget()).toBe('nav/subs');
+    await unmount(root);
+  });
+
+  it('the tile arrives after the grid rendered: focus stays on the focused author tile', async () => {
+    const root = await openSubs();
+    await focusOn(root, TILE(2));
+    focusMock.mockClear();
+    lists.scrollToIndex.mockClear();
+    blog = ownBlog();
+    // E1 now names the own blog (as a later refetch would).
+    await setMe(MINE);
+    expect(tileIds(root)).toEqual([MY_TILE, TILE(1), TILE(2), TILE(3)]);
+    // Never the skeleton again.
+    expect(visible(root, 'subs/skeleton')).toBe(false);
+    // Tile 2 moved from index 1 to 2 (same row 0): scrolled to its row and
+    // focused again by id (the Story 3.2 data-change rule), nothing else.
+    expect(lists.scrollToIndex).toHaveBeenLastCalledWith(
+      expect.objectContaining({ index: Math.floor(2 / 3) }),
+    );
+    expect(focusTargets()).toEqual([TILE(2)]);
+    await unmount(root);
+  });
+
+  it('focus on «Мой блог», then a refetch finds no post: the tile goes, focus → its neighbour by index (the first tile)', async () => {
+    e1 = e1With(MINE);
+    blog = ownBlog();
+    const root = await openSubs();
+    await focusOn(root, MY_TILE);
+    focusMock.mockClear();
+    await setOwnPosts(MINE, []);
+    expect(tileIds(root)).toEqual([TILE(1), TILE(2), TILE(3)]);
+    expect(lastFocusTarget()).toBe(TILE(1));
+    await unmount(root);
+  });
+
+  it('the focused plain tile is the own blog and «Мой блог» arrives: focus moves to «Мой блог» (the same blog)', async () => {
+    const root = await openSubs();
+    await focusOn(root, TILE(2));
+    focusMock.mockClear();
+    blog = req =>
+      req.path === e3Path(blogUrlOf(2))
+        ? { status: 200, body: e3Body(blogUrlOf(2)) }
+        : req.path === e4Path(blogUrlOf(2))
+          ? { status: 200, body: e4Page(1) }
+          : undefined;
+    await setMe(blogUrlOf(2));
+    expect(tileIds(root)).toEqual([MY_TILE, TILE(1), TILE(3)]);
+    expect(lastFocusTarget()).toBe(MY_TILE);
+
+    // And back: «Мой блог» goes (no post) while the blog is still a
+    // subscription → its plain tile, at its own index.
+    await focusOn(root, MY_TILE);
+    focusMock.mockClear();
+    await setOwnPosts(blogUrlOf(2), []);
+    expect(tileIds(root)).toEqual([TILE(1), TILE(2), TILE(3)]);
+    expect(lastFocusTarget()).toBe(TILE(2));
+    await unmount(root);
+  });
+
+  it('E1 fails: the grid is shown; leave and come back: the grid at once, no skeleton, no new E1', async () => {
+    let calls = 0;
+    e1 = () => (calls++ === 0 ? e1With(MINE)() : { status: 404, body: {} });
+    const root = await openSubs();
+    expect(tileIds(root)).toEqual([TILE(1), TILE(2), TILE(3)]);
+    const profile = profileCalls().length;
+    await focusOn(root, TILE(1));
+    await back(); // → nav/subs
+    await focusOn(root, 'nav/subs');
+    await back(); // → Главная
+    expect(visible(root, 'subs')).toBe(false);
+    await focusOn(root, 'nav/home');
+    focusMock.mockClear();
+    await press(root, 'nav/subs');
+    expect(visible(root, 'subs/skeleton')).toBe(false);
+    expect(tileIds(root)).toEqual([TILE(1), TILE(2), TILE(3)]);
+    expect(lastFocusTarget()).toBe(TILE(1));
+    // The failed check is settled: not asked again on mount.
+    expect(profileCalls()).toHaveLength(profile);
+    await unmount(root);
+  });
+
+  it('the tile arrives while focus is on the sidebar: no focus move', async () => {
+    const root = await openSubs();
+    // The initial focus landed on the first tile, then the user went ←.
+    await focusOn(root, TILE(1));
+    await focusOn(root, 'nav/subs');
+    focusMock.mockClear();
+    blog = ownBlog();
+    await setMe(MINE);
+    expect(tileIds(root)[0]).toBe(MY_TILE);
+    expect(focusTargets()).toEqual([]);
+    await unmount(root);
+  });
+
+  it('flag off: no profile E1, no E3/E4, no tile', async () => {
+    mockMyBlogFlag.on = false;
+    e1 = e1With(MINE);
+    blog = ownBlog();
+    const root = await openSubs();
+    expect(tileIds(root)).toEqual([TILE(1), TILE(2), TILE(3)]);
+    // The cold-start validate only.
+    expect(profileCalls()).toHaveLength(1);
+    expect(transport.calls.filter(c => c.path.startsWith('/v1/blog/'))).toHaveLength(0);
+    await unmount(root);
+  });
+
+  it('an account reset clears the cached profile', async () => {
+    e1 = e1With(MINE);
+    blog = ownBlog();
+    const root = await openSubs();
+    expect(queryClient.getQueryData(queryKeys.me())).toEqual({ id: '1001', blogUrl: MINE });
+    await unmount(root);
+    await accountScope.reset();
+    expect(queryClient.getQueryData(queryKeys.me())).toBeUndefined();
   });
 });

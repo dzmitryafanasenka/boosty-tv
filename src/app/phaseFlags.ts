@@ -8,6 +8,9 @@
  * sections only): while it is off, a MediaRow shows no «Смотреть» /
  * «Продолжить» / «С начала» and OK on it does nothing (Story 3.5). Story
  * 4.1 turns it on: «Смотреть» and OK on a MediaRow open the Player.
+ *
+ * `myBlog` (Story 5.2) is an in-screen entry point, not a section: while it
+ * is off, Подписки sends no profile E1 and shows no «Мой блог» tile.
  */
 export const phaseFlags = {
   home: true,
@@ -16,6 +19,7 @@ export const phaseFlags = {
   events: false,
   settings: true,
   player: true,
+  myBlog: true,
 } as const satisfies Record<string, boolean>;
 
 export type Capability = keyof typeof phaseFlags;

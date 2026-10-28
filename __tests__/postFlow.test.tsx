@@ -30,7 +30,6 @@ import { requestHostFocus } from '../src/shared/ui/requestHostFocus';
 import backHandler from '../src/test/backHandlerMock';
 import { e3Body, syntheticBlogPosts } from '../src/test/authorFixtures';
 import { E5_PATH, syntheticFeed } from '../src/test/feedFixtures';
-import e1Ok from '../src/test/fixtures/boosty/e1-user-current.json';
 import e1Unauthorized from '../src/test/fixtures/boosty/e1-no-token.json';
 import e8NoToken from '../src/test/fixtures/boosty/e8-no-token.json';
 import refreshRejected from '../src/test/fixtures/boosty/refresh-invalid-grant.json';
@@ -44,7 +43,12 @@ import {
   postDetail,
   text as textBlock,
 } from '../src/test/postFixtures';
-import { E2_PATH, blogUrlOf, subscriptionsBody } from '../src/test/subscriptionFixtures';
+import {
+  E2_PATH,
+  blogUrlOf,
+  e1NoBlogBody,
+  subscriptionsBody,
+} from '../src/test/subscriptionFixtures';
 import {
   byTestId,
   clearNativeModules,
@@ -164,7 +168,7 @@ beforeEach(() => {
   const blogPosts = syntheticBlogPosts({ blogUrl: AUTHOR_BLOG, total: 7 });
   fullHandler = (req: FixtureRequest): Reply => {
     if (req.path === E1) {
-      return { status: 200, body: e1Ok.body };
+      return { status: 200, body: e1NoBlogBody() };
     }
     if (req.path === E5_PATH) {
       return feed(req);
@@ -609,7 +613,7 @@ describe('locked, missing, errors (matrix «Locked», «Not found», «Error»)'
 
     it('truly locked (E1 200): one refetch, still locked; no E1 for another locked post within 5 min, one after', async () => {
       install({ status: refreshOk.status, body: refreshOk.body });
-      e1Reply = () => ({ status: 200, body: e1Ok.body });
+      e1Reply = () => ({ status: 200, body: e1NoBlogBody() });
       const root = await openDead();
       expect(transport.callsTo(E1)).toHaveLength(2);
       expect(transport.callsTo(TOKEN)).toHaveLength(0);

@@ -21,3 +21,17 @@ describe('queryKeys.post (Story 3.4)', () => {
     expect(queryKeys.post('b', 'p')[0]).not.toBe(queryKeys.authorPosts('b')[0]);
   });
 });
+
+describe('queryKeys.me (Story 5.2)', () => {
+  it('its own root, never a prefix of another key', () => {
+    expect(queryKeys.me()).toEqual(['me']);
+    for (const key of [
+      queryKeys.subscriptions(),
+      queryKeys.subscriptionFeed(),
+      queryKeys.author('me'),
+      queryKeys.authorPosts('me'),
+    ]) {
+      expect(key[0]).not.toBe('me');
+    }
+  });
+});

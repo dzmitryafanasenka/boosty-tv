@@ -2,6 +2,7 @@ import { memo, useCallback, useMemo, type RefObject } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { FlashList, type FlashListRef, type ListRenderItemInfo } from '@shopify/flash-list';
 import type { Author } from '../../shared/entities/author';
+import { t } from '../../shared/i18n';
 import {
   useZoneItem,
   type ListRestoration,
@@ -18,6 +19,14 @@ import {
 /** Focus ids (docs/focus-map.md §1.5). */
 export const SUBS_TILE_PREFIX = 'subs/tile/';
 export const subsTileId = (blogUrl: string) => `${SUBS_TILE_PREFIX}${blogUrl}`;
+/**
+ * The «Мой блог» tile (Story 5.2): always the first tile when shown. Outside
+ * the `subs/tile/<blogUrl>` namespace, so no subscribed blog can share it.
+ */
+export const MY_BLOG_TILE_ID = 'subs/mine';
+/** A Подписки tile id: an author tile or «Мой блог». */
+export const isSubsTileId = (id: string) =>
+  id === MY_BLOG_TILE_ID || id.startsWith(SUBS_TILE_PREFIX);
 
 /** Owner decision 2026-10-26: 3 columns (as the feed). */
 export const SUBS_COLUMNS = 3;
@@ -79,6 +88,8 @@ export function subsListAdapter(list: {
 type TileProps = {
   author: Author;
   index: number;
+  /** The «Мой блог» tile: its own id and the tinted label. */
+  mine: boolean;
   restoration: ListRestoration;
   onOpen: (blogUrl: string) => void;
 };
@@ -88,8 +99,14 @@ type TileProps = {
  * Memoized with stable props, so a focus move re-renders only the two
  * tiles' focus state. OK opens Автор (Story 3.3).
  */
-const SubsTile = memo(function SubsTileView({ author, index, restoration, onOpen }: TileProps) {
-  const id = subsTileId(author.blogUrl);
+const SubsTile = memo(function SubsTileView({
+  author,
+  index,
+  mine,
+  restoration,
+  onOpen,
+}: TileProps) {
+  const id = mine ? MY_BLOG_TILE_ID : subsTileId(author.blogUrl);
   const zone = useZoneItem(id);
   const zoneRef = zone.ref;
   const itemRef = restoration.itemRef(id);
@@ -114,6 +131,7 @@ const SubsTile = memo(function SubsTileView({ author, index, restoration, onOpen
       testID={id}
       author={author}
       width={SUBS_TILE_WIDTH}
+      label={mine ? t('subs.myBlog') : undefined}
       onFocus={onFocus}
       onPress={onPress}
       style={index % SUBS_COLUMNS === 0 ? styles.slot : styles.slotGap}
@@ -123,11 +141,13 @@ const SubsTile = memo(function SubsTileView({ author, index, restoration, onOpen
 
 type RowProps = {
   row: SubsRowItem;
+  /** The row's first tile is «Мой блог» (only the first row). */
+  firstIsMyBlog: boolean;
   restoration: ListRestoration;
   onOpen: (blogUrl: string) => void;
 };
 
-const SubsRow = memo(function SubsRowView({ row, restoration, onOpen }: RowProps) {
+const SubsRow = memo(function SubsRowView({ row, firstIsMyBlog, restoration, onOpen }: RowProps) {
   return (
     <View style={styles.row}>
       {row.authors.map((author, column) => (
@@ -137,6 +157,7 @@ const SubsRow = memo(function SubsRowView({ row, restoration, onOpen }: RowProps
           key={column}
           author={author}
           index={row.start + column}
+          mine={firstIsMyBlog && column === 0}
           restoration={restoration}
           onOpen={onOpen}
         />
@@ -147,6 +168,8 @@ const SubsRow = memo(function SubsRowView({ row, restoration, onOpen }: RowProps
 
 export type SubscriptionsGridProps = {
   authors: readonly Author[];
+  /** The first author is the account's own blog («Мой блог», Story 5.2). */
+  firstIsMyBlog?: boolean;
   height: number;
   restoration: ListRestoration;
   listRef: RefObject<FlashListRef<SubsRowItem> | null>;
@@ -165,6 +188,7 @@ export type SubscriptionsGridProps = {
  */
 export function SubscriptionsGrid({
   authors,
+  firstIsMyBlog = false,
   height,
   restoration,
   listRef,
@@ -174,9 +198,14 @@ export function SubscriptionsGrid({
   const rows = useMemo(() => subsRows(authors), [authors]);
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<SubsRowItem>) => (
-      <SubsRow row={item} restoration={restoration} onOpen={onOpen} />
+      <SubsRow
+        row={item}
+        firstIsMyBlog={firstIsMyBlog && item.start === 0}
+        restoration={restoration}
+        onOpen={onOpen}
+      />
     ),
-    [restoration, onOpen],
+    [firstIsMyBlog, restoration, onOpen],
   );
   return (
     <FlashList

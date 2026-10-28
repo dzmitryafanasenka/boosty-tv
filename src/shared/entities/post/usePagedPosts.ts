@@ -61,6 +61,12 @@ export type PagedPostsOptions = {
   /** One page after `cursor` (null: the first page), from PostRepository. */
   fetchPage: (cursor: string | null) => Promise<PostPage>;
   enabled?: boolean;
+  /**
+   * False: a first page that failed is not fetched again when another
+   * observer mounts (Подписки's «Мой блог» check, Story 5.2: a failure is a
+   * settled «no tile»). Default true (the Author page retries on mount).
+   */
+  retryOnMount?: boolean;
 };
 
 /**
@@ -76,6 +82,7 @@ export function usePagedPosts({
   queryKey,
   fetchPage,
   enabled = true,
+  retryOnMount = true,
 }: PagedPostsOptions): PagedPosts {
   const fetchRef = useRef(fetchPage);
   fetchRef.current = fetchPage;
@@ -89,6 +96,7 @@ export function usePagedPosts({
     // feed, the resume refresh of page 1, ADR 0010) update it.
     refetchOnMount: false,
     retry: false,
+    retryOnMount,
     enabled,
   });
 

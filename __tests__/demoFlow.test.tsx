@@ -108,19 +108,22 @@ test('fixture-backed Shell with the «ДЕМО» badge; SecureStore and the netw
   });
 });
 
-test('Story 3.2: Подписки shows the demo authors (E2 answered by the demo transport)', async () => {
+test('Story 3.2: Подписки shows the demo authors (E2 answered by the demo transport); Story 5.2: «Мой блог» first, once', async () => {
   fetchMock.mockClear();
   const root = await renderApp();
   await press(root, 'nav/subs');
   const tiles = root.container
     .queryAll(n => n.props.focusable === true)
     .map(n => n.props.testID as string)
-    .filter(id => id.startsWith('subs/tile/'));
+    .filter(id => id.startsWith('subs/tile/') || id === 'subs/mine');
+  // The demo account owns `demo-blog-2` (E1 `blogUrl`): its tile is first
+  // as «Мой блог» and is not repeated among the subscriptions.
   expect(tiles.slice(0, 3)).toEqual([
+    'subs/mine',
     'subs/tile/demo-blog-1',
-    'subs/tile/demo-blog-2',
     'subs/tile/demo-blog-3',
   ]);
+  expect(tiles).not.toContain('subs/tile/demo-blog-2');
   expect(fetchMock).not.toHaveBeenCalled();
   await act(async () => {
     root.unmount();
