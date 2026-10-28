@@ -46,6 +46,12 @@ export type FocusableSurfaceProps = Omit<
    */
   scalePressed?: number;
   disabled?: boolean;
+  /**
+   * False: temporarily not focusable, drawn as usual (not disabled). Главная's
+   * «Обновить» while focus is on a «Продолжить» card, so ↓ from the row
+   * keeps the column (Story 5.1). Default true.
+   */
+  focusable?: boolean;
   /** Outer layout style (margins, alignment). Never scaled. */
   style?: StyleProp<ViewStyle>;
   /**
@@ -90,6 +96,7 @@ export function FocusableSurface({
   scaleFocus,
   scalePressed = focus['pressed-scale'],
   disabled = false,
+  focusable = true,
   style,
   surfaceStyle,
   children,
@@ -157,7 +164,7 @@ export function FocusableSurface({
       ref={ref}
       testID={testID}
       disabled={disabled}
-      focusable={!disabled}
+      focusable={!disabled && focusable}
       style={style}
       onFocus={(event: FocusEvent) => {
         setFocused(true);

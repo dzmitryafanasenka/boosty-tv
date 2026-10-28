@@ -385,7 +385,7 @@ describe('confirm and session creation', () => {
     for (const personal of ['291234567', '1001', '•']) {
       expect(sidebar).not.toContain(personal);
     }
-    // The sidebar, then the feed cards.
+    // The sidebar, then «Обновить» (Story 5.1) and the feed cards.
     expect(
       root.container
         .queryAll(node => node.props.focusable === true)
@@ -394,6 +394,7 @@ describe('confirm and session creation', () => {
       'nav/home',
       'nav/subs',
       'nav/settings',
+      'home/refresh',
       ...e5Posts().map(p => `home/feed/${p.id}`),
     ]);
 

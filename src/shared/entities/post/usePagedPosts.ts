@@ -29,6 +29,8 @@ export const MAX_AUTO_FETCHES = 3;
 export type PagedPosts = {
   /** Every loaded page, appended and deduped by `post.id` (first kept). */
   posts: Post[];
+  /** The last write to the list (a fetch, an append or a head refresh); 0: none. */
+  dataUpdatedAt: number;
   /**
    * No card yet, none failed, and more may come (no page yet, or pages that
    * added no card but have a next cursor): the skeleton.
@@ -147,6 +149,7 @@ export function usePagedPosts({
 
   return {
     posts,
+    dataUpdatedAt: query.dataUpdatedAt,
     // After the cap, no card and more pages: the empty StateView.
     isPending:
       firstPageError === null &&

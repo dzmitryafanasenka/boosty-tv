@@ -95,6 +95,14 @@ export const ru = {
       errorTitle: 'Не удалось загрузить ленту',
       loadMoreError: 'Не удалось загрузить следующие посты.',
     },
+    // «Обновить» in the feed's title row (Story 5.1, FEED-03): a forced head
+    // refresh of the feed and the subscriptions. The label reads
+    // `refreshing` while it runs; a failure shows `refreshFailed` inline.
+    refresh: 'Обновить',
+    refreshing: 'Обновляем…',
+    refreshFailed: 'Не удалось обновить',
+    refreshA11y: 'Обновить ленту',
+    refreshingA11y: 'Обновляем ленту…',
     // «Продолжить просмотр» (Story 4.7, FR15): the local history of this
     // device (scope label, EXPERIENCE › Voice). `{left}` is «Осталось N мин»
     // (`post.video.status.left`); without a known duration it is left out.

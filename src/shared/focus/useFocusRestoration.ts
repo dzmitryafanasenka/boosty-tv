@@ -49,6 +49,8 @@ export type ListRestoration = {
   onScroll(event: NativeSyntheticEvent<NativeScrollEvent>): void;
   /** Item `ref`: the mounted host view per id. */
   itemRef(id: string): (view: HostView | null) => void;
+  /** The mounted host view of `id` (null: not mounted), e.g. for a focus guide. */
+  viewOf(id: string): HostView | null;
   /**
    * On return (the route is focused again): restore the scroll; if the
    * target's current index differs from the remembered one, scroll it into
@@ -160,6 +162,8 @@ export function useFocusRestoration({
     return callback;
   }, []);
 
+  const viewOf = useCallback((id: string) => views.current.get(id) ?? null, []);
+
   /** Focus `id` once mounted, within the frame budget; `onGiveUp` otherwise. */
   const focusWhenMounted = useCallback(
     (id: string, onGiveUp: () => void) => {
@@ -242,7 +246,7 @@ export function useFocusRestoration({
   }, [cancel, focusWhenMounted]);
 
   return useMemo(
-    () => ({ onItemFocus, onScroll, itemRef, restore, cancel, focusInitial, focusItem }),
-    [onItemFocus, onScroll, itemRef, restore, cancel, focusInitial, focusItem],
+    () => ({ onItemFocus, onScroll, itemRef, viewOf, restore, cancel, focusInitial, focusItem }),
+    [onItemFocus, onScroll, itemRef, viewOf, restore, cancel, focusInitial, focusItem],
   );
 }

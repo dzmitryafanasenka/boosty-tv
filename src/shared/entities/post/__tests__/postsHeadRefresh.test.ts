@@ -283,3 +283,70 @@ describe('mergePostsHead with pinnedFirst (Автор, Epic 3 retro A1)', () => 
     expect(result).toBe('replaced');
   });
 });
+
+describe('refreshPostsHead force (Story 5.1, «Обновить»)', () => {
+  it('no staleness check: a fresh cache is refreshed too', async () => {
+    seed(KEY_A);
+    const fetch = jest.fn().mockResolvedValue(page(['n1', ...range(0, 19)], 'c19'));
+    expect(await refreshPostsHead(client, KEY_A, fetch, T0 + 1, undefined, undefined, { force: true })).toBe(
+      'prepended',
+    );
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(client.getQueryState(KEY_A)?.dataUpdatedAt).toBe(T0 + 1);
+  });
+
+  it('joins a running refresh of the same key (one request, the same result); a plain call still skips', async () => {
+    seed(KEY_A);
+    const reply = deferred<PostPage>();
+    const fetch = jest.fn().mockReturnValue(reply.promise);
+    const now = T0 + QUERY_STALE_TIME_MS;
+    const resume = refreshPostsHead(client, KEY_A, fetch, now);
+    const forced = refreshPostsHead(client, KEY_A, fetch, now, undefined, undefined, { force: true });
+    expect(await refreshPostsHead(client, KEY_A, fetch, now)).toBe('skipped');
+    reply.resolve(page(['n1', ...range(0, 19)], 'c19'));
+    expect(await resume).toBe('prepended');
+    expect(await forced).toBe('prepended');
+    expect(fetch).toHaveBeenCalledTimes(1);
+    // Released: the next forced call sends again.
+    fetch.mockResolvedValue(page(range(0, 20), 'c20'));
+    expect(await refreshPostsHead(client, KEY_A, fetch, now, undefined, undefined, { force: true })).toBe(
+      'unchanged',
+    );
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('no cache: skipped; a running fetch: waits for it, then sends; an error state: sends anyway', async () => {
+    const fetch = jest.fn().mockResolvedValue(page(['n1', ...range(0, 19)], 'c19'));
+    const force = { force: true, skipWhileError: true };
+    expect(await refreshPostsHead(client, KEY_A, fetch, T0, undefined, undefined, force)).toBe('skipped');
+    seed(KEY_A);
+    const query = client.getQueryCache().find({ queryKey: KEY_A })!;
+    query.setState({ fetchStatus: 'fetching' });
+    const run = refreshPostsHead(client, KEY_A, fetch, T0, undefined, undefined, force);
+    await Promise.resolve();
+    expect(fetch).not.toHaveBeenCalled();
+    query.setState({ fetchStatus: 'idle' });
+    expect(await run).toBe('prepended');
+    expect(fetch).toHaveBeenCalledTimes(1);
+    query.setState({ status: 'error', error: new AppError('Network') });
+    expect(await refreshPostsHead(client, KEY_A, fetch, T0, undefined, undefined, force)).toBe('unchanged');
+    expect(fetch).toHaveBeenCalledTimes(2);
+    // A reset while waiting: skipped, nothing sent.
+    query.setState({ fetchStatus: 'fetching' });
+    const waiting = refreshPostsHead(client, KEY_A, fetch, T0, undefined, undefined, force);
+    client.clear();
+    expect(await waiting).toBe('skipped');
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('a synchronous throw of the fetch is a failure and releases the key', async () => {
+    seed(KEY_A);
+    const fetch = jest.fn().mockImplementationOnce(() => {
+      throw new AppError('Network');
+    });
+    const opts = { force: true };
+    expect(await refreshPostsHead(client, KEY_A, fetch, T0, createLogger(), undefined, opts)).toBe('failed');
+    fetch.mockResolvedValue(page(range(0, 20), 'c20'));
+    expect(await refreshPostsHead(client, KEY_A, fetch, T0, undefined, undefined, opts)).toBe('unchanged');
+  });
+});

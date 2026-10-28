@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { FlashListRef } from '@shopify/flash-list';
-import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
+import { StyleSheet, TVFocusGuideView, View, useWindowDimensions } from 'react-native';
 import type { HttpClient } from '../../shared/api';
 import { videoDisplayTitle, type MediaRef, type Post } from '../../shared/entities/post';
 import {
@@ -20,11 +21,14 @@ import {
   type ProgressEntry,
 } from '../../shared/services/progress';
 import {
+  Button,
   PostCardSkeleton,
   StateView,
   Text,
   requestHostFocus,
   spacing,
+  colors,
+  components,
   typography,
   useHeadChangeRefocus,
   useHeldRowAutoFetch,
@@ -51,6 +55,7 @@ import {
   continueNeighbour,
   type ContinueItem,
 } from './ContinueRow';
+import { manualRefreshFeed } from './feedRefresh';
 import { useSubscriptionFeed } from './useSubscriptionFeed';
 
 /** Focus id of «Повторить» on the offline StateView (docs/focus-map.md §3). */
@@ -59,9 +64,24 @@ export const HOME_OFFLINE_RETRY_ID = 'home/offline/retry';
 export const HOME_STATE_ACTION_ID = 'state/home/action';
 /** FocusRestoration section of Главная (the Shell's section id). */
 export const HOME_SECTION = 'home';
+/** «Обновить» in the feed's title row (Story 5.1, docs/focus-map.md §3 B). */
+export const HOME_REFRESH_ID = 'home/refresh';
 
 const SKELETON_ROWS = 2;
 const HEADER_HEIGHT = typography.section.lineHeight;
+/**
+ * The ↓ guide under «Обновить» (Story 5.1): a thin band right under the
+ * button, with its width, so Android's focus search ↓ from the button finds
+ * it before any card and it redirects to the remembered feed card.
+ */
+const DOWN_GUIDE_HEIGHT = spacing['2'];
+/** The grid phase's title row: «Новое в подписках» + «Обновить», then the ↓ band. */
+const TITLE_ROW_HEIGHT =
+  Math.max(HEADER_HEIGHT, components['button-small'].height) + DOWN_GUIDE_HEIGHT;
+
+/** Where the last Shell focus was, for the title row's guides (Story 5.1). */
+type TitleFocus = 'refresh' | 'continue' | 'other';
+type RefreshState = 'idle' | 'busy' | 'failed';
 
 /** What the Shell tells Главная about focus (it owns the zones). */
 export type HomeFocusInfo = {
@@ -209,7 +229,7 @@ export function HomeScreen({
   // (window − 2 × safe-y) minus the header and the grid's top gap. With the
   // Continue row, the feed title scrolls with the grid (the list header).
   const listHeight =
-    windowHeight - 2 * spacing['safe-y'] - (showContinue ? 0 : HEADER_HEIGHT) - FEED_LIST_TOP_GAP;
+    windowHeight - 2 * spacing['safe-y'] - (showContinue ? 0 : TITLE_ROW_HEIGHT) - FEED_LIST_TOP_GAP;
 
   const listRef = useRef<FlashListRef<FeedRowItem>>(null);
   // The grid's posts (`useShownGridPosts` over PostGrid's
@@ -414,7 +434,11 @@ export function HomeScreen({
     if (phase === 'offline') {
       // Opened with OK while offline: «Повторить» (Story 2.5 behavior; the
       // Shell leaves Главная's content focus to this screen).
-      if (mountFocus && mayTakeFocus()) {
+      // Also when «Обновить» had focus and went away with the grid.
+      if (
+        (mountFocus && mayTakeFocus()) ||
+        (focusRef.current.isActive() && focusRef.current.current() === HOME_REFRESH_ID)
+      ) {
         takeActionFocus(HOME_OFFLINE_RETRY_ID, offlineRetryView.current);
       }
     } else if (phase === 'grid') {
@@ -432,11 +456,14 @@ export function HomeScreen({
       }
     } else if (
       (mountFocus && mayTakeFocus()) ||
-      (focusRef.current.isActive() && focusRef.current.current() === HOME_STATE_ACTION_ID)
+      (focusRef.current.isActive() &&
+        (focusRef.current.current() === HOME_STATE_ACTION_ID ||
+          focusRef.current.current() === HOME_REFRESH_ID))
     ) {
       // Empty or error: focus stays on the sidebar (as for the offline view,
       // Story 2.5), unless the section was opened with OK or the previous
-      // StateView action had focus (its view was replaced).
+      // StateView action had focus (its view was replaced), or «Обновить»
+      // had it and went away with the grid (an empty last page 1, Story 5.1).
       takeActionFocus(HOME_STATE_ACTION_ID, stateActionView.current);
     }
     pendingMountFocus.current = false;
@@ -577,6 +604,126 @@ export function HomeScreen({
     () => focusRef.current.isActive() && focusRef.current.current() === FEED_RETRY_ID,
   );
 
+  // «Обновить» (Story 5.1, FEED-03): a forced head refresh of the feed and
+  // the subscriptions. Busy: «Обновляем…», focus kept, OK ignored; a failure
+  // keeps every card and shows a short inline error; the next press tries
+  // again. The remembered feed card is kept (↓ returns to it).
+  const queryClient = useQueryClient();
+  const [refresh, setRefresh] = useState<RefreshState>('idle');
+  const refreshRunning = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const httpRef = useLatestRef(http);
+  // The inline error is about the last press only: new feed data (any
+  // write, e.g. a later resume refresh) or leaving the grid clears it.
+  useEffect(() => {
+    setRefresh(current => (current === 'failed' ? 'idle' : current));
+  }, [feed.dataUpdatedAt, phase]);
+  const onRefresh = useCallback(() => {
+    if (refreshRunning.current) {
+      return;
+    }
+    refreshRunning.current = true;
+    // OK on «Обновить» is a move (the head-follow rule never takes it).
+    latch.move();
+    setRefresh('busy');
+    manualRefreshFeed(queryClient, httpRef.current, Date.now())
+      .catch(() => 'failed' as const)
+      .then(result => {
+        refreshRunning.current = false;
+        if (mounted.current) {
+          setRefresh(result === 'failed' ? 'failed' : 'idle');
+        }
+      });
+  }, [latch, queryClient, httpRef]);
+
+  // The title row's focus moves (docs/focus-map.md §3 B, Story 5.1):
+  // - ↑ from the first feed row → «Обновить»: the row is a guide whose
+  //   destination is the button;
+  // - ↓ from «Обновить» → the remembered feed card (by id), else its
+  //   neighbour by index, else the first card: the band under the button;
+  // - ↑ from «Обновить» → the Continue row's guide (native), ← → the sidebar
+  //   (native, like the first column);
+  // - while a Continue card has focus the row is no guide and the button is
+  //   not focusable, so ↓ from the row keeps its column (Story 4.7).
+  const [titleFocus, setTitleFocus] = useState<TitleFocus>('other');
+  const lastFeedCard = useRef<{ id: string; index: number } | null>(null);
+  if (lastFeedCard.current === null) {
+    const entry = focusRestoration.peek(routeKey, HOME_SECTION);
+    if (entry?.focusId.startsWith(FEED_CARD_PREFIX) && entry.focusId !== FEED_RETRY_ID) {
+      lastFeedCard.current = { id: entry.focusId, index: entry.index ?? 0 };
+    }
+  }
+  useEffect(
+    () =>
+      focus.onFocusChange(focusId => {
+        if (focusId.startsWith(FEED_CARD_PREFIX) && focusId !== FEED_RETRY_ID) {
+          const index = idsRef.current.indexOf(focusId);
+          lastFeedCard.current = { id: focusId, index: Math.max(index, 0) };
+        }
+        setTitleFocus(
+          focusId === HOME_REFRESH_ID
+            ? 'refresh'
+            : focusId.startsWith(CONTINUE_CARD_PREFIX)
+              ? 'continue'
+              : 'other',
+        );
+      }),
+    [focus],
+  );
+  const refreshZone = useZoneItem(HOME_REFRESH_ID);
+  const [refreshView, setRefreshView] = useState<HostView | null>(null);
+  // The button reports focus to the content zone (Back, the Shell's focus
+  // tracking) but does not register its view there: the zone's fallback
+  // destination is the first registered item, and the button mounts before
+  // the grid's cards, so → from the sidebar would land on it instead of a
+  // card (focus-map §3 B: → returns to the remembered card).
+  const refreshRef = useCallback((view: HostView | null) => setRefreshView(view), []);
+  const [downTarget, setDownTarget] = useState<HostView | null>(null);
+  useEffect(() => {
+    if (titleFocus !== 'refresh') {
+      setDownTarget(null);
+      return;
+    }
+    const pick = () => {
+      const remembered = lastFeedCard.current;
+      const id =
+        remembered === null
+          ? ids[0]
+          : ids.includes(remembered.id)
+            ? remembered.id
+            : ids[Math.min(remembered.index, ids.length - 1)];
+      return (
+        (id !== undefined ? restoration.viewOf(id) : null) ??
+        (ids[0] !== undefined ? restoration.viewOf(ids[0]) : null)
+      );
+    };
+    setDownTarget(pick());
+    // A row that mounts after the list's layout pass (a regroup after a
+    // merge): look again on the next frame.
+    const frame = requestAnimationFrame(() => setDownTarget(pick()));
+    return () => cancelAnimationFrame(frame);
+  }, [titleFocus, ids, restoration]);
+
+  const titleRow =
+    phase === 'grid' ? (
+      <FeedTitleRow
+        refresh={refresh}
+        onRefresh={onRefresh}
+        buttonRef={refreshRef}
+        onButtonFocus={refreshZone.onFocus}
+        buttonFocusable={titleFocus !== 'continue'}
+        rowDestination={titleFocus === 'continue' ? null : refreshView}
+        downDestination={titleFocus === 'refresh' ? downTarget : null}
+        inList={showContinue}
+      />
+    ) : null;
+
   if (phase === 'offline' && offline) {
     return (
       <View testID="home/offline" style={styles.centered}>
@@ -599,7 +746,11 @@ export function HomeScreen({
 
   return (
     <View testID="home/feed" style={styles.root}>
-      {phase === 'grid' && showContinue ? null : (
+      {phase === 'grid' ? (
+        showContinue ? null : (
+          titleRow
+        )
+      ) : (
         <Text variant="section" accessibilityRole="header" style={styles.header}>
           {t('home.feed.title')}
         </Text>
@@ -677,6 +828,7 @@ export function HomeScreen({
                 items={continueItems}
                 restoration={restoration}
                 onCardPress={onContinuePress}
+                titleRow={titleRow}
               />
             ) : null
           }
@@ -688,27 +840,140 @@ export function HomeScreen({
 
 /**
  * The grid's list header with the Continue row (Story 4.7): the row, then
- * «Новое в подписках» (it scrolls with the grid here).
+ * the feed's title row (it scrolls with the grid here).
  */
-function ContinueHeader(props: {
+function ContinueHeader({
+  titleRow,
+  ...props
+}: {
   items: readonly ContinueItem[];
   restoration: ReturnType<typeof useFocusRestoration>;
   onCardPress: (id: string) => void;
+  titleRow: ReactNode;
 }) {
   return (
     <View testID="home/header">
       <ContinueRow {...props} />
-      <Text variant="section" accessibilityRole="header" style={styles.feedTitle}>
-        {t('home.feed.title')}
-      </Text>
+      {titleRow}
     </View>
   );
 }
 
+/**
+ * The feed's title row in the grid phase (Story 5.1): «Новое в подписках»,
+ * the secondary small «Обновить» (busy: «Обновляем…») and, after a failed
+ * refresh, a short inline error. The row is a focus guide to the button
+ * (↑ from the first feed row); the band under it is a guide to the
+ * remembered feed card (↓ from the button). See HomeScreen for the rules.
+ */
+function FeedTitleRow({
+  refresh,
+  onRefresh,
+  buttonRef,
+  onButtonFocus,
+  buttonFocusable,
+  rowDestination,
+  downDestination,
+  inList,
+}: {
+  refresh: RefreshState;
+  onRefresh: () => void;
+  buttonRef: (view: HostView | null) => void;
+  onButtonFocus: () => void;
+  buttonFocusable: boolean;
+  rowDestination: HostView | null;
+  downDestination: HostView | null;
+  inList: boolean;
+}) {
+  const rowDestinations = useMemo(() => (rowDestination ? [rowDestination] : []), [rowDestination]);
+  const downDestinations = useMemo(
+    () => (downDestination ? [downDestination] : []),
+    [downDestination],
+  );
+  return (
+    <TVFocusGuideView
+      testID="home/title-row"
+      destinations={rowDestinations}
+      // → from «Обновить» does nothing (no edge transition; device check:
+      // it reached the feed card to the lower right).
+      trapFocusRight
+      style={inList ? styles.titleRowInList : styles.titleRow}
+    >
+      <View style={styles.titleBox}>
+        <Text variant="section" accessibilityRole="header">
+          {t('home.feed.title')}
+        </Text>
+      </View>
+      {/*
+        The ↓ band sits right under the button with the button's width:
+        Android's focus search weighs the distance between centers, so a
+        full-width band would lose to the card under the button (device
+        check, Story 5.1).
+      */}
+      <View style={styles.refreshColumn}>
+        <Button
+          ref={buttonRef}
+          testID={HOME_REFRESH_ID}
+          kind="secondary"
+          size="small"
+          label={t('home.refresh')}
+          busyLabel={t('home.refreshing')}
+          busyAccessibilityLabel={t('home.refreshingA11y')}
+          accessibilityLabel={t('home.refreshA11y')}
+          busy={refresh === 'busy'}
+          focusable={buttonFocusable}
+          onPress={onRefresh}
+          onFocus={onButtonFocus}
+        />
+        <TVFocusGuideView
+          testID="home/refresh/down-guide"
+          destinations={downDestinations}
+          style={styles.downGuide}
+        />
+      </View>
+      {refresh === 'failed' ? (
+        <View style={styles.titleBox}>
+          <Text
+            testID="home/refresh/error"
+            variant="body-s"
+            numberOfLines={1}
+            accessibilityLiveRegion="polite"
+            style={styles.refreshError}
+          >
+            {t('home.refreshFailed')}
+          </Text>
+        </View>
+      ) : null}
+    </TVFocusGuideView>
+  );
+}
+
 const styles = StyleSheet.create({
-  feedTitle: {
-    height: HEADER_HEIGHT,
+  titleRow: {
+    height: TITLE_ROW_HEIGHT,
+    marginLeft: spacing['focus-headroom'],
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  titleRowInList: {
+    height: TITLE_ROW_HEIGHT,
     marginTop: spacing['4'],
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  titleBox: {
+    height: components['button-small'].height,
+    justifyContent: 'center',
+  },
+  refreshColumn: {
+    marginLeft: spacing['6'],
+  },
+  refreshError: {
+    marginLeft: spacing['6'],
+    color: colors['error-text'],
+  },
+  downGuide: {
+    height: DOWN_GUIDE_HEIGHT,
   },
   root: {
     flex: 1,
