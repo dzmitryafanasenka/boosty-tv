@@ -10,7 +10,7 @@ import {
   authorCardWidth,
 } from '../AuthorCard';
 import { t } from '../../i18n';
-import { components, focus, spacing } from '../tokens';
+import { colors, components, focus, spacing } from '../tokens';
 
 const ID = 'tile';
 const evt = { nativeEvent: {} };
@@ -24,10 +24,10 @@ const author = (overrides: Partial<Author> = {}): Author => ({
   ...overrides,
 });
 
-async function render(a: Author): Promise<Root> {
+async function render(a: Author, label?: string): Promise<Root> {
   const root = createRoot();
   await act(async () => {
-    root.render(<AuthorCard author={a} width={WIDTH} testID={ID} />);
+    root.render(<AuthorCard author={a} width={WIDTH} testID={ID} label={label} />);
   });
   return root;
 }
@@ -190,8 +190,8 @@ describe('AuthorCard native view budget (Story 3.1 device profiling)', () => {
   /** Style keys that keep a View from being flattened away by Fabric. */
   const PAINT = /^(background|border|opacity|transform|overflow|shadow|elevation|zIndex)/;
 
-  async function count(a: Author) {
-    const root = await render(a);
+  async function count(a: Author, label?: string) {
+    const root = await render(a, label);
     const hosts = root.container.queryAll(n => typeof n.type === 'string');
     const native = hosts.filter(n => {
       if (n.type !== 'View') {
@@ -215,5 +215,48 @@ describe('AuthorCard native view budget (Story 3.1 device profiling)', () => {
     const { hosts, native } = await count(author());
     expect(native).toBeLessThanOrEqual(5);
     expect(hosts).toBeLessThanOrEqual(6);
+  });
+
+  it('a labelled tile («Мой блог»): the label adds its tint view and its text only (≤ 7 native views)', async () => {
+    const { hosts, native } = await count(author(), 'Мой блог');
+    expect(native).toBeLessThanOrEqual(7);
+    expect(hosts).toBeLessThanOrEqual(8);
+  });
+});
+
+describe('AuthorCard «Мой блог» label (Story 5.2, UX-DR7)', () => {
+  it('a tinted label above the name: accent-tint background, accent-text text; first in the a11y label', async () => {
+    const root = await render(author(), t('subs.myBlog'));
+    const [label] = byId(root, `${ID}/label`);
+    expect(label).toBeDefined();
+    expect(StyleSheet.flatten(label.props.style).backgroundColor).toBe(colors['accent-tint']);
+    expect(json(root)).toContain('Мой блог');
+    expect(json(root)).toContain(colors['accent-text']);
+    expect(host(root).props.accessibilityLabel).toBe('Мой блог. Марина Лебедева. Кухня без спешки');
+    expect(authorCardA11yLabel(author({ ownerName: null }), 'Мой блог')).toBe(
+      'Мой блог. Кухня без спешки',
+    );
+    // Still one focusable element; the label is not focusable.
+    expect(root.container.queryAll(n => n.props.focusable === true)).toHaveLength(1);
+    await act(async () => root.unmount());
+  });
+
+  it('a long owner name with the label: one name line (fits the fixed card height); two without', async () => {
+    const long = author({ ownerName: 'Очень длинное имя владельца блога, которое не помещается в одну строку' });
+    const nameLines = (root: Root) => byId(root, `${ID}/owner`)[0].props.numberOfLines;
+    const labelled = await render(long, 'Мой блог');
+    expect(nameLines(labelled)).toBe(1);
+    expect(byId(labelled, `${ID}/title`)[0].props.numberOfLines).toBe(1);
+    // label (badge 13 + 2 × 1) + gap 2 + one name line 16 + gap 2 + title 15 ≤ 76.
+    await act(async () => labelled.unmount());
+    const plain = await render(long);
+    expect(nameLines(plain)).toBe(2);
+    await act(async () => plain.unmount());
+  });
+
+  it('no label prop: no label view', async () => {
+    const root = await render(author());
+    expect(byId(root, `${ID}/label`)).toHaveLength(0);
+    await act(async () => root.unmount());
   });
 });

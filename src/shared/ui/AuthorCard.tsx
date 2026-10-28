@@ -9,8 +9,9 @@ import { colors, components, rounded, spacing } from './tokens';
 
 /**
  * DESIGN.md AuthorCard (Story 3.2): the avatar on the left, then the blog
- * title (2 lines) and the owner name (1 line). No «Мой блог» label yet (its
- * flag is off), no price, no subscribe or manage action.
+ * title (2 lines) and the owner name (1 line), and an optional tinted label
+ * above them (`label`: «Мой блог», Story 5.2; `accent-tint` background,
+ * `accent-text` text). No price, no subscribe or manage action.
  *
  * The width is the grid's: the token width (232) leaves no horizontal focus
  * headroom in the 720 dp content (3 × 232 + 2 × 12 = 720), so the grid
@@ -54,11 +55,15 @@ export function authorSecondaryLine(author: Author): string | null {
   return title.length > 0 && same(title) !== same(author.ownerName) ? title : null;
 }
 
-/** «{name}. {title}», or the main line alone. */
-export function authorCardA11yLabel(author: Author): string {
+/**
+ * «{name}. {title}», or the main line alone; with a label first: «Мой блог.
+ * {name}. {title}».
+ */
+export function authorCardA11yLabel(author: Author, label?: string): string {
   const name = authorPrimaryName(author);
   const title = authorSecondaryLine(author);
-  return title !== null ? tf('authorCard.a11y', { name, title }) : name;
+  const rest = title !== null ? tf('authorCard.a11y', { name, title }) : name;
+  return label ? tf('authorCard.a11yLabelled', { label, rest }) : rest;
 }
 
 export type AuthorCardProps = {
@@ -70,6 +75,8 @@ export type AuthorCardProps = {
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
   ref?: Ref<HostView>;
+  /** A tinted label above the name («Мой блог», Story 5.2); none when absent. */
+  label?: string;
 };
 
 /**
@@ -118,6 +125,7 @@ export function AuthorCardView({
   onPress,
   style,
   ref,
+  label,
 }: AuthorCardProps) {
   const secondary = authorSecondaryLine(author);
   return (
@@ -127,7 +135,7 @@ export function AuthorCardView({
       radius={TOKENS.radius}
       scaleFocus={TOKENS.scaleFocus}
       accessibilityRole="button"
-      accessibilityLabel={authorCardA11yLabel(author)}
+      accessibilityLabel={authorCardA11yLabel(author, label)}
       onFocus={onFocus}
       onPress={onPress}
       style={style}
@@ -145,11 +153,20 @@ export function AuthorCardView({
         <>
           <AuthorAvatar url={author.avatarUrl} testID={testID ? `${testID}/avatar` : undefined} />
           <View style={styles.text}>
+            {label ? (
+              <View testID={testID ? `${testID}/label` : undefined} style={styles.label}>
+                <Text variant="badge" color="accent-text" numberOfLines={1}>
+                  {label}
+                </Text>
+              </View>
+            ) : null}
             <Text
               testID={testID ? `${testID}/${author.ownerName !== null ? 'owner' : 'title'}` : undefined}
               variant="card-title"
               color={focused ? 'text' : 'text-card'}
-              numberOfLines={2}
+              // With the label the card has room for one name line only
+              // (label 15 + 2 + 16 + 2 + 15 within the fixed height 76).
+              numberOfLines={label ? 1 : 2}
             >
               {authorPrimaryName(author)}
             </Text>
@@ -230,6 +247,16 @@ const styles = StyleSheet.create({
   },
   secondary: {
     marginTop: OWNER_GAP,
+  },
+  // DESIGN.md: the «Мой блог» tint label (design 30 px high, 12 px padding,
+  // radius 8, 600 weight): `badge` text on `accent-tint`.
+  label: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing['3'],
+    paddingVertical: spacing['1'] / 2,
+    marginBottom: OWNER_GAP,
+    borderRadius: rounded.sm,
+    backgroundColor: colors['accent-tint'],
   },
   skeleton: {
     backgroundColor: colors.skeleton,

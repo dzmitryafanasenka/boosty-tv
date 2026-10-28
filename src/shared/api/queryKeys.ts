@@ -10,6 +10,12 @@ export const queryKeys = {
   /** E2 the subscribed authors (Story 3.2), one request, no paging. */
   subscriptions: () => ['subscriptions'] as const,
   /**
+   * E1 the account's profile (Story 5.2, `UserRepository.current`: «Мой
+   * блог»). Separate from the session's own E1 (validate), which is not a
+   * query. Account-scoped like every key (the cache is cleared on sign-out).
+   */
+  me: () => ['me'] as const,
+  /**
    * E3 a blog's header (Story 3.3). `blogUrl` is the blog's identity (AD-9),
    * not a URL. Separate roots for E3 and E4, so one never prefix-matches
    * the other.

@@ -35,8 +35,12 @@ import {
   syntheticBlogPosts,
 } from '../src/test/authorFixtures';
 import { E5_PATH, cursorFor, cursorOf, e5Page, lockedPost } from '../src/test/feedFixtures';
-import e1Ok from '../src/test/fixtures/boosty/e1-user-current.json';
-import { E2_PATH, blogUrlOf, subscriptionsBody } from '../src/test/subscriptionFixtures';
+import {
+  E2_PATH,
+  blogUrlOf,
+  e1NoBlogBody,
+  subscriptionsBody,
+} from '../src/test/subscriptionFixtures';
 import {
   byTestId,
   clearNativeModules,
@@ -134,7 +138,7 @@ beforeEach(() => {
   e4 = syntheticBlogPosts({ blogUrl: BLOG, total: 7 });
   transport = installFixtureTransport(req => {
     if (req.path === E1) {
-      return { status: 200, body: e1Ok.body };
+      return { status: 200, body: e1NoBlogBody() };
     }
     if (req.path === E5_PATH) {
       return { status: 200, body: e5Page() };
@@ -368,8 +372,9 @@ describe('content (matrix «No posts», «Locked posts», «Malformed post»)', 
     await settle();
     expect(authorCards(root)).toEqual([CARD('locked-1'), CARD('locked-2')]);
     expect(visible(root, `${CARD('locked-2')}/lock`)).toBe(true);
-    // Only the cold-start E1 and one E4; the Author page never asks for more.
-    expect(transport.callsTo(E1)).toHaveLength(1);
+    // Only the cold-start E1, Подписки's profile E1 («Мой блог», Story 5.2)
+    // and one E4; the Author page never asks for more.
+    expect(transport.callsTo(E1)).toHaveLength(2);
     expect(e4Calls()).toHaveLength(1);
     expect(transport.callsTo('/oauth/token/')).toHaveLength(0);
     expect(visible(root, 'author')).toBe(true);

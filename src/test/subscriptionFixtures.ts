@@ -8,7 +8,9 @@
  * - `subscription(n)`: item `n` cloned from a live item with a synthetic
  *   `blogUrl` (`synthetic-blog-<n>`) and title (`Blog <n>`).
  * - `subscriptionsBody(count, total)`: `count` synthetic items and `total`.
+ * - `e1NoBlogBody()`: E1 without `blogUrl` (no «Мой блог», Story 5.2).
  */
+import e1UserCurrent from './fixtures/boosty/e1-user-current.json';
 import e2Subscriptions from './fixtures/boosty/e2-subscriptions.json';
 
 export const E2_PATH = '/v1/user/subscriptions';
@@ -50,4 +52,15 @@ export function subscriptionsBody(count: number, total: number = count): Json {
     total,
     data: Array.from({ length: count }, (_, i) => subscription(i + 1)),
   };
+}
+
+/**
+ * The E1 body of an account without its own blog (Story 5.2): the live E1
+ * fixture without `blogUrl`, so Подписки shows no «Мой блог» and sends no
+ * E3/E4 for it. Flows that are not about «Мой блог» answer E1 with it.
+ */
+export function e1NoBlogBody(): Json {
+  const body = clone(e1UserCurrent.body) as Json;
+  delete body.blogUrl;
+  return body;
 }

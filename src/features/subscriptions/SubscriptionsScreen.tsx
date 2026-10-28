@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { FlashListRef } from '@shopify/flash-list';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import type { HttpClient } from '../../shared/api';
+import type { Author } from '../../shared/entities/author';
 import {
   focusRestoration,
   mayTakeScreenFocus,
@@ -22,16 +23,17 @@ import {
   type HostView,
 } from '../../shared/ui';
 import {
+  MY_BLOG_TILE_ID,
   SUBS_COLUMNS,
   SUBS_LIST_TOP_GAP,
-  SUBS_TILE_PREFIX,
   SUBS_TILE_WIDTH,
   SubscriptionsGrid,
+  isSubsTileId,
   subsListAdapter,
   subsTileId,
   type SubsRowItem,
 } from './SubscriptionsGrid';
-import { useSubscriptions } from './useSubscriptions';
+import { useMyBlog, useSubscriptions } from './useSubscriptions';
 
 /** The error StateView's single action (focus-map §1.5 `state/<screen>/action`). */
 export const SUBS_STATE_ACTION_ID = 'state/subs/action';
@@ -71,6 +73,11 @@ export type SubscriptionsScreenProps = {
   focus: SubscriptionsFocusInfo;
   /** OK on a tile: open the Author page (Story 3.3). */
   onOpenAuthor?: (blogUrl: string) => void;
+  /**
+   * `phaseFlags.myBlog` (AD-20, from the Shell; features cannot import
+   * `app`). Off: no profile E1 and no «Мой блог» tile.
+   */
+  myBlogEnabled?: boolean;
 };
 
 type Phase = 'loading' | 'error' | 'empty' | 'grid';
@@ -95,6 +102,13 @@ type Phase = 'loading' | 'error' | 'empty' | 'grid';
  *   `blogUrl` with the fallback chain (neighbor by index → first tile →
  *   the sidebar item), at the same scroll.
  *
+ * «Мой блог» (Story 5.2, focus-map §3 C): when the account's own blog has a
+ * post, its tile (`subs/mine`, tinted label) is the first tile and
+ * the initial focus: the skeleton stays until the check settles (E1, then
+ * E3 and E4 page 1); a failure means no tile and no error. The own blog is
+ * shown once: as «Мой блог», not again among the subscriptions. A tile that
+ * arrives (or goes) later never moves focus off the focused tile.
+ *
  * The response reached the E2 limit and `total > 30`: «Показаны первые N»
  * (N = tiles shown) next to the header, not focusable; no paging
  * (unverified, api-contract §5).
@@ -105,8 +119,19 @@ export function SubscriptionsScreen({
   focusOnMount = false,
   focus,
   onOpenAuthor,
+  myBlogEnabled = false,
 }: SubscriptionsScreenProps) {
   const subs = useSubscriptions(http);
+  const myBlog = useMyBlog(http, myBlogEnabled);
+  const mine = myBlog.author;
+  // «Мой блог» first; the own blog is not repeated among the subscriptions.
+  const authors = useMemo<Author[]>(
+    () =>
+      mine === null
+        ? subs.authors
+        : [mine, ...subs.authors.filter(a => a.blogUrl !== mine.blogUrl)],
+    [mine, subs.authors],
+  );
   const windowHeight = useWindowDimensions().height;
   // A bounded viewport (Story 2.4 device lesson): the content zone's height
   // (window − 2 × safe-y) minus the header and the grid's top gap.
@@ -114,7 +139,11 @@ export function SubscriptionsScreen({
 
   const listRef = useRef<FlashListRef<SubsRowItem>>(null);
   const adapterRef = useRef(subsListAdapter(listRef));
-  const ids = useMemo(() => subs.authors.map(a => subsTileId(a.blogUrl)), [subs.authors]);
+  const ids = useMemo(
+    () =>
+      authors.map((a, i) => (i === 0 && mine !== null ? MY_BLOG_TILE_ID : subsTileId(a.blogUrl))),
+    [authors, mine],
+  );
   // Scroll on return: mounted with cached tiles, the grid opens at the
   // remembered tile's row, so it is mounted when restoration focuses it.
   const [initialRow] = useState(() => {
@@ -135,8 +164,8 @@ export function SubscriptionsScreen({
     },
     [stateAction],
   );
-  // Nothing above the grid («Мой блог» is off): the StateView action when
-  // shown, else give up to the sidebar item.
+  // Nothing above the grid («Мой блог» is a grid tile, not a row above
+  // it): the StateView action when shown, else give up to the sidebar item.
   const focusAbove = useCallback(() => {
     if (stateActionView.current) {
       requestHostFocus(stateActionView.current);
@@ -157,7 +186,7 @@ export function SubscriptionsScreen({
       current === null ||
       current === info.sectionItemId ||
       current === SUBS_STATE_ACTION_ID ||
-      current.startsWith(SUBS_TILE_PREFIX)
+      isSubsTileId(current)
     );
   }, []);
 
@@ -190,13 +219,30 @@ export function SubscriptionsScreen({
     restoreElseFirst(restoration);
   }, [restoration]);
 
+  // «Мой блог» holds the skeleton only on the first load (E2 not cached when
+  // Подписки mounted) and only until Подписки first settles, so a shown tile
+  // is the initial focus. A mount over a cached grid, or a later check (a
+  // `blogUrl` that appears, a refetch), never shows the skeleton: the tile
+  // just arrives without moving focus.
+  const [firstLoad] = useState(() => subs.isPending);
+  const [settled, setSettled] = useState(false);
+  const nowSettled = !subs.isPending && !myBlog.isPending;
+  useEffect(() => {
+    if (nowSettled) {
+      setSettled(true);
+    }
+  }, [nowSettled]);
+  const holdForMyBlog = firstLoad && !settled && myBlog.isPending;
+
   const phase: Phase = subs.isPending
     ? 'loading'
     : subs.error !== null
       ? 'error'
-      : subs.authors.length === 0
-        ? 'empty'
-        : 'grid';
+      : holdForMyBlog
+        ? 'loading'
+        : authors.length === 0
+          ? 'empty'
+          : 'grid';
 
   const pendingMountFocus = useRef(focusOnMount);
   /** The user has not moved focus away from where Подписки may take it. */
@@ -235,7 +281,7 @@ export function SubscriptionsScreen({
       if (
         info.isActive() &&
         current !== null &&
-        (current === SUBS_STATE_ACTION_ID || current.startsWith(SUBS_TILE_PREFIX))
+        (current === SUBS_STATE_ACTION_ID || isSubsTileId(current))
       ) {
         // Empty while the error action or a tile had focus (a retry, or a
         // background refetch that emptied the grid): that view is gone and
@@ -274,10 +320,19 @@ export function SubscriptionsScreen({
   // focus. The trigger is that change of the ids, never frame timing. A
   // focused tile that is still shown is scrolled into view at its new index
   // and focused again; a tile that is gone follows the fallback chain.
+  //
+  // «Мой блог» and the own blog's plain tile are the same tile: when the
+  // focused plain tile is deduped by an arriving «Мой блог» (or «Мой блог»
+  // goes while the blog is still a subscription), focus moves to the other
+  // id of that blog instead of a neighbour.
   const lastIds = useRef(ids);
+  const ownBlogUrl = mine?.blogUrl ?? null;
+  const lastOwnBlogUrl = useRef(ownBlogUrl);
   useLayoutEffect(() => {
     const previous = lastIds.current;
     lastIds.current = ids;
+    const previousOwn = lastOwnBlogUrl.current;
+    lastOwnBlogUrl.current = ownBlogUrl;
     if (previous.length === 0 || ids.length === 0 || previous === ids) {
       return;
     }
@@ -289,7 +344,7 @@ export function SubscriptionsScreen({
       return;
     }
     const focused = focusRef.current.current();
-    if (focused === null || !focused.startsWith(SUBS_TILE_PREFIX)) {
+    if (focused === null || !isSubsTileId(focused)) {
       // A restore still waiting for its tile: re-resolve it against the new
       // ids (the awaited tile may be gone).
       if (focusPending.current) {
@@ -297,22 +352,34 @@ export function SubscriptionsScreen({
       }
       return;
     }
-    const index = ids.indexOf(focused);
+    let target = focused;
+    if (!ids.includes(focused)) {
+      if (focused === MY_BLOG_TILE_ID && previousOwn !== null) {
+        target = subsTileId(previousOwn);
+      } else if (ownBlogUrl !== null && focused === subsTileId(ownBlogUrl)) {
+        target = MY_BLOG_TILE_ID;
+      }
+    }
+    const index = ids.indexOf(target);
     if (index < 0) {
       restoreOrFirst();
       return;
     }
     const before = previous.indexOf(focused);
     const rowStart = (i: number) => i - (i % SUBS_COLUMNS);
-    if (before === index && previous[rowStart(before)] === ids[rowStart(index)]) {
+    if (
+      target === focused &&
+      before === index &&
+      previous[rowStart(before)] === ids[rowStart(index)]
+    ) {
       // Same index, same row key: the tile's row did not remount.
       return;
     }
     if (before !== index) {
       adapterRef.current.scrollToIndex({ index, animated: false, viewPosition: 0.5 });
     }
-    restoration.focusItem(focused);
-  }, [ids, canFocus, restoration, restoreOrFirst]);
+    restoration.focusItem(target);
+  }, [ids, ownBlogUrl, canFocus, restoration, restoreOrFirst]);
 
   return (
     <View testID="subs" style={styles.root}>
@@ -379,7 +446,8 @@ export function SubscriptionsScreen({
       ) : null}
       {phase === 'grid' ? (
         <SubscriptionsGrid
-          authors={subs.authors}
+          authors={authors}
+          firstIsMyBlog={mine !== null}
           height={listHeight}
           restoration={gridRestoration}
           listRef={listRef}

@@ -15,7 +15,7 @@ import type { HttpClient } from '../shared/api';
 import type { MediaRef } from '../shared/entities/post';
 import { FocusZone, Screen, type FocusZoneHandle } from '../shared/focus';
 import { requestHostFocus, type HostView } from '../shared/ui';
-import { enabledSections, type SectionId } from './phaseFlags';
+import { enabledSections, phaseFlags, type SectionId } from './phaseFlags';
 import { NAV_ID, Sidebar, sidebarLayout, useSidebarNav } from './Sidebar';
 
 export type ShellProps = {
@@ -389,6 +389,7 @@ function SectionContent({
           focusOnMount={focusContent}
           focus={subsFocus}
           onOpenAuthor={onOpenAuthor}
+          myBlogEnabled={phaseFlags.myBlog}
         />
       );
     // Phase-gated off (phaseFlags): never rendered.

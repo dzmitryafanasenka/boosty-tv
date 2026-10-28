@@ -16,7 +16,8 @@ import type { ReadResult, SecureStore } from '../../shared/platform/secureStore'
  * confirm synthetic tokens (so a demo sign-in on A5 lands; the id differs
  * from the stored `demo`, so it runs the account-switch hook, Story 2.8),
  * E5 (the feed, Story 3.1) synthetic posts, E2 (Подписки, Story 3.2)
- * synthetic authors, E3/E4 (Автор, Story 3.3: `demo-blog-1` 2 pages,
+ * synthetic authors, E1 the account's own blog `demo-blog-2` (Story 5.2),
+ * E3/E4 (Автор, Story 3.3: `demo-blog-1` 2 pages,
  * `demo-blog-3` no posts, the last demo blog missing), E8 (Пост, Story 3.4:
  * every demo post with several paragraphs and a like count, every fourth
  * one also with image, file, audio, poll and unknown blocks and an inline link;
@@ -119,6 +120,8 @@ const DEMO_BLOG_POSTS: Record<string, number> = {
   'demo-blog-3': 0,
 };
 const BLOG_PAGE = 20;
+/** The demo account's own blog (E1 `blogUrl`, Story 5.2 «Мой блог»). */
+const DEMO_MY_BLOG = 'demo-blog-2';
 /** The demo blog whose E3 answers 404 `blog_not_found` («Автор недоступен»). */
 const DEMO_MISSING_BLOG = `demo-blog-${DEMO_SUBSCRIPTIONS}`;
 
@@ -279,7 +282,9 @@ export function createDemoSessionManager(): SessionManager {
       case '/v1/user/subscriptions':
         return { status: 200, body: demoSubscriptions(), delayMs: 300 };
       case '/v1/user/current':
-        return { status: 200, body: { id: 1001 }, delayMs: 300 };
+        // Story 5.2: the demo account owns `demo-blog-2` (7 posts, also a
+        // subscription), so Подписки shows «Мой блог» first, once.
+        return { status: 200, body: { id: 1001, blogUrl: DEMO_MY_BLOG }, delayMs: 300 };
       case '/auth/phone/verification_code/send':
         return {
           status: 200,

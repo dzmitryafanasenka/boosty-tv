@@ -129,6 +129,8 @@ export const ru = {
     emptyBody: 'Подписаться на авторов можно на сайте или в приложении Boosty. После этого авторы появятся здесь.',
     errorTitle: 'Не удалось загрузить подписки',
     firstOnly: 'Показаны первые {n}',
+    // Story 5.2: the label on the account's own blog tile (AuthorCard).
+    myBlog: 'Мой блог',
   },
   // Автор (Story 3.3, E3 + E4; docs/focus-map.md §4 D). Missing blog (any
   // E3 404; only `blog_not_found` is verified): «Назад» only, no retry. The header reads
@@ -269,6 +271,8 @@ export const ru = {
   // there is no second line.
   authorCard: {
     a11y: '{name}. {title}',
+    // A labelled tile («Мой блог», Story 5.2): «Мой блог. {name}. {title}».
+    a11yLabelled: '{label}. {rest}',
   },
   // Card dates (owner decision 2026-10-26), device local time:
   // «сегодня, 14:30» / «вчера» / «12 окт» (current year) / «12 окт 2025».
