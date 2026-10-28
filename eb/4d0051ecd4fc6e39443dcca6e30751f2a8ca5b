@@ -1,0 +1,41 @@
+__tests__/playerFlow.test.tsx
+  s_67d3a4bcdb9d96::t_50c654d72fd3a8 1287,1290-1291,1293-1334,1696,1712
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_67d3a4bcdb9d96::t_5351245133fb63 227
+_bmad-output/implementation-artifacts/spec-4-5-finishing-a-video.md
+  s_67d3a4bcdb9d96::t_4da2b05707d089 1-50
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_67d3a4bcdb9d96::t_1906337d26fe0d 32,74
+docs/feature-parity.md
+  s_67d3a4bcdb9d96::t_42bb206bc478cd 83
+docs/focus-map.md
+  s_67d3a4bcdb9d96::t_fbe670b134f7e2 319-320
+docs/testing.md
+  s_67d3a4bcdb9d96::t_1cf1c26c377e72 896-899
+src/app/stackRoutes.tsx
+  s_67d3a4bcdb9d96::t_5a63584fc56cd1 8,10,19,355-358,363-364,372,396-412,421
+src/features/player/PlayerScreen.tsx
+  s_67d3a4bcdb9d96::t_1f597f185cc6f3 109-114,171-179,1003,1005-1007,1012-1016,1018
+src/features/post/PostScreen.tsx
+  s_67d3a4bcdb9d96::t_38d8ae5b19a00b 16,31,82-104
+src/features/post/__tests__/endedReturnFocus.test.ts
+  s_67d3a4bcdb9d96::t_1483efabc4049a 1-76
+src/features/post/index.ts
+  s_67d3a4bcdb9d96::t_f61b2994fccf49 4,7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "eb4d0051ecd4fc6e39443dcca6e30751f2a8ca5b",
+  "prompts": {},
+  "sessions": {
+    "s_67d3a4bcdb9d96": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e93f6f61-902b-4690-b071-9acc2f500329",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
