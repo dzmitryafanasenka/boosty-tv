@@ -1,0 +1,83 @@
+__tests__/authorFlow.test.tsx
+  s_67d3a4bcdb9d96::t_525b45634f7242 38-43,141,375-377
+__tests__/demoFlow.test.tsx
+  s_67d3a4bcdb9d96::t_4b6e8a8d097158 111,118-120,122,126
+__tests__/postFlow.test.tsx
+  s_67d3a4bcdb9d96::t_b6dc562b474f47 46-51,171,616
+__tests__/subscriptionsFlow.test.tsx
+  s_67d3a4bcdb9d96::t_1d3d07673cae9d 12,23,28,64-78,105-108,132,134-135,138-141,164-166,632-940
+_bmad-output/implementation-artifacts/spec-5-2-my-blog-tile-in-subscriptions.md
+  s_67d3a4bcdb9d96::t_27b9587acd0779 1-91
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_67d3a4bcdb9d96::t_8c6cb9ed10f2db 32,81
+docs/api-contract.md
+  s_67d3a4bcdb9d96::t_bb046dc15bddb8 245,247-248
+docs/feature-parity.md
+  s_67d3a4bcdb9d96::t_2dc98301480963 54
+docs/focus-map.md
+  s_67d3a4bcdb9d96::t_2d9be8863937ae 60,145,186-194
+docs/testing.md
+  s_67d3a4bcdb9d96::t_cf8f37bb5341c6 896-919
+src/app/Shell.tsx
+  s_67d3a4bcdb9d96::t_25b5088068ba1f 18,392
+src/app/__tests__/phaseFlags.test.ts
+  s_67d3a4bcdb9d96::t_6c4338c26adfe4 3,11,27-31
+src/app/dev/demo.ts
+  s_67d3a4bcdb9d96::t_a264f0f98a3290 19-20,123-124,285-287
+src/app/phaseFlags.ts
+  s_67d3a4bcdb9d96::t_0b6e538f104eaa 11-13,22
+src/features/subscriptions/SubscriptionsGrid.tsx
+  s_67d3a4bcdb9d96::t_cf1bea64bb5514 5,22-29,91-92,102-109,134,144-145,150,160,171-172,191,201-206,208
+src/features/subscriptions/SubscriptionsScreen.tsx
+  s_67d3a4bcdb9d96::t_a9bfc3bd0f3ca8 5,26,31,36,76-80,105-111,122,125-134,142-146,167-168,189,222-236,241-245,284,323-327,329-330,334-335,347,355-363,370-374,381-382,449-450
+src/features/subscriptions/useSubscriptions.ts
+  s_67d3a4bcdb9d96::t_80a347a39e8881 2,14-15,70-155
+src/shared/api/__tests__/queryKeys.test.ts
+  s_67d3a4bcdb9d96::t_20f6a57f435857 24-37
+src/shared/api/dto/userCurrent.ts
+  s_67d3a4bcdb9d96::t_ea8fccd2a33a56 2,6-9,14
+src/shared/entities/post/usePagedPosts.ts
+  s_67d3a4bcdb9d96::t_5fe55478e6ba65 64-69,85,99
+src/shared/entities/user/__tests__/userRepository.test.ts
+  s_67d3a4bcdb9d96::t_fad9d93cf5cd71 1-86
+src/shared/entities/user/index.ts
+  s_67d3a4bcdb9d96::t_dc95400051db4e 1-2
+src/shared/entities/user/types.ts
+  s_67d3a4bcdb9d96::t_c8b3a8010f2ceb 1-13
+src/shared/entities/user/userRepository.ts
+  s_67d3a4bcdb9d96::t_810dfcc4eb6b34 1-26
+src/shared/i18n/ru.ts
+  s_67d3a4bcdb9d96::t_932665f455baad 132-133,274-275
+src/shared/ui/AuthorCard.tsx
+  s_67d3a4bcdb9d96::t_e9f3291af37ee4 12-14,58-62,65-66,78-79,128,138,156-162,167-169,251-260
+src/shared/ui/__tests__/AuthorCard.test.tsx
+  s_67d3a4bcdb9d96::t_40486a1212ca24 13,27,30,193-194,219-261
+src/test/subscriptionFixtures.ts
+  s_67d3a4bcdb9d96::t_b8cfecdd4ca6eb 11,13,56-66
+src/shared/api/queryKeys.ts
+  s_f82d8d9d04b42a::t_f253009293bc26 12-17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "9762eb8d6d76e946523db8345144541944907b58",
+  "prompts": {},
+  "sessions": {
+    "s_67d3a4bcdb9d96": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e93f6f61-902b-4690-b071-9acc2f500329",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_f82d8d9d04b42a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a6adf85d62e203d03",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
