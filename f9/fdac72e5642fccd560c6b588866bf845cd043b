@@ -1,0 +1,85 @@
+__tests__/demoFlow.test.tsx
+  s_67d3a4bcdb9d96::t_140c566a4a001a 12,224-253
+__tests__/homeFeedFlow.test.tsx
+  s_67d3a4bcdb9d96::t_ad255d71e16767 35,2628-2630,2635,2733,2808,2978-3308
+_bmad-output/implementation-artifacts/spec-5-4-filter-by-period.md
+  s_67d3a4bcdb9d96::t_d3f0e08b5b552a 1-123
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_67d3a4bcdb9d96::t_0ab07daa644ea0 32,83
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/SeekKeysModule.kt
+  s_67d3a4bcdb9d96::t_116c1304c48796 13-19,33,60-61
+docs/api-contract.md
+  s_67d3a4bcdb9d96::t_fb059eef6a9587 249,315-342
+docs/feature-parity.md
+  s_67d3a4bcdb9d96::t_89f0140c62a771 69
+docs/focus-map.md
+  s_67d3a4bcdb9d96::t_ae4bbaa69d50e7 17,64,241-247,347,426
+docs/testing.md
+  s_67d3a4bcdb9d96::t_13270f7b5fff78 896-932
+src/app/dev/demo.ts
+  s_67d3a4bcdb9d96::t_1068b5c943658c 87-89,96-97,101-104,114-120
+src/features/home/HomeScreen.tsx
+  s_67d3a4bcdb9d96::t_d10d3e6b0166f6 12,160-165,168-176,496-499,501-502
+src/features/player/PlayerScreen.tsx
+  s_67d3a4bcdb9d96::t_0c125eebb7d140 829-833
+src/shared/api/__tests__/queryKeys.test.ts
+  s_67d3a4bcdb9d96::t_d0e8859ec75d83 41,43,46,49,53-55,59,61-62,67,71-88
+src/shared/entities/post/__tests__/postRepository.test.ts
+  s_67d3a4bcdb9d96::t_303f79344aa9f3 14,48-50,54,58-95,117
+src/shared/entities/post/postRepository.ts
+  s_67d3a4bcdb9d96::t_6aba4b8d069eb6 6,33-43,46-48,50-51,99-100,109,112
+src/shared/filters/FilterSheet.tsx
+  s_67d3a4bcdb9d96::t_e06e5ea6de20c5 1-2,4-18,20-22,24,27-30,32,34-35,42-67,69-72,74-85,87-91,96-108,111-112,114-146,151,156-222,230,234-235,237,239,245-256,281-283
+src/shared/filters/PeriodStepper.tsx
+  s_67d3a4bcdb9d96::t_ffb714df13d805 1-500
+src/shared/filters/__tests__/PeriodStepper.test.tsx
+  s_67d3a4bcdb9d96::t_1b687e552a27a4 1-384
+src/shared/filters/__tests__/filtersStore.test.ts
+  s_67d3a4bcdb9d96::t_a31a778de0a6cb 17,23-28,41,50-75,87
+src/shared/filters/filter.ts
+  s_67d3a4bcdb9d96::t_46fb2a0b380ffe 2-3,17-33,36,45-63,65,67-69,76-162
+src/shared/filters/filtersStore.ts
+  s_67d3a4bcdb9d96::t_2e10e82c0555a4 3-10,16-17,25,41-48
+src/shared/filters/focusSoon.ts
+  s_67d3a4bcdb9d96::t_07d6e901a94286 1-14
+src/shared/filters/index.ts
+  s_67d3a4bcdb9d96::t_f03e8052f6e98f 3,5,7-10,12-14,16,19-20,22,30-31,35-37,39,42-54
+src/shared/i18n/format.ts
+  s_67d3a4bcdb9d96::t_aea5bad21f1ade 9-10
+src/shared/i18n/ru.ts
+  s_67d3a4bcdb9d96::t_f97029c6a6a479 143-172,348-377
+src/shared/platform/__tests__/seekKeys.test.ts
+  s_67d3a4bcdb9d96::t_18b39bfea475ae 1-53
+src/shared/platform/seekKeys.ts
+  s_67d3a4bcdb9d96::t_b29c1113c341b8 4-6,9-12,16,28-29,33,42-46,54
+src/shared/ui/SettingRow.tsx
+  s_67d3a4bcdb9d96::t_b8c86bce7dda87 21-26,51,84,95-99,105,131-135
+src/shared/filters/__tests__/period.test.ts
+  s_f9e6d78539dc30::t_2e49c3e09f2067 1-213
+src/shared/filters/periodLabel.ts
+  s_f9e6d78539dc30::t_f0c9244608741c 1-36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "f9fdac72e5642fccd560c6b588866bf845cd043b",
+  "prompts": {},
+  "sessions": {
+    "s_67d3a4bcdb9d96": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e93f6f61-902b-4690-b071-9acc2f500329",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_f9e6d78539dc30": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a89dd5c25e7871444",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
