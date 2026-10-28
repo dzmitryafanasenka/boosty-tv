@@ -13,6 +13,7 @@ import {
   postBodyItems,
   videoRowsOf,
   type MediaRef,
+  type Post,
   type PostBodyItem,
   type VideoRow,
 } from '../../shared/entities/post';
@@ -27,6 +28,7 @@ import {
   progressStatus,
   useProgress,
   useProgressRepository,
+  type ProgressSnapshot,
   type ProgressStatus,
 } from '../../shared/services/progress';
 import { StateView, requestHostFocus, spacing, type HostView } from '../../shared/ui';
@@ -75,6 +77,29 @@ export function primaryTarget(
     }
   }
   return rows.length > 0 ? { row: rows[0], resume: false } : null;
+}
+
+/**
+ * Story 4.5 (focus-map G «Ended»): where focus lands on the Post after a
+ * video played to its real end: the first unfinished MediaRow after the
+ * ended one (post order, the 4.2 finished rule), else the primary button.
+ * `snapshot` is the progress of a media id (local entry, else server).
+ */
+export function endedReturnFocusId(
+  post: Post,
+  endedMediaId: string,
+  snapshot: (mediaId: string) => ProgressSnapshot | null,
+): string {
+  const rows = videoRowsOf(post);
+  const ended = rows.findIndex(row => row.ref.mediaId === endedMediaId);
+  for (let i = ended + 1; ended >= 0 && i < rows.length; i += 1) {
+    const snap = snapshot(rows[i].ref.mediaId);
+    const status = progressStatus(snap?.positionSec ?? null, snap?.durationSec ?? rows[i].durationSec);
+    if (status.kind !== 'watched') {
+      return postVideoId(post.id, rows[i].ref.mediaId);
+    }
+  }
+  return postPrimaryId(post.id);
 }
 
 const NO_DESTINATIONS: HostView[] = [];

@@ -224,6 +224,7 @@
   summary: The adaptive 1080p cap relies on the declared HLS/DASH variant bitrates from `onLoad` (`adaptiveBitrateCap`); before `onLoad` there is no cap, and a stream whose 1440p variant declares a lower bitrate than 1080p would not be capped.
   evidence: react-native-video 6.19.3 exposes only `maxBitRate` for adaptive limits on Android. Device: 360p → 720p → 1080p, no 1440p after the fix (Story 4.1).
 - source_spec: `_bmad-output/implementation-artifacts/spec-4-1-play-a-video-from-a-post.md`
+  status: Done 2026-10-28 in `_bmad-output/implementation-artifacts/spec-4-5-finishing-a-video.md`: the Ended return focus goes through `remember` on the player's removal (`endedFocus` in `PlayerRoute`).
   summary: Story 4.5 «Ended» relies on `setReturnFocus` to the next unfinished MediaRow, but the Post's content zone reads restoration through `peek`, so the one-shot override is never consumed; the player exit now uses `remember`. Decide the mechanism in 4.5.
   evidence: `src/app/stackRoutes.tsx` PlayerRoute exit; focus-map §4 G «Ended». Review 4.1, finding 14.
 - source_spec: `_bmad-output/implementation-artifacts/spec-4-1-play-a-video-from-a-post.md`

@@ -106,6 +106,12 @@ export type PlayerScreenProps = {
    * its own locked notice. Default: `onExit`.
    */
   onNoAccess?: () => void;
+  /**
+   * Story 4.5: the engine reported the real end (the final position is
+   * already reported): leave for the origin, no autoplay. Default: stay
+   * paused at the end (a later play starts over from 0).
+   */
+  onEnded?: () => void;
   /** Story 4.2: `resume` (default) starts at the resume point, `beginning` at 0. */
   start?: PlayerStart;
 };
@@ -162,7 +168,15 @@ export type PlayerScreenProps = {
  *   `pickSource` on every open.
  * - No autoplay of the next video (Story 4.5).
  */
-export function PlayerScreen({ http, mediaRef, isActive, onExit, onNoAccess, start = 'resume' }: PlayerScreenProps) {
+export function PlayerScreen({
+  http,
+  mediaRef,
+  isActive,
+  onExit,
+  onNoAccess,
+  onEnded,
+  start = 'resume',
+}: PlayerScreenProps) {
   const progress = useProgressRepository();
   // The device's quality preference (Story 4.3): read once per app run;
   // the engine waits for it, so the first source is the preferred one.
@@ -986,15 +1000,22 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, onNoAccess, sta
     },
     [seek, reportRef, startReached],
   );
+  const onEndedRef = useLatestRef(onEnded);
   const onEnd = useCallback(() => {
-    // No autoplay and no Ended flow before Story 4.5: stay paused at the end;
-    // a later play starts over from 0. The final position is written (finished).
+    // The final position is written (finished). Story 4.5: then leave for
+    // the origin (no autoplay); without `onEnded`, stay paused at the end
+    // and a later play starts over from 0.
     const { durationSec: d, positionSec: p } = live.current;
     reportRef.current('end', Math.max(d, p));
     ended.current = true;
     setPaused(true);
+    const leave = onEndedRef.current;
+    if (leave) {
+      leave();
+      return;
+    }
     showOverlay();
-  }, [showOverlay, live, reportRef]);
+  }, [showOverlay, live, reportRef, onEndedRef]);
   /**
    * An engine error (Story 4.4: an expired signed URL, a CDN or decoder
    * failure, also before the first `onLoad`). With the budget left: the
