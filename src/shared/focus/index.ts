@@ -14,7 +14,13 @@ export {
   type FocusZoneHandle,
   type FocusZoneProps,
 } from './FocusZone';
-export { ModalHostProvider, useModal, type ModalApi } from './ModalHost';
+export {
+  ModalHostProvider,
+  useModal,
+  type ModalApi,
+  type ModalOptions,
+  type ModalPlacement,
+} from './ModalHost';
 export { Screen, type ScreenProps } from './Screen';
 export {
   mayTakeScreenFocus,

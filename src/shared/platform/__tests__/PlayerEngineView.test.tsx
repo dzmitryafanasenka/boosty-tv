@@ -86,4 +86,42 @@ describe('PlayerEngineView (react-native-video adapter)', () => {
     expect(mockVideo.seek).toHaveBeenCalledWith(12);
     await act(async () => root.unmount());
   });
+
+  it.each(['hls', 'dash'] as const)('%s: onResolution from onBandwidthUpdate (reportBandwidth), only known and changed heights', async format => {
+    const onResolution = jest.fn();
+    let root!: Root;
+    await act(async () => {
+      root = createRoot();
+      root.render(
+        <PlayerEngineView source={{ uri: URL, format }} paused={false} onResolution={onResolution} />,
+      );
+    });
+    expect(mockVideo.props?.reportBandwidth).toBe(true);
+    const sample = async (height: number | undefined) =>
+      act(async () => {
+        mockVideo.props?.onBandwidthUpdate({ bitrate: 1_000_000, height, width: 0 });
+      });
+    await sample(0);
+    await sample(undefined);
+    expect(onResolution).not.toHaveBeenCalled();
+    await sample(1080);
+    await sample(1080);
+    await sample(720);
+    expect(onResolution.mock.calls).toEqual([[1080], [720]]);
+    await act(async () => root.unmount());
+  });
+
+  it('progressive or no listener: no bandwidth reports', async () => {
+    let root!: Root;
+    await act(async () => {
+      root = createRoot();
+      root.render(<PlayerEngineView source={{ uri: URL, format: 'progressive' }} paused={false} onResolution={jest.fn()} />);
+    });
+    expect(mockVideo.props?.reportBandwidth).toBe(false);
+    expect(mockVideo.props?.onBandwidthUpdate).toBeUndefined();
+    await act(async () => root.unmount());
+    const { root: other } = await render('hls');
+    expect(mockVideo.props?.reportBandwidth).toBe(false);
+    await act(async () => other.unmount());
+  });
 });

@@ -192,3 +192,25 @@ describe('seekController (Story 4.1)', () => {
     expect(onHeldEnd).toHaveBeenCalledTimes(3);
   });
 });
+
+describe('a fixed step (the ±10 s controls, Story 4.3)', () => {
+  it('each press moves the target by exactly the step (no acceleration); one commit 600 ms after the last; clamped', () => {
+    jest.useFakeTimers();
+    const onCommit = jest.fn();
+    const seek = createSeekController({ onCommit, onChange: () => {} });
+    expect(seek.press(1, 100, 600, 10)).toBe(110);
+    expect(seek.press(1, 100, 600, 10)).toBe(120);
+    expect(seek.press(1, 100, 600, 10)).toBe(130);
+    expect(seek.press(1, 100, 600, 10)).toBe(140);
+    jest.advanceTimersByTime(599);
+    expect(onCommit).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(1);
+    expect(onCommit).toHaveBeenCalledWith(140);
+    seek.reset();
+    expect(seek.press(-1, 5, 600, 10)).toBe(0);
+    seek.reset();
+    expect(seek.press(1, 595, 600, 10)).toBe(599);
+    seek.reset();
+    jest.useRealTimers();
+  });
+});

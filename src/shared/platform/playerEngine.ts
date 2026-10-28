@@ -45,6 +45,14 @@ export type PlayerEngineProps = {
    * when it is a short code (never a message: messages can carry the URL).
    */
   onError?: (code: string | null) => void;
+  /**
+   * Story 4.3: the height in pixels of the video track the engine is
+   * playing, reported for adaptive sources (HLS, DASH) when it is known and
+   * whenever it changes. Never guessed: no report, no value. The Android
+   * adapter reads it from react-native-video's `onBandwidthUpdate`
+   * (`reportBandwidth`).
+   */
+  onResolution?: (heightPx: number) => void;
   ref?: Ref<PlayerEngineHandle>;
 };
 

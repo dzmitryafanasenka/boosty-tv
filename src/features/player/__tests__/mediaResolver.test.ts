@@ -1,7 +1,7 @@
 import { videoSourcesOf, type VideoSource } from '../../../shared/entities/post';
 // eslint-disable-next-line boundaries/dependencies -- test-only fixtures
 import { e8Accessible } from '../../../test/postFixtures';
-import { PROGRESSIVE_MAX_HEIGHT, pickSource } from '../mediaResolver';
+import { PROGRESSIVE_MAX_HEIGHT, pickSource, qualityOf, qualityOptions } from '../mediaResolver';
 
 const URL = 'https://example.invalid/player';
 const hls = (type = 'hls'): VideoSource => ({ format: 'hls', type, url: URL });
@@ -48,8 +48,40 @@ describe('pickSource (Story 4.1 source order)', () => {
     expect(pickSource([hls('live_hls')])).toMatchObject({ type: 'live_hls' });
   });
 
-  it('the preferred quality (Story 4.3) wins when it exists, else the order applies', () => {
-    expect(pickSource([hls(), mp4(720, 'high')], { preferredType: 'high' })).toMatchObject({ type: 'high' });
-    expect(pickSource([hls(), mp4(720, 'high')], { preferredType: 'full_hd' })).toMatchObject({ type: 'hls' });
+  it('a preferred height (Story 4.3) wins when the video has it, else the default order (the preference is kept)', () => {
+    expect(pickSource([hls(), mp4(720, 'high')], { preference: 720 })).toMatchObject({ type: 'high' });
+    expect(pickSource([hls(), mp4(720, 'high')], { preference: 1080 })).toMatchObject({ type: 'hls' });
+    // Above the automatic cap: an explicit pick plays it (owner decision 2026-10-28).
+    expect(pickSource([hls(), mp4(1440, 'quad_hd'), mp4(1080)], { preference: 1440 })).toMatchObject({ height: 1440 });
+    // Two types at one height: the first in the API's order.
+    expect(pickSource([mp4(480, 'sd'), mp4(480, 'medium')], { preference: 480 })).toMatchObject({ type: 'sd' });
+  });
+
+  it('«auto» or no preference: the default order', () => {
+    expect(pickSource([mp4(720), hls()], { preference: 'auto' })).toMatchObject({ format: 'hls' });
+    expect(pickSource([mp4(720), mp4(360)], { preference: 'auto' })).toMatchObject({ height: 720 });
+    expect(pickSource([mp4(720), hls()], { preference: null })).toMatchObject({ format: 'hls' });
+  });
+});
+
+describe('qualityOptions / qualityOf (Story 4.3)', () => {
+  it('matrix «List»: hls + dash + 360/720/1080 → Авто, 1080, 720, 360', () => {
+    expect(qualityOptions([mp4(360), hls(), mp4(1080), dash(), mp4(720)])).toEqual(['auto', 1080, 720, 360]);
+  });
+
+  it('matrix «Progressive only»: 480 (two types) + 720 → 720, 480 (no Авто)', () => {
+    expect(qualityOptions([mp4(480, 'sd'), mp4(720), mp4(480, 'medium')])).toEqual([720, 480]);
+  });
+
+  it('heights above 1080p are listed; adaptive only → Авто only; nothing → empty', () => {
+    expect(qualityOptions([mp4(2160), mp4(1440), mp4(1080)])).toEqual([2160, 1440, 1080]);
+    expect(qualityOptions([dash(), hls('live_hls')])).toEqual(['auto']);
+    expect(qualityOptions([])).toEqual([]);
+  });
+
+  it('qualityOf: adaptive → auto, progressive → its height', () => {
+    expect(qualityOf(hls())).toBe('auto');
+    expect(qualityOf(dash())).toBe('auto');
+    expect(qualityOf(mp4(720))).toBe(720);
   });
 });

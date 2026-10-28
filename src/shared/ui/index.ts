@@ -13,6 +13,8 @@ export { useReducedMotion } from './useReducedMotion';
 export { TextField, type TextFieldHandle, type TextFieldProps } from './TextField';
 export { NavItem, type NavItemProps } from './NavItem';
 export { SettingRow, type SettingRowKind, type SettingRowProps } from './SettingRow';
+export { SideSheet, type SideSheetProps } from './SideSheet';
+export { GearIcon, SkipIcon, type IconProps } from './icons';
 export { StateView, type StateViewAction, type StateViewProps } from './StateView';
 export { Dialog, type DialogAction, type DialogProps } from './Dialog';
 export {

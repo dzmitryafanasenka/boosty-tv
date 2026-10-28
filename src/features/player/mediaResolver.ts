@@ -39,25 +39,35 @@ export const PROGRESSIVE_MAX_HEIGHT = 1080;
 /** The player's E8 entry lives this long after the player unmounts. */
 export const MEDIA_SOURCE_GC_TIME_MS = 1_000;
 
+/**
+ * A quality choice (Story 4.3): `auto` (the adaptive source: HLS, else DASH)
+ * or a progressive height in pixels. Never a URL or a Boosty `type`; this is
+ * what the device-scoped preference stores (`qualityPreference.ts`).
+ */
+export type QualityKey = 'auto' | number;
+
 export type PickOptions = {
-  /** The stored preferred quality (Story 4.3); none in 4.1. */
-  preferredType?: string | null;
+  /** The stored quality preference (Story 4.3); null or `auto`: the default order. */
+  preference?: QualityKey | null;
   maxProgressiveHeight?: number;
 };
 
 /**
  * The source to play (api-contract §6, epic-4-context): the preferred
- * quality (its `type`) when it exists, else HLS, else DASH, else the highest
+ * height's progressive source when this video has it (the first of that
+ * height in the API's order), else HLS, else DASH, else the highest
  * progressive at or below the device cap (else the lowest progressive
  * above it). Among adaptive sources of one format, a non-live type wins
- * (`hls` over `live_hls`). Null when nothing is usable.
+ * (`hls` over `live_hls`). A preferred height the video lacks falls back to
+ * the default order (no error; the preference is kept). Null when nothing
+ * is usable.
  */
 export function pickSource(
   sources: readonly VideoSource[],
-  { preferredType = null, maxProgressiveHeight = PROGRESSIVE_MAX_HEIGHT }: PickOptions = {},
+  { preference = null, maxProgressiveHeight = PROGRESSIVE_MAX_HEIGHT }: PickOptions = {},
 ): VideoSource | null {
-  if (preferredType !== null) {
-    const preferred = sources.find(source => source.type === preferredType);
+  if (typeof preference === 'number') {
+    const preferred = sources.find(source => source.format === 'progressive' && source.height === preference);
     if (preferred) {
       return preferred;
     }
@@ -86,6 +96,32 @@ export function pickSource(
   return best ?? lowestAbove;
 }
 
+/**
+ * The quality list of the settings sheet (Story 4.3, owner decisions
+ * 2026-10-28): «Авто» first when the video has HLS or DASH (one row), then
+ * every progressive height that exists, highest first, one row per height
+ * (two types at one height are one row). Heights above 1080p are listed;
+ * only the automatic pick keeps its cap.
+ */
+export function qualityOptions(sources: readonly VideoSource[]): QualityKey[] {
+  const heights = new Set<number>();
+  let adaptive = false;
+  for (const source of sources) {
+    if (source.format === 'progressive') {
+      heights.add(source.height);
+    } else {
+      adaptive = true;
+    }
+  }
+  const sorted = [...heights].sort((a, b) => b - a);
+  return adaptive ? ['auto', ...sorted] : sorted;
+}
+
+/** The quality row a source belongs to: `auto` for HLS/DASH, else its height. */
+export function qualityOf(source: VideoSource): QualityKey {
+  return source.format === 'progressive' ? source.height : 'auto';
+}
+
 /** The overlay's top band (DESIGN.md Player overlay). */
 export type PlayerMeta = {
   authorName: string;
@@ -102,7 +138,16 @@ export type MediaSourceState =
    * reload). `progress` is what the ProgressRepository's `begin` gets (no URL
    * but the unsigned preview).
    */
-  | { kind: 'ready'; source: VideoSource; meta: PlayerMeta; progress: ProgressMeta; resolution: number }
+  | {
+      kind: 'ready';
+      /** The source to play: `pickSource` with the quality preference. */
+      source: VideoSource;
+      /** Every usable source of this video (the settings sheet's list, Story 4.3). */
+      sources: readonly VideoSource[];
+      meta: PlayerMeta;
+      progress: ProgressMeta;
+      resolution: number;
+    }
   /** The fresh E8 says the post is locked: «Нет доступа к этому видео», no retry. */
   | { kind: 'locked' }
   /** E8 404 or the video is gone from the post: «Видео недоступно», no retry. */
@@ -135,6 +180,7 @@ export function useMediaSource(
   http: HttpClient,
   ref: MediaRef,
   onServerProgress?: ServerProgressSink,
+  preference: QualityKey | null = null,
 ): MediaSource {
   const sinkRef = useRef(onServerProgress);
   sinkRef.current = onServerProgress;
@@ -200,7 +246,7 @@ export function useMediaSource(
     if (data.kind === 'locked' || data.kind === 'unavailable') {
       return { kind: data.kind };
     }
-    const source = pickSource(data.sources);
+    const source = pickSource(data.sources, { preference });
     if (source === null) {
       return { kind: 'noSource' };
     }
@@ -210,6 +256,7 @@ export function useMediaSource(
     return {
       kind: 'ready',
       source,
+      sources: data.sources,
       meta: {
         authorName: data.post.author.name,
         authorAvatarUrl: data.post.author.avatarUrl,
@@ -225,7 +272,7 @@ export function useMediaSource(
       },
       resolution,
     };
-  }, [data, heldError, dataError, resolution, ref.mediaId]);
+  }, [data, heldError, dataError, resolution, ref.mediaId, preference]);
 
   return {
     state,

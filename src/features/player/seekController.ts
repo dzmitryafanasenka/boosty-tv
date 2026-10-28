@@ -49,9 +49,11 @@ export type SeekControllerOptions = {
 export type SeekController = {
   /**
    * One press: the new pending target. `positionSec` is the playback
-   * position, `durationSec` 0 or null when unknown.
+   * position, `durationSec` 0 or null when unknown. `stepSec` fixes the step
+   * (the ±10 s controls, Story 4.3 owner decision: exactly 10 s per OK,
+   * no acceleration); without it the step grows along `SEEK_STEPS_SEC`.
    */
-  press(direction: SeekDirection, positionSec: number, durationSec: number | null): number;
+  press(direction: SeekDirection, positionSec: number, durationSec: number | null, stepSec?: number): number;
   /** The bubble's target: pending, else in flight; null when not seeking. */
   target(): number | null;
   /** A target is pending or a committed seek is in flight. */
@@ -160,11 +162,11 @@ export function createSeekController({
   };
 
   return {
-    press(direction, positionSec, durationSec) {
+    press(direction, positionSec, durationSec, stepSec) {
       const withinWindow = pending !== null && lastDirection === direction;
       streak = withinWindow ? streak + 1 : 0;
       lastDirection = direction;
-      const step = SEEK_STEPS_SEC[Math.min(streak, SEEK_STEPS_SEC.length - 1)];
+      const step = stepSec ?? SEEK_STEPS_SEC[Math.min(streak, SEEK_STEPS_SEC.length - 1)];
       const base = pending ?? inFlight ?? positionSec;
       const max = durationSec !== null && durationSec > 0 ? durationSec - 1 : Infinity;
       pending = Math.max(0, Math.min(max, Math.round(base + direction * step)));

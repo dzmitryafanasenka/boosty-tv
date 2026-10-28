@@ -16,8 +16,9 @@ import { colors } from '../ui/tokens';
 
 /**
  * The one modal host (AD-13, docs/focus-map.md §1.3–1.4), rendered above the
- * navigation stack. `open(content, initiatorRef)` shows `content` on
- * `colors.scrim` inside a `TVFocusGuideView` that traps all four sides.
+ * navigation stack. `open(content, initiatorRef, {placement})` shows
+ * `content` on `colors.scrim` (centered, or as a full-height right panel for
+ * side sheets: `placement: 'end'`, Story 4.3) inside a `TVFocusGuideView` that traps all four sides.
  * Focus is moved into the trap on open, so the D-pad cannot reach the
  * background (the same mechanism as the per-screen trap, ADR 0007). The
  * background is hidden from accessibility while it is open. It is not made
@@ -33,8 +34,16 @@ import { colors } from '../ui/tokens';
  * and two frames later (the only request that stuck on the device).
  */
 
+/**
+ * Where the content sits: `center` (dialogs, the default) or `end`, a
+ * full-height panel on the right edge (side sheets, Story 4.3).
+ */
+export type ModalPlacement = 'center' | 'end';
+
+export type ModalOptions = { placement?: ModalPlacement };
+
 export type ModalApi = {
-  open(content: ReactNode, initiatorRef?: RefObject<HostView | null>): void;
+  open(content: ReactNode, initiatorRef?: RefObject<HostView | null>, options?: ModalOptions): void;
   /**
    * Close the overlay. Focus returns to the initiator, unless
    * `restoreFocus: false` (the screen behind is going away, e.g. the
@@ -46,7 +55,7 @@ export type ModalApi = {
 
 const ModalContext = createContext<ModalApi | null>(null);
 
-type Modal = { content: ReactNode; initiator?: RefObject<HostView | null> };
+type Modal = { content: ReactNode; initiator?: RefObject<HostView | null>; placement: ModalPlacement };
 
 export function ModalHostProvider({ children }: { children?: ReactNode }) {
   const [modal, setModal] = useState<Modal | null>(null);
@@ -59,9 +68,9 @@ export function ModalHostProvider({ children }: { children?: ReactNode }) {
   const backSub = useRef<{ remove(): void } | null>(null);
   const closeRef = useRef<ModalApi['close']>(() => {});
 
-  const open = useCallback<ModalApi['open']>((content, initiatorRef) => {
+  const open = useCallback<ModalApi['open']>((content, initiatorRef, options) => {
     returnTo.current = undefined;
-    const next = { content, initiator: initiatorRef };
+    const next: Modal = { content, initiator: initiatorRef, placement: options?.placement ?? 'center' };
     // Set now, so close() / isOpen() right after open() see it before the commit.
     modalRef.current = next;
     // Registered now, before the content's mount effects (see above).
@@ -149,16 +158,21 @@ export function ModalHostProvider({ children }: { children?: ReactNode }) {
         {children}
       </View>
       {modal ? (
-        <View testID="modal/scrim" style={styles.scrim}>
+        <View testID="modal/scrim" style={[styles.scrim, modal.placement === 'end' && styles.scrimEnd]}>
           <TVFocusGuideView
             testID="modal/trap"
             trapFocusUp
             trapFocusDown
             trapFocusLeft
             trapFocusRight
-            style={styles.trap}
+            style={modal.placement === 'end' ? styles.trapEnd : styles.trap}
           >
-            <View testID="modal/content" ref={containerRef} collapsable={false}>
+            <View
+              testID="modal/content"
+              ref={containerRef}
+              collapsable={false}
+              style={modal.placement === 'end' ? styles.contentEnd : undefined}
+            >
               {modal.content}
             </View>
           </TVFocusGuideView>
@@ -190,5 +204,16 @@ const styles = StyleSheet.create({
   trap: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // A side sheet: full height on the right edge.
+  scrimEnd: {
+    alignItems: 'flex-end',
+    justifyContent: 'flex-start',
+  },
+  trapEnd: {
+    flex: 1,
+  },
+  contentEnd: {
+    flex: 1,
   },
 });
