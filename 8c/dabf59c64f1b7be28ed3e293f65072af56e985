@@ -1,0 +1,43 @@
+__tests__/playerFlow.test.tsx
+  s_67d3a4bcdb9d96::t_8fd5255af675f8 215-217,2681-2835
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_67d3a4bcdb9d96::t_1b78d979705c1b 67
+_bmad-output/implementation-artifacts/spec-4-6-sleep-background-and-audio-focus.md
+  s_67d3a4bcdb9d96::t_2aaeeea9eca39c 1-49
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_67d3a4bcdb9d96::t_4f2cea567aef43 32,75
+docs/feature-parity.md
+  s_67d3a4bcdb9d96::t_c016680415d552 117
+docs/focus-map.md
+  s_67d3a4bcdb9d96::t_50b6db00acf623 322
+docs/testing.md
+  s_67d3a4bcdb9d96::t_c535892a4d6cfc 896-901
+src/features/player/PlayerScreen.tsx
+  s_67d3a4bcdb9d96::t_73d6916683409c 14,74-81,344-351,359,368,586-619,714-732,753,1148-1160,1210
+src/shared/platform/PlayerEngineView.tsx
+  s_67d3a4bcdb9d96::t_8fe61002870ff4 4,55,106-110
+src/shared/platform/__tests__/PlayerEngineView.test.tsx
+  s_67d3a4bcdb9d96::t_07676b3ceb8c0f 127-145
+src/shared/platform/__tests__/appLifecycle.test.ts
+  s_67d3a4bcdb9d96::t_904f6aa11b18ce 1-46
+src/shared/platform/appLifecycle.ts
+  s_67d3a4bcdb9d96::t_cca8cc3cc7ea1c 4-8,23-35
+src/shared/platform/playerEngine.ts
+  s_67d3a4bcdb9d96::t_1b6813be2a4ace 56-62
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "8cdabf59c64f1b7be28ed3e293f65072af56e985",
+  "prompts": {},
+  "sessions": {
+    "s_67d3a4bcdb9d96": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e93f6f61-902b-4690-b071-9acc2f500329",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
