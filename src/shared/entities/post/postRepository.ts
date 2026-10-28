@@ -3,7 +3,7 @@ import { blogPostsPageDtoSchema, feedPageDtoSchema } from '../../api/dto/feed';
 import { blockTypeDtoSchema, okVideoTimeCodeDtoSchema } from '../../api/dto/post';
 import { blogUrlSchema } from '../../api/dto/subscriptions';
 import type { HttpClient } from '../../api/httpClient';
-import type { Filter } from '../../filters/filter';
+import { periodBounds, type Filter } from '../../filters/filter';
 import { logger as appLogger, type Logger } from '../../services/logger';
 import { mapPost } from './mapPost';
 import type { MediaRef, Post, PostPage, PostResult, ServerProgressSink } from './types';
@@ -31,12 +31,24 @@ function feedAccessParams(filter: Filter): string {
 }
 
 /**
- * E5 path. Comments are always off (`comments_limit=0&reply_limit=0`); the
- * Filter's access params follow. The opaque cursor goes back verbatim,
- * URL-encoded (api-contract §5).
+ * E5 period params (Story 5.4, FILTER-02, api-contract §3 «E5 period»):
+ * none for «За всё время», else `from_ts`/`to_ts` in epoch seconds,
+ * resolved here at request time from the symbolic period (local start of
+ * the first day, 23:59:59 of the last day).
  */
-export function feedPath(cursor: string | null, filter: Filter): string {
-  const base = `/v1/feed/post/?limit=${FEED_PAGE_SIZE}&comments_limit=0&reply_limit=0&${feedAccessParams(filter)}`;
+function feedPeriodParams(filter: Filter, nowMs: number): string {
+  const bounds = periodBounds(filter.period, nowMs);
+  return bounds === null ? '' : `&from_ts=${bounds.fromTs}&to_ts=${bounds.toTs}`;
+}
+
+/**
+ * E5 path. Comments are always off (`comments_limit=0&reply_limit=0`); the
+ * Filter's access params follow, then its period params (`nowMs` resolves
+ * a preset). The opaque cursor goes back verbatim, URL-encoded
+ * (api-contract §5).
+ */
+export function feedPath(cursor: string | null, filter: Filter, nowMs: number = Date.now()): string {
+  const base = `/v1/feed/post/?limit=${FEED_PAGE_SIZE}&comments_limit=0&reply_limit=0&${feedAccessParams(filter)}${feedPeriodParams(filter, nowMs)}`;
   return cursor === null ? base : `${base}&offset=${encodeURIComponent(cursor)}`;
 }
 
@@ -84,7 +96,8 @@ function toPage(
 }
 
 /**
- * One E5 page with the Filter's params (Story 5.3). Rejects with `AppError`
+ * One E5 page with the Filter's params (Stories 5.3–5.4; `now` resolves the
+ * period at request time, never earlier). Rejects with `AppError`
  * (from HttpClient; `Parse` when the page shape is wrong). A malformed post
  * is dropped by the mapper; the page never fails for one post. Paging stops
  * on `isLast` or a missing `extra`/`offset`.
@@ -93,9 +106,10 @@ async function feedPage(
   http: HttpClient,
   cursor: string | null,
   filter: Filter,
+  now: number = Date.now(),
   logger: Logger = appLogger,
 ): Promise<PostPage> {
-  const { body } = await http.get(feedPath(cursor, filter), feedPageDtoSchema);
+  const { body } = await http.get(feedPath(cursor, filter, now), feedPageDtoSchema);
   return toPage(body.data.posts, body.extra, logger);
 }
 

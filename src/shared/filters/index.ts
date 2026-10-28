@@ -1,12 +1,25 @@
 export {
   ACCESS_VALUES,
+  ALL_TIME,
   DEFAULT_FILTER,
+  PERIOD_PRESET_DAYS,
   activeFilterCount,
+  addDays,
+  calendarDayOf,
+  daysInMonth,
+  formatDayKey,
   isDefaultFilter,
+  parseDayKey,
+  periodBounds,
+  periodEquals,
   type AccessFilter,
+  type CalendarDay,
   type Filter,
   type FilterScope,
+  type Period,
+  type PeriodPresetDays,
 } from './filter';
+export { formatDay, formatPeriod, formatRange } from './periodLabel';
 export {
   filtersAccountStore,
   filtersStore,
@@ -14,9 +27,28 @@ export {
   useFilter,
 } from './filtersStore';
 export {
+  CUSTOM_DEFAULT_SPAN_DAYS,
+  FILTERS_PERIOD_ID,
   FILTERS_RESET_ID,
   FILTERS_SHEET_ID,
   FilterSheet,
+  PERIOD_ALL_ID,
+  PERIOD_CUSTOM_ID,
+  PERIOD_LIST_ID,
   filterAccessId,
+  periodPresetId,
   type FilterSheetProps,
 } from './FilterSheet';
+export {
+  PERIOD_DONE_ID,
+  PERIOD_MIN_YEAR,
+  PERIOD_STEPPER_ID,
+  PeriodStepper,
+  STEPPER_ENTRY_GUARD_MS,
+  clampCalendarDay,
+  stepCalendarField,
+  stepperFieldId,
+  type PeriodStepperProps,
+  type StepperField,
+  type StepperGroup,
+} from './PeriodStepper';

@@ -84,17 +84,24 @@ function demoPost(n: number, blog?: { blogUrl: string; index: number }) {
  * filter state can be shown: `only_allowed=true` or no access params (the
  * live server default behaved like «Доступные мне», api-contract §3 E5) →
  * the accessible posts only, `only_bought=true` → nothing (the demo account
- * bought nothing), both `false` → every post.
+ * bought nothing), both `false` → every post. Story 5.4: `from_ts` and
+ * `to_ts` (epoch seconds, both inclusive) keep the posts published inside
+ * them (the demo posts are from 30 Sep – 1 Oct 2026, UTC).
  */
 function demoFeedPage(url: string, total: number) {
   const match = /[?&]offset=([^&]*)/.exec(url);
   const start = match ? Number(decodeURIComponent(match[1])) || 0 : 0;
   const onlyAllowed = !/[?&]only_allowed=false(&|$)/.test(url);
   const onlyBought = /[?&]only_bought=true(&|$)/.test(url);
+  const fromTs = numberParam(url, 'from_ts') ?? -Infinity;
+  const toTs = numberParam(url, 'to_ts') ?? Infinity;
   const all = onlyBought
     ? []
     : Array.from({ length: total }, (_, n) => demoPost(n)).filter(
-        post => !onlyAllowed || post.hasAccess,
+        post =>
+          (!onlyAllowed || post.hasAccess) &&
+          post.publishTime >= fromTs &&
+          post.publishTime <= toTs,
       );
   const end = Math.min(start + FEED_PAGE, all.length);
   const posts = all.slice(start, end);
@@ -102,6 +109,13 @@ function demoFeedPage(url: string, total: number) {
     data: { posts, blogs: [], counters: {} },
     extra: { offset: String(end), isLast: end >= all.length },
   };
+}
+
+/** A numeric query param of `url`; null when absent or not a number. */
+function numberParam(url: string, name: string): number | null {
+  const match = new RegExp(`[?&]${name}=([^&]*)`).exec(url);
+  const value = match ? Number(match[1]) : NaN;
+  return Number.isFinite(value) ? value : null;
 }
 
 /** Demo subscriptions: the feed's authors first, then a few more (no avatars). */

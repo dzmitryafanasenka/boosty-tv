@@ -826,7 +826,11 @@ export function PlayerScreen({
   const onSeekKey = useCallback(
     (event: SeekKeyEvent) => {
       const { phase: current, isActive: active } = live.current;
-      // The settings sheet owns the remote while it is open.
+      // The settings sheet owns the remote while it is open. ↑ ↓ (forwarded
+      // for the period stepper, Story 5.4) are not seek keys.
+      if (event.key === 'up' || event.key === 'down') {
+        return;
+      }
       if (!active() || current !== 'playing' || sheetOpenRef.current) {
         return;
       }

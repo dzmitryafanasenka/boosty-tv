@@ -38,31 +38,52 @@ describe('queryKeys.me (Story 5.2)', () => {
 });
 
 describe('queryKeys.subscriptionFeed (Story 5.3)', () => {
+  const ALL_TIME = { kind: 'all' } as const;
   it('carries the symbolic Filter, one key per access value, under one prefix', () => {
-    expect(queryKeys.subscriptionFeed({ access: 'allowed' })).toEqual([
+    expect(queryKeys.subscriptionFeed({ access: 'allowed', period: ALL_TIME })).toEqual([
       'feed',
       'subscriptions',
-      { access: 'allowed' },
+      { access: 'allowed', period: { kind: 'all' } },
     ]);
     const keys = (['allowed', 'all', 'bought'] as const).map(access =>
-      JSON.stringify(queryKeys.subscriptionFeed({ access })),
+      JSON.stringify(queryKeys.subscriptionFeed({ access, period: ALL_TIME })),
     );
     expect(new Set(keys).size).toBe(3);
     const prefix = queryKeys.allSubscriptionFeeds();
-    expect(queryKeys.subscriptionFeed({ access: 'bought' }).slice(0, prefix.length)).toEqual(prefix);
+    expect(queryKeys.subscriptionFeed({ access: 'bought', period: ALL_TIME }).slice(0, prefix.length)).toEqual(
+      prefix,
+    );
   });
 });
 
-describe('queryKeys.subscriptionFeed: the whole Filter is the key (Story 5.3)', () => {
+describe('queryKeys.subscriptionFeed: the whole Filter is the key (Stories 5.3–5.4)', () => {
   it('two Filters that differ in any field give different keys; equal Filters the same key', () => {
-    const base = { access: 'all' } as const;
-    const extended = { ...base, period: { kind: 'all' } } as unknown as typeof base;
+    const base = { access: 'all', period: { kind: 'all' } } as const;
+    const extended = { ...base, tagIds: ['1'] } as unknown as typeof base;
     expect(queryKeys.subscriptionFeed(base)[2]).toBe(base);
     expect(JSON.stringify(queryKeys.subscriptionFeed(extended))).not.toBe(
       JSON.stringify(queryKeys.subscriptionFeed(base)),
     );
-    expect(JSON.stringify(queryKeys.subscriptionFeed({ access: 'all' }))).toBe(
+    expect(JSON.stringify(queryKeys.subscriptionFeed({ access: 'all', period: { kind: 'all' } }))).toBe(
       JSON.stringify(queryKeys.subscriptionFeed(base)),
+    );
+  });
+
+  it('the period is symbolic (Story 5.4): one key per preset and range, no time in it', () => {
+    const week = { access: 'allowed', period: { kind: 'preset', days: 7 } } as const;
+    const custom = {
+      access: 'allowed',
+      period: { kind: 'custom', fromDay: '2026-08-01', toDay: '2026-09-25' },
+    } as const;
+    const keys = [
+      { access: 'allowed', period: { kind: 'all' } } as const,
+      week,
+      { access: 'allowed', period: { kind: 'preset', days: 30 } } as const,
+      custom,
+    ].map(filter => JSON.stringify(queryKeys.subscriptionFeed(filter)));
+    expect(new Set(keys).size).toBe(4);
+    expect(JSON.stringify(queryKeys.subscriptionFeed(week))).toBe(
+      '["feed","subscriptions",{"access":"allowed","period":{"kind":"preset","days":7}}]',
     );
   });
 });

@@ -10,12 +10,13 @@ import com.facebook.react.bridge.ReactMethod
 import java.lang.ref.WeakReference
 
 /**
- * Hold-to-seek for the player (Story 4.1, owner decision). React Native
- * delivers D-pad left/right to JS only as key up on the pinned remote, so a
- * held key is invisible there. While the player enables it, `MainActivity`
- * forwards every D-pad LEFT/RIGHT key down (with Android's `repeatCount`)
- * and key up as the `seekKey` device event `{key, action, repeat}`. The
- * event is not consumed: native focus handling is unchanged.
+ * Hold-to-seek for the player (Story 4.1, owner decision) and hold-to-step
+ * for the custom-period stepper (Story 5.4, owner decision). React Native
+ * delivers D-pad arrows to JS only as key up on the pinned remote, so a held
+ * key is invisible there. While a subscriber enables it, `MainActivity`
+ * forwards every D-pad LEFT/RIGHT/UP/DOWN key down (with Android's
+ * `repeatCount`) and key up as the `seekKey` device event `{key, action,
+ * repeat}`. The event is not consumed: native focus handling is unchanged.
  *
  * Debuggable builds log one line per forwarded key under `BoostySeekKeys`
  * (key, action, repeat count; no content), for the device measurement.
@@ -29,7 +30,7 @@ class SeekKeysModule(reactContext: ReactApplicationContext) :
 
   override fun getName(): String = NAME
 
-  /** The player turns forwarding on while it is the focused route, off otherwise. */
+  /** On while a subscriber (the player, the period stepper) listens, off otherwise. */
   @ReactMethod
   fun setEnabled(value: Boolean) {
     enabled = value
@@ -56,6 +57,8 @@ class SeekKeysModule(reactContext: ReactApplicationContext) :
         when (event.keyCode) {
           KeyEvent.KEYCODE_DPAD_LEFT -> "left"
           KeyEvent.KEYCODE_DPAD_RIGHT -> "right"
+          KeyEvent.KEYCODE_DPAD_UP -> "up"
+          KeyEvent.KEYCODE_DPAD_DOWN -> "down"
           else -> return
         }
       val action =

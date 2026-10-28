@@ -140,6 +140,36 @@ export const ru = {
       bought: 'Только купленные',
     },
     reset: 'Сбросить',
+    // Story 5.4: two or more active sections, the chip reads «Фильтры» and
+    // the count; `{count}` is the count with its plural word.
+    chipA11yMany: 'Фильтры. {count}',
+    // Story 5.4 (FILTER-02): the «Период» row, its list (D9) and the
+    // custom-period stepper (D10). `{from}`/`{to}` are `day` values.
+    period: {
+      title: 'Период',
+      all: 'За всё время',
+      preset: {
+        d7: 'Последние 7 дней',
+        d30: 'Последние 30 дней',
+        d90: 'Последние 3 месяца',
+      },
+      custom: 'Свой период…',
+      customTitle: 'Свой период',
+      hint: '↑ ↓ меняют значение, ← → переход между полями, OK — готово',
+      from: 'С',
+      to: 'По',
+      done: 'Готово',
+      invalid: 'Дата «по» раньше даты «с»',
+      range: '{from} — {to}',
+      day: '{day} {month} {year}',
+      field: {
+        day: 'день',
+        month: 'месяц',
+        year: 'год',
+      },
+      // TalkBack on a stepper field: «С, день: 1».
+      fieldA11y: '{group}, {field}: {value}',
+    },
   },
   // Подписки (Story 3.2, E2; docs/focus-map.md §3 C1–C3). Empty: no CTA
   // (C3). `{n}` is the number of tiles shown.
@@ -315,6 +345,36 @@ export const ru = {
       oct: 'окт',
       nov: 'ноя',
       dec: 'дек',
+    },
+    // Story 5.4: full month names, genitive («1 августа 2026») and
+    // nominative (the stepper's month field for TalkBack).
+    monthGenitive: {
+      jan: 'января',
+      feb: 'февраля',
+      mar: 'марта',
+      apr: 'апреля',
+      may: 'мая',
+      jun: 'июня',
+      jul: 'июля',
+      aug: 'августа',
+      sep: 'сентября',
+      oct: 'октября',
+      nov: 'ноября',
+      dec: 'декабря',
+    },
+    monthName: {
+      jan: 'январь',
+      feb: 'февраль',
+      mar: 'март',
+      apr: 'апрель',
+      may: 'май',
+      jun: 'июнь',
+      jul: 'июль',
+      aug: 'август',
+      sep: 'сентябрь',
+      oct: 'октябрь',
+      nov: 'ноябрь',
+      dec: 'декабрь',
     },
   },
   // The persistent badge of the debug-only demo mode (Story 2.5).

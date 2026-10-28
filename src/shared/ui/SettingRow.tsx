@@ -18,6 +18,12 @@ export type SettingRowProps = {
   label: string;
   /** Right-aligned value (info rows), e.g. the version. */
   value?: string;
+  /**
+   * Lines the value may wrap to (default 1: one line, right of the label).
+   * Above 1 the value goes under the label and wraps (Story 5.4: a custom
+   * period range does not fit beside its label on the 320 dp filter sheet).
+   */
+  valueLines?: number;
   /** `nav` and `radio` rows; ignored for `info`. */
   onPress?: () => void;
   /** `radio` rows: this choice is the current one (accent mark, `accessibilityState.selected`). */
@@ -42,6 +48,7 @@ export function SettingRow({
   kind,
   label,
   value,
+  valueLines = 1,
   onPress,
   selected = false,
   onFocus,
@@ -74,7 +81,7 @@ export function SettingRow({
       surfaceStyle={surfaceStyle}
     >
       {({ focused }) => (
-        <View style={styles.content}>
+        <View style={valueLines > 1 ? styles.stacked : styles.content}>
           {radio ? (
             <View
               testID={testID ? `${testID}/radio` : undefined}
@@ -85,13 +92,17 @@ export function SettingRow({
               ) : null}
             </View>
           ) : null}
-          <Text variant="body" numberOfLines={1} style={styles.label}>
+          <Text
+            variant="body"
+            numberOfLines={1}
+            style={valueLines > 1 ? undefined : styles.label}
+          >
             {label}
           </Text>
           {value ? (
             <Text
               variant="body"
-              numberOfLines={1}
+              numberOfLines={valueLines}
               color={focused ? 'text-secondary' : 'text-meta'}
             >
               {value}
@@ -116,6 +127,11 @@ const styles = StyleSheet.create({
   label: {
     flex: 1,
     marginRight: spacing['8'],
+  },
+  // `valueLines` > 1: the value under the label (device: Story 5.4, a long
+  // value beside the label squeezed the label or overflowed the row).
+  stacked: {
+    paddingVertical: spacing['3'],
   },
   // The radio mark (DESIGN.md: selected radio marks use `accent`).
   radio: {

@@ -246,7 +246,7 @@ All of these are under `https://api.boosty.to` and use a Bearer token.
 | E2 | `GET /v1/user/subscriptions` | Subscriptions | `limit=30`, `with_follow=true` | `data[].blog{title, blogUrl, owner{name, avatarUrl?}}` (1.16.0 stopped parsing price fields after a crash). No pagination is used. Possible top-level `offset/limit/total` are commented out. |
 | E3 | `GET /v1/blog/{blogUrl}` | Blog header (Story 5.2: Подписки also sends it for the own blog, with the Author page's query key, to decide and draw «Мой блог»; `unavailable` or a failure → no tile) | — | `title`, `blogUrl`, `owner{name, avatarUrl}` |
 | E4 | `GET /v1/blog/{blogUrl}/post/` | Blog posts (Story 5.2: Подписки sends page 1 for the own blog, with the Author page's params and query key, to decide «Мой блог»; the reference's `limit=1` is not used. A failed own-blog E1/E3/E4 is not re-sent when Подписки mounts again. While Подписки is mounted, the resume head refresh also refreshes this page 1, because it observes `authorPosts(ownBlogUrl)`) | `limit` (20), `offset?` (opaque string), `comments_limit=0`, `reply_limit=0`, `is_only_allowed?`, `only_bought?`, `from_ts?`, `to_ts?` (epoch s), `tags_ids?` (comma-joined) | `data[]: Post`, `extra{offset, isLast}`. A pinned post (`isPinned: true`) comes first, out of date order (seen live on 2 of 3 blogs, 2026-10-27); the app keeps that order and marks the card with a pin badge on the Author page |
-| E5 | `GET /v1/feed/post/` | Feed (Story 5.3: Главная always sends the access params of the active `feed` Filter, see «E5 access params (LIVE)» below) | `limit` (10), `offset?`, `comments_limit=0`, `reply_limit=0`, `only_allowed?`, `only_bought?`, `tags_ids?`, `from_ts?`, `to_ts?` | `data.posts[]: Post`, `extra` |
+| E5 | `GET /v1/feed/post/` | Feed (Story 5.3: Главная always sends the access params of the active `feed` Filter, see «E5 access params (LIVE)» below; Story 5.4: plus `from_ts`/`to_ts` for a period other than «За всё время», see «E5 period (LIVE)») | `limit` (10), `offset?`, `comments_limit=0`, `reply_limit=0`, `only_allowed?`, `only_bought?`, `tags_ids?`, `from_ts?`, `to_ts?` | `data.posts[]: Post`, `extra` |
 | E6 | `GET /v1/search/feed/post/` | Feed search | E5 params + `search_query` | `data.searchPosts[].post: Post`, `extra` |
 | E7 | `GET /v1/search/blog/post/` | Blog search | `blog_url`, `search_query`, E4 params (with `is_only_allowed`) | `data.searchPosts[].post: Post`, `extra` |
 | E8 | `GET /v1/blog/{blogUrl}/post/{postId}` | Single post (the reference uses it to refresh media URLs and `timeCode`) | `comments_limit`, `reply_limit` (the reference sends 20. **We must send 0**. 0 is accepted: `LIVE`, Story 1.5) | `Post` (top level, no `data` wrapper) |
@@ -311,6 +311,34 @@ Live check (debug build with a temporary counts-only log, removed before the com
 | «Только купленные» | 1 post (not on the no-params page 1) | 0 | `isLast: true`, `offset` present |
 
 So the server's default without params behaved like «Доступные мне» on page 1 for this account, «Все посты» adds locked posts (never an error), and «Только купленные» returned the purchased post as a one-post last page. One account, one run; the no-params comparison covered page 1 only. Locked posts under «Все посты» are ordinary (`hasAccess: false`), so the all-locked session check (§7) runs only under «Доступные мне». An empty «Только купленные» page (no purchases) was not seen live (this account has one); it is host-tested with the existing empty-page shape. Shape fixture: `src/test/fixtures/boosty/e5-feed-only-bought.json` (a one-post last page built from the sanitized `e5-feed.json` post; the live run logged counts only, no body was captured).
+
+### E5 period (`LIVE`, Story 5.4)
+
+The reference (`FilterComponent`, `DateRangePickerDialog`, 1.16.0) sends `from_ts` and `to_ts` in epoch seconds, normalized to the local start and end of day. Boosty TV sends them after the access params, before `offset`, only when the period is not «За всё время»:
+
+| Period | Params |
+|---|---|
+| «За всё время» (default) | none |
+| «Последние N дней» (N = 7, 30, 90) | `from_ts` = local 00:00:00 of today − (N − 1), `to_ts` = local 23:59:59 of today |
+| «Свой период…» (from, to) | `from_ts` = local 00:00:00 of the first day, `to_ts` = local 23:59:59 of the last day |
+
+The Filter and the query key hold the period symbolically; `PostRepository.feedPage` resolves it with `Date.now()` when the request is sent, so the bounds move only when the local day changes.
+
+Live check (debug build with a temporary log, removed before the commit; Chromecast with Google TV 4K, the owner's session, 2026-10-28; HTTP 200 for every request; only counts and booleans were logged, never ids, titles, dates or URLs). `T` is the newest default page-1 post's publish time as the app maps it (`publishTime`, else `createdAt`):
+
+| Request (default access params) | Result |
+|---|---|
+| `from_ts=T&to_ts=T` | 1 post, the newest one: **both bounds inclusive**, compared with that publish time |
+| `from_ts=T−30 d&to_ts=T−1` | 10 posts, not the newest one, all inside the bounds, more pages |
+| `from_ts=T+1&to_ts=T+30 d` | 0 posts, last page |
+| `from_ts=T−1 h&to_ts=T+1 h` | 1 post (the newest one) |
+| The same window in milliseconds | 0 posts: the server reads seconds |
+| «Последние 7 дней» (from the app) | page 1: 2 posts, every one inside the bounds, last page |
+| «Последние 30 дней» | page 1: 10, page 2: 9 (last), every post inside the bounds |
+| «Последние 3 месяца» | pages 1–2: 10 + 10, more pages, every post inside the bounds |
+| «Свой период…» 28 Sep – 26 Oct 2026 | page 1: 10, page 2: 8 (last), every post inside the bounds |
+
+So E5 honours `from_ts`/`to_ts` in seconds with both ends inclusive; 23:59:59 as the end of the last day therefore includes a post published in that last second. Paging (`offset`, `isLast`) works as without a period. One account, one run; E4 (`from_ts`/`to_ts` on a blog, Story 5.7) was not checked.
 
 ## 4. Post object (`REF`)
 

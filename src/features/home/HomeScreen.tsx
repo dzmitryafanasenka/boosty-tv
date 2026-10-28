@@ -9,6 +9,7 @@ import {
   FilterSheet,
   activeFilterCount,
   filtersStore,
+  formatPeriod,
   isDefaultFilter,
   useFilter,
   type Filter,
@@ -156,10 +157,23 @@ export type HomeScreenProps = {
   filtersEnabled?: boolean;
 };
 
-/** The chip's visible label and TalkBack label for a Filter. */
+/**
+ * The chip's visible label and TalkBack label for a Filter (owner decision
+ * 2026-10-28, Story 5.4): the default → «Фильтры · Доступные мне»; one
+ * active section → that section's value («Фильтры · Последние 7 дней») and
+ * the count; two or more → «Фильтры» and the count.
+ */
 function chipLabels(filter: Filter): { label: string; a11y: string; count: number } {
-  const value = t(`filters.access.${filter.access}`);
   const count = activeFilterCount(filter);
+  if (count >= 2) {
+    return {
+      label: t('filters.title'),
+      a11y: tf('filters.chipA11yMany', { count: `${count} ${tp('filters.activeCount', count)}` }),
+      count,
+    };
+  }
+  const value =
+    filter.period.kind !== 'all' ? formatPeriod(filter.period) : t(`filters.access.${filter.access}`);
   return {
     label: tf('filters.chip', { value }),
     a11y:
@@ -479,9 +493,13 @@ export function HomeScreen({
    * after OK on «Главная»: a move within the sidebar during the skeleton
    * still wins).
    */
+  // Story 5.4 (device): a sheet level change unmounts the focused row and
+  // native focus may fall back to the sidebar for a moment, which the
+  // Shell records; the page never takes focus while a modal is open.
+  const modal = useModal();
   const mayTakeFocus = useCallback(
-    () => mayTakeScreenFocus(focusRef.current, HOME_STATE_ACTION_ID),
-    [],
+    () => !modal.isOpen() && mayTakeScreenFocus(focusRef.current, HOME_STATE_ACTION_ID),
+    [modal],
   );
 
   usePhaseChange(phase, (_phase, previous) => {
@@ -727,7 +745,6 @@ export function HomeScreen({
   // modal host (focus trapped, opens on the selected value; Back closes it
   // and focus returns to the chip, its initiator). A change applies at once
   // and the feed behind refetches; focus stays in the sheet.
-  const modal = useModal();
   const chipView = useRef<HostView | null>(null);
   const filtersZone = useZoneItem(HOME_FILTERS_ID);
   const onOpenFilters = useCallback(() => {
