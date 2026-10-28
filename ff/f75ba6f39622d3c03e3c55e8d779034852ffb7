@@ -1,0 +1,87 @@
+__tests__/homeFeedFlow.test.tsx
+  s_67d3a4bcdb9d96::t_042b2f734f96f7 11,14,25-27,76-80,124-125,152-153,161,166-167,1817-2301
+__tests__/playerFlow.test.tsx
+  s_67d3a4bcdb9d96::t_3697d5f42475f3 424-431,464-465,478-479,518-519
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_67d3a4bcdb9d96::t_b2fdcd58d393a0 267,290-300
+_bmad-output/implementation-artifacts/spec-4-7-continue-watching-row-on-the-home-screen.md
+  s_67d3a4bcdb9d96::t_fffaf8551fee55 1-121
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_67d3a4bcdb9d96::t_5bf7fb181789b8 32,76
+docs/api-contract.md
+  s_67d3a4bcdb9d96::t_1d9760171e6488 446
+docs/feature-parity.md
+  s_67d3a4bcdb9d96::t_7e770547d31dd9 110
+docs/focus-map.md
+  s_67d3a4bcdb9d96::t_fc2bc51301984b 142,186-194,329
+docs/testing.md
+  s_67d3a4bcdb9d96::t_0418456a34362d 896-920
+src/app/App.tsx
+  s_67d3a4bcdb9d96::t_0fd3211aab786e 42,50,224-237,269
+src/app/Shell.tsx
+  s_67d3a4bcdb9d96::t_cac53f0902b7af 15,50-51,103,321,343,359,371
+src/app/routes.ts
+  s_67d3a4bcdb9d96::t_5419c2e2582222 40-42,46
+src/app/stackRoutes.tsx
+  s_67d3a4bcdb9d96::t_1aac9ca0b8a778 365-368,372,375,381
+src/features/home/ContinueRow.tsx
+  s_67d3a4bcdb9d96::t_5eca413997396e 1-271
+src/features/home/HomeScreen.tsx
+  s_67d3a4bcdb9d96::t_f1d0aeebf17e19 1,5,16-21,47-53,111-116,119-142,184,196-206,209-212,287-288,301-307,310,319-348,352-356,361-373,378,458-463,476,494-554,568,602-606,674-682,689-707,709-712
+src/features/player/PlayerOverlay.tsx
+  s_67d3a4bcdb9d96::t_94f02a0c05c916 3,53
+src/features/player/PlayerScreen.tsx
+  s_67d3a4bcdb9d96::t_48596852edd560 1171-1181
+src/features/player/mediaResolver.ts
+  s_67d3a4bcdb9d96::t_aca17a3a1c3c86 188-189,191,239-240,251,254-256,310-313,349
+src/shared/api/__tests__/sessionCheck.test.ts
+  s_67d3a4bcdb9d96::t_c6a2e4ed580128 89,95,126,131
+src/shared/api/sessionCheck.ts
+  s_67d3a4bcdb9d96::t_c2c00a72ca26c3 55-60,140
+src/shared/entities/post/index.ts
+  s_67d3a4bcdb9d96::t_06498d842e2e40 29
+src/shared/entities/post/videoTitle.ts
+  s_67d3a4bcdb9d96::t_21d400cb7128c0 1-16
+src/shared/i18n/ru.ts
+  s_67d3a4bcdb9d96::t_5a30c508d2eb0f 98-107
+src/shared/services/progress/__tests__/continueEntries.test.tsx
+  s_67d3a4bcdb9d96::t_9436c5fb2637c3 1-159
+src/shared/services/progress/__tests__/progressRepository.test.ts
+  s_67d3a4bcdb9d96::t_86311b2a60063e 26,598-677
+src/shared/services/progress/continueEntries.ts
+  s_67d3a4bcdb9d96::t_b7847c3436f7d1 1-79
+src/shared/services/progress/index.ts
+  s_67d3a4bcdb9d96::t_fba8f1a27b9833 20-26,32
+src/shared/services/progress/progressRepository.ts
+  s_67d3a4bcdb9d96::t_b030c06d64f7bc 71-77,369-376
+src/shared/services/progress/progressStore.ts
+  s_67d3a4bcdb9d96::t_395129851e6e07 38-41,73-77,121-138,194,199-202,206-209,215-216,225,290-301
+src/shared/ui/ContinueCard.tsx
+  s_67d3a4bcdb9d96::t_f920bc828b251f 1-192
+src/shared/ui/PostCard.tsx
+  s_67d3a4bcdb9d96::t_3ac1d999238f78 34-44
+src/shared/ui/PostGrid.tsx
+  s_67d3a4bcdb9d96::t_525a7c05d574a9 12,683-688,713,790
+src/shared/ui/__tests__/ContinueCard.test.tsx
+  s_67d3a4bcdb9d96::t_30c85774d233eb 1-79
+src/shared/ui/__tests__/surfaceRules.test.tsx
+  s_67d3a4bcdb9d96::t_620c3a87d9d07a 16,52-65
+src/shared/ui/index.ts
+  s_67d3a4bcdb9d96::t_307450f72fa509 32-38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "fff75ba6f39622d3c03e3c55e8d779034852ffb7",
+  "prompts": {},
+  "sessions": {
+    "s_67d3a4bcdb9d96": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e93f6f61-902b-4690-b071-9acc2f500329",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
