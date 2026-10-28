@@ -113,6 +113,30 @@ describe('SettingRow', () => {
   });
 });
 
+describe('SettingRow radio (Story 4.3)', () => {
+  it('a radio role, the selected state and accent mark; OK calls onPress', async () => {
+    const onPress = jest.fn();
+    const root = await render(<SettingRow testID={ID} kind="radio" label="720p" selected onPress={onPress} />);
+    const node = host(root);
+    expect(node.props.accessibilityRole).toBe('radio');
+    expect(node.props.accessibilityLabel).toBe('720p');
+    expect(node.props.accessibilityState).toMatchObject({ selected: true, checked: true });
+    const [mark] = byId(root, `${ID}/selected`);
+    expect(StyleSheet.flatten(mark.props.style).backgroundColor).toBe(colors.accent);
+    await act(async () => {
+      host(root).props.onClick({ nativeEvent: {} });
+    });
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
+  it('not selected: no mark, selected false', async () => {
+    const root = await render(<SettingRow testID={ID} kind="radio" label="Авто" />);
+    expect(host(root).props.accessibilityState).toMatchObject({ selected: false });
+    expect(byId(root, `${ID}/selected`)).toHaveLength(0);
+    expect(byId(root, `${ID}/radio`)).toHaveLength(1);
+  });
+});
+
 describe('StateView', () => {
   it('without an action: title-s title, body-s body, nothing focusable', async () => {
     const root = await render(<StateView testID="state" title="Лента появится здесь" body="Текст" />);

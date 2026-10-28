@@ -184,9 +184,9 @@ export const ru = {
     continueVideo: 'Продолжить · {label}',
     restart: 'С начала',
   },
-  // G Плеер (Story 4.1, docs/focus-map.md §4 G). No «Настройки» before
-  // Story 4.3; no resume or progress before Story 4.2. Times are
-  // `formatDuration`; `{remaining}` already carries no sign.
+  // G Плеер (Story 4.1, docs/focus-map.md §4 G). «Настройки» and the
+  // quality sheet are Story 4.3. Times are `formatDuration`; `{remaining}`
+  // already carries no sign. `{height}` is a progressive height in pixels.
   player: {
     loading: 'Загружаем видео',
     buffering: 'Загрузка',
@@ -203,6 +203,20 @@ export const ru = {
     noAccessBody: 'Этот пост сейчас недоступен для вашей подписки.',
     unavailableTitle: 'Видео недоступно',
     unavailableBody: 'Этого видео больше нет в посте.',
+    settings: 'Настройки',
+    // The ±10 s controls (Story 4.3 owner decision 2026-10-28).
+    back10: 'Назад на 10 секунд',
+    forward10: 'Вперёд на 10 секунд',
+    // The digits inside the ±10 s SVG icons (ADR 0013).
+    glyph: {
+      ten: '10',
+    },
+    quality: {
+      title: 'Качество',
+      auto: 'Авто',
+      autoAt: 'Авто · {height}p',
+      height: '{height}p',
+    },
   },
   common: {
     retry: 'Повторить',

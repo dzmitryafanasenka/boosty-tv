@@ -1,6 +1,7 @@
 import { useImperativeHandle, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import Video, {
+  type OnBandwidthUpdateData,
   type OnBufferData,
   type OnLoadData,
   type OnProgressData,
@@ -33,7 +34,9 @@ const SHORT_CODE = /^[A-Za-z0-9_-]{1,24}$/;
  * User-Agent and no `Authorization` (verified by the debug-only network log,
  * `android/app/src/debug`). Adaptive selection is capped at
  * `ADAPTIVE_MAX_HEIGHT` once the tracks are known (`onLoad`): the bitrate
- * cap of `adaptiveBitrateCap`. It never plays in the background and keeps
+ * cap of `adaptiveBitrateCap`. For adaptive sources it reports the playing
+ * track's height (`onResolution`, Story 4.3) from `onBandwidthUpdate`
+ * (`reportBandwidth`; 0 means unknown and is never reported). It never plays in the background and keeps
  * the system's audio focus handling.
  */
 export function PlayerEngineView({
@@ -47,6 +50,7 @@ export function PlayerEngineView({
   onSeekDone,
   onEnd,
   onError,
+  onResolution,
   ref,
 }: PlayerEngineProps) {
   const video = useRef<VideoRef>(null);
@@ -60,6 +64,9 @@ export function PlayerEngineView({
   const adaptive = source.format !== 'progressive';
   /** 0 = no cap, until the loaded tracks show a variant above the height cap. */
   const [bitrateCap, setBitrateCap] = useState(0);
+  /** The last reported track height (Story 4.3): reported again only when it changes. */
+  const reportedHeight = useRef(0);
+  const reportResolution = adaptive && onResolution !== undefined;
   return (
     <Video
       ref={video}
@@ -71,6 +78,18 @@ export function PlayerEngineView({
       playInBackground={false}
       progressUpdateInterval={500}
       maxBitRate={adaptive ? bitrateCap : 0}
+      reportBandwidth={reportResolution}
+      onBandwidthUpdate={
+        reportResolution
+          ? (e: OnBandwidthUpdateData) => {
+              const height = typeof e.height === 'number' && Number.isFinite(e.height) ? Math.floor(e.height) : 0;
+              if (height > 0 && height !== reportedHeight.current) {
+                reportedHeight.current = height;
+                onResolution?.(height);
+              }
+            }
+          : undefined
+      }
       style={[styles.video, style]}
       onLoad={(e: OnLoadData) => {
         if (adaptive) {

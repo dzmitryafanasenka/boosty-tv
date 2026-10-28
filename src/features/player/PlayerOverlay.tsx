@@ -5,6 +5,8 @@ import { formatDuration } from '../../shared/i18n/format';
 import {
   AuthorAvatar,
   FocusableSurface,
+  GearIcon,
+  SkipIcon,
   Text,
   colors,
   components,
@@ -18,6 +20,16 @@ import type { PlayerMeta } from './mediaResolver';
 /** Focus ids (docs/focus-map.md §1.5). */
 export const PLAYER_TIMELINE_ID = 'player/timeline';
 export const PLAYER_PLAYPAUSE_ID = 'player/playpause';
+export const PLAYER_SETTINGS_ID = 'player/settings';
+export const PLAYER_BACK10_ID = 'player/back10';
+export const PLAYER_FORWARD10_ID = 'player/forward10';
+/** The overlay's controls: raw ← → never seek on them (they move focus natively). */
+export const PLAYER_CONTROL_IDS: ReadonlySet<string> = new Set([
+  PLAYER_PLAYPAUSE_ID,
+  PLAYER_BACK10_ID,
+  PLAYER_FORWARD10_ID,
+  PLAYER_SETTINGS_ID,
+]);
 
 const CONTROL = components['player-control'];
 const TIMELINE = components.timeline;
@@ -199,6 +211,49 @@ function PlayPauseControl({ paused, onPress, onFocus, ref }: PlayPauseProps) {
   );
 }
 
+type IconControlProps = {
+  testID: string;
+  label: string;
+  /** The icon, drawn in the control's ink (inverted when focused). */
+  icon: 'back10' | 'forward10' | 'settings';
+  onPress: () => void;
+  onFocus: () => void;
+  ref?: Ref<HostView>;
+};
+
+/**
+ * A round PlayerControl with an SVG icon (Story 4.3, ADR 0013): a circular
+ * arrow with «10» for ±10 s, a gear for «Настройки». Same tokens and states
+ * as play/pause: `overlay-badge`; focused inverted plus ring.
+ */
+function IconControl({ testID, label, icon, onPress, onFocus, ref }: IconControlProps) {
+  return (
+    <FocusableSurface
+      ref={ref}
+      testID={testID}
+      radius={CONTROL.radius}
+      scaleFocus={focus['scale-button']}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      onFocus={onFocus}
+      surfaceStyle={({ focused }: SurfaceState) => [
+        styles.control,
+        { backgroundColor: focused ? CONTROL.bgFocus : CONTROL.bg },
+      ]}
+    >
+      {({ focused }: SurfaceState) => {
+        const ink = focused ? CONTROL.iconFocus : colors.text;
+        return icon === 'settings' ? (
+          <GearIcon testID={`${testID}/icon`} color={ink} />
+        ) : (
+          <SkipIcon testID={`${testID}/icon`} direction={icon === 'back10' ? -1 : 1} color={ink} />
+        );
+      }}
+    </FocusableSurface>
+  );
+}
+
 export type PlayerOverlayProps = {
   meta: PlayerMeta;
   paused: boolean;
@@ -208,16 +263,27 @@ export type PlayerOverlayProps = {
   onTogglePause: () => void;
   onTimelineFocus: () => void;
   onPlayPauseFocus: () => void;
+  /** «−10 с» / «+10 с» (Story 4.3 owner decision): OK moves the seek target by 10 s. */
+  onSkip: (direction: -1 | 1) => void;
+  /** Focus arrived on a control without its own handler (±10 s): its id. */
+  onControlFocus: (id: string) => void;
+  /** «Настройки» (Story 4.3): opens the settings sheet. */
+  onOpenSettings: () => void;
+  onSettingsFocus: () => void;
   timelineRef?: Ref<HostView>;
   playPauseRef?: Ref<HostView>;
+  /** «Настройки», the sheet's initiator (focus returns here when it closes). */
+  settingsRef?: Ref<HostView>;
 };
 
 /**
  * DESIGN.md Player overlay. Top band: avatar · author, the post title
  * (`player-title`, ≤ 2 lines), the video title when it differs. Bottom band:
- * the timeline, elapsed / remaining (tabular), then the controls (play/pause
- * only: «Настройки» is Story 4.3). Both bands sit on a darkening gradient.
- * Focus: the timeline; ↓ → play/pause; ↑ → the timeline (native).
+ * the timeline, elapsed / remaining (tabular), then the controls row:
+ * «−10 с» · play/pause · «+10 с» centered, the ⚙ «Настройки» at its right
+ * end (Story 4.3 owner decision 2026-10-28). Both bands sit on a darkening
+ * gradient. Focus: the timeline; ↓ → play/pause; ← → across −10 · play/pause
+ * · +10 · ⚙; ↑ → the timeline (all native).
  */
 export function PlayerOverlay({
   meta,
@@ -228,8 +294,13 @@ export function PlayerOverlay({
   onTogglePause,
   onTimelineFocus,
   onPlayPauseFocus,
+  onSkip,
+  onControlFocus,
+  onOpenSettings,
+  onSettingsFocus,
   timelineRef,
   playPauseRef,
+  settingsRef,
 }: PlayerOverlayProps) {
   const showVideoTitle = isDistinctVideoTitle(meta.videoTitle, meta.postTitle);
   return (
@@ -280,12 +351,38 @@ export function PlayerOverlay({
           ) : null}
         </View>
         <View testID="player/controls" style={styles.controls}>
-          <PlayPauseControl
-            ref={playPauseRef}
-            paused={paused}
-            onPress={onTogglePause}
-            onFocus={onPlayPauseFocus}
-          />
+          <View testID="player/controls/center" style={styles.controlsCenter}>
+            <IconControl
+              testID={PLAYER_BACK10_ID}
+              label={t('player.back10')}
+              icon="back10"
+              onPress={() => onSkip(-1)}
+              onFocus={() => onControlFocus(PLAYER_BACK10_ID)}
+            />
+            <PlayPauseControl
+              ref={playPauseRef}
+              paused={paused}
+              onPress={onTogglePause}
+              onFocus={onPlayPauseFocus}
+            />
+            <IconControl
+              testID={PLAYER_FORWARD10_ID}
+              label={t('player.forward10')}
+              icon="forward10"
+              onPress={() => onSkip(1)}
+              onFocus={() => onControlFocus(PLAYER_FORWARD10_ID)}
+            />
+          </View>
+          <View testID="player/controls/end" style={styles.controlsEnd}>
+            <IconControl
+              ref={settingsRef}
+              testID={PLAYER_SETTINGS_ID}
+              label={t('player.settings')}
+              icon="settings"
+              onPress={onOpenSettings}
+              onFocus={onSettingsFocus}
+            />
+          </View>
         </View>
       </View>
     </View>
@@ -367,10 +464,25 @@ const styles = StyleSheet.create({
     marginTop: spacing['2'],
   },
   // Centered under the timeline (owner decision, Story 4.1 device check).
+  // The row spans the band: −10 · play/pause · +10 centered, ⚙ at the right
+  // end on the same line (so native ← → reaches it from +10).
   controls: {
     flexDirection: 'row',
     justifyContent: 'center',
+    alignItems: 'center',
     marginTop: spacing['6'],
+  },
+  controlsCenter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing['8'],
+  },
+  controlsEnd: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
   },
   control: {
     width: CONTROL.size,

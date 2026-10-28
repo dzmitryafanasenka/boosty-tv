@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import type { HttpClient } from '../../shared/api';
 import type { MediaRef } from '../../shared/entities/post';
-import { useLatestRef } from '../../shared/focus';
+import { useLatestRef, useModal } from '../../shared/focus';
 import { t } from '../../shared/i18n';
 import { subscribeAppBackground } from '../../shared/platform/appLifecycle';
 import { playbackArbiter } from '../../shared/platform/playbackArbiter';
@@ -27,8 +27,20 @@ import {
   spacing,
   type HostView,
 } from '../../shared/ui';
-import { useMediaSource } from './mediaResolver';
-import { PLAYER_PLAYPAUSE_ID, PLAYER_TIMELINE_ID, PlayerOverlay } from './PlayerOverlay';
+import { pickSource, qualityOf, qualityOptions, useMediaSource, type QualityKey } from './mediaResolver';
+import {
+  PLAYER_CONTROL_IDS,
+  PLAYER_PLAYPAUSE_ID,
+  PLAYER_SETTINGS_ID,
+  PLAYER_TIMELINE_ID,
+  PlayerOverlay,
+} from './PlayerOverlay';
+import {
+  PlayerSettingsSheet,
+  createSettingsSheetModel,
+  type SettingsSheetData,
+} from './PlayerSettingsSheet';
+import { qualityPreference } from './qualityPreference';
 import { createSeekController, type SeekDirection } from './seekController';
 
 /** Focus ids (docs/focus-map.md §1.5). */
@@ -46,6 +58,8 @@ export const BUFFER_SPINNER_MS = motion['buffer-delay'].delay;
  * 1.6, focus-map §1.1).
  */
 export const ENTRY_GUARD_MS = 500;
+/** The ±10 s controls' step (Story 4.3 owner decision). */
+export const SKIP_STEP_SEC = 10;
 /** A held ← → seeks at most this often (Android repeats a held key every ≈ 50 ms). */
 export const HOLD_REPEAT_MS = 200;
 
@@ -62,13 +76,15 @@ export type PlayerStart = 'resume' | 'beginning';
 /**
  * The start-position gate of one source (Story 4.2): no progress is
  * reported before the start position is reached (never a pre-seek `t=0`).
- * - `load`: waiting for `onLoad` (and the local store);
+ * - `load`: waiting for `onLoad` (and the local store); `target` is an
+ *   explicit start (a quality switch, Story 4.3: the current or pending
+ *   position), else the resume point (or 0 for «С начала»);
  * - `seek`: the initial seek to `target` is in flight (until its `onSeekDone`);
  * - `first`: starting at 0, the first progress event starts reporting;
  * - `started`: reports flow.
  */
 type StartGate =
-  | { kind: 'load' }
+  | { kind: 'load'; target?: number }
   | { kind: 'seek'; target: number }
   | { kind: 'first' }
   | { kind: 'started' };
@@ -118,11 +134,38 @@ export type PlayerScreenProps = {
  *   progress event); then `tick` on progress, `pause` on a user pause (not a
  *   hold-scrub pause), `end`, `background`, `exit` (Stop, Back, «Назад»,
  *   unmount). The repository decides when E9 is written.
- * - No quality sheet or autoplay of the next video (Stories 4.3–4.5).
+ * - Settings (Story 4.3): «Настройки» (right of play/pause) and the Menu /
+ *   Info keys open the settings sheet (`PlayerSettingsSheet`, the one modal
+ *   host, a right side sheet). While it is open the overlay never hides, the
+ *   player ignores the remote (the sheet owns it) and playback continues.
+ *   A quality pick stores the device preference, remounts the engine with
+ *   that source of the same E8 (no new request) and seeks to the current
+ *   (or pending) position through the start gate (no `begin`, no t=0); the
+ *   sheet closes with focus on «Настройки». The stored preference feeds
+ *   `pickSource` on every open.
+ * - No autoplay of the next video (Story 4.5).
  */
 export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume' }: PlayerScreenProps) {
   const progress = useProgressRepository();
-  const media = useMediaSource(http, mediaRef, progress?.onServerProgress);
+  // The device's quality preference (Story 4.3): read once per app run;
+  // the engine waits for it, so the first source is the preferred one.
+  const [preference, setPreference] = useState<QualityKey | null | undefined>(() => qualityPreference.peek());
+  useEffect(() => {
+    if (preference !== undefined) {
+      return;
+    }
+    let alive = true;
+    qualityPreference.read().then(value => {
+      if (alive) {
+        setPreference(value);
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, [preference]);
+  const preferenceReady = preference !== undefined;
+  const media = useMediaSource(http, mediaRef, progress?.onServerProgress, preference ?? null);
   // The local store is loaded before the engine starts, so the resume point
   // is known at `onLoad` (a cold start reads the persisted entry).
   const [progressReady, setProgressReady] = useState(() => progress === null || progress.store.isReady());
@@ -163,6 +206,11 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
   const [buffering, setBuffering] = useState(true);
   const [spinner, setSpinner] = useState(false);
   const [overlay, setOverlay] = useState(false);
+  /** The adaptive source's track height as the engine reports it (Story 4.3); null before a report. */
+  const [autoHeight, setAutoHeight] = useState<number | null>(null);
+  /** The settings sheet is open (Story 4.3): the ref for event handlers, the state for rendering. */
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const sheetOpenRef = useRef(false);
   /** Bumped on every input that shows the overlay: restarts the auto-hide. */
   const [interaction, setInteraction] = useState(0);
   const [, setSeekTick] = useState(0);
@@ -202,6 +250,8 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
   const seeking = seek.isSeeking();
   const seekTarget = seek.target();
 
+  /** A quality pick waiting for its source's `onLoad` before it is stored (Story 4.3). */
+  const pendingPreferenceWrite = useRef<QualityKey | null>(null);
   /** The start-position gate of the current source (Story 4.2). */
   const gate = useRef<StartGate>({ kind: 'load' });
   /** The first source of this player opening starts at `start`; a later one (retry) resumes. */
@@ -217,6 +267,7 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
     setPositionSec(0);
     setDurationSec(0);
     setBuffering(true);
+    setAutoHeight(null);
   }, [resolution, seek]);
 
   // The one playback slot (AD-19): claimed while playing, released on
@@ -241,7 +292,7 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
   }, [buffered]);
 
   // Auto-hide: only while playing, never paused, seeking or on error.
-  const mayHide = overlay && playing && !paused && !seeking;
+  const mayHide = overlay && playing && !paused && !seeking && !sheetOpen;
   useEffect(() => {
     if (!mayHide) {
       return;
@@ -288,6 +339,54 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
   const onBackFocus = useCallback(() => {
     focused.current = PLAYER_BACK_ID;
   }, []);
+  const onSettingsFocus = useCallback(() => {
+    focused.current = PLAYER_SETTINGS_ID;
+  }, []);
+  const onControlFocus = useCallback((id: string) => {
+    focused.current = id;
+  }, []);
+
+  // ------------------------------------------------------ settings sheet
+
+  const modal = useModal();
+  const settingsView = useRef<HostView | null>(null);
+  /** The sheet's data (the modal host renders the sheet element once; this updates under it). */
+  const [sheetModel] = useState(() =>
+    createSettingsSheetModel({ options: [], selected: 'auto', autoHeight: null }),
+  );
+  const sheetData = useMemo<SettingsSheetData | null>(
+    () =>
+      ready === null
+        ? null
+        : { options: qualityOptions(ready.sources), selected: qualityOf(ready.source), autoHeight },
+    [ready, autoHeight],
+  );
+  useEffect(() => {
+    if (sheetData !== null) {
+      sheetModel.set(sheetData);
+    }
+  }, [sheetData, sheetModel]);
+  const closeSheet = useCallback(
+    (restoreFocus: boolean) => {
+      if (!sheetOpenRef.current) {
+        return;
+      }
+      sheetOpenRef.current = false;
+      setSheetOpen(false);
+      modal.close({ restoreFocus });
+    },
+    [modal],
+  );
+  // The sheet exists only while playing (an engine error, a retry): closed
+  // without restoring focus, before the focus effect below picks the target.
+  useEffect(() => {
+    if (!playing) {
+      closeSheet(false);
+    }
+  }, [playing, closeSheet]);
+  // Unmount (any exit path) with the sheet open: close it.
+  const closeSheetRef = useLatestRef(closeSheet);
+  useEffect(() => () => closeSheetRef.current(false), [closeSheetRef]);
 
   // Where focus goes for each phase and overlay state. The element that
   // had focus can disappear in the same commit (the surface turning
@@ -311,13 +410,15 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
             : surfaceFocusable
               ? [surfaceView, PLAYER_SURFACE_ID]
               : [null, null];
-    if (view === null || !isActive()) {
+    // The settings sheet owns focus while open; closing it returns focus to
+    // «Настройки» (the modal host), not to this target.
+    if (view === null || !isActive() || sheetOpenRef.current) {
       return;
     }
     requestHostFocus(view.current);
     let frame = requestAnimationFrame(() => {
       frame = requestAnimationFrame(() => {
-        if (focused.current !== id && isActive()) {
+        if (focused.current !== id && isActive() && !sheetOpenRef.current) {
           requestHostFocus(view.current);
         }
       });
@@ -332,7 +433,7 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
     setInteraction(n => n + 1);
   }, []);
 
-  const live = useLatestRef({ phase, overlay, paused, positionSec, durationSec, isActive, onExit, mediaRef });
+  const live = useLatestRef({ phase, overlay, paused, positionSec, durationSec, isActive, onExit, mediaRef, ready });
 
   /**
    * One progress report (Story 4.2), only once the start position was
@@ -364,6 +465,77 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
   useEffect(() => subscribeAppBackground(() => reportRef.current('background')), [reportRef]);
   // Unmount (any exit path): a forced write, not awaited.
   useEffect(() => () => reportRef.current('exit'), [reportRef]);
+
+  /**
+   * A quality pick (Story 4.3): the preference is stored (device scope;
+   * «Авто» clears the height); when it changes the playing source, the
+   * engine remounts with that source of the same E8 and starts at the
+   * current position (or the pending seek target) through the start gate:
+   * no report before that seek is done (never t=0), and the progress session
+   * continues (no `begin`). The sheet closes, focus → «Настройки».
+   */
+  const pickQuality = useCallback(
+    (key: QualityKey) => {
+      const current = live.current.ready;
+      setPreference(key);
+      // This run uses the pick at once; the device store gets it only once
+      // the switched source loaded (a pick the decoder cannot play is never
+      // stored, so later opens are not broken by it).
+      qualityPreference.remember(key);
+      const next = current === null ? null : pickSource(current.sources, { preference: key });
+      if (current !== null && next !== null && next !== current.source) {
+        pendingPreferenceWrite.current = key;
+        const startGate = gate.current;
+        if (startGate.kind !== 'load') {
+          // Before the start position is reached, the pending start stays the
+          // start (the resume point, or its in-flight seek); after it, the
+          // current position or the pending seek target.
+          const target = startGate.kind === 'seek' ? startGate.target : (seek.target() ?? live.current.positionSec);
+          gate.current = { kind: 'load', target };
+          setPositionSec(target);
+        }
+        // A held scrub paused a playing video: it resumes, as its own end would.
+        if (seek.isHeld() && scrubWasPlaying.current) {
+          setPaused(false);
+        }
+        seek.reset();
+        scrubWasPlaying.current = false;
+        ended.current = false;
+        setBuffering(true);
+        setAutoHeight(null);
+      } else {
+        // The playing source stays: it already plays, so the choice is stored.
+        pendingPreferenceWrite.current = null;
+        qualityPreference.write(key);
+      }
+      closeSheet(true);
+      showOverlay();
+    },
+    [live, seek, closeSheet, showOverlay],
+  );
+  const pickQualityRef = useLatestRef(pickQuality);
+
+  /** «Настройки», Menu or Info: the settings sheet (the overlay shows and stays). */
+  const openSettings = useCallback(() => {
+    if (live.current.phase !== 'playing' || sheetOpenRef.current) {
+      return;
+    }
+    sheetOpenRef.current = true;
+    setSheetOpen(true);
+    showOverlay();
+    modal.open(
+      <PlayerSettingsSheet
+        model={sheetModel}
+        onPick={key => pickQualityRef.current(key)}
+        onClosed={() => {
+          sheetOpenRef.current = false;
+          setSheetOpen(false);
+        }}
+      />,
+      settingsView,
+      { placement: 'end' },
+    );
+  }, [live, showOverlay, modal, sheetModel, pickQualityRef]);
 
   /** Exit (Back, Stop, «Назад»): report, then leave. */
   const exitPlayer = useCallback(() => {
@@ -431,6 +603,23 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
     [live, seek, showOverlay],
   );
 
+  /**
+   * OK on «−10 с» / «+10 с» (Story 4.3 owner decision 2026-10-28): the seek
+   * target moves by exactly 10 s (quick OKs accumulate, one commit 600 ms
+   * after the last, the bubble shows it, clamped); ignored (overlay only)
+   * until the duration is known.
+   */
+  const onSkip = useCallback(
+    (direction: SeekDirection) => {
+      const { positionSec: position, durationSec: duration } = live.current;
+      if (duration > 0) {
+        seek.press(direction, position, duration, SKIP_STEP_SEC);
+      }
+      showOverlay();
+    },
+    [live, seek, showOverlay],
+  );
+
   /** OK on the surface (overlay hidden): pause and show the overlay (a pending seek: commit it). */
   const onSurfacePress = useCallback(() => {
     if (live.current.phase !== 'playing' || entryGuarded()) {
@@ -462,11 +651,12 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
   const onSeekKey = useCallback(
     (event: SeekKeyEvent) => {
       const { phase: current, isActive: active } = live.current;
-      if (!active() || current !== 'playing') {
+      // The settings sheet owns the remote while it is open.
+      if (!active() || current !== 'playing' || sheetOpenRef.current) {
         return;
       }
       const direction: SeekDirection = event.key === 'right' ? 1 : -1;
-      const onControls = focused.current === PLAYER_PLAYPAUSE_ID;
+      const onControls = focused.current !== null && PLAYER_CONTROL_IDS.has(focused.current);
       if (event.action === 'down') {
         swallowUp.current[event.key] = true;
         const now = Date.now();
@@ -509,6 +699,15 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
       if (!active() || current !== 'playing' || Number(event.eventKeyAction) !== KEY_UP) {
         return;
       }
+      // The settings sheet owns the remote while it is open (its rows move
+      // natively); no seek, no pause behind it.
+      if (sheetOpenRef.current) {
+        const type = event.eventType;
+        if ((type === 'left' || type === 'right') && swallowUp.current[type]) {
+          swallowUp.current[type] = false;
+        }
+        return;
+      }
       const type = event.eventType;
       if (!REMOTE_KEYS.has(type)) {
         return;
@@ -525,7 +724,7 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
       switch (type) {
         case 'left':
         case 'right':
-          if (focused.current === PLAYER_PLAYPAUSE_ID) {
+          if (focused.current !== null && PLAYER_CONTROL_IDS.has(focused.current)) {
             // ← → move between the controls natively.
             showOverlay();
           } else {
@@ -564,9 +763,14 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
         case 'stop':
           exitPlayer();
           return;
+        case 'menu':
+        case 'info':
+          // Story 4.3: react-native-tvos maps only these two (no Settings key).
+          openSettings();
+          return;
       }
     },
-    [live, seek, seekBy, showOverlay, togglePause, setPlaying, entryGuarded, exitPlayer],
+    [live, seek, seekBy, showOverlay, togglePause, setPlaying, entryGuarded, exitPlayer, openSettings],
   );
   useTVEventHandler(onTvEvent);
 
@@ -574,6 +778,10 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
   useFocusEffect(
     useCallback(() => {
       const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        // The settings sheet's levels come first (the modal host and the sheet).
+        if (sheetOpenRef.current) {
+          return false;
+        }
         // A held seek target is the first Back layer: cancel it, the overlay stays.
         if (seek.isHeld()) {
           seek.cancel();
@@ -596,17 +804,28 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
     ({ durationSec: d }: { durationSec: number }) => {
       setDurationSec(d);
       setBuffering(false);
+      // A switched source loaded: its quality is now stored (Story 4.3).
+      if (pendingPreferenceWrite.current !== null) {
+        qualityPreference.write(pendingPreferenceWrite.current);
+        pendingPreferenceWrite.current = null;
+      }
       if (gate.current.kind !== 'load') {
         return;
       }
+      // A quality switch (Story 4.3): the explicit start, no resume point.
+      const explicit = gate.current.target;
       // Story 4.2: the start position, once per source: the resume point
       // (local, else the server `timeCode`; 0 when none or finished), or 0
       // for «С начала». Reports wait until the seek there is done.
       const target =
-        progress === null || startMode.current === 'beginning'
-          ? 0
-          : progress.resumePoint(live.current.mediaRef, d > 0 ? d : null);
-      startMode.current = 'resume';
+        explicit !== undefined
+          ? explicit
+          : progress === null || startMode.current === 'beginning'
+            ? 0
+            : progress.resumePoint(live.current.mediaRef, d > 0 ? d : null);
+      if (explicit === undefined) {
+        startMode.current = 'resume';
+      }
       if (target > 0) {
         gate.current = { kind: 'seek', target };
         setPositionSec(target);
@@ -660,6 +879,8 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
     showOverlay();
   }, [showOverlay, live, reportRef]);
   const onError = useCallback(() => {
+    // A switched source that failed before `onLoad` is never stored.
+    pendingPreferenceWrite.current = null;
     seek.reset();
     setFailedResolution(resolution);
   }, [resolution, seek]);
@@ -688,9 +909,10 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
         onPress={onSurfacePress}
         style={styles.surface}
       >
-        {ready !== null && !failed && progressReady ? (
+        {ready !== null && !failed && progressReady && preferenceReady ? (
           <PlayerEngineView
-            key={ready.resolution}
+            // A new E8 or a quality switch (Story 4.3) remounts the engine.
+            key={`${ready.resolution}:${ready.source.type}`}
             ref={engine}
             testID="player/engine"
             source={{ uri: ready.source.url, format: ready.source.format }}
@@ -701,6 +923,7 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
             onSeekDone={onSeekDone}
             onEnd={onEnd}
             onError={onError}
+            onResolution={setAutoHeight}
           />
         ) : null}
       </Pressable>
@@ -721,7 +944,12 @@ export function PlayerScreen({ http, mediaRef, isActive, onExit, start = 'resume
           onTogglePause={onOk}
           onTimelineFocus={onTimelineFocus}
           onPlayPauseFocus={onPlayPauseFocus}
+          onSkip={onSkip}
+          onControlFocus={onControlFocus}
+          onOpenSettings={openSettings}
+          onSettingsFocus={onSettingsFocus}
           timelineRef={timelineView}
+          settingsRef={settingsView}
         />
       ) : null}
       {errorTarget !== null ? (
@@ -775,6 +1003,8 @@ const REMOTE_KEYS: ReadonlySet<string> = new Set([
   'rewind',
   'previous',
   'stop',
+  'menu',
+  'info',
 ]);
 
 const styles = StyleSheet.create({

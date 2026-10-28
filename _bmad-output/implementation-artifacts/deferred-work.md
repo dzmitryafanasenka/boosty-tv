@@ -261,3 +261,15 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-4-2-progress-is-saved-and-playback-resumes.md`
   summary: Check whether `ok_video.preview` URLs carry a CDN token before Story 4.7 renders the stored `meta.previewUrl`; if signed, store none and re-read the preview from E8.
   evidence: Unverified (medium if true): the progress store persists `meta.previewUrl`; settle by inspecting one live E8 preview URL shape (redacted).
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-3-choose-video-quality.md`
+  summary: Story 4.3 device checks still open — the physical remote, TalkBack, ±10 quick-press accumulation and +10 near the end, the side sheet's native focus trap at its edges, a pick the decoder cannot play (1440p). Sheet, list, «Авто · 1080p», a 720p pick at the same second, Back order, cold-start preference, icons and −10 passed over adb (2026-10-28).
+  evidence: docs/testing.md «Story 4.3» (agent, adb).
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-3-choose-video-quality.md`
+  summary: A picked height the decoder cannot play (e.g. 1440p AVC High on the pinned device) is not stored (the device store is written only after the picked source's `onLoad`), but it stays this run's in-memory choice: «Повторить» and later opens in the same app run re-play it, and the sheet is unreachable from the error state. A height that loaded and fails later (mid-stream decoder error) is stored. Story 4.4's recovery should fall back to the default order after a failure of a preferred source.
+  evidence: Owner decision 2026-10-28 (a failing pick shows the existing start-failure error; recovery is Story 4.4); `PlayerScreen` `pickQuality`, `mediaResolver.pickSource`.
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-3-choose-video-quality.md`
+  summary: The Menu and Info keys open the sheet but are unverified on a real remote (the pinned Chromecast remote has neither); no Settings key code exists on Android (react-native-tvos maps only `menu` and `info`).
+  evidence: `ReactAndroidHWInputDeviceHelper.kt` key map; focus-map §4 G Story 4.3 notes.
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-3-choose-video-quality.md`
+  summary: A quality switch while the new source has not reached its start (the `load`/`seek` gate) writes no progress until that seek lands; an exit in that window keeps the last written position (≤ 10 s old), and a retry after a switch resumes from that position, not the exact switch second.
+  evidence: `PlayerScreen` start gate (`{kind: 'load', target}`); the same rule as a fresh source (Story 4.2: never a pre-seek t=0).
