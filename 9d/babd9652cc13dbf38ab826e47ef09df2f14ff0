@@ -1,0 +1,109 @@
+__tests__/demoFlow.test.tsx
+  s_cf2d44a91f5eb5::t_ef6ff7fb1ad065 13,255-313
+__tests__/homeFeedFlow.test.tsx
+  s_cf2d44a91f5eb5::t_6cd96d3b802a52 14,2635,2733,2808,3286,3309-3668
+_bmad-output/implementation-artifacts/epic-5-context.md
+  s_cf2d44a91f5eb5::t_fb70f3ba53ed68 7,21-34,38-52,57-62,64,66-69,71-77,79-82,86-90
+_bmad-output/implementation-artifacts/spec-5-5-filter-by-tags.md
+  s_cf2d44a91f5eb5::t_2235ab3d8b8d53 1-123
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_cf2d44a91f5eb5::t_e55b24038cba76 32,84
+docs/api-contract.md
+  s_cf2d44a91f5eb5::t_67676439092b65 249,257,343-366
+docs/feature-parity.md
+  s_cf2d44a91f5eb5::t_64ffcc7e26d209 70-71
+docs/focus-map.md
+  s_cf2d44a91f5eb5::t_547c5003bdb5f5 64,235,238,242,250-256
+docs/testing.md
+  s_cf2d44a91f5eb5::t_26e8f968b69650 896-919
+src/app/dev/demo.ts
+  s_7d2b450e62bdd8::t_949bca189aa2c4 18-19,45-69,101,116-118,127-130,137-138,344-345
+src/features/home/HomeScreen.tsx
+  s_7d2b450e62bdd8::t_d4171d3609aeb2 160-169,173-175,187-191,771-772
+src/shared/api/__tests__/queryKeys.test.ts
+  s_7d2b450e62bdd8::t_9bcf87f8a8db8f 43,46,49,53,59-63,66-69,75,79,82,84,89-114,116-124
+src/shared/api/dto/feedTags.ts
+  s_cf2d44a91f5eb5::t_4871e78ef06e45 1-37
+src/shared/api/queryKeys.ts
+  s_7d2b450e62bdd8::t_045225ba83ccf6 1,14-16,18-23,26-31
+src/shared/entities/post/__tests__/postRepository.test.ts
+  s_7d2b450e62bdd8::t_ae92575955836e 48-50,54,59-82,93,102,113,141
+src/shared/entities/post/postRepository.ts
+  s_7d2b450e62bdd8::t_d60c8b0a607447 6,44-53,57-58,61
+src/shared/entities/tag/__tests__/tagRepository.test.ts
+  s_cf2d44a91f5eb5::t_84a6f743638b0b 1-128
+src/shared/entities/tag/index.ts
+  s_7d2b450e62bdd8::t_d010141d7f40f1 1-2
+src/shared/entities/tag/tagRepository.ts
+  s_7d2b450e62bdd8::t_048fbbaf369ee7 1-67
+src/shared/entities/tag/types.ts
+  s_7d2b450e62bdd8::t_8e6194e51d6499 1-17
+src/shared/filters/FilterSheet.tsx
+  s_cf2d44a91f5eb5::t_90215d3066aaf7 3,24,33,43-44,47,74,77,80-85,92-93,97-100,102,141-143,152,154,221-224,273-288,316-318
+src/shared/filters/TagList.tsx
+  s_cf2d44a91f5eb5::t_102065a5561592 1-298
+src/shared/filters/__tests__/filtersStore.test.ts
+  s_7d2b450e62bdd8::t_663c69bf6def28 17,24-28,41,55,87
+src/shared/filters/__tests__/period.test.ts
+  s_7d2b450e62bdd8::t_b4c20a905bfb96 31,37-39,41,43,150
+src/shared/filters/__tests__/tags.test.ts
+  s_7d2b450e62bdd8::t_9532ad72d484d0 1-90
+src/shared/filters/filter.ts
+  s_7d2b450e62bdd8::t_b9e1e3dd35f684 2-3,34-40,44-49,60-62,65-75,77-79,93-96,99-101
+src/shared/filters/filtersStore.ts
+  s_7d2b450e62bdd8::t_d4d8645bef8d1e 5,11,20-27,34,58-77
+src/shared/filters/index.ts
+  s_7d2b450e62bdd8::t_febec4be25dedf 5,16,23,37,59-70
+src/shared/i18n/ru.ts
+  s_7d2b450e62bdd8::t_e5d956b9070d83 173-188
+src/shared/ui/FilterChip.tsx
+  s_cf2d44a91f5eb5::t_031a38d5503f85 32-33,70,95-99
+src/shared/ui/SettingRow.tsx
+  s_7d2b450e62bdd8::t_421807102193d0 4,11-14,16,30,34-35,46-47,61,69-70,84-86,88-90,108-121,177-192
+src/shared/ui/__tests__/shellPrimitives.test.tsx
+  s_7d2b450e62bdd8::t_a0bc4e1930449b 140-165
+src/shared/ui/__tests__/surfaceRules.test.tsx
+  s_7d2b450e62bdd8::t_5a86687c90b522 36
+src/shared/ui/icons/index.tsx
+  s_7d2b450e62bdd8::t_1ee5e2dc311361 87-109
+src/shared/ui/index.ts
+  s_7d2b450e62bdd8::t_06752a8e931ac6 18
+src/test/fixtures/boosty/e13-feed-tags-1.json
+  s_7d2b450e62bdd8::t_61af7b21f867e7 1-35
+src/test/fixtures/boosty/e13-feed-tags-2.json
+  s_7d2b450e62bdd8::t_e6838f7ec7239b 1-28
+src/shared/filters/useFeedTags.ts
+  s_23aea130a35b51::t_6c9ec58860ebc4 1-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "9dbabd9652cc13dbf38ab826e47ef09df2f14ff0",
+  "prompts": {},
+  "sessions": {
+    "s_23aea130a35b51": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a9350efd2a6ce64b1",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_7d2b450e62bdd8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "286a96b5-e844-4877-aaaf-8b94666e7567",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_cf2d44a91f5eb5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e4efc8e8-0d1b-4dec-bf0c-2aa71e3e2534",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
