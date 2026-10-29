@@ -10,6 +10,7 @@ import { resetQueryCache } from '../src/app/queryClient';
 import { session } from '../src/app/session';
 import { focusRestoration } from '../src/shared/focus';
 import { filtersStore, formatDayKey, periodBounds } from '../src/shared/filters';
+import { TagRepository } from '../src/shared/entities/tag';
 import { t } from '../src/shared/i18n';
 import { createAsyncStorage } from '@react-native-async-storage/async-storage';
 import { accountScope } from '../src/shared/account';
@@ -246,6 +247,65 @@ test('Story 5.4: the demo feed honours from_ts / to_ts (a custom day keeps only 
     await act(async () => {
       root.unmount();
     });
+  } finally {
+    filtersStore.getState().clear();
+  }
+});
+
+test('Story 5.5: the demo E13 answers two pages of 8; the demo feed intersects tags_ids', async () => {
+  const root = await renderApp();
+  try {
+    // The demo transport delays each reply (fake timers here).
+    const load = async (cursor: string | null) => {
+      const pending = TagRepository.feedTagsPage(session.http, cursor);
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(1000);
+      });
+      return pending;
+    };
+    const page1 = await load(null);
+    expect(page1.tags).toHaveLength(8);
+    expect(page1.nextCursor).not.toBeNull();
+    const page2 = await load(page1.nextCursor);
+    expect(page2.tags.map(tag => tag.id)).toEqual(['9', '10', '11', '12', '13', '14', '15', '16']);
+    expect(page2.nextCursor).toBeNull();
+  } finally {
+    await act(async () => {
+      root.unmount();
+    });
+  }
+  // Demo post n carries tags (n % 4) + 1 and (n % 3) + 5: tags 1 and 5 → n % 12 = 0
+  // (locked posts, n % 7 = 6, are not «Доступные мне»).
+  const cardsWith = async (tags: { id: string; title: string }[]) => {
+    for (const tag of tags) {
+      filtersStore.getState().toggleTag('feed', tag);
+    }
+    const app = await renderApp();
+    const cards = app.container
+      .queryAll(n => n.props.focusable === true)
+      .map(n => n.props.testID as string)
+      .filter(id => id.startsWith('home/feed/demo-post-'));
+    await act(async () => {
+      app.unmount();
+    });
+    filtersStore.getState().clear();
+    await resetQueryCache();
+    return cards;
+  };
+  try {
+    expect(
+      await cardsWith([
+        { id: '1', title: 'Демо-тег 1' },
+        { id: '5', title: 'Демо-тег 5' },
+      ]),
+    ).toEqual(['home/feed/demo-post-0', 'home/feed/demo-post-12', 'home/feed/demo-post-24']);
+    // Two tags of one group never meet on a post: nothing.
+    expect(
+      await cardsWith([
+        { id: '1', title: 'Демо-тег 1' },
+        { id: '2', title: 'Демо-тег 2' },
+      ]),
+    ).toEqual([]);
   } finally {
     filtersStore.getState().clear();
   }

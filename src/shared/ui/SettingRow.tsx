@@ -1,16 +1,19 @@
 import type { Ref } from 'react';
 import { StyleSheet, View, type BlurEvent, type FocusEvent } from 'react-native';
 import { FocusableSurface, type HostView, type SurfaceState } from './FocusableSurface';
+import { CheckIcon } from './icons';
 import { Text } from './Text';
 import { colors, components, spacing } from './tokens';
 
 /**
  * Kinds implemented so far (DESIGN.md SettingRow): `info` shows a value and
  * OK does nothing; `nav` opens something on OK; `radio` (Story 4.3) is one
- * choice of a list, with an accent mark when `selected`, and OK picks it.
- * Toggle and check come with the stories that need them.
+ * choice of a list, with an accent mark when `selected`, and OK picks it;
+ * `check` (Story 5.5, a tag) is one of several independent choices, an
+ * accent box with a tick when `checked`, and OK toggles it. Toggle comes
+ * with the story that needs it.
  */
-export type SettingRowKind = 'info' | 'nav' | 'radio';
+export type SettingRowKind = 'info' | 'nav' | 'radio' | 'check';
 
 export type SettingRowProps = {
   kind: SettingRowKind;
@@ -24,10 +27,12 @@ export type SettingRowProps = {
    * period range does not fit beside its label on the 320 dp filter sheet).
    */
   valueLines?: number;
-  /** `nav` and `radio` rows; ignored for `info`. */
+  /** `nav`, `radio` and `check` rows; ignored for `info`. */
   onPress?: () => void;
   /** `radio` rows: this choice is the current one (accent mark, `accessibilityState.selected`). */
   selected?: boolean;
+  /** `check` rows: checked (accent box with a tick, `accessibilityState.checked`). */
+  checked?: boolean;
   onFocus?: (event: FocusEvent) => void;
   onBlur?: (event: BlurEvent) => void;
   hasTVPreferredFocus?: boolean;
@@ -38,6 +43,8 @@ export type SettingRowProps = {
 const TOKENS = components['setting-row'];
 /** The radio mark's diameter. */
 const RADIO = 18;
+/** The check box's side (the mock's 32 px at 1920, halved and rounded to the radio's). */
+const CHECK = 18;
 
 /**
  * DESIGN.md SettingRow (`setting-row` tokens): focusable in every kind, so
@@ -51,6 +58,7 @@ export function SettingRow({
   valueLines = 1,
   onPress,
   selected = false,
+  checked = false,
   onFocus,
   onBlur,
   hasTVPreferredFocus,
@@ -58,7 +66,8 @@ export function SettingRow({
   ref,
 }: SettingRowProps) {
   const radio = kind === 'radio';
-  const pressable = kind === 'nav' || radio;
+  const check = kind === 'check';
+  const pressable = kind === 'nav' || radio || check;
   const surfaceStyle = ({ focused }: SurfaceState) => [
     styles.surface,
     focused && { backgroundColor: TOKENS.bgFocus },
@@ -72,9 +81,13 @@ export function SettingRow({
       radius={TOKENS.radius}
       scaleFocus={TOKENS.scaleFocus}
       hasTVPreferredFocus={hasTVPreferredFocus}
-      accessibilityRole={radio ? 'radio' : kind === 'nav' ? 'button' : 'text'}
+      accessibilityRole={
+        radio ? 'radio' : check ? 'checkbox' : kind === 'nav' ? 'button' : 'text'
+      }
       accessibilityLabel={a11yLabel}
-      accessibilityState={radio ? { selected, checked: selected } : undefined}
+      accessibilityState={
+        radio ? { selected, checked: selected } : check ? { checked } : undefined
+      }
       onPress={pressable ? onPress : undefined}
       onFocus={onFocus}
       onBlur={onBlur}
@@ -89,6 +102,20 @@ export function SettingRow({
             >
               {selected ? (
                 <View testID={testID ? `${testID}/selected` : undefined} style={styles.radioDot} />
+              ) : null}
+            </View>
+          ) : null}
+          {check ? (
+            <View
+              testID={testID ? `${testID}/check` : undefined}
+              style={[styles.check, checked && styles.checkOn]}
+            >
+              {checked ? (
+                <CheckIcon
+                  testID={testID ? `${testID}/checked` : undefined}
+                  color={colors['accent-ink']}
+                  size={CHECK - 4}
+                />
               ) : null}
             </View>
           ) : null}
@@ -146,6 +173,22 @@ const styles = StyleSheet.create({
   },
   radioSelected: {
     borderColor: colors.accent,
+  },
+  // The check box (DESIGN.md: selected check marks use `accent`; the mock's
+  // tick is dark ink on the accent box).
+  check: {
+    width: CHECK,
+    height: CHECK,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: colors['text-meta'],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing['6'],
+  },
+  checkOn: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accent,
   },
   radioDot: {
     width: RADIO / 2,

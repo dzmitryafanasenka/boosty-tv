@@ -11,7 +11,7 @@
 import { createAsyncStorage } from '@react-native-async-storage/async-storage';
 import { QueryClientProvider, notifyManager } from '@tanstack/react-query';
 import { act } from 'react';
-import { AppState, StyleSheet } from 'react-native';
+import { AppState, FlatList, StyleSheet } from 'react-native';
 import App, { navigationRef } from '../src/app/App';
 import { HomeScreen, type HomeFocusInfo } from '../src/features/home';
 import type { HttpClient } from '../src/shared/api';
@@ -2632,7 +2632,7 @@ describe('Story 5.3: filter the feed by access', () => {
       byTestId(sheet, 'modal/content')[0]
         .queryAll(n => n.props.focusable === true)
         .map(n => n.props.testID),
-    ).toEqual([ALLOWED, ALL, BOUGHT, 'filters/period']);
+    ).toEqual([ALLOWED, ALL, BOUGHT, 'filters/period', 'filters/tags']);
     expect(focusTargets()).toContain(ALLOWED);
     expect(one(sheet, ALLOWED).props.accessibilityState).toEqual(
       expect.objectContaining({ selected: true }),
@@ -2730,7 +2730,7 @@ describe('Story 5.3: filter the feed by access', () => {
     expect(visible(root, SHEET)).toBe(false);
     expect(lastFocusTarget()).toBe(CHIP);
     // The Filter stays (no Apply button).
-    expect(getFilter('feed')).toEqual({ access: 'all', period: { kind: 'all' } });
+    expect(getFilter('feed')).toEqual({ access: 'all', period: { kind: 'all' }, tags: [] });
     await focusOn(root, CHIP);
     await back();
     expect(lastFocusTarget()).toBe('nav/home');
@@ -2805,7 +2805,7 @@ describe('Story 5.3: filter the feed by access', () => {
     const root = await openSheet();
     await press(root, ALL);
     await back();
-    expect(getFilter('feed')).toEqual({ access: 'all', period: { kind: 'all' } });
+    expect(getFilter('feed')).toEqual({ access: 'all', period: { kind: 'all' }, tags: [] });
     await press(root, 'nav/settings');
     await press(root, 'settings/row/signout');
     await press(root, 'dialog/signout/confirm');
@@ -3283,7 +3283,7 @@ describe('Story 5.4: filter by period', () => {
         .map(q => JSON.stringify(q.queryKey));
     const before = keys();
     expect(before).toContain(
-      JSON.stringify(queryKeys.subscriptionFeed({ access: 'allowed', period: { kind: 'preset', days: 7 } })),
+      JSON.stringify(queryKeys.subscriptionFeed({ access: 'allowed', period: { kind: 'preset', days: 7 }, tags: [] })),
     );
     jest.setSystemTime(NOW + 30 * 60 * 1000);
     // A re-render (the list again, the same preset again: a no-op).
@@ -3303,6 +3303,366 @@ describe('Story 5.4: filter by period', () => {
     await focusOn(root, 'state/home/action');
     await press(root, 'state/home/action');
     expect(getFilter('feed')).toEqual(DEFAULT_FILTER);
+    await unmount(root);
+  });
+});
+
+describe('Story 5.5: filter by tags', () => {
+  const CHIP = 'home/filters';
+  const SHEET = 'filters/sheet';
+  const TAGS_ROW = 'filters/tags';
+  const LEVEL = 'filters/tags/list';
+  const TAG_RESET = 'filters/tags/reset';
+  const LOAD_MORE = 'filters/tags/load-more';
+  const RETRY = 'filters/tags/retry';
+  const LOADING = 'filters/tags/loading';
+  const EMPTY = 'filters/tags/empty';
+  const RESET = 'filters/reset';
+  const E13 = '/v1/search/feed/tag/';
+  const tagRow = (id: number | string) => `filters/tag/${id}`;
+  const tagCalls = () => transport.callsTo(E13);
+  const tagsParam = (url: string) => {
+    const match = /[?&]tags_ids=([^&]*)/.exec(url);
+    return match ? decodeURIComponent(match[1]) : null;
+  };
+  /** One E13 page: tags `from`…`to` («Тег N»), with a next cursor unless last. */
+  const tagsPage = (from: number, to: number, next: string | null): FixtureReply => ({
+    status: 200,
+    body: {
+      data: {
+        searchTags: Array.from({ length: to - from + 1 }, (_, i) => ({
+          tag: { id: from + i, title: `Тег ${from + i}` },
+          rank: 0,
+        })),
+      },
+      extra: next === null ? { offset: 'end', isLast: true } : { offset: next, isLast: false },
+    },
+  });
+  let tags: (req: FixtureRequest) => Reply;
+
+  beforeEach(() => {
+    tags = () => tagsPage(1, 5, null);
+    other = req => (req.path === E13 ? tags(req) : undefined);
+  });
+
+  async function openSheet() {
+    const root = await renderApp();
+    await focusOn(root, `home/feed/${e5Posts()[0].id}`);
+    await focusOn(root, CHIP);
+    await press(root, CHIP);
+    expect(visible(root, SHEET)).toBe(true);
+    return root;
+  }
+
+  async function openTags() {
+    const root = await openSheet();
+    focusMock.mockClear();
+    await press(root, TAGS_ROW);
+    expect(visible(root, LEVEL)).toBe(true);
+    return root;
+  }
+
+  const levelFocusables = (root: Root) =>
+    byTestId(root, 'modal/content')[0]
+      .queryAll(n => n.props.focusable === true)
+      .map(n => n.props.testID as string);
+
+  it('the sheet: «Теги · Все» under «Период»; nothing is sent before the level opens', async () => {
+    const root = await openSheet();
+    expect(one(root, TAGS_ROW).props.accessibilityLabel).toBe(
+      `${t('filters.tags.title')} ${t('filters.tags.none')}`,
+    );
+    expect(tagCalls()).toHaveLength(0);
+    await unmount(root);
+  });
+
+  it('matrix «Open tags»: E13 limit=100, the loading row, then the check rows; focus on the first row', async () => {
+    const page = deferred();
+    tags = () => page.promise;
+    const root = await openTags();
+    expect(tagCalls()).toHaveLength(1);
+    expect(tagCalls()[0].url).toBe(`https://api.boosty.to${E13}?limit=100`);
+    expect(levelFocusables(root)).toEqual([LOADING]);
+    expect(lastFocusTarget()).toBe(LOADING);
+    expect(text(byTestId(root, LEVEL)[0])).toContain(t('filters.tags.title'));
+    focusMock.mockClear();
+    page.resolve(tagsPage(1, 3, null));
+    await settle();
+    expect(levelFocusables(root)).toEqual([tagRow(1), tagRow(2), tagRow(3)]);
+    expect(lastFocusTarget()).toBe(tagRow(1));
+    expect(one(root, tagRow(1)).props.accessibilityRole).toBe('checkbox');
+    expect(one(root, tagRow(1)).props.accessibilityState).toEqual(expect.objectContaining({ checked: false }));
+    expect(one(root, tagRow(1)).props.accessibilityLabel).toBe('Тег 1');
+    await unmount(root);
+  });
+
+  it('matrix «Open tags», E13 fails: «Повторить»; OK retries with focus on it; success → the first tag', async () => {
+    tags = () => ({ status: 500, body: {} });
+    const root = await openTags();
+    await settle(WITH_TIMERS);
+    expect(levelFocusables(root)).toEqual([RETRY]);
+    expect(lastFocusTarget()).toBe(RETRY);
+    expect(text(one(root, RETRY))).toContain(t('filters.tags.error'));
+    const page = deferred();
+    tags = () => page.promise;
+    const calls = tagCalls().length;
+    focusMock.mockClear();
+    await press(root, RETRY);
+    expect(tagCalls()).toHaveLength(calls + 1);
+    // While it runs the row stays (focus kept, no loading row).
+    expect(levelFocusables(root)).toEqual([RETRY]);
+    expect(focusTargets()).toEqual([]);
+    page.resolve(tagsPage(1, 2, null));
+    await settle();
+    expect(levelFocusables(root)).toEqual([tagRow(1), tagRow(2)]);
+    expect(lastFocusTarget()).toBe(tagRow(1));
+    await unmount(root);
+  });
+
+  it('matrix «No tags»: «Тегов нет»', async () => {
+    tags = () => ({ status: 200, body: { data: { searchTags: [] }, extra: { offset: 'x', isLast: true } } });
+    const root = await openTags();
+    expect(levelFocusables(root)).toEqual([EMPTY]);
+    expect(text(one(root, EMPTY))).toContain(t('filters.tags.empty'));
+    expect(lastFocusTarget()).toBe(EMPTY);
+    await unmount(root);
+  });
+
+  it('matrix «Toggle»: «Тег 4» then «Тег 2» → E5 tags_ids sorted, one page 1 each; focus stays; the chip and «Теги» follow', async () => {
+    const root = await openTags();
+    focusMock.mockClear();
+    await press(root, tagRow(4));
+    expect(feedCalls()).toHaveLength(2);
+    expect(tagsParam(feedCalls()[1].url)).toBe('4');
+    expect(cursorOf(feedCalls()[1].url)).toBeNull();
+    expect(feedCalls()[1].url).toContain('only_allowed=true&only_bought=false&tags_ids=4');
+    expect(one(root, tagRow(4)).props.accessibilityState).toEqual(expect.objectContaining({ checked: true }));
+    // The tag «Сбросить» appears on top; focus stays on the row; the order is unchanged.
+    expect(levelFocusables(root)).toEqual([TAG_RESET, tagRow(1), tagRow(2), tagRow(3), tagRow(4), tagRow(5)]);
+    expect(focusTargets()).toEqual([]);
+    // One tag: the chip reads its title.
+    expect(text(one(root, CHIP))).toContain(tf('filters.chip', { value: 'Тег 4' }));
+    expect(text(byTestId(root, `${CHIP}/count`)[0])).toContain('1');
+    await press(root, tagRow(2));
+    expect(feedCalls()).toHaveLength(3);
+    expect(tagsParam(feedCalls()[2].url)).toBe('2,4');
+    expect(getFilter('feed').tags).toEqual([
+      { id: '4', title: 'Тег 4' },
+      { id: '2', title: 'Тег 2' },
+    ]);
+    expect(focusTargets()).toEqual([]);
+    // Several tags, the only section: «Теги: 2», the count 1.
+    const value = tf('filters.tags.chipMany', { n: '2' });
+    expect(text(one(root, CHIP))).toContain(tf('filters.chip', { value }));
+    expect(text(byTestId(root, `${CHIP}/count`)[0])).toContain('1');
+    expect(one(root, CHIP).props.accessibilityLabel).toBe(
+      tf('filters.chipA11yCount', { value, count: `1 ${tp('filters.activeCount', 1)}` }),
+    );
+    // Unchecking: the next refetch without it.
+    await press(root, tagRow(4));
+    expect(tagsParam(feedCalls()[feedCalls().length - 1].url)).toBe('2');
+    // Back → the sheet on «Теги» with the titles; Back → the chip.
+    focusMock.mockClear();
+    await back();
+    expect(visible(root, SHEET)).toBe(true);
+    expect(lastFocusTarget()).toBe(TAGS_ROW);
+    expect(one(root, TAGS_ROW).props.accessibilityLabel).toBe(`${t('filters.tags.title')} Тег 2`);
+    await back();
+    expect(visible(root, SHEET)).toBe(false);
+    expect(lastFocusTarget()).toBe(CHIP);
+    // Reopened: the checked tag first, then the loaded tags (deduped); focus on the tag «Сбросить».
+    await press(root, CHIP);
+    focusMock.mockClear();
+    await press(root, TAGS_ROW);
+    expect(levelFocusables(root)).toEqual([TAG_RESET, tagRow(2), tagRow(1), tagRow(3), tagRow(4), tagRow(5)]);
+    expect(lastFocusTarget()).toBe(TAG_RESET);
+    // The tag query is not refetched on mount (`refetchOnMount: false`): no second E13 while cached.
+    expect(tagCalls()).toHaveLength(1);
+    await unmount(root);
+  });
+
+  it('matrix «Toggle», E5 fails: the error state behind; focus stays on the row', async () => {
+    feed = req => (tagsParam(req.url) === null ? { status: 200, body: e5Page() } : { status: 403, body: {} });
+    const root = await openTags();
+    focusMock.mockClear();
+    await press(root, tagRow(1));
+    expect(visible(root, 'home/feed/error')).toBe(true);
+    expect(visible(root, LEVEL)).toBe(true);
+    expect(focusTargets().filter(id => id?.startsWith('home/') || id?.startsWith('state/'))).toEqual([]);
+    await unmount(root);
+  });
+
+  it('matrix «Load more»: «Загрузить ещё» while isLast is false; next page with the opaque offset; focus stays, then the first new row when the row goes', async () => {
+    tags = req => {
+      const match = /[?&]offset=([^&]*)/.exec(req.url);
+      const offset = match ? decodeURIComponent(match[1]) : null;
+      return offset === null
+        ? tagsPage(1, 3, 'p 2')
+        : offset === 'p 2'
+          ? tagsPage(3, 5, 'p3')
+          : tagsPage(6, 7, null);
+    };
+    const root = await openTags();
+    expect(levelFocusables(root)).toEqual([tagRow(1), tagRow(2), tagRow(3), LOAD_MORE]);
+    expect(text(one(root, LOAD_MORE))).toContain(t('filters.tags.loadMore'));
+    await focusOn(root, LOAD_MORE);
+    focusMock.mockClear();
+    await press(root, LOAD_MORE);
+    expect(tagCalls()).toHaveLength(2);
+    expect(tagCalls()[1].url).toBe(`https://api.boosty.to${E13}?limit=100&offset=p%202`);
+    // Deduped (tag 3 twice); more pages: the row stays with focus.
+    expect(levelFocusables(root)).toEqual([tagRow(1), tagRow(2), tagRow(3), tagRow(4), tagRow(5), LOAD_MORE]);
+    expect(focusTargets()).toEqual([]);
+    await press(root, LOAD_MORE);
+    expect(tagCalls()[2].url).toContain('&offset=p3');
+    expect(levelFocusables(root)).toEqual([1, 2, 3, 4, 5, 6, 7].map(tagRow));
+    expect(lastFocusTarget()).toBe(tagRow(6));
+    await unmount(root);
+  });
+
+  it('«Загрузить ещё» keeps focus after a page: the list scrolls to its end; a repeated cursor ends the paging', async () => {
+    tags = req => {
+      const match = /[?&]offset=([^&]*)/.exec(req.url);
+      // Page 2 answers page 1's cursor again: no third request, no row.
+      return match === null ? tagsPage(1, 3, 'c1') : tagsPage(4, 5, 'c1');
+    };
+    const root = await openTags();
+    const scrollToEnd = jest.spyOn(FlatList.prototype, 'scrollToEnd');
+    await focusOn(root, LOAD_MORE);
+    await press(root, LOAD_MORE);
+    expect(tagCalls()).toHaveLength(2);
+    expect(levelFocusables(root)).toEqual([1, 2, 3, 4, 5].map(tagRow));
+    expect(lastFocusTarget()).toBe(tagRow(4));
+    // The row went (no scroll needed); with a page that keeps it, the scroll is asserted below.
+    expect(scrollToEnd).not.toHaveBeenCalled();
+    await unmount(root);
+  });
+
+  it('«Загрузить ещё» stays focused when more pages remain: scrollToEnd keeps it in view', async () => {
+    tags = req => {
+      const match = /[?&]offset=([^&]*)/.exec(req.url);
+      return match === null ? tagsPage(1, 3, 'c1') : tagsPage(4, 6, 'c2');
+    };
+    const root = await openTags();
+    const scrollToEnd = jest.spyOn(FlatList.prototype, 'scrollToEnd');
+    await focusOn(root, LOAD_MORE);
+    await press(root, LOAD_MORE);
+    expect(levelFocusables(root)).toEqual([...[1, 2, 3, 4, 5, 6].map(tagRow), LOAD_MORE]);
+    expect(scrollToEnd).toHaveBeenCalledTimes(1);
+    await unmount(root);
+  });
+
+  it('matrix «Load more», the page fails: «Повторить» replaces it with focus; OK reloads that page', async () => {
+    let fail = true;
+    tags = req =>
+      /offset=/.test(req.url)
+        ? fail
+          ? { status: 500, body: {} }
+          : tagsPage(3, 4, null)
+        : tagsPage(1, 2, 'p2');
+    const root = await openTags();
+    await focusOn(root, LOAD_MORE);
+    focusMock.mockClear();
+    await press(root, LOAD_MORE);
+    await settle(WITH_TIMERS);
+    expect(levelFocusables(root)).toEqual([tagRow(1), tagRow(2), RETRY]);
+    expect(lastFocusTarget()).toBe(RETRY);
+    fail = false;
+    focusMock.mockClear();
+    await press(root, RETRY);
+    expect(tagCalls()[tagCalls().length - 1].url).toContain('&offset=p2');
+    expect(levelFocusables(root)).toEqual([1, 2, 3, 4].map(tagRow));
+    expect(lastFocusTarget()).toBe(tagRow(3));
+    await unmount(root);
+  });
+
+  it('matrix «Tag reset»: the tag «Сбросить» clears the tags only (access kept); focus → the first tag row', async () => {
+    const root = await openSheet();
+    await press(root, 'filters/access/all');
+    focusMock.mockClear();
+    await press(root, TAGS_ROW);
+    await press(root, tagRow(2));
+    await press(root, tagRow(3));
+    expect(text(one(root, CHIP))).toContain(t('filters.title'));
+    expect(text(byTestId(root, `${CHIP}/count`)[0])).toContain('2');
+    focusMock.mockClear();
+    const calls = feedCalls().length;
+    await press(root, TAG_RESET);
+    expect(getFilter('feed')).toEqual({ access: 'all', period: { kind: 'all' }, tags: [] });
+    expect(visible(root, TAG_RESET)).toBe(false);
+    expect(lastFocusTarget()).toBe(tagRow(1));
+    // «Все посты» without tags was cached: no E5 (within staleTime).
+    expect(feedCalls()).toHaveLength(calls);
+    await back();
+    expect(one(root, TAGS_ROW).props.accessibilityLabel).toBe(
+      `${t('filters.tags.title')} ${t('filters.tags.none')}`,
+    );
+    expect(visible(root, RESET)).toBe(true);
+    await unmount(root);
+  });
+
+  it('matrix «Sheet reset»: access + tags → the sheet «Сбросить» clears all; focus → «Доступные мне»', async () => {
+    const root = await openSheet();
+    await press(root, 'filters/access/bought');
+    await press(root, TAGS_ROW);
+    await press(root, tagRow(1));
+    await back();
+    focusMock.mockClear();
+    await press(root, RESET);
+    expect(getFilter('feed')).toEqual(DEFAULT_FILTER);
+    expect(lastFocusTarget()).toBe('filters/access/allowed');
+    expect(byTestId(root, `${CHIP}/count`)).toHaveLength(0);
+    await unmount(root);
+  });
+
+  it('matrix «Key stability»: A+B and B+A are one query key (one E5)', async () => {
+    const root = await openTags();
+    await press(root, tagRow(1));
+    await press(root, tagRow(2));
+    await press(root, tagRow(1));
+    await press(root, tagRow(1));
+    expect(getFilter('feed').tags.map(tag => tag.id)).toEqual(['2', '1']);
+    // A → A+B → B → B+A: the cached A+B key, no new request.
+    const sent = feedCalls().map(call => tagsParam(call.url));
+    expect(sent).toEqual([null, '1', '1,2', '2']);
+    expect(JSON.stringify(queryKeys.subscriptionFeed(getFilter('feed')))).toBe(
+      JSON.stringify(
+        queryKeys.subscriptionFeed({
+          ...DEFAULT_FILTER,
+          tags: [
+            { id: '1', title: 'x' },
+            { id: '2', title: 'y' },
+          ],
+        }),
+      ),
+    );
+    await unmount(root);
+  });
+
+  it('300 tags: a virtualized list with stable keys (not every row rendered)', async () => {
+    tags = () => tagsPage(1, 300, null);
+    const root = await openTags();
+    const rendered = levelFocusables(root);
+    expect(rendered[0]).toBe(tagRow(1));
+    expect(rendered.length).toBeLessThan(300);
+    expect(new Set(rendered).size).toBe(rendered.length);
+    const list = byTestId(root, LEVEL)[0].queryAll(n => typeof n.props.keyExtractor === 'function')[0];
+    expect(list.props.data).toHaveLength(300);
+    expect(list.props.keyExtractor(list.props.data[299], 299)).toBe(tagRow(300));
+    await unmount(root);
+  });
+
+  it('the list takes its box\'s measured height (device: the TV list wrapper ignores flex)', async () => {
+    const root = await openTags();
+    const listOf = () =>
+      byTestId(root, LEVEL)[0].queryAll(n => typeof n.props.keyExtractor === 'function')[0];
+    expect(StyleSheet.flatten(listOf().props.style).flex).toBe(1);
+    await act(async () => {
+      byTestId(root, 'filters/tags/box')[0].props.onLayout({ nativeEvent: { layout: { height: 480 } } });
+    });
+    const style = StyleSheet.flatten(listOf().props.style);
+    expect(style.height).toBe(480);
+    expect(style.flex).toBeUndefined();
     await unmount(root);
   });
 });

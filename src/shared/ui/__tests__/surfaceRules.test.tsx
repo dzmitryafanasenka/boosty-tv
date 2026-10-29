@@ -33,6 +33,7 @@ const consumers: Array<[string, () => ReactElement]> = [
   ['SettingRow nav', () => <SettingRow testID={ID} kind="nav" label="x" />],
   ['SettingRow info', () => <SettingRow testID={ID} kind="info" label="x" value="1" />],
   ['SettingRow radio selected', () => <SettingRow testID={ID} kind="radio" label="x" selected />],
+  ['SettingRow check checked', () => <SettingRow testID={ID} kind="check" label="x" checked />],
   ['PostCard', () => <PostCard testID={ID} post={asPost(feedPost(1))} width={221} />],
   ['PostCard locked', () => <PostCard testID={ID} post={asPost(lockedPost())} width={221} />],
   [

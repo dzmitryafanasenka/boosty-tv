@@ -15,7 +15,8 @@ import type { ReadResult, SecureStore } from '../../shared/platform/secureStore'
  * 200 with a synthetic id, send-code answers a synthetic challenge and
  * confirm synthetic tokens (so a demo sign-in on A5 lands; the id differs
  * from the stored `demo`, so it runs the account-switch hook, Story 2.8),
- * E5 (the feed, Story 3.1) synthetic posts, E2 (Подписки, Story 3.2)
+ * E5 (the feed, Story 3.1) synthetic posts, E13 (feed tags, Story 5.5: two
+ * pages of 8), E2 (Подписки, Story 3.2)
  * synthetic authors, E1 the account's own blog `demo-blog-2` (Story 5.2),
  * E3/E4 (Автор, Story 3.3: `demo-blog-1` 2 pages,
  * `demo-blog-3` no posts, the last demo blog missing), E8 (Пост, Story 3.4:
@@ -40,6 +41,31 @@ const FEED_PAGE = 10;
 const DEMO_BLOGS = ['demo-blog-1', 'demo-blog-2', 'demo-blog-3'];
 /** Fixed base so the demo dates are stable: 2026-10-01 00:00 UTC. */
 const DEMO_FEED_START = 1_790_812_800;
+
+/** Demo feed tags (E13, Story 5.5): 16 tags in two pages of 8. */
+export const DEMO_TAGS = 16;
+const DEMO_TAGS_PAGE = 8;
+const demoTag = (id: number) => ({ id, title: `Демо-тег ${id}` });
+
+/**
+ * A demo post's tags: one of tags 1–4 and one of tags 5–7, so filtering by
+ * two tags of one group finds nothing and tags 8–16 match no post.
+ */
+function demoPostTags(n: number) {
+  return [demoTag((n % 4) + 1), demoTag((n % 3) + 5)];
+}
+
+/** The E13 page after `offset` (the demo cursor is the next tag index). */
+function demoFeedTagsPage(url: string) {
+  const match = /[?&]offset=([^&]*)/.exec(url);
+  const start = match ? Number(decodeURIComponent(match[1])) || 0 : 0;
+  const end = Math.min(start + DEMO_TAGS_PAGE, DEMO_TAGS);
+  const searchTags = Array.from({ length: Math.max(0, end - start) }, (_, i) => ({
+    tag: demoTag(start + i + 1),
+    rank: 0,
+  }));
+  return { data: { searchTags }, extra: { offset: String(end), isLast: end >= DEMO_TAGS } };
+}
 
 /** One synthetic E5/E4 post (shape of `src/test/fixtures/boosty/e5-feed.json`). */
 function demoPost(n: number, blog?: { blogUrl: string; index: number }) {
@@ -72,6 +98,7 @@ function demoPost(n: number, blog?: { blogUrl: string; index: number }) {
     user: { name: `Демо-автор ${authorIndex + 1}`, blogUrl },
     data,
     teaser: [],
+    tags: demoPostTags(n),
     // Story 3.6: every other locked post names its level (only `name`; no
     // price fields in the demo), the rest show the copy without a level.
     ...(locked && n % 14 === 6 ? { subscriptionLevel: { name: 'Демо-уровень' } } : {}),
@@ -86,7 +113,9 @@ function demoPost(n: number, blog?: { blogUrl: string; index: number }) {
  * the accessible posts only, `only_bought=true` → nothing (the demo account
  * bought nothing), both `false` → every post. Story 5.4: `from_ts` and
  * `to_ts` (epoch seconds, both inclusive) keep the posts published inside
- * them (the demo posts are from 30 Sep – 1 Oct 2026, UTC).
+ * them (the demo posts are from 30 Sep – 1 Oct 2026, UTC). Story 5.5:
+ * `tags_ids` keeps the posts that carry every listed tag (the live server
+ * intersects them, api-contract §3 «E5 tags»).
  */
 function demoFeedPage(url: string, total: number) {
   const match = /[?&]offset=([^&]*)/.exec(url);
@@ -95,13 +124,18 @@ function demoFeedPage(url: string, total: number) {
   const onlyBought = /[?&]only_bought=true(&|$)/.test(url);
   const fromTs = numberParam(url, 'from_ts') ?? -Infinity;
   const toTs = numberParam(url, 'to_ts') ?? Infinity;
+  const tagsMatch = /[?&]tags_ids=([^&]*)/.exec(url);
+  const tagIds = tagsMatch
+    ? decodeURIComponent(tagsMatch[1]).split(',').filter(id => id !== '')
+    : [];
   const all = onlyBought
     ? []
     : Array.from({ length: total }, (_, n) => demoPost(n)).filter(
         post =>
           (!onlyAllowed || post.hasAccess) &&
           post.publishTime >= fromTs &&
-          post.publishTime <= toTs,
+          post.publishTime <= toTs &&
+          tagIds.every(id => post.tags.some(tag => String(tag.id) === id)),
       );
   const end = Math.min(start + FEED_PAGE, all.length);
   const posts = all.slice(start, end);
@@ -307,6 +341,8 @@ export function createDemoSessionManager(): SessionManager {
     switch (request.path) {
       case '/v1/feed/post/':
         return { status: 200, body: demoFeedPage(request.url, DEMO_FEED_POSTS), delayMs: 300 };
+      case '/v1/search/feed/tag/':
+        return { status: 200, body: demoFeedTagsPage(request.url), delayMs: 300 };
       case '/v1/user/subscriptions':
         return { status: 200, body: demoSubscriptions(), delayMs: 300 };
       case '/v1/user/current':

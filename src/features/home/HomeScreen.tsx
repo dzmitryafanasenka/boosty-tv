@@ -158,10 +158,21 @@ export type HomeScreenProps = {
 };
 
 /**
+ * The tag section's chip value (owner decision 2026-10-29, Story 5.5 Q2 a):
+ * one tag → its title («Фильтры · Выпечка»), several → «Теги: N».
+ */
+function chipTagsValue(filter: Filter): string {
+  return filter.tags.length === 1
+    ? filter.tags[0].title
+    : tf('filters.tags.chipMany', { n: String(filter.tags.length) });
+}
+
+/**
  * The chip's visible label and TalkBack label for a Filter (owner decision
  * 2026-10-28, Story 5.4): the default → «Фильтры · Доступные мне»; one
- * active section → that section's value («Фильтры · Последние 7 дней») and
- * the count; two or more → «Фильтры» and the count.
+ * active section → that section's value («Фильтры · Последние 7 дней»;
+ * tags: `chipTagsValue`) and the count; two or more → «Фильтры» and the
+ * count.
  */
 function chipLabels(filter: Filter): { label: string; a11y: string; count: number } {
   const count = activeFilterCount(filter);
@@ -173,7 +184,11 @@ function chipLabels(filter: Filter): { label: string; a11y: string; count: numbe
     };
   }
   const value =
-    filter.period.kind !== 'all' ? formatPeriod(filter.period) : t(`filters.access.${filter.access}`);
+    filter.tags.length > 0
+      ? chipTagsValue(filter)
+      : filter.period.kind !== 'all'
+        ? formatPeriod(filter.period)
+        : t(`filters.access.${filter.access}`);
   return {
     label: tf('filters.chip', { value }),
     a11y:
@@ -753,8 +768,8 @@ export function HomeScreen({
     }
     // OK on the chip is a move (the head-follow rule never takes it).
     latch.move();
-    modal.open(<FilterSheet scope="feed" />, chipView, { placement: 'end' });
-  }, [latch, modal]);
+    modal.open(<FilterSheet scope="feed" http={httpRef.current} />, chipView, { placement: 'end' });
+  }, [latch, modal, httpRef]);
   // «Сбросить фильтры» on the filtered empty view: the default Filter; the
   // first feed card takes focus when it arrives.
   const onResetFilters = useCallback(() => {

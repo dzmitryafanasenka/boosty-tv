@@ -45,15 +45,39 @@ describe('feedPath', () => {
   });
 
   it('Story 5.3: each access value maps to the reference params («Все посты»: both false)', () => {
-    expect(feedPath(null, { access: 'allowed', period: ALL_TIME })).toBe(`${BASE}&only_allowed=true&only_bought=false`);
-    expect(feedPath(null, { access: 'all', period: ALL_TIME })).toBe(`${BASE}&only_allowed=false&only_bought=false`);
-    expect(feedPath(null, { access: 'bought', period: ALL_TIME })).toBe(`${BASE}&only_allowed=false&only_bought=true`);
+    expect(feedPath(null, { access: 'allowed', period: ALL_TIME, tags: [] })).toBe(`${BASE}&only_allowed=true&only_bought=false`);
+    expect(feedPath(null, { access: 'all', period: ALL_TIME, tags: [] })).toBe(`${BASE}&only_allowed=false&only_bought=false`);
+    expect(feedPath(null, { access: 'bought', period: ALL_TIME, tags: [] })).toBe(`${BASE}&only_allowed=false&only_bought=true`);
   });
 
   it('passes the opaque cursor back verbatim, URL-encoded, after the access params', () => {
-    expect(feedPath('a b&c=d/é:1', { access: 'all', period: ALL_TIME })).toBe(
+    expect(feedPath('a b&c=d/é:1', { access: 'all', period: ALL_TIME, tags: [] })).toBe(
       `${BASE}&only_allowed=false&only_bought=false&offset=a%20b%26c%3Dd%2F%C3%A9%3A1`,
     );
+  });
+
+  describe('Story 5.5: tags_ids', () => {
+    const A = { id: '12', title: 'Выпечка' };
+    const B = { id: '3', title: 'Супы' };
+    it('no tags: no tags_ids', () => {
+      expect(feedPath(null, DEFAULT_FILTER)).not.toContain('tags_ids');
+    });
+
+    it('the sorted ids, comma-joined, after the access params and before the offset; titles never sent', () => {
+      const path = feedPath('c1', { access: 'all', period: ALL_TIME, tags: [A, B] });
+      expect(path).toBe(`${BASE}&only_allowed=false&only_bought=false&tags_ids=12,3&offset=c1`);
+      expect(feedPath('c1', { access: 'all', period: ALL_TIME, tags: [B, A] })).toBe(path);
+      expect(path).not.toContain('%D0');
+    });
+
+    it('after the period params; each id URL-encoded', () => {
+      const path = feedPath(
+        null,
+        { access: 'allowed', period: { kind: 'preset', days: 7 }, tags: [{ id: 'a&b', title: 'x' }] },
+        new Date(2026, 9, 28).getTime(),
+      );
+      expect(path).toMatch(/&to_ts=\d+&tags_ids=a%26b$/);
+    });
   });
 
   describe('Story 5.4: the period resolved at request time', () => {
@@ -66,7 +90,7 @@ describe('feedPath', () => {
     });
 
     it('a preset: from_ts = local 00:00 of today − 6, to_ts = today 23:59:59 (epoch seconds), before the offset', () => {
-      const path = feedPath('c1', { access: 'allowed', period: { kind: 'preset', days: 7 } }, NOW);
+      const path = feedPath('c1', { access: 'allowed', period: { kind: 'preset', days: 7 }, tags: [] }, NOW);
       expect(path).toBe(
         `${BASE}&only_allowed=true&only_bought=false&from_ts=${sec(2026, 10, 22)}&to_ts=${sec(2026, 10, 28, 23, 59, 59)}&offset=c1`,
       );
@@ -75,7 +99,7 @@ describe('feedPath', () => {
     it('a custom range: 1 Aug 00:00:00 – 25 Sep 23:59:59 local', () => {
       const path = feedPath(
         null,
-        { access: 'all', period: { kind: 'custom', fromDay: '2026-08-01', toDay: '2026-09-25' } },
+        { access: 'all', period: { kind: 'custom', fromDay: '2026-08-01', toDay: '2026-09-25' }, tags: [] },
         NOW,
       );
       expect(path).toContain(`&from_ts=${sec(2026, 8, 1)}&to_ts=${sec(2026, 9, 25, 23, 59, 59)}`);
@@ -86,7 +110,7 @@ describe('feedPath', () => {
       jest.setSystemTime(NOW);
       try {
         const { http, transport } = client(() => ({ status: 200, body: e5Page() }));
-        await PostRepository.feedPage(http, null, { access: 'allowed', period: { kind: 'preset', days: 30 } });
+        await PostRepository.feedPage(http, null, { access: 'allowed', period: { kind: 'preset', days: 30 }, tags: [] });
         expect(transport.calls[0].url).toContain(`from_ts=${sec(2026, 9, 29)}&to_ts=${sec(2026, 10, 28, 23, 59, 59)}`);
       } finally {
         jest.useRealTimers();
@@ -114,7 +138,7 @@ describe('PostRepository.feedPage', () => {
 
   it('Story 5.3: «Только купленные» sends its params; a one-post last page (the live shape) ends the paging', async () => {
     const { http, transport } = client(() => ({ status: 200, body: e5OnlyBought.body }));
-    const page = await PostRepository.feedPage(http, null, { access: 'bought', period: ALL_TIME });
+    const page = await PostRepository.feedPage(http, null, { access: 'bought', period: ALL_TIME, tags: [] });
     expect(transport.calls[0].url).toContain('&only_allowed=false&only_bought=true');
     expect(page.posts).toHaveLength(1);
     expect(page.nextCursor).toBeNull();

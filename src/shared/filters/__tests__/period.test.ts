@@ -28,19 +28,19 @@ const day = (year: number, month: number, d: number): CalendarDay => ({ year, mo
 
 describe('Period model (AD-18, Story 5.4)', () => {
   it('the default Filter is «Доступные мне» + «За всё время», frozen', () => {
-    expect(DEFAULT_FILTER).toEqual({ access: 'allowed', period: { kind: 'all' } });
+    expect(DEFAULT_FILTER).toEqual({ access: 'allowed', period: { kind: 'all' }, tags: [] });
     expect(Object.isFrozen(DEFAULT_FILTER)).toBe(true);
     expect(Object.isFrozen(DEFAULT_FILTER.period)).toBe(true);
   });
 
   it('activeFilterCount counts the access and the period sections', () => {
-    expect(activeFilterCount({ access: 'allowed', period: { kind: 'all' } })).toBe(0);
-    expect(activeFilterCount({ access: 'allowed', period: { kind: 'preset', days: 7 } })).toBe(1);
-    expect(activeFilterCount({ access: 'all', period: { kind: 'all' } })).toBe(1);
+    expect(activeFilterCount({ access: 'allowed', period: { kind: 'all' }, tags: [] })).toBe(0);
+    expect(activeFilterCount({ access: 'allowed', period: { kind: 'preset', days: 7 }, tags: [] })).toBe(1);
+    expect(activeFilterCount({ access: 'all', period: { kind: 'all' }, tags: [] })).toBe(1);
     expect(
-      activeFilterCount({ access: 'all', period: { kind: 'custom', fromDay: '2026-08-01', toDay: '2026-09-25' } }),
+      activeFilterCount({ access: 'all', period: { kind: 'custom', fromDay: '2026-08-01', toDay: '2026-09-25' }, tags: [] }),
     ).toBe(2);
-    expect(isDefaultFilter({ access: 'allowed', period: { kind: 'preset', days: 90 } })).toBe(false);
+    expect(isDefaultFilter({ access: 'allowed', period: { kind: 'preset', days: 90 }, tags: [] })).toBe(false);
   });
 
   it('periodEquals compares the choice, not the object', () => {
@@ -147,7 +147,7 @@ describe('periodBounds (request-time resolution)', () => {
   });
 
   it('matrix «Key stability»: the Filter holds no time; only the request resolves it', () => {
-    const filter = { access: 'allowed', period: { kind: 'preset', days: 7 } } as const;
+    const filter = { access: 'allowed', period: { kind: 'preset', days: 7 }, tags: [] } as const;
     const before = JSON.stringify(filter);
     const a = periodBounds(filter.period, NOW);
     const b = periodBounds(filter.period, NOW + 60_000);

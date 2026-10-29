@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { BackHandler, StyleSheet, View } from 'react-native';
+import type { HttpClient } from '../api';
 import { t } from '../i18n';
 import { SettingRow, SideSheet, Text, spacing, type HostView } from '../ui';
 import {
@@ -20,6 +21,7 @@ import { filtersStore, useFilter } from './filtersStore';
 import { focusSoon } from './focusSoon';
 import { formatPeriod } from './periodLabel';
 import { PeriodStepper } from './PeriodStepper';
+import { TagList } from './TagList';
 
 /** Focus ids (docs/focus-map.md §1.5, D8–D10). */
 export const FILTERS_SHEET_ID = 'filters/sheet';
@@ -28,6 +30,7 @@ export const FILTERS_PERIOD_ID = 'filters/period';
 export const PERIOD_LIST_ID = 'filters/period/list';
 export const PERIOD_ALL_ID = 'filters/period/all';
 export const PERIOD_CUSTOM_ID = 'filters/period/custom';
+export const FILTERS_TAGS_ID = 'filters/tags';
 export const filterAccessId = (access: AccessFilter) => `filters/access/${access}`;
 export const periodPresetId = (days: PeriodPresetDays) => `filters/period/${days}d`;
 
@@ -37,9 +40,11 @@ export const CUSTOM_DEFAULT_SPAN_DAYS = 30;
 export type FilterSheetProps = {
   /** Whose Filter the sheet edits (Story 5.3: `feed`). */
   scope: FilterScope;
+  /** The active session's client: the tag level's E13 (Story 5.5). */
+  http: HttpClient;
 };
 
-type Level = 'sheet' | 'period' | 'custom';
+type Level = 'sheet' | 'period' | 'custom' | 'tags';
 
 /** The list row of a period (its focus id). */
 function periodRowId(period: Period): string {
@@ -66,31 +71,35 @@ function stepperRange(period: Period, today: CalendarDay): { from: CalendarDay; 
 }
 
 /**
- * The filter SideSheet (Stories 5.3–5.4, FILTER-01/02, EXPERIENCE.md
+ * The filter SideSheet (Stories 5.3–5.5, FILTER-01/02/03, EXPERIENCE.md
  * «FilterChip → filter SideSheet»): 320 dp, opened through the one modal
  * host with `placement: 'end'` (focus trapped, ← → do nothing, Back closes
- * it and focus returns to the chip). Three levels:
+ * it and focus returns to the chip). Four levels:
  *
  * - **sheet (D8):** the «Доступ» values as radio rows, the «Период» row
- *   (its value: the current period), then «Сбросить» while the Filter is
- *   not the default. Opens with focus on the selected access value. OK on
- *   a value applies it at once (no Apply button), focus stays; OK on
- *   «Сбросить» resets access and period, the row goes and focus moves to
- *   «Доступные мне». OK on «Период» → the list.
+ *   (its value: the current period), the «Теги» row (its value: the
+ *   checked titles, else «Все»), then «Сбросить» while the Filter is not
+ *   the default. Opens with focus on the selected access value. OK on a
+ *   value applies it at once (no Apply button), focus stays; OK on
+ *   «Сбросить» resets every section, the row goes and focus moves to
+ *   «Доступные мне». OK on «Период» → the list; OK on «Теги» → the tags.
  * - **period (D9):** «За всё время», the three presets (radio) and «Свой
  *   период…» (nav; its value is the active custom range). Opens on the
  *   current period. A preset applies at once and returns to the sheet with
  *   focus on «Период»; «Свой период…» → the stepper.
  * - **custom (D10):** `PeriodStepper`; «Готово» applies the range and
  *   returns to the sheet on «Период».
+ * - **tags (D11, Story 5.5):** `TagList` (the feed's E13 tags as check
+ *   rows, its own «Сбросить», «Загрузить ещё» / «Повторить»).
  *
  * Back closes the deepest level first (this sheet's own BackHandler
  * listener, newer than the modal host's): stepper → list (on «Свой
- * период…», edits discarded), list → sheet (on «Период»), sheet → the host
- * closes it. It reads the Filter from `filtersStore` itself: the modal host
- * renders this element once, the Filter changes under it.
+ * период…», edits discarded), list → sheet (on «Период»), tags → sheet (on
+ * «Теги»), sheet → the host closes it. It reads the Filter from
+ * `filtersStore` itself: the modal host renders this element once, the
+ * Filter changes under it.
  */
-export function FilterSheet({ scope }: FilterSheetProps) {
+export function FilterSheet({ scope, http }: FilterSheetProps) {
   const filter = useFilter(scope);
   const showReset = !isDefaultFilter(filter);
   const [level, setLevel] = useState<Level>('sheet');
@@ -129,6 +138,9 @@ export function FilterSheet({ scope }: FilterSheetProps) {
         case 'period':
           goToRef.current('sheet', FILTERS_PERIOD_ID);
           return true;
+        case 'tags':
+          goToRef.current('sheet', FILTERS_TAGS_ID);
+          return true;
         case 'sheet':
           // The modal host closes the sheet.
           return false;
@@ -137,9 +149,9 @@ export function FilterSheet({ scope }: FilterSheetProps) {
     return () => sub.remove();
   }, []);
 
-  // Each level's focus. The stepper focuses its own first field.
+  // Each level's focus. The stepper and the tag list focus their own first row.
   useEffect(() => {
-    if (level === 'custom') {
+    if (level === 'custom' || level === 'tags') {
       return undefined;
     }
     return focusSoon(() => rows.current.get(levelFocus.current) ?? null);
@@ -206,6 +218,10 @@ export function FilterSheet({ scope }: FilterSheetProps) {
     );
   }
 
+  if (level === 'tags') {
+    return <TagList scope={scope} http={http} />;
+  }
+
   if (level === 'custom' && today !== null) {
     const range = stepperRange(filter.period, today);
     return (
@@ -254,6 +270,22 @@ export function FilterSheet({ scope }: FilterSheetProps) {
           onPress={() => goTo('period', periodRowId(filter.period))}
         />
       </View>
+      <View style={styles.tags}>
+        <SettingRow
+          ref={rowRef(FILTERS_TAGS_ID)}
+          testID={FILTERS_TAGS_ID}
+          kind="nav"
+          label={t('filters.tags.title')}
+          value={
+            filter.tags.length === 0
+              ? t('filters.tags.none')
+              : filter.tags.map(tag => tag.title).join(t('filters.tags.separator'))
+          }
+          valueLines={2}
+          hasTVPreferredFocus={levelFocus.current === FILTERS_TAGS_ID}
+          onPress={() => goTo('tags', FILTERS_TAGS_ID)}
+        />
+      </View>
       {showReset ? (
         <View style={styles.reset}>
           <SettingRow
@@ -280,6 +312,9 @@ const styles = StyleSheet.create({
   },
   period: {
     marginTop: spacing['6'],
+  },
+  tags: {
+    marginTop: spacing['3'],
   },
   reset: {
     marginTop: spacing['8'],

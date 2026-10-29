@@ -1,0 +1,35 @@
+{
+  "case": "e13-feed-tags-1",
+  "status": 200,
+  "body": {
+    "data": {
+      "searchTags": [
+        {
+          "tag": {
+            "title": "redacted",
+            "id": 1001
+          },
+          "rank": 5
+        },
+        {
+          "tag": {
+            "title": "redacted",
+            "id": 1002
+          },
+          "rank": 5
+        },
+        {
+          "tag": {
+            "title": "redacted",
+            "id": 1003
+          },
+          "rank": 5
+        }
+      ]
+    },
+    "extra": {
+      "offset": "redacted",
+      "isLast": false
+    }
+  }
+}

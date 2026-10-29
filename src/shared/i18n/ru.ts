@@ -170,6 +170,22 @@ export const ru = {
       // TalkBack on a stepper field: «С, день: 1».
       fieldA11y: '{group}, {field}: {value}',
     },
+    // Story 5.5 (FILTER-03): the «Теги» row (value: the checked titles
+    // joined by `separator`, else `none`), its level (D11) and the chip
+    // when tags are the one active section (`chipMany`: `{n}` tags).
+    tags: {
+      title: 'Теги',
+      none: 'Все',
+      separator: ', ',
+      reset: 'Сбросить',
+      loading: 'Загружаем теги',
+      empty: 'Тегов нет',
+      loadMore: 'Загрузить ещё',
+      loadingMore: 'Загружаем…',
+      retry: 'Повторить',
+      error: 'Не удалось загрузить теги',
+      chipMany: 'Теги: {n}',
+    },
   },
   // Подписки (Story 3.2, E2; docs/focus-map.md §3 C1–C3). Empty: no CTA
   // (C3). `{n}` is the number of tiles shown.
