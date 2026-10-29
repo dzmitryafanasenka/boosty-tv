@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 10-25-2026 14:34
-last_updated: 10-29-2026 13:03
+last_updated: 10-29-2026 13:11
 project: Boosty TV
 project_key: NOKEY
 tracking_system: file-system
@@ -76,7 +76,7 @@ development_status:
   4-7-continue-watching-row-on-the-home-screen: done
   epic-4-retrospective: optional
 
-  epic-5: in-progress
+  epic-5: done
   5-1-refresh-the-feed: done
   5-2-my-blog-tile-in-subscriptions: done
   5-3-filter-the-feed-by-access: done
@@ -84,7 +84,7 @@ development_status:
   5-5-filter-by-tags: done
   5-6-search-in-subscriptions: done
   5-7-search-and-filters-inside-an-author: done
-  epic-5-retrospective: optional
+  epic-5-retrospective: done
 
   epic-6: backlog
   6-1-rich-text-emoji-and-long-posts: backlog
@@ -234,12 +234,63 @@ action_items:
     action: "Reconcile planning artifacts to the as-built (epics.md, EXPERIENCE.md,
       DESIGN.md, superseded mocks) and the deferred feature-parity Epic 3 pass"
     owner: "pm"
-    status: open
+    status: in-progress
     ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-10-27.md"
   - id: "epic-3-retro-item-18-show-a-device-screenshot-of-a-visible-ui"
     epic: 3
     action: "Show a device screenshot of a visible UI choice before the review loop;
       never push a branch the owner did not ask to push"
     owner: "agent"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-10-27.md"
+  - id: "epic-5-retro-item-19-поиск-port-the-next-frame-outcome-settle"
+    epic: 5
+    action: "Поиск: port the next-frame outcome settle from Автор and re-run the query
+      on «Сбросить фильтры»; add the cached-empty-default reset test"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-10-29.md"
+  - id: "epic-5-retro-item-20-live-e6-access-check-доступные-мне-again"
+    epic: 5
+    action: "Live E6 access check: «Доступные мне» against a locked match and «Только
+      купленные» against the purchased post; record in api-contract; owner decision
+      if E6 ignores them"
+    owner: "dev+owner"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-10-29.md"
+  - id: "epic-5-retro-item-21-обновить-also-refreshes-the-мой-блог-til"
+    epic: 5
+    action: "«Обновить» also refreshes the «Мой блог» tile queries; document (or split)
+      what phaseFlags.search gates"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-10-29.md"
+  - id: "epic-5-retro-item-22-before-epic-7-extract-the-shared-outcome"
+    epic: 5
+    action: "Before Epic 7: extract the shared outcome-focus hook, one trim-on-key-change
+      hook and flow-test grid/sheet helpers; split AuthorScreen.tsx"
+    owner: "architect"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-10-29.md"
+  - id: "epic-5-retro-item-23-reconcile-epics-md-epic-5-context-md-arc"
+    epic: 5
+    action: "Reconcile epics.md, epic-5-context.md, ARCHITECTURE-SPINE AD-18 and EXPERIENCE.md
+      with the Epic 5 as-built (per-route Author scope, no «Только купленные» on Автор,
+      Author default access, client-side drop, search on «Готово»)"
+    owner: "pm"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-10-29.md"
+  - id: "epic-5-retro-item-24-when-a-review-patches-a-pattern-another"
+    epic: 5
+    action: "When a review patches a pattern another screen copies, patch or extract
+      every copy in the same change"
+    owner: "agent"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-10-29.md"
+  - id: "epic-5-retro-item-25-owner-physical-remote-pass-of-поиск-and"
+    epic: 5
+    action: "Owner physical-remote pass of Поиск and Автор search with Cyrillic input
+      on a build with the 5.6/5.7 review fixes"
+    owner: "owner"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-10-29.md"
