@@ -1,0 +1,65 @@
+__tests__/demoFlow.test.tsx
+  s_3889105f87e0de::t_8be92fb9a63e3f 187-188,198-199,201-202
+__tests__/postFlow.test.tsx
+  s_3889105f87e0de::t_07cec4a2806717 33-34,86-87,367,417,1763-1764,2377-2540
+_bmad-output/implementation-artifacts/spec-6-4-inline-audio.md
+  s_3889105f87e0de::t_28d348dc045798 1-145
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_3889105f87e0de::t_ff28ed03e0e855 32,93
+docs/api-contract.md
+  s_3889105f87e0de::t_82786b3f25e2a0 487,535-547,667
+docs/feature-parity.md
+  s_3889105f87e0de::t_012e2e22840e09 85
+docs/focus-map.md
+  s_3889105f87e0de::t_b844e70e15a841 358-364,421
+docs/testing.md
+  s_3889105f87e0de::t_3c73b882c88519 896-924
+src/app/dev/demo.ts
+  s_3889105f87e0de::t_266df85e77e716 29-30,361-370,380-381
+src/features/player/AudioBlock.tsx
+  s_3889105f87e0de::t_f4d8d92818012d 1-636
+src/features/player/__tests__/AudioBlock.test.tsx
+  s_3889105f87e0de::t_68a8bffe2ea751 1-615
+src/features/player/index.ts
+  s_3889105f87e0de::t_e07eac9182c47e 1-7
+src/features/post/PostBody.tsx
+  s_3889105f87e0de::t_34aa7e31ebc8f0 13,833-836,856-857,916-929
+src/features/post/PostScreen.tsx
+  s_3889105f87e0de::t_5062d539304f1d 49,269-270,274,537-547,653-654
+src/features/post/usePost.ts
+  s_3889105f87e0de::t_a428fd489ef5fa 13,103-119
+src/shared/api/dto/post.ts
+  s_3889105f87e0de::t_dd354244bc0dd1 21-22,140-154
+src/shared/entities/post/__tests__/postBody.test.ts
+  s_3889105f87e0de::t_6c29f930ac20b0 25-27,29,801,806,810,814-871
+src/shared/entities/post/__tests__/postRepository.test.ts
+  s_3889105f87e0de::t_6d77990e8276bc 650-753
+src/shared/entities/post/index.ts
+  s_3889105f87e0de::t_e9297a4b79f748 22
+src/shared/entities/post/postBody.ts
+  s_3889105f87e0de::t_349ac8972e179e 13-14,56-57,208-212,470,480,497-499,502-506,518,639-650
+src/shared/entities/post/postRepository.ts
+  s_3889105f87e0de::t_399c9969308e63 9,410-414,416-419,421-430,432-433,438,440,446-478,497-530,541
+src/shared/i18n/ru.ts
+  s_3889105f87e0de::t_80d33d1bc116e4 382-397
+src/test/fixtures/boosty/e8-post-accessible.json
+  s_3889105f87e0de::t_786d098b08bb99 791-808
+src/test/postFixtures.ts
+  s_3889105f87e0de::t_726a760358db27 34-36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "a747360660635a66974bf7c9c7f2a79cb7ec71ec",
+  "prompts": {},
+  "sessions": {
+    "s_3889105f87e0de": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6900e7f-f881-4858-9cce-006384a7dd3e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
