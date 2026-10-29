@@ -1,0 +1,41 @@
+__tests__/authorFlow.test.tsx
+  s_3889105f87e0de::t_e13ef816410a75 1678-1717
+__tests__/searchFlow.test.tsx
+  s_3889105f87e0de::t_01acc3c9f3b812 296-335,435-535
+__tests__/subscriptionsFlow.test.tsx
+  s_3889105f87e0de::t_c05e0a0199f1ad 942-1121
+_bmad-output/implementation-artifacts/spec-epic-5-retro-a1-a3.md
+  s_3889105f87e0de::t_fd47bd22560638 1-118
+docs/api-contract.md
+  s_3889105f87e0de::t_bbb8da763331c1 245,248,250,387-402
+docs/focus-map.md
+  s_3889105f87e0de::t_ec08e736e1e617 91,190,288
+docs/testing.md
+  s_3889105f87e0de::t_a08b789e14a716 896-909
+src/app/phaseFlags.ts
+  s_3889105f87e0de::t_86f0a30c4889f0 18-20
+src/features/author/AuthorScreen.tsx
+  s_3889105f87e0de::t_8ae8d9f25bcf1e 4,6,68-69,194-200,419-420,432-445,447-467,576,579,611,653-657
+src/features/home/feedRefresh.ts
+  s_3889105f87e0de::t_e5dea125d2aadf 3-4,9,14,76-129,140-141,164-165
+src/features/search/SearchScreen.tsx
+  s_3889105f87e0de::t_2d60e71d68fab5 3,5,64-65,263-312,334,367,375,377,379-381,384-387,389
+src/features/subscriptions/useSubscriptions.ts
+  s_3889105f87e0de::t_c6371eb41defe3 102-104
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "aa33e33342dfd1faa66803ad907ba32b9b9b8897",
+  "prompts": {},
+  "sessions": {
+    "s_3889105f87e0de": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6900e7f-f881-4858-9cce-006384a7dd3e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
