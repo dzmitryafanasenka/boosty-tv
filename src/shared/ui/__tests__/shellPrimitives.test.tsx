@@ -137,6 +137,32 @@ describe('SettingRow radio (Story 4.3)', () => {
   });
 });
 
+describe('SettingRow check (Story 5.5)', () => {
+  it('a checkbox role, the checked state and an accent box with a tick; OK calls onPress', async () => {
+    const onPress = jest.fn();
+    const root = await render(<SettingRow testID={ID} kind="check" label="Выпечка" checked onPress={onPress} />);
+    const node = host(root);
+    expect(node.props.accessibilityRole).toBe('checkbox');
+    expect(node.props.accessibilityLabel).toBe('Выпечка');
+    expect(node.props.accessibilityState).toMatchObject({ checked: true });
+    const [box] = byId(root, `${ID}/check`);
+    expect(StyleSheet.flatten(box.props.style).backgroundColor).toBe(colors.accent);
+    expect(byId(root, `${ID}/checked`).length).toBeGreaterThan(0);
+    await act(async () => {
+      host(root).props.onClick({ nativeEvent: {} });
+    });
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
+  it('not checked: an empty box, checked false', async () => {
+    const root = await render(<SettingRow testID={ID} kind="check" label="Супы" />);
+    expect(host(root).props.accessibilityState).toMatchObject({ checked: false });
+    expect(byId(root, `${ID}/checked`)).toHaveLength(0);
+    const [box] = byId(root, `${ID}/check`);
+    expect(StyleSheet.flatten(box.props.style).backgroundColor).toBeUndefined();
+  });
+});
+
 describe('StateView', () => {
   it('without an action: title-s title, body-s body, nothing focusable', async () => {
     const root = await render(<StateView testID="state" title="Лента появится здесь" body="Текст" />);

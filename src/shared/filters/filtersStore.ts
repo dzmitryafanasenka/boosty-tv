@@ -2,11 +2,13 @@ import { createStore, useStore } from 'zustand';
 import { defineAccountScoped } from '../account/defineAccountScoped';
 import {
   DEFAULT_FILTER,
+  NO_TAGS,
   periodEquals,
   type AccessFilter,
   type Filter,
   type FilterScope,
   type Period,
+  type TagRef,
 } from './filter';
 
 type FiltersState = {
@@ -15,14 +17,21 @@ type FiltersState = {
   setAccess(scope: FilterScope, access: AccessFilter): void;
   /** The scope's period (Story 5.4); the same period changes nothing. */
   setPeriod(scope: FilterScope, period: Period): void;
-  /** Back to the default Filter for that scope. */
+  /**
+   * Story 5.5: check the tag (appended, selection order kept) or uncheck it
+   * (by id). The title is the one shown when it was checked.
+   */
+  toggleTag(scope: FilterScope, tag: TagRef): void;
+  /** Story 5.5: uncheck every tag, keep access and period; no tag changes nothing. */
+  clearTags(scope: FilterScope): void;
+  /** Back to the default Filter for that scope (every section). */
   reset(scope: FilterScope): void;
   /** Every scope back to the default (AccountScope). */
   clear(): void;
 };
 
 /**
- * The one filters store (AD-18, Stories 5.3–5.4): a Filter per scope, in memory
+ * The one filters store (AD-18, Stories 5.3–5.5): a Filter per scope, in memory
  * only (never persisted across a restart) and account-scoped: wiped on
  * sign-out and account switch (`filtersAccountStore`), kept across a
  * same-account re-login. Zustand (ARCHITECTURE-SPINE) because the filter
@@ -45,6 +54,26 @@ export const filtersStore = createStore<FiltersState>()(set => ({
         return state;
       }
       return { filters: { ...state.filters, [scope]: { ...current, period } } };
+    }),
+  toggleTag: (scope, tag) =>
+    set(state => {
+      const current = state.filters[scope] ?? DEFAULT_FILTER;
+      const checked = current.tags.some(t => t.id === tag.id);
+      const remaining = current.tags.filter(t => t.id !== tag.id);
+      const tags = checked
+        ? remaining.length === 0
+          ? NO_TAGS
+          : remaining
+        : [...current.tags, { id: tag.id, title: tag.title }];
+      return { filters: { ...state.filters, [scope]: { ...current, tags } } };
+    }),
+  clearTags: scope =>
+    set(state => {
+      const current = state.filters[scope] ?? DEFAULT_FILTER;
+      if (current.tags.length === 0) {
+        return state;
+      }
+      return { filters: { ...state.filters, [scope]: { ...current, tags: NO_TAGS } } };
     }),
   reset: scope =>
     set(state => {

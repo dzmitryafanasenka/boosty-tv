@@ -84,3 +84,26 @@ export function GearIcon({ color, size = 24, testID }: IconProps) {
     </Svg>
   );
 }
+
+/** A check mark (Story 5.5, SettingRow `check`): one stroked tick. */
+export function CheckIcon({ color, size = 24, testID }: IconProps) {
+  return (
+    <Svg
+      testID={testID}
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      <Path
+        d="M5 12.5 L10 17.5 L19 7"
+        stroke={color}
+        strokeWidth={3.2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </Svg>
+  );
+}

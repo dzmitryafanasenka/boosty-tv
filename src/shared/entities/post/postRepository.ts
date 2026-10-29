@@ -3,7 +3,7 @@ import { blogPostsPageDtoSchema, feedPageDtoSchema } from '../../api/dto/feed';
 import { blockTypeDtoSchema, okVideoTimeCodeDtoSchema } from '../../api/dto/post';
 import { blogUrlSchema } from '../../api/dto/subscriptions';
 import type { HttpClient } from '../../api/httpClient';
-import { periodBounds, type Filter } from '../../filters/filter';
+import { periodBounds, tagIdsKey, type Filter } from '../../filters/filter';
 import { logger as appLogger, type Logger } from '../../services/logger';
 import { mapPost } from './mapPost';
 import type { MediaRef, Post, PostPage, PostResult, ServerProgressSink } from './types';
@@ -42,13 +42,23 @@ function feedPeriodParams(filter: Filter, nowMs: number): string {
 }
 
 /**
+ * E5 tag param (Story 5.5, FILTER-03, api-contract §3 «E5 tags»): none
+ * without tags, else `tags_ids` = the sorted ids, each URL-encoded,
+ * comma-joined.
+ */
+function feedTagParams(filter: Filter): string {
+  const ids = tagIdsKey(filter);
+  return ids.length === 0 ? '' : `&tags_ids=${ids.map(encodeURIComponent).join(',')}`;
+}
+
+/**
  * E5 path. Comments are always off (`comments_limit=0&reply_limit=0`); the
  * Filter's access params follow, then its period params (`nowMs` resolves
- * a preset). The opaque cursor goes back verbatim, URL-encoded
- * (api-contract §5).
+ * a preset), then its tags. The opaque cursor goes back verbatim,
+ * URL-encoded (api-contract §5).
  */
 export function feedPath(cursor: string | null, filter: Filter, nowMs: number = Date.now()): string {
-  const base = `/v1/feed/post/?limit=${FEED_PAGE_SIZE}&comments_limit=0&reply_limit=0&${feedAccessParams(filter)}${feedPeriodParams(filter, nowMs)}`;
+  const base = `/v1/feed/post/?limit=${FEED_PAGE_SIZE}&comments_limit=0&reply_limit=0&${feedAccessParams(filter)}${feedPeriodParams(filter, nowMs)}${feedTagParams(filter)}`;
   return cursor === null ? base : `${base}&offset=${encodeURIComponent(cursor)}`;
 }
 

@@ -14,18 +14,18 @@ afterEach(() => {
 
 describe('Filter model (AD-18, Story 5.3)', () => {
   it('the default is «Доступные мне» (owner decision 2026-10-28)', () => {
-    expect(DEFAULT_FILTER).toEqual({ access: 'allowed', period: { kind: 'all' } });
+    expect(DEFAULT_FILTER).toEqual({ access: 'allowed', period: { kind: 'all' }, tags: [] });
     expect(Object.isFrozen(DEFAULT_FILTER)).toBe(true);
     expect(ACCESS_VALUES).toEqual(['allowed', 'all', 'bought']);
   });
 
   it('counts a non-default access as one active filter', () => {
     const all = { kind: 'all' } as const;
-    expect(activeFilterCount({ access: 'allowed', period: all })).toBe(0);
-    expect(activeFilterCount({ access: 'all', period: all })).toBe(1);
-    expect(activeFilterCount({ access: 'bought', period: all })).toBe(1);
-    expect(isDefaultFilter({ access: 'allowed', period: all })).toBe(true);
-    expect(isDefaultFilter({ access: 'bought', period: all })).toBe(false);
+    expect(activeFilterCount({ access: 'allowed', period: all, tags: [] })).toBe(0);
+    expect(activeFilterCount({ access: 'all', period: all, tags: [] })).toBe(1);
+    expect(activeFilterCount({ access: 'bought', period: all, tags: [] })).toBe(1);
+    expect(isDefaultFilter({ access: 'allowed', period: all, tags: [] })).toBe(true);
+    expect(isDefaultFilter({ access: 'bought', period: all, tags: [] })).toBe(false);
   });
 });
 
@@ -38,7 +38,7 @@ describe('filtersStore', () => {
     const listener = jest.fn();
     const unsubscribe = filtersStore.subscribe(listener);
     filtersStore.getState().setAccess('feed', 'all');
-    expect(getFilter('feed')).toEqual({ access: 'all', period: { kind: 'all' } });
+    expect(getFilter('feed')).toEqual({ access: 'all', period: { kind: 'all' }, tags: [] });
     expect(listener).toHaveBeenCalledTimes(1);
     const before = getFilter('feed');
     filtersStore.getState().setAccess('feed', 'all');
@@ -52,7 +52,7 @@ describe('filtersStore', () => {
     const unsubscribe = filtersStore.subscribe(listener);
     filtersStore.getState().setAccess('feed', 'all');
     filtersStore.getState().setPeriod('feed', { kind: 'preset', days: 7 });
-    expect(getFilter('feed')).toEqual({ access: 'all', period: { kind: 'preset', days: 7 } });
+    expect(getFilter('feed')).toEqual({ access: 'all', period: { kind: 'preset', days: 7 }, tags: [] });
     expect(listener).toHaveBeenCalledTimes(2);
     const before = getFilter('feed');
     filtersStore.getState().setPeriod('feed', { kind: 'preset', days: 7 });
@@ -84,7 +84,7 @@ describe('filtersStore', () => {
 
   it('is in memory only: nothing is persisted (no storage module is used)', () => {
     filtersStore.getState().setAccess('feed', 'all');
-    expect(filtersStore.getState().filters).toEqual({ feed: { access: 'all', period: { kind: 'all' } } });
+    expect(filtersStore.getState().filters).toEqual({ feed: { access: 'all', period: { kind: 'all' }, tags: [] } });
   });
 
   it('the account-scoped store (AD-4) wipes every scope', async () => {

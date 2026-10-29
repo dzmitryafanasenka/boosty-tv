@@ -1,6 +1,6 @@
 /**
- * The Filter model (AD-18, Stories 5.3–5.4). Story 5.3 added the access
- * section, Story 5.4 the period; Story 5.5 adds `tagIds`. A Filter is plain,
+ * The Filter model (AD-18, Stories 5.3–5.5). Story 5.3 added the access
+ * section, Story 5.4 the period, Story 5.5 the tags. A Filter is plain,
  * serializable data: it is part of list query keys (never a resolved
  * timestamp, URL or cursor) and repositories turn it into request params.
  */
@@ -31,9 +31,22 @@ export type Period =
   | { readonly kind: 'preset'; readonly days: PeriodPresetDays }
   | { readonly kind: 'custom'; readonly fromDay: string; readonly toDay: string };
 
+/**
+ * A selected tag (FILTER-03, Story 5.5), as the reference's `Tag(id, title)`:
+ * the id goes to the request and the key, the title only labels the «Теги»
+ * row and the chip.
+ */
+export type TagRef = { readonly id: string; readonly title: string };
+
 export type Filter = {
   readonly access: AccessFilter;
   readonly period: Period;
+  /**
+   * The selected tags, in selection order (Story 5.5). The query key and
+   * `tags_ids` use the sorted ids only (`tagIdsKey`), so the order and a
+   * renamed tag never change the key.
+   */
+  readonly tags: readonly TagRef[];
 };
 
 /**
@@ -44,11 +57,26 @@ export type FilterScope = 'feed';
 
 export const ALL_TIME: Period = Object.freeze({ kind: 'all' });
 
+/** No tag selected (one frozen array). */
+export const NO_TAGS: readonly TagRef[] = Object.freeze([]);
+
 /**
  * The default Filter (owner decision 2026-10-28: «Доступные мне», «За всё
- * время»). One frozen object, so selectors stay stable.
+ * время»; Story 5.5: no tags). One frozen object, so selectors stay stable.
  */
-export const DEFAULT_FILTER: Filter = Object.freeze({ access: 'allowed', period: ALL_TIME });
+export const DEFAULT_FILTER: Filter = Object.freeze({
+  access: 'allowed',
+  period: ALL_TIME,
+  tags: NO_TAGS,
+});
+
+/**
+ * The selected tag ids, deduped and sorted (Story 5.5): the query key's and
+ * `tags_ids`'s form, so A+B and B+A are the same request. Titles excluded.
+ */
+export function tagIdsKey(filter: Filter): string[] {
+  return [...new Set(filter.tags.map(tag => tag.id))].sort();
+}
 
 /** Two periods are the same choice. */
 export function periodEquals(a: Period, b: Period): boolean {
@@ -62,10 +90,15 @@ export function periodEquals(a: Period, b: Period): boolean {
   }
 }
 
-/** How many sections differ from the default (the chip's count): access and period. */
+/**
+ * How many sections differ from the default (the chip's count): access,
+ * period and tags (the tag section counts once, however many are checked).
+ */
 export function activeFilterCount(filter: Filter): number {
   return (
-    (filter.access === DEFAULT_FILTER.access ? 0 : 1) + (filter.period.kind === 'all' ? 0 : 1)
+    (filter.access === DEFAULT_FILTER.access ? 0 : 1) +
+    (filter.period.kind === 'all' ? 0 : 1) +
+    (filter.tags.length === 0 ? 0 : 1)
   );
 }
 

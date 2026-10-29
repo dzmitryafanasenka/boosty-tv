@@ -1,4 +1,4 @@
-import type { Filter } from '../filters/filter';
+import { tagIdsKey, type Filter } from '../filters/filter';
 
 /**
  * TanStack Query keys (AD-7): the only place that builds them. The query
@@ -11,11 +11,24 @@ export const queryKeys = {
    * E5 «Новое в подписках» (Story 3.1), an infinite query, one per Filter
    * (Story 5.3, AD-18: the symbolic Filter, never request params). Every
    * feed path (page loads, the resume head refresh, «Обновить») uses the
-   * active `feed` Filter's key.
+   * active `feed` Filter's key. Story 5.5: the tags as their sorted ids
+   * (`tagIdsKey`), never their titles or selection order, so A+B and B+A
+   * (or a renamed tag) are one query.
    */
-  subscriptionFeed: (filter: Filter) => ['feed', 'subscriptions', filter] as const,
+  subscriptionFeed: (filter: Filter) =>
+    [
+      'feed',
+      'subscriptions',
+      { access: filter.access, period: filter.period, tagIds: tagIdsKey(filter) },
+    ] as const,
   /** Every Filter's E5 feed query (a prefix of `subscriptionFeed`). */
   allSubscriptionFeeds: () => ['feed', 'subscriptions'] as const,
+  /**
+   * E13 the feed's tags for the filter sheet (Story 5.5), an infinite query
+   * (the opaque cursors are page params). Its own root: never a prefix of a
+   * feed key.
+   */
+  feedTags: () => ['feedTags'] as const,
   /** E2 the subscribed authors (Story 3.2), one request, no paging. */
   subscriptions: () => ['subscriptions'] as const,
   /**

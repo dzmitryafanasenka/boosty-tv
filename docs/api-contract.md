@@ -246,7 +246,7 @@ All of these are under `https://api.boosty.to` and use a Bearer token.
 | E2 | `GET /v1/user/subscriptions` | Subscriptions | `limit=30`, `with_follow=true` | `data[].blog{title, blogUrl, owner{name, avatarUrl?}}` (1.16.0 stopped parsing price fields after a crash). No pagination is used. Possible top-level `offset/limit/total` are commented out. |
 | E3 | `GET /v1/blog/{blogUrl}` | Blog header (Story 5.2: Подписки also sends it for the own blog, with the Author page's query key, to decide and draw «Мой блог»; `unavailable` or a failure → no tile) | — | `title`, `blogUrl`, `owner{name, avatarUrl}` |
 | E4 | `GET /v1/blog/{blogUrl}/post/` | Blog posts (Story 5.2: Подписки sends page 1 for the own blog, with the Author page's params and query key, to decide «Мой блог»; the reference's `limit=1` is not used. A failed own-blog E1/E3/E4 is not re-sent when Подписки mounts again. While Подписки is mounted, the resume head refresh also refreshes this page 1, because it observes `authorPosts(ownBlogUrl)`) | `limit` (20), `offset?` (opaque string), `comments_limit=0`, `reply_limit=0`, `is_only_allowed?`, `only_bought?`, `from_ts?`, `to_ts?` (epoch s), `tags_ids?` (comma-joined) | `data[]: Post`, `extra{offset, isLast}`. A pinned post (`isPinned: true`) comes first, out of date order (seen live on 2 of 3 blogs, 2026-10-27); the app keeps that order and marks the card with a pin badge on the Author page |
-| E5 | `GET /v1/feed/post/` | Feed (Story 5.3: Главная always sends the access params of the active `feed` Filter, see «E5 access params (LIVE)» below; Story 5.4: plus `from_ts`/`to_ts` for a period other than «За всё время», see «E5 period (LIVE)») | `limit` (10), `offset?`, `comments_limit=0`, `reply_limit=0`, `only_allowed?`, `only_bought?`, `tags_ids?`, `from_ts?`, `to_ts?` | `data.posts[]: Post`, `extra` |
+| E5 | `GET /v1/feed/post/` | Feed (Story 5.3: Главная always sends the access params of the active `feed` Filter, see «E5 access params (LIVE)» below; Story 5.4: plus `from_ts`/`to_ts` for a period other than «За всё время», see «E5 period (LIVE)»; Story 5.5: plus `tags_ids` when tags are checked, see «E5 tags (LIVE)») | `limit` (10), `offset?`, `comments_limit=0`, `reply_limit=0`, `only_allowed?`, `only_bought?`, `tags_ids?`, `from_ts?`, `to_ts?` | `data.posts[]: Post`, `extra` |
 | E6 | `GET /v1/search/feed/post/` | Feed search | E5 params + `search_query` | `data.searchPosts[].post: Post`, `extra` |
 | E7 | `GET /v1/search/blog/post/` | Blog search | `blog_url`, `search_query`, E4 params (with `is_only_allowed`) | `data.searchPosts[].post: Post`, `extra` |
 | E8 | `GET /v1/blog/{blogUrl}/post/{postId}` | Single post (the reference uses it to refresh media URLs and `timeCode`) | `comments_limit`, `reply_limit` (the reference sends 20. **We must send 0**. 0 is accepted: `LIVE`, Story 1.5) | `Post` (top level, no `data` wrapper) |
@@ -254,7 +254,7 @@ All of these are under `https://api.boosty.to` and use a Bearer token.
 | E10 | `GET /v1/blog/{blogUrl}/poll/{pollId}` | Refresh poll | — | `data.poll: Poll` |
 | E11 | `POST /v1/poll/{pollId}/vote` | Vote | form `answer` = comma-joined option ids | body ignored |
 | E12 | `DELETE /v1/poll/{pollId}/vote` | Retract vote | — | body ignored |
-| E13 | `GET /v1/search/feed/tag/` | Feed tags (filter) | `limit` (100), `offset?` | `data.searchTags[]{tag{id, title}, rank}`, `extra{offset, isLast}` |
+| E13 | `GET /v1/search/feed/tag/` | Feed tags (filter; Story 5.5: the filter sheet's tag level, content profile, see «E13 (LIVE)») | `limit` (100), `offset?` | `data.searchTags[]{tag{id, title}, rank}`, `extra{offset, isLast}` |
 | E14 | `GET /v1/blog/{blogUrl}/post/tag/` | Blog tags | — | `data[]{id, title}` |
 | E15 | `GET /v1/blog/{blogUrl}/video_stream` | Active or scheduled live stream | — | **`204 No Content` = none.** Otherwise: `id`, `int_id`, `title`, `isOnline`, `isTemplate`, `hasAccess`, `startTime` (epoch s), `signedQuery`, `isLiked`, `data[]` (content blocks incl. `ok_stream`/`ok_video`), `teaser[]`, `count{viewers, likes}`, `subscriptionLevel{name, currencyPrices{RUB, USD, EUR}}` |
 | E16 | `PUT /v1/blog/{blogUrl}/video_stream/heartbeat/viewer` | Live viewer heartbeat (every 30 s) | `stop=true` query param on exit | body discarded |
@@ -339,6 +339,30 @@ Live check (debug build with a temporary log, removed before the commit; Chromec
 | «Свой период…» 28 Sep – 26 Oct 2026 | page 1: 10, page 2: 8 (last), every post inside the bounds |
 
 So E5 honours `from_ts`/`to_ts` in seconds with both ends inclusive; 23:59:59 as the end of the last day therefore includes a post published in that last second. Paging (`offset`, `isLast`) works as without a period. One account, one run; E4 (`from_ts`/`to_ts` on a blog, Story 5.7) was not checked.
+
+### E13 (`LIVE`, Story 5.5)
+
+Boosty TV sends `GET /v1/search/feed/tag/?limit=100`, then `&offset=<extra.offset>` (opaque, verbatim, URL-encoded) for the next page, only on an explicit «Загрузить ещё». `TagRepository.feedTagsPage` reads `data.searchTags[].tag{id, title}`; `rank` is not read. One item without a non-negative integer (or non-empty string) `id` or a non-blank `title` is dropped and counted in the log (no value logged), never the page; a missing `data.searchTags` is `Parse`. Paging stops on `isLast` or a missing `extra`/`offset` (`TagRepository`), or on a cursor already used (`useFeedTags`, no loop). Ids become strings; a string id must be digits only (a comma would split `tags_ids`).
+
+Live check (debug build with a temporary counts-only log, removed before the commit; Chromecast with Google TV 4K, the owner's session, 2026-10-29; only keys, types, counts and booleans were logged, never ids, titles or URLs): HTTP 200; top level `{data, extra}`; `data` has only `searchTags`; 45 items, each `{tag, rank}` with `tag{id, title}`; every `id` a number, all 45 distinct; every `title` a non-blank string; `rank` a number; `extra{offset: string, isLast: true}`. So this account's tags fit in one page: a second page and the «Загрузить ещё» path were **not** seen live (host-tested and in the demo only). Sanitized shape fixtures: `src/test/fixtures/boosty/e13-feed-tags-1.json` (`isLast: false`) and `e13-feed-tags-2.json` (`isLast: true`); the two-page split is synthetic (the live run logged counts only, no body was captured).
+
+### E5 tags (`LIVE`, Story 5.5)
+
+The reference sends the selected tag ids as one comma-joined `tags_ids`. Boosty TV sends `tags_ids` after the access and period params, before `offset`, only when at least one tag is checked: the ids **sorted** (string order), each URL-encoded, joined by a literal `,` (`tags_ids=12,3`). The Filter keeps `{id, title}` per tag in selection order; the query key holds the sorted ids only, so A+B and B+A are one request and one cache entry.
+
+Live check (same run; default access params, `limit` 20/50 for the probe requests only; HTTP 200 for every request; counts and booleans only). A = the tag most frequent on the unfiltered page 1:
+
+| Request | Result |
+|---|---|
+| Unfiltered (`limit=20`) | 20 posts, 8 with tags, 6 distinct tags, all 6 among the E13 tags |
+| `tags_ids=A` (`limit=50`) | 50 posts, **every one carries A**, more pages; the 4 unfiltered posts with A all in it |
+| `tags_ids=B`, B never on a post with A (on that page) | 16 posts, every one carries B, last page |
+| `tags_ids=A,B` (that B) | **0 posts**, last page |
+| `tags_ids=B'` (second run: B' seen together with A) | 1 post, carrying A and B' |
+| `tags_ids=A,B'` | 1 post, carrying A and B' |
+| `A,B` encoded as `A%2CB`, and `B,A` | the same posts as `A,B` |
+
+So E5 honours `tags_ids` and **intersects** the listed tags: a post must carry every listed tag (a union would have returned at least A's 50 posts). A literal and an encoded comma behave the same; the order does not matter. One account, two runs; E4 `tags_ids` (Story 5.7) was not checked.
 
 ## 4. Post object (`REF`)
 

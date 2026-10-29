@@ -29,6 +29,8 @@ export type FilterChipProps = {
 
 /** The count badge's diameter (fits inside the 32 dp pill). */
 const BADGE = 20;
+/** The label's widest (Story 5.5): longer values end in an ellipsis. */
+const LABEL_MAX_WIDTH = 360;
 
 /**
  * DESIGN.md FilterChip (`filter-chip` tokens, Story 5.3): a 32 dp pill on
@@ -65,7 +67,7 @@ export function FilterChip({
       surfaceStyle={surfaceStyle}
     >
       <View style={styles.content}>
-        <Text variant="button-s" numberOfLines={1}>
+        <Text variant="button-s" numberOfLines={1} style={styles.label}>
           {label}
         </Text>
         {count > 0 ? (
@@ -89,6 +91,11 @@ const styles = StyleSheet.create({
   content: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  // A long value (Story 5.5: a free-form tag title) ends in an ellipsis
+  // instead of pushing «Обновить» out of the title row.
+  label: {
+    maxWidth: LABEL_MAX_WIDTH,
   },
   badge: {
     minWidth: BADGE,
