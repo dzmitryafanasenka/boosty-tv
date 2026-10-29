@@ -1,6 +1,7 @@
 export {
   PollWidget,
   pollAccessibilityLabel,
+  pollCheckOptionAccessibilityLabel,
   pollOptionAccessibilityLabel,
   type PollWidgetProps,
 } from './PollWidget';

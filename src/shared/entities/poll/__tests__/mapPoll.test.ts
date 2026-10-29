@@ -1,6 +1,6 @@
 // eslint-disable-next-line boundaries/dependencies -- test-only fixtures
 import { e8Accessible } from '../../../../test/postFixtures';
-import { isChosen, mapPoll, pollBarPercent, pollPercent } from '../mapPoll';
+import { isChosen, isMultipleVotable, isVotablePoll, mapPoll, pollBarPercent, pollPercent } from '../mapPoll';
 
 /** The live key set (api-contract §4.2 «Polls (LIVE)»), synthetic values. */
 const option = (id: number, counter: number, fraction: number) => ({
@@ -155,5 +155,18 @@ describe('poll percent and bar (Story 6.5)', () => {
     expect(pollBarPercent(140)).toBe(100);
     expect(pollBarPercent(-5)).toBe(0);
     expect(pollBarPercent(Number.POSITIVE_INFINITY)).toBe(0);
+  });
+});
+
+describe('poll modes (Stories 6.6, 6.7)', () => {
+  it.each([
+    ['open single', {}, true, false],
+    ['open multiple', { isMultiple: true }, false, true],
+    ['finished single', { isFinished: true }, false, false],
+    ['finished multiple', { isMultiple: true, isFinished: true }, false, false],
+  ])('%s (%p): isVotablePoll %p, isMultipleVotable %p', (_name, overrides, single, multiple) => {
+    const poll = mapPoll(rawPoll(overrides))!;
+    expect(isVotablePoll(poll)).toBe(single);
+    expect(isMultipleVotable(poll)).toBe(multiple);
   });
 });

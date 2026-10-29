@@ -33,7 +33,9 @@ import type { ReadResult, SecureStore } from '../../shared/platform/secureStore'
  * `demo-post-13`/`-27` have none, Story 3.6), E9 progress writes 200 (Story
  * 4.2; demo videos have no `playerUrls`, so the player itself cannot play
  * them), E10–E12 (Story 6.6: the open demo polls take a vote, a change and
- * a retract, kept in memory for the app run), every other request a 404. The
+ * a retract, kept in memory for the app run; Story 6.7: the open
+ * multiple-choice demo polls (n % 8 = 5) take a multi-id vote and a
+ * retract), every other request a 404. The
  * keychain is never touched, so the owner's stored session survives a demo
  * run.
  *
@@ -78,9 +80,14 @@ function demoFeedTagsPage(url: string) {
  * Story 6.5: a top-level `poll` (the live shape, api-contract §4.2) on
  * every odd post (every second one): an open one with the user's choice on
  * its second option (n % 4 = 1) or a finished one with no voters (n % 4 =
- * 3); none otherwise (a locked post never gets one).
+ * 3); none otherwise (a locked post never gets one). Story 6.7: of the
+ * open ones, n % 8 = 5 is multiple choice and not voted (`demo-post-5`).
  */
 function demoPoll(n: number) {
+  if (n % 8 === 5) {
+    // Story 6.7: every other open demo poll is multiple choice, not voted.
+    return demoMultiplePoll(n);
+  }
   if (n % 4 === 1) {
     return demoOpenPoll(n);
   }
@@ -145,10 +152,52 @@ function demoOpenPoll(n: number) {
   };
 }
 
+/** Story 6.7: the open multiple-choice demo poll's options: `[id, text, votes from others]`. */
+const DEMO_MULTI_OPTIONS = [
+  [1, 'История', 31],
+  [2, 'Наука', 24],
+  [3, 'Технологии', 18],
+  [4, 'Искусство', 9],
+] as const;
+/** Story 6.7: the demo user's choices per open multiple-choice poll (absent: none). In memory only. */
+const demoMultiAnswers = new Map<number, readonly number[]>();
+
+/**
+ * Story 6.7: an open multiple-choice demo poll (n % 8 = 5), not voted at
+ * first: the others' votes plus the demo user's choices. A fraction is each
+ * option's share of the voters (so they may add up past 100, as a
+ * multiple-choice poll's do); the voter count adds 1 once the user voted.
+ */
+function demoMultiplePoll(n: number) {
+  const id = DEMO_POLL_BASE + n;
+  const answer = demoMultiAnswers.get(id) ?? [];
+  const counts = DEMO_MULTI_OPTIONS.map(([optionId, , others]) => others + (answer.includes(optionId) ? 1 : 0));
+  const counter = 40 + (answer.length > 0 ? 1 : 0);
+  return {
+    id,
+    title: ['Какие темы разобрать?'],
+    isMultiple: true,
+    isFinished: false,
+    counter,
+    ...(answer.length === 0 ? {} : { answer: [...answer] }),
+    defaultLang: 'ru',
+    hasOther: false,
+    options: DEMO_MULTI_OPTIONS.map(([optionId, text], i) => ({
+      id: optionId,
+      text,
+      counter: counts[i],
+      fraction: Math.round((counts[i] / counter) * 100),
+      voters: {},
+    })),
+  };
+}
+
 /**
  * Story 6.6: the demo E10/E11/E12 for an open demo poll (`2000 + n`, n % 4
  * = 1); null for any other poll id (404). E11 takes `answer` = one known
- * option id (else 400), E12 clears the choice.
+ * option id (else 400), E12 clears the choice. Story 6.7: for the
+ * multiple-choice one (n % 8 = 5), E11 takes one or more known ids,
+ * comma-joined and distinct (else 400).
  */
 function demoPollReply(
   method: string,
@@ -159,6 +208,9 @@ function demoPollReply(
   const n = id - DEMO_POLL_BASE;
   if (!Number.isInteger(n) || n < 0 || n % 4 !== 1) {
     return null;
+  }
+  if (n % 8 === 5) {
+    return demoMultipleReply(method, id, n, form);
   }
   if (method === 'GET') {
     return { status: 200, body: { data: { poll: demoOpenPoll(n) } } };
@@ -172,6 +224,29 @@ function demoPollReply(
     return { status: 400, body: { error: 'bad_request' } };
   }
   demoPollAnswers.set(id, answer);
+  return { status: 200, body: {} };
+}
+
+/** Story 6.7: the demo E10/E11/E12 of an open multiple-choice demo poll. */
+function demoMultipleReply(
+  method: string,
+  id: number,
+  n: number,
+  form: Record<string, string>,
+): { status: number; body?: unknown } {
+  if (method === 'GET') {
+    return { status: 200, body: { data: { poll: demoMultiplePoll(n) } } };
+  }
+  if (method === 'DELETE') {
+    demoMultiAnswers.delete(id);
+    return { status: 200, body: {} };
+  }
+  const ids = (form.answer ?? '').split(',').map(Number);
+  const known = ids.every(optionId => DEMO_MULTI_OPTIONS.some(([known_]) => known_ === optionId));
+  if (method !== 'POST' || !known || new Set(ids).size !== ids.length) {
+    return { status: 400, body: { error: 'bad_request' } };
+  }
+  demoMultiAnswers.set(id, ids);
   return { status: 200, body: {} };
 }
 
