@@ -1,0 +1,59 @@
+__tests__/demoFlow.test.tsx
+  s_7477a2e6c69ec6::t_92ad5b3aa2bceb 262-304
+__tests__/postFlow.test.tsx
+  s_7477a2e6c69ec6::t_43e51f9cf5f3f8 64,132-163,1061-1090,2967-2972,2987-3001,3020-3021,3033-3288
+_bmad-output/implementation-artifacts/spec-6-7-multiple-choice-poll.md
+  s_7477a2e6c69ec6::t_b280b33002e609 1-150
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_7477a2e6c69ec6::t_7087b9126a3813 32,96
+docs/api-contract.md
+  s_7477a2e6c69ec6::t_7b1fc4a428943d 601,620-621
+docs/feature-parity.md
+  s_7477a2e6c69ec6::t_2f00f935f1d16f 98-100
+docs/focus-map.md
+  s_7477a2e6c69ec6::t_b2aaa663c49b22 310,424-425
+docs/testing.md
+  s_7477a2e6c69ec6::t_50686fd5ecc6bd 896-911
+src/app/dev/demo.ts
+  s_7477a2e6c69ec6::t_a470470aef5572 36-38,83-84,87-90,155-194,198-200,212-214,230-252
+src/features/polls/PollWidget.tsx
+  s_7477a2e6c69ec6::t_d09c1fc72593cf 1,6,23,34-36,67-73,133-135,147-148,150-168,222-230,243-281,303,330,363,393-918,1068,1086,1167-1194
+src/features/polls/__tests__/PollWidget.test.tsx
+  s_7477a2e6c69ec6::t_7d911baa2435c3 547-964
+src/features/polls/index.ts
+  s_7477a2e6c69ec6::t_1062c91edfa7cc 4
+src/features/polls/usePollVote.ts
+  s_7477a2e6c69ec6::t_b854bc08032e13 8-9,28,64-69,73-76,78,95,98,104,112,137,150
+src/features/post/PostBody.tsx
+  s_7477a2e6c69ec6::t_5d65e1de37c6bd 843-844,846-853,964-965,977-978
+src/features/post/PostScreen.tsx
+  s_7477a2e6c69ec6::t_437d16c2199be3 29,67-69,324-330,523-573,599-601,604-606,609-611,613-614,618,620,638,640-647
+src/shared/entities/poll/__tests__/mapPoll.test.ts
+  s_7477a2e6c69ec6::t_941f365d2fd50b 3,160-172
+src/shared/entities/poll/__tests__/pollRepository.test.ts
+  s_7477a2e6c69ec6::t_2627b51636dc63 12-13,120-131
+src/shared/entities/poll/index.ts
+  s_7477a2e6c69ec6::t_d5f7fce13064ff 1
+src/shared/entities/poll/mapPoll.ts
+  s_7477a2e6c69ec6::t_84a4136c105be4 92-100
+src/shared/i18n/ru.ts
+  s_7477a2e6c69ec6::t_cc35061ac9520f 427-434
+src/test/fixtures/boosty/e10-poll-multiple.json
+  s_7477a2e6c69ec6::t_c2d9572773f57d 1-44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "d62a0fb863ca1343af441c524bc8f0baad762c29",
+  "prompts": {},
+  "sessions": {
+    "s_7477a2e6c69ec6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d998e7e2-636f-4943-a058-23b274887697",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
