@@ -15,8 +15,9 @@
  * `filters` (Story 5.3) is the «Фильтры» chip on Главная: while it is off,
  * there is no chip and the feed uses the default Filter (and so does Поиск).
  *
- * `search` (Story 5.6) is the Поиск sidebar section («Поиск по подпискам»,
- * E6): while it is off, the section is not rendered.
+ * `search` gates both search scopes: the Поиск sidebar section («Поиск по
+ * подпискам», E6, Story 5.6) and Автор's «Поиск в блоге» field (E7, Story
+ * 5.7). While it is off, neither is rendered.
  */
 export const phaseFlags = {
   home: true,

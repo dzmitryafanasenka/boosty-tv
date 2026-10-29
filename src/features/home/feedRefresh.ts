@@ -1,14 +1,17 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { queryKeys, type HttpClient } from '../../shared/api';
+import type { BlogResult } from '../../shared/entities/author';
+import type { CurrentUser } from '../../shared/entities/user';
 import {
   PostRepository,
   mergePostsHead,
   refreshPostsHead,
+  trimPostsToFirstPage,
   type PostPage,
   type PostsData,
   type PostsHeadRefreshResult,
 } from '../../shared/entities/post';
-import type { Filter } from '../../shared/filters';
+import { DEFAULT_FILTER, type Filter } from '../../shared/filters';
 import { logger as appLogger, type Logger } from '../../shared/services/logger';
 
 /**
@@ -70,6 +73,60 @@ export function refreshFeedHead(
   );
 }
 
+/** Refetch exactly one cached query (also with no observer), not awaited. */
+function refetchExact(client: QueryClient, queryKey: readonly unknown[]): Promise<void> {
+  return client.invalidateQueries({ queryKey, exact: true, refetchType: 'all' });
+}
+
+/**
+ * «Обновить» re-asks the «Мой блог» steps that ended without a tile (Epic 5
+ * retro A3; the tile's own rules stay Подписки's, Story 5.2): from the
+ * cache only, with the keys of `useMyBlog` (`features/home` never imports
+ * `features/subscriptions`).
+ *
+ * - `me` (E1) failed, or has no `blogUrl`: refetched; on success the
+ *   observers (when Подписки is mounted) run the rest of the chain.
+ * - The own blog's header (E3) failed or is `unavailable`: refetched.
+ * - Its posts (E4, the default Filter) failed or are empty: refetched.
+ *   That list holds page 1 only (Подписки never loads more); a longer
+ *   one is trimmed to page 1 first, so one request is sent, never a
+ *   page storm.
+ * - A step never asked, one in flight, or one that succeeded (a shown
+ *   tile): no request. Подписки not visited yet: the `me` query is not in
+ *   the cache. With `phaseFlags.myBlog` off, `useMyBlog` never fills the
+ *   `me` query, so nothing is re-asked.
+ * - Cost: for an account without a blog, every «Обновить» after a visit
+ *   to Подписки sends one E1.
+ */
+function recheckMyBlog(client: QueryClient): void {
+  const settled = (state: { status: string; fetchStatus: string } | undefined) =>
+    state !== undefined && state.status !== 'pending' && state.fetchStatus !== 'fetching';
+  const meKey = queryKeys.me();
+  const me = client.getQueryState<CurrentUser>(meKey);
+  if (!settled(me)) {
+    return;
+  }
+  const blogUrl = me?.data?.blogUrl ?? null;
+  if (blogUrl === null) {
+    // Failed, or the account had no blog (yet).
+    refetchExact(client, meKey).catch(() => {});
+    return;
+  }
+  const headerKey = queryKeys.author(blogUrl);
+  const header = client.getQueryState<BlogResult>(headerKey);
+  if (settled(header) && header?.data?.kind !== 'ok') {
+    refetchExact(client, headerKey).catch(() => {});
+  }
+  const postsKey = queryKeys.authorPosts(blogUrl, DEFAULT_FILTER);
+  const posts = client.getQueryState<PostsData>(postsKey);
+  const hasPost = posts?.data?.pages.some(page => page.posts.length > 0) ?? false;
+  if (settled(posts) && !hasPost) {
+    trimPostsToFirstPage(client, postsKey)
+      .then(() => refetchExact(client, postsKey))
+      .catch(() => {});
+  }
+}
+
 /** One manual refresh at a time per client (its promise). */
 const manualRunning = new WeakMap<QueryClient, Promise<FeedRefreshResult>>();
 
@@ -80,7 +137,8 @@ const manualRunning = new WeakMap<QueryClient, Promise<FeedRefreshResult>>();
  * merged into the cached feed, loaded pages kept, never a refetch of the
  * infinite query, ADR 0010), and an invalidation of exactly the
  * subscriptions query (E2, refetched once when it is cached, even with no
- * observer; not awaited). The feed is the active `feed` Filter's (Story
+ * observer; not awaited), plus the «Мой блог» re-check (`recheckMyBlog`,
+ * Epic 5 retro A3; not awaited). The feed is the active `feed` Filter's (Story
  * 5.3). Single-flight: a call while one runs returns the
  * same promise; a resume refresh already running is joined, not
  * duplicated. The result is the feed's (`failed`: the cache stays, the kind
@@ -103,6 +161,8 @@ export function manualRefreshFeed(
   client
     .invalidateQueries({ queryKey: queryKeys.subscriptions(), exact: true, refetchType: 'all' })
     .catch(() => {});
+  // «Мой блог» steps that ended without a tile (Epic 5 retro A3); not awaited.
+  recheckMyBlog(client);
   const run = (async () => {
     try {
       return await refreshPostsHead(

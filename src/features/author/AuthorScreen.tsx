@@ -1,9 +1,9 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { FlashListRef } from '@shopify/flash-list';
-import { useQueryClient } from '@tanstack/react-query';
+import { hashKey, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { StyleSheet, TVFocusGuideView, View, useWindowDimensions } from 'react-native';
-import type { HttpClient } from '../../shared/api';
+import { queryKeys, type HttpClient } from '../../shared/api';
 import {
   DEFAULT_FILTER,
   FilterSheet,
@@ -65,6 +65,8 @@ export const authorFiltersId = (blogUrl: string) => `author/${blogUrl}/action/fi
 export const authorResetId = (blogUrl: string) => `author/${blogUrl}/action/reset`;
 
 const SKELETON_ROWS = 2;
+/** Frames the no-fetch outcome settle waits for the render and the cache. */
+const OUTCOME_FRAME_TRIES = 30;
 const FIELD = components['text-field'];
 /** The action row: the label above the 50 dp field, and a little room under it. */
 export const AUTHOR_ACTION_ROW_HEIGHT =
@@ -189,6 +191,13 @@ export function AuthorScreen({
   const search = useBlogSearch(http, blogUrl, query, filter);
   /** What the grid shows: the search results while a query is active, else the posts. */
   const list = searching ? search : posts;
+  const listKey = useMemo(
+    () =>
+      query !== null
+        ? queryKeys.blogSearch(blogUrl, query, filter)
+        : queryKeys.authorPosts(blogUrl, filter),
+    [blogUrl, query, filter],
+  );
   const client = useQueryClient();
   const modal = useModal();
   const windowHeight = useWindowDimensions().height;
@@ -407,6 +416,8 @@ export function AuthorScreen({
   const pendingOutcome = useRef(false);
   const outcomeFetchSeen = useRef(false);
   const listFetchingRef = useLatestRef(list.isFetching);
+  /** The shown list's key (hashed), as last rendered. */
+  const shownKeyRef = useLatestRef(hashKey(listKey));
   /** The latest `resolveOutcome` (set below; read by the next-frame check). */
   const resolveLater = useRef<() => boolean>(() => false);
   const outcomeFrame = useRef<number | null>(null);
@@ -418,22 +429,42 @@ export function AuthorScreen({
     },
     [],
   );
-  const awaitOutcome = useCallback(() => {
-    pendingOutcome.current = true;
-    outcomeFetchSeen.current = false;
-    // No fetch followed (e.g. «Сбросить фильтры» onto a cached, also empty
-    // list: no phase change, no fetching cycle): settle on the next frame
-    // with the same rules, so the flag never outlives its action.
-    if (outcomeFrame.current !== null) {
-      cancelAnimationFrame(outcomeFrame.current);
-    }
-    outcomeFrame.current = requestAnimationFrame(() => {
-      outcomeFrame.current = null;
-      if (pendingOutcome.current && !outcomeFetchSeen.current && !listFetchingRef.current) {
-        resolveLater.current();
+  const awaitOutcome = useCallback(
+    (awaited: QueryKey) => {
+      pendingOutcome.current = true;
+      outcomeFetchSeen.current = false;
+      // No fetch followed (e.g. an action onto a cached list with no phase
+      // change and no fetching cycle): settle on a next frame with the same
+      // rules, so the flag never outlives its action. Not while the awaited
+      // list is fetching per the cache, or the render has not reached it
+      // yet (a slow device: TanStack's batched notify can come after the
+      // frame); then look again on the next frame, at most
+      // OUTCOME_FRAME_TRIES times (a longer fetch settles through the
+      // fetching cycle or the phase change).
+      if (outcomeFrame.current !== null) {
+        cancelAnimationFrame(outcomeFrame.current);
       }
-    });
-  }, [listFetchingRef]);
+      const awaitedHash = hashKey(awaited);
+      let tries = 0;
+      const check = () => {
+        outcomeFrame.current = null;
+        if (!pendingOutcome.current || outcomeFetchSeen.current) {
+          return;
+        }
+        const busy =
+          listFetchingRef.current ||
+          shownKeyRef.current !== awaitedHash ||
+          client.isFetching({ queryKey: awaited, exact: true }) > 0;
+        if (!busy) {
+          resolveLater.current();
+        } else if (++tries < OUTCOME_FRAME_TRIES) {
+          outcomeFrame.current = requestAnimationFrame(check);
+        }
+      };
+      outcomeFrame.current = requestAnimationFrame(check);
+    },
+    [listFetchingRef, shownKeyRef, client],
+  );
   const mayTakeOutcomeFocus = useCallback(() => {
     const info = focusRef.current;
     if (!info.isActive() || modal.isOpen()) {
@@ -542,10 +573,10 @@ export function AuthorScreen({
   // «Повторить» of a failed list page 1 (posts or search results).
   const onRetryList = useCallback(() => {
     if (searching) {
-      awaitOutcome();
+      awaitOutcome(listKey);
     }
     list.refetch();
-  }, [list, searching, awaitOutcome]);
+  }, [list, searching, awaitOutcome, listKey]);
 
   /** Back to the normal list (the search memory starts over at the field). */
   const leaveSearch = useCallback(() => {
@@ -577,7 +608,7 @@ export function AuthorScreen({
     }
     restoration.cancel();
     focusRestoration.remember(routeKey, MAIN_SECTION, fieldId, 0);
-    awaitOutcome();
+    awaitOutcome(queryKeys.blogSearch(blogUrl, next, filterRef.current));
     submitBlogSearch(client, blogUrl, next, filterRef.current).catch(() => {});
     setQuery(next);
   }, [
@@ -619,7 +650,11 @@ export function AuthorScreen({
   // cached result for it is not reused).
   const onResetFilters = useCallback(() => {
     focusField();
-    awaitOutcome();
+    awaitOutcome(
+      queryRef.current !== null
+        ? queryKeys.blogSearch(blogUrl, queryRef.current, DEFAULT_FILTER)
+        : queryKeys.authorPosts(blogUrl, DEFAULT_FILTER),
+    );
     if (queryRef.current !== null) {
       submitBlogSearch(client, blogUrl, queryRef.current, DEFAULT_FILTER).catch(() => {});
     }

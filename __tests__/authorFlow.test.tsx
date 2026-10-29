@@ -1675,6 +1675,46 @@ describe('Story 5.7: search and filters inside an author', () => {
     await unmount(root);
   });
 
+  it('«Готово» from the error view on a slow device (the settle frame fires before the fetching render): the outcome still lands on the fetched results', async () => {
+    e7 = () => ({ status: 400, body: {} });
+    const root = await openAuthor();
+    await runSearch(root, 'пирог');
+    expect(lastFocusTarget()).toBe(STATE);
+    const reply = deferred();
+    let pending: FixtureRequest | null = null;
+    e7 = req => {
+      pending = req;
+      return reply.promise;
+    };
+    // TanStack's notifications are held: the render still shows the error
+    // (not fetching) when the next frames fire.
+    const held: Array<() => void> = [];
+    notifyManager.setScheduler(callback => {
+      held.push(callback);
+    });
+    try {
+      await runSearch(root, 'пирог');
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+      expect(visible(root, 'author/search-error')).toBe(true);
+      expect(queryClient.isFetching({ queryKey: queryKeys.blogSearch(BLOG, 'пирог', DEFAULT_FILTER) })).toBe(1);
+    } finally {
+      notifyManager.setScheduler(callback => {
+        Promise.resolve().then(callback);
+      });
+    }
+    focusMock.mockClear();
+    await act(async () => {
+      held.splice(0).forEach(callback => callback());
+    });
+    reply.resolve(syntheticBlogSearch(5)(pending as unknown as FixtureRequest));
+    await f.settle();
+    expect(focusTargets()).not.toContain(STATE);
+    expect(lastFocusTarget()).toBe(SYN(0));
+    await unmount(root);
+  });
+
   it('Search access (owner decision B a): «Доступные мне» drops locked results; «Все посты» shows them', async () => {
     e7 = syntheticBlogSearch(6, n => n % 2 === 1);
     const root = await openAuthor();

@@ -99,7 +99,9 @@ const NO_BLOG = '';
  * tile shows E3's header with the E1 `blogUrl` (the route). Off (`enabled`
  * false, the `myBlog` phase flag): no request. A failed step is not asked
  * again when Подписки mounts again (`retryOnMount: false`); the Author page's
- * own observers still retry on their mount.
+ * own observers still retry on their mount. Главная's «Обновить» re-asks the
+ * steps that ended without a tile (`recheckMyBlog` in
+ * `features/home/feedRefresh.ts`, Epic 5 retro A3; same keys).
  */
 export function useMyBlog(http: HttpClient, enabled: boolean): MyBlog {
   const me = useQuery({
