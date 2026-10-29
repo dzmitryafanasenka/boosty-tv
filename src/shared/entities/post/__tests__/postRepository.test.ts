@@ -8,12 +8,23 @@ import { cursorFor, e5Page, feedPost, syntheticFeed } from '../../../../test/fee
 import { blogPost, e4Page, syntheticBlogPosts } from '../../../../test/authorFixtures';
 // eslint-disable-next-line boundaries/dependencies -- test-only fixtures
 import { e8Accessible, e8Locked, e8MissingReply } from '../../../../test/postFixtures';
-import { PostRepository, blogPostsPath, feedPath, mergePosts, postPath } from '../postRepository';
+import {
+  PostRepository,
+  blogPostsPath,
+  feedPath,
+  feedSearchPath,
+  mergePosts,
+  postPath,
+} from '../postRepository';
 import { mapPost } from '../mapPost';
 import type { Post } from '../types';
 import { ALL_TIME, DEFAULT_FILTER } from '../../../filters';
 // eslint-disable-next-line boundaries/dependencies -- test-only fixtures
 import e5OnlyBought from '../../../../test/fixtures/boosty/e5-feed-only-bought.json';
+// eslint-disable-next-line boundaries/dependencies -- test-only fixtures
+import e6Search1 from '../../../../test/fixtures/boosty/e6-feed-search-1.json';
+// eslint-disable-next-line boundaries/dependencies -- test-only fixtures
+import e6Search2 from '../../../../test/fixtures/boosty/e6-feed-search-2.json';
 
 function client(handler: FixtureHandler) {
   const transport = createFixtureTransport(handler);
@@ -361,5 +372,114 @@ describe('PostRepository.post (E8, Story 3.4)', () => {
     for (const [blogUrl, postId] of [['a/b', 'p'], ['..', 'p'], ['b', '..'], ['b', '.'], ['b', '']]) {
       expect(() => postPath(blogUrl, postId)).toThrow(new AppError('Client'));
     }
+  });
+});
+
+describe('feedSearchPath (E6, Story 5.6)', () => {
+  const BASE = '/v1/search/feed/post/?limit=10&comments_limit=0&reply_limit=0';
+
+  it('E5 params, then search_query; no offset on the first page', () => {
+    expect(feedSearchPath('капуста', null, DEFAULT_FILTER)).toBe(
+      `${BASE}&only_allowed=true&only_bought=false&search_query=%D0%BA%D0%B0%D0%BF%D1%83%D1%81%D1%82%D0%B0`,
+    );
+  });
+
+  it('encodes Cyrillic, spaces, `&`, `#`, `=`, `+`, `%` and `/` so the query stays one param', () => {
+    const path = feedSearchPath('квашеная капуста & #1 a=b+c 50% x/y', null, DEFAULT_FILTER);
+    const param = /[?&]search_query=([^&#]*)/.exec(path)?.[1] ?? '';
+    expect(decodeURIComponent(param)).toBe('квашеная капуста & #1 a=b+c 50% x/y');
+    expect(path).not.toContain('#');
+    expect(path.split('&').filter(part => part.startsWith('search_query='))).toHaveLength(1);
+    expect(param).toContain('%26');
+    expect(param).toContain('%23');
+  });
+
+  it('the Filter params as on E5 (access, period resolved at `now`, sorted tags), then the query, then the cursor', () => {
+    const now = new Date(2026, 9, 29, 12, 0, 0).getTime();
+    const filter = {
+      access: 'all' as const,
+      period: { kind: 'preset' as const, days: 7 as const },
+      tags: [
+        { id: '12', title: 'B' },
+        { id: '3', title: 'A' },
+      ],
+    };
+    const path = feedSearchPath('q', 'a b&c', filter, now);
+    const feed = feedPath(null, filter, now).replace('/v1/feed/post/', '/v1/search/feed/post/');
+    expect(path).toBe(`${feed}&search_query=q&offset=a%20b%26c`);
+    expect(path).toContain('tags_ids=12,3');
+  });
+});
+
+describe('PostRepository.feedSearchPage (E6, Story 5.6)', () => {
+  it('reads data.searchPosts[].post (the live shape) and the opaque cursor', async () => {
+    const { http, transport } = client(() => ({ status: 200, body: e6Search1.body }));
+    const page = await PostRepository.feedSearchPage(http, 'капуста', null, DEFAULT_FILTER);
+    expect(page.posts.map(p => p.id)).toEqual(
+      e6Search1.body.data.searchPosts.map(item => item.post.id),
+    );
+    expect(page.nextCursor).toBe('redacted');
+    expect(transport.calls[0].path).toBe('/v1/search/feed/post/');
+    expect(transport.calls[0].url).toContain('search_query=');
+    expect(transport.calls.every(c => !c.path.includes('comment'))).toBe(true);
+  });
+
+  it('the last page (isLast) ends the paging', async () => {
+    const { http } = client(() => ({ status: 200, body: e6Search2.body }));
+    const page = await PostRepository.feedSearchPage(http, 'q', 'redacted', DEFAULT_FILTER);
+    expect(page.posts).toHaveLength(2);
+    expect(page.nextCursor).toBeNull();
+  });
+
+  it('drops an item without a post object, and a malformed post, never the page; counts only in the log', async () => {
+    const logger = createLogger();
+    const warn = jest.spyOn(logger, 'warn');
+    const bad = feedPost(2);
+    delete (bad.user as Record<string, unknown>).name;
+    const { http } = client(() => ({
+      status: 200,
+      body: {
+        data: {
+          searchPosts: [
+            { post: feedPost(0), rank: 5 },
+            { rank: 5 },
+            { post: null },
+            'junk',
+            { post: bad },
+            { post: feedPost(1), headline: 'redacted' },
+            { post: feedPost(1) },
+          ],
+        },
+        extra: { offset: 'c', isLast: false },
+      },
+    }));
+    const page = await PostRepository.feedSearchPage(http, 'q', null, DEFAULT_FILTER, Date.now(), logger);
+    expect(page.posts.map(p => p.id)).toEqual(['feed-post-0', 'feed-post-1']);
+    expect(page.nextCursor).toBe('c');
+    expect(warn).toHaveBeenCalledWith('search', 'dropped', { count: 3 });
+    expect(JSON.stringify(warn.mock.calls)).not.toContain('"q"');
+  });
+
+  it('empty results: an empty last page', async () => {
+    const { http } = client(() => ({
+      status: 200,
+      body: { data: { blogs: [], searchPosts: [] }, extra: { offset: 'x', isLast: true } },
+    }));
+    expect(await PostRepository.feedSearchPage(http, 'q', null, DEFAULT_FILTER)).toEqual({
+      posts: [],
+      nextCursor: null,
+    });
+  });
+
+  it.each([
+    ['no data.searchPosts (an E5 body)', { status: 200, body: { data: { posts: [] } } }, 'Parse'],
+    ['searchPosts not an array', { status: 200, body: { data: { searchPosts: {} } } }, 'Parse'],
+    ['403', { status: 403, body: {} }, 'Client'],
+    ['503', { status: 503, body: {} }, 'Server'],
+  ])('a page with %s rejects with AppError', async (_name, reply, kind) => {
+    const { http } = client(() => reply);
+    await expect(PostRepository.feedSearchPage(http, 'q', null, DEFAULT_FILTER)).rejects.toEqual(
+      new AppError(kind as never),
+    );
   });
 });

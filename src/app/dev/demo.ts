@@ -15,7 +15,8 @@ import type { ReadResult, SecureStore } from '../../shared/platform/secureStore'
  * 200 with a synthetic id, send-code answers a synthetic challenge and
  * confirm synthetic tokens (so a demo sign-in on A5 lands; the id differs
  * from the stored `demo`, so it runs the account-switch hook, Story 2.8),
- * E5 (the feed, Story 3.1) synthetic posts, E13 (feed tags, Story 5.5: two
+ * E5 (the feed, Story 3.1) synthetic posts, E6 (Поиск, Story 5.6: a title
+ * substring match over the feed posts with the same Filter params), E13 (feed tags, Story 5.5: two
  * pages of 8), E2 (Подписки, Story 3.2)
  * synthetic authors, E1 the account's own blog `demo-blog-2` (Story 5.2),
  * E3/E4 (Автор, Story 3.3: `demo-blog-1` 2 pages,
@@ -118,8 +119,15 @@ function demoPost(n: number, blog?: { blogUrl: string; index: number }) {
  * intersects them, api-contract §3 «E5 tags»).
  */
 function demoFeedPage(url: string, total: number) {
-  const match = /[?&]offset=([^&]*)/.exec(url);
-  const start = match ? Number(decodeURIComponent(match[1])) || 0 : 0;
+  const page = demoPage(url, demoFilteredPosts(url, total));
+  return {
+    data: { posts: page.posts, blogs: [], counters: {} },
+    extra: { offset: page.offset, isLast: page.isLast },
+  };
+}
+
+/** The demo posts that pass the E5 Filter params of `url` (shared by E5 and E6). */
+function demoFilteredPosts(url: string, total: number) {
   const onlyAllowed = !/[?&]only_allowed=false(&|$)/.test(url);
   const onlyBought = /[?&]only_bought=true(&|$)/.test(url);
   const fromTs = numberParam(url, 'from_ts') ?? -Infinity;
@@ -128,7 +136,7 @@ function demoFeedPage(url: string, total: number) {
   const tagIds = tagsMatch
     ? decodeURIComponent(tagsMatch[1]).split(',').filter(id => id !== '')
     : [];
-  const all = onlyBought
+  return onlyBought
     ? []
     : Array.from({ length: total }, (_, n) => demoPost(n)).filter(
         post =>
@@ -137,11 +145,31 @@ function demoFeedPage(url: string, total: number) {
           post.publishTime <= toTs &&
           tagIds.every(id => post.tags.some(tag => String(tag.id) === id)),
       );
+}
+
+/** The page of `all` after the demo cursor `offset` (the next index). */
+function demoPage<T>(url: string, all: readonly T[]) {
+  const match = /[?&]offset=([^&]*)/.exec(url);
+  const start = match ? Number(decodeURIComponent(match[1])) || 0 : 0;
   const end = Math.min(start + FEED_PAGE, all.length);
-  const posts = all.slice(start, end);
+  return { posts: all.slice(start, end), offset: String(end), isLast: end >= all.length };
+}
+
+/**
+ * E6 «Поиск по подпискам» (Story 5.6): the E5 Filter params as above, plus
+ * `search_query` as a case-insensitive title substring match (the demo has
+ * no server search; «Демо» matches every post, «пост 1» posts 1, 10–19).
+ */
+function demoFeedSearchPage(url: string, total: number) {
+  const match = /[?&]search_query=([^&]*)/.exec(url);
+  const query = match ? decodeURIComponent(match[1].replace(/\+/g, ' ')).trim().toLowerCase() : '';
+  const found = demoFilteredPosts(url, total).filter(
+    post => query !== '' && post.title.toLowerCase().includes(query),
+  );
+  const page = demoPage(url, found);
   return {
-    data: { posts, blogs: [], counters: {} },
-    extra: { offset: String(end), isLast: end >= all.length },
+    data: { searchPosts: page.posts.map(post => ({ post })) },
+    extra: { offset: page.offset, isLast: page.isLast },
   };
 }
 
@@ -341,6 +369,8 @@ export function createDemoSessionManager(): SessionManager {
     switch (request.path) {
       case '/v1/feed/post/':
         return { status: 200, body: demoFeedPage(request.url, DEMO_FEED_POSTS), delayMs: 300 };
+      case '/v1/search/feed/post/':
+        return { status: 200, body: demoFeedSearchPage(request.url, DEMO_FEED_POSTS), delayMs: 300 };
       case '/v1/search/feed/tag/':
         return { status: 200, body: demoFeedTagsPage(request.url), delayMs: 300 };
       case '/v1/user/subscriptions':

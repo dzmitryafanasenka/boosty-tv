@@ -24,6 +24,21 @@ export const queryKeys = {
   /** Every Filter's E5 feed query (a prefix of `subscriptionFeed`). */
   allSubscriptionFeeds: () => ['feed', 'subscriptions'] as const,
   /**
+   * E6 «Поиск по подпискам» (Story 5.6), an infinite query per submitted
+   * query and `search` Filter (the trimmed query, the symbolic Filter as in
+   * `subscriptionFeed`; never request params, a cursor or a URL). Its own
+   * root `search`: never a prefix of a feed or author key (AD-7). Story
+   * 5.7's blog search will be `['search', 'blog', blogUrl, …]`.
+   */
+  feedSearch: (query: string, filter: Filter) =>
+    [
+      'search',
+      'feed',
+      { query, access: filter.access, period: filter.period, tagIds: tagIdsKey(filter) },
+    ] as const,
+  /** Every E6 search query (a prefix of `feedSearch`). */
+  allFeedSearches: () => ['search', 'feed'] as const,
+  /**
    * E13 the feed's tags for the filter sheet (Story 5.5), an infinite query
    * (the opaque cursors are page params). Its own root: never a prefix of a
    * feed key.

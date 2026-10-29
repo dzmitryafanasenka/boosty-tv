@@ -38,3 +38,34 @@ export const blogPostsPageDtoSchema = z.object({
 });
 
 export type BlogPostsPageDto = z.infer<typeof blogPostsPageDtoSchema>;
+
+/**
+ * 200 body of E6 `GET /v1/search/feed/post/` (docs/api-contract.md §3
+ * «E6 (LIVE)», Story 5.6; sanitized shape in
+ * `src/test/fixtures/boosty/e6-feed-search-1.json`):
+ * `{data{searchPosts[]{post: Post}}, extra{offset, isLast}}`.
+ *
+ * Items stay `unknown`: each is read by `feedSearchItemDtoSchema` and its
+ * `post` by the one post mapper, so a malformed item is dropped without
+ * failing the page. A missing `data.searchPosts` is a `Parse` error for the
+ * page. `extra` is the feed's (an opaque `offset` passed back verbatim; a
+ * missing one ends the paging).
+ */
+export const feedSearchPageDtoSchema = z.object({
+  data: z.object({
+    searchPosts: z.array(z.unknown()),
+  }),
+  extra: feedPageDtoSchema.shape.extra,
+});
+
+export type FeedSearchPageDto = z.infer<typeof feedSearchPageDtoSchema>;
+
+/**
+ * One E6 item: an object with a `post` object. Anything else drops the item
+ * (the post itself is validated by `postDtoSchema` in the mapper).
+ */
+export const feedSearchItemDtoSchema = z.object({
+  post: z.record(z.string(), z.unknown()),
+});
+
+export type FeedSearchItemDto = z.infer<typeof feedSearchItemDtoSchema>;

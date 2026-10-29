@@ -142,12 +142,13 @@ describe('Shell', () => {
     await unmount(root);
   });
 
-  it('renders only the phase-enabled sections (Главная, Подписки, Настройки)', async () => {
+  it('renders only the phase-enabled sections (Главная, Поиск, Подписки, Настройки)', async () => {
     const root = await renderApp();
     const sidebar = byTestId(root, 'shell/sidebar')[0];
-    expect(focusableIds(root, sidebar)).toEqual(['nav/home', 'nav/subs', 'nav/settings']);
+    expect(focusableIds(root, sidebar)).toEqual(['nav/home', 'nav/search', 'nav/subs', 'nav/settings']);
     expect(one(root, 'nav/subs').props.accessibilityLabel).toBe(t('shell.nav.subs'));
-    for (const hidden of ['nav/search', 'nav/events']) {
+    expect(one(root, 'nav/search').props.accessibilityLabel).toBe(t('shell.nav.search'));
+    for (const hidden of ['nav/events']) {
       expect(visible(root, hidden)).toBe(false);
     }
     expect(one(root, 'nav/home').props.accessibilityLabel).toBe(

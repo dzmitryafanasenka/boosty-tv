@@ -124,3 +124,58 @@ describe('queryKeys.feedTags (Story 5.5)', () => {
     expect(queryKeys.subscriptions()[0]).not.toBe('feedTags');
   });
 });
+
+describe('queryKeys.feedSearch (Story 5.6)', () => {
+  const ALL_TIME = { kind: 'all' } as const;
+  const base = { access: 'allowed', period: ALL_TIME, tags: [] } as const;
+
+  it('the query and the symbolic Filter (sorted tag ids, no titles) under the `search` root', () => {
+    expect(queryKeys.feedSearch('капуста', base)).toEqual([
+      'search',
+      'feed',
+      { query: 'капуста', access: 'allowed', period: { kind: 'all' }, tagIds: [] },
+    ]);
+    const tagged = queryKeys.feedSearch('q', {
+      ...base,
+      tags: [
+        { id: '12', title: 'Выпечка' },
+        { id: '3', title: 'Супы' },
+      ],
+    });
+    expect(tagged[2].tagIds).toEqual(['12', '3']);
+    expect(JSON.stringify(tagged)).not.toContain('Выпечка');
+    const prefix = queryKeys.allFeedSearches();
+    expect(tagged.slice(0, prefix.length)).toEqual(prefix);
+  });
+
+  it('another query or any other Filter section is another key', () => {
+    const keys = [
+      queryKeys.feedSearch('a', base),
+      queryKeys.feedSearch('b', base),
+      queryKeys.feedSearch('a', { ...base, access: 'all' }),
+      queryKeys.feedSearch('a', { ...base, period: { kind: 'preset', days: 7 } }),
+      queryKeys.feedSearch('a', { ...base, tags: [{ id: '1', title: 'x' }] }),
+    ].map(key => JSON.stringify(key));
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it('never collides with or prefix-matches a feed or author key, with the same Filter', () => {
+    const search = queryKeys.feedSearch('q', base);
+    const others = [
+      queryKeys.subscriptionFeed(base),
+      queryKeys.allSubscriptionFeeds(),
+      queryKeys.authorPosts('search'),
+      queryKeys.allAuthorPosts(),
+      queryKeys.author('search'),
+      queryKeys.feedTags(),
+      queryKeys.post('search', 'feed'),
+    ];
+    for (const other of others) {
+      expect(other[0]).not.toBe(search[0]);
+      expect(search.slice(0, other.length)).not.toEqual(other);
+      expect(other.slice(0, queryKeys.allFeedSearches().length)).not.toEqual(
+        queryKeys.allFeedSearches(),
+      );
+    }
+  });
+});

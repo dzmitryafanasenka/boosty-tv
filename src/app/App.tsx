@@ -48,7 +48,7 @@ import type * as DevFocusModule from './dev/devFocus';
 import { progress } from './progress';
 import { queryClient, resetQueryCache } from './queryClient';
 import type { RootStackParamList } from './routes';
-import { phaseFlags } from './phaseFlags';
+import { phaseFlags, type SectionId } from './phaseFlags';
 import { DEMO_ACTIVE, session } from './session';
 import { SessionUiContext, useSessionUi, type SessionUi } from './sessionUi';
 import { Shell } from './Shell';
@@ -213,11 +213,12 @@ function ShellRoute({
     },
     [navigation],
   );
-  // OK on a feed card (Главная): Пост, with Главная as its sidebar's current item.
+  // OK on a feed card (Главная) or a search result (Поиск, Story 5.6): Пост,
+  // with that section as its sidebar's current item.
   const onOpenPost = useCallback(
-    (blogUrl: string, postId: string) => {
+    (blogUrl: string, postId: string, section: SectionId = 'home') => {
       if (navigation.isFocused()) {
-        navigation.push('Post', { blogUrl, postId, section: 'home' });
+        navigation.push('Post', { blogUrl, postId, section });
       }
     },
     [navigation],
