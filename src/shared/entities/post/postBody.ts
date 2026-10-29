@@ -2,8 +2,8 @@ import type { Block, ListItem, TextSpan } from './types';
 
 /**
  * The Post screen's body (Story 3.4): the blocks as paragraphs and neutral
- * placeholders, in order. Links as chips, images, files, audio and polls
- * are later Epic 6 stories.
+ * placeholders, in order. Images are Story 6.2; links as chips, files,
+ * audio and polls are later Epic 6 stories.
  *
  * - `text` fragments are merged until a `BLOCK_END` fragment ends the
  *   paragraph. A `link` block is a fragment too (owner decision 2026-10-27,
@@ -36,9 +36,10 @@ import type { Block, ListItem, TextSpan } from './types';
  *   without an id stays a `video` placeholder: an `ok_video` block whose id
  *   is `''` (the type allows it; the DTO normally rejects it), or the
  *   mapper's `Block.Unknown` with raw type `ok_video` (id missing).
- * - With `images: true` (a locked post's teaser, Story 3.6), an `image`
- *   block with a URL is an `image` item; otherwise every other block
- *   (image, file, audio, poll, unknown or malformed) is one placeholder.
+ * - With `images` (`true`: a locked post's teaser, Story 3.6; `'stops'`:
+ *   an accessible post, Story 6.2), an `image` block with a URL is an
+ *   `image` item; otherwise every other block (image, file, audio, poll,
+ *   unknown or malformed) is one placeholder.
  *
  * Keys (focus-map §1.5, block keys): `<type>:<id>` when the block has an
  * id, else `<type>@<index in data[]>`; a paragraph uses its first fragment's
@@ -155,11 +156,20 @@ export type PostBodyItem =
     }
   | { kind: 'placeholder'; key: string; block: PlaceholderKind }
   /**
-   * A teaser image of a locked post (Story 3.6, owner decision 2026-10-27,
-   * option A; only with `images: true`). `width`/`height` are positive or
-   * null. Images inside accessible posts stay placeholders until Story 6.2.
+   * An image with a URL (only with `images`): a locked post's teaser
+   * (Story 3.6, owner decision 2026-10-27, option A; not a stop) or, with
+   * `images: 'stops'`, an image of an accessible post (Story 6.2: a focus
+   * stop). `width`/`height` are positive or null.
    */
-  | { kind: 'image'; key: string; url: string; width: number | null; height: number | null };
+  | {
+      kind: 'image';
+      key: string;
+      url: string;
+      width: number | null;
+      height: number | null;
+      /** A focus stop (an accessible post's image, Story 6.2). */
+      stop: boolean;
+    };
 
 const MAX_LIST_DEPTH = 8;
 
@@ -370,22 +380,27 @@ function listLines(items: readonly ListItem[], depth: number, out: Line[]): void
 }
 
 /**
- * Whether a body item is a focus stop: a paragraph with plain text. A
- * paragraph (or split part) of emoji only has no text to read or land on,
- * so it is shown as non-focusable content (Story 6.1).
+ * Whether a body item is a focus stop: a paragraph with plain text, or an
+ * accessible post's image (Story 6.2). A paragraph (or split part) of emoji
+ * only has no text to read or land on, so it is shown as non-focusable
+ * content (Story 6.1); a teaser image is never a stop (Story 3.6).
  */
 export function isFocusStop(item: PostBodyItem): boolean {
-  return item.kind === 'paragraph' && item.text.length > 0;
+  return (
+    (item.kind === 'paragraph' && item.text.length > 0) || (item.kind === 'image' && item.stop)
+  );
 }
 
 export type PostBodyOptions = {
   /** The post's videos with an id are MediaRows: leave them out (default false). */
   videoRows?: boolean;
   /**
-   * Image blocks with a URL are `image` items (a locked post's teaser, Story
-   * 3.6); without a URL they stay placeholders. Default false.
+   * Image blocks with a URL are `image` items; without a URL they stay
+   * placeholders. `true`: a locked post's teaser (Story 3.6, not stops);
+   * `'stops'`: an accessible post's images (Story 6.2, focus stops).
+   * Default false (placeholders).
    */
-  images?: boolean;
+  images?: boolean | 'stops';
 };
 
 const positive = (n: number | null): number | null => (n !== null && n > 0 ? n : null);
@@ -467,6 +482,7 @@ export function postBodyItems(
           url: block.url,
           width: positive(block.width),
           height: positive(block.height),
+          stop: images === 'stops',
         },
         index,
       );

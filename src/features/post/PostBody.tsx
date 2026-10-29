@@ -255,6 +255,124 @@ function TeaserImage({ id, url, width, height, maxHeight, columnWidth }: TeaserI
   );
 }
 
+/** DESIGN.md ImageBlock (Story 6.2): the tallest an inline image may be. */
+export const IMAGE_STOP_MAX_HEIGHT = 300;
+/** A failed image's smallest box, so «Изображение недоступно» always fits. */
+const FAILED_MIN_WIDTH = 280;
+const FAILED_MIN_HEIGHT = 96;
+
+type ImageStopProps = {
+  id: string;
+  url: string;
+  width: number | null;
+  height: number | null;
+  /** The column's measured inner width; null until measured. */
+  columnWidth: number | null;
+  onView: (id: string, view: HostView | null) => void;
+  onFocus: (id: string) => void;
+};
+
+/**
+ * An image inside an accessible post (Story 6.2, FR36): a focus stop (so
+ * ↓ scrolls a tall image into view) with no OK action, as the reference's
+ * focusable image box. The box is the column width capped at the text
+ * measure and at `IMAGE_STOP_MAX_HEIGHT` (it shrinks with the aspect: the
+ * loaded image's real one, until then the block's, else 16:9, as the
+ * teaser image). The skeleton colour shows until it loads; a failure shows
+ * «Изображение недоступно» in the same box and keeps the stop (focus is
+ * never lost to a failure). Plain `{uri}` source: no auth headers. Loading
+ * never moves focus.
+ */
+const ImageStop = memo(function ImageStopView({
+  id,
+  url,
+  width,
+  height,
+  columnWidth,
+  onView,
+  onFocus,
+}: ImageStopProps) {
+  const zone = useZoneItem(id);
+  const zoneRef = zone.ref;
+  const ref = useCallback(
+    (view: HostView | null) => {
+      zoneRef?.(view);
+      onView(id, view);
+    },
+    [zoneRef, onView, id],
+  );
+  const handleFocus = useCallback(() => {
+    zone.onFocus();
+    onFocus(id);
+  }, [zone, onFocus, id]);
+  // Per URL, as the teaser image: a refetch with a new URL starts over.
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState<{ url: string; aspect: number } | null>(null);
+  const failed = failedUrl === url;
+  const aspect =
+    (loaded?.url === url ? loaded.aspect : null) ?? aspectOf(width, height) ?? DEFAULT_ASPECT;
+  const boxWidth = Math.min(
+    columnWidth ?? spacing['text-measure'],
+    spacing['text-measure'],
+    IMAGE_STOP_MAX_HEIGHT * aspect,
+  );
+  const boxHeight = boxWidth / aspect;
+  // A failure keeps a readable box: an extreme aspect (a thin banner or
+  // strip) would clip the message.
+  const failedWidth = Math.max(boxWidth, Math.min(columnWidth ?? spacing['text-measure'], FAILED_MIN_WIDTH));
+  const failedHeight = Math.max(boxHeight, FAILED_MIN_HEIGHT);
+  const onLoad = (e: ImageLoadEvent) => {
+    const real = aspectOf(e.nativeEvent.source?.width, e.nativeEvent.source?.height);
+    setLoaded({ url, aspect: real ?? aspect });
+  };
+  return (
+    <FocusableSurface
+      ref={ref}
+      testID={id}
+      radius={rounded.md}
+      // No scale (not `focus.scale-row`): a 600 dp image scaled past the
+      // column would overlap the text around it; the ring marks focus.
+      // OK has no action, so no press feedback either.
+      scaleFocus={1}
+      scalePressed={1}
+      accessibilityRole="image"
+      accessibilityLabel={failed ? t('post.imageUnavailable') : t('post.block.image')}
+      onFocus={handleFocus}
+      style={styles.imageStop}
+    >
+      <View
+        testID={`${id}/box`}
+        style={[
+          styles.imageStopBox,
+          failed ? { width: failedWidth, height: failedHeight } : { width: boxWidth, height: boxHeight },
+          failed || loaded?.url === url ? null : styles.imageStopLoading,
+        ]}
+      >
+        {failed ? (
+          <View testID={`${id}/failed`} style={styles.imageStopFailed}>
+            <Text variant="body-s" color="text-secondary">
+              {t('post.imageUnavailable')}
+            </Text>
+          </View>
+        ) : (
+          <Image
+            key={url}
+            testID={`${id}/image`}
+            source={{ uri: url }}
+            resizeMode="contain"
+            resizeMethod="resize"
+            fadeDuration={0}
+            onLoad={onLoad}
+            onError={() => setFailedUrl(url)}
+            accessibilityIgnoresInvertColors
+            style={styles.imageFill}
+          />
+        )}
+      </View>
+    </FocusableSurface>
+  );
+});
+
 export type PostBodyProps = {
   items: readonly PostBodyItem[];
   /** `post/<postId>/block/` */
@@ -305,7 +423,18 @@ export function PostBody({
               />
             );
           case 'image':
-            return (
+            return item.stop ? (
+              <ImageStop
+                key={item.key}
+                id={id}
+                url={item.url}
+                width={item.width}
+                height={item.height}
+                columnWidth={columnWidth}
+                onView={onParagraphView}
+                onFocus={onParagraphFocus}
+              />
+            ) : (
               <TeaserImage
                 key={item.key}
                 id={id}
@@ -592,6 +721,25 @@ const styles = StyleSheet.create({
   imageFill: {
     width: '100%',
     height: '100%',
+  },
+  // Story 6.2 ImageBlock: the stop's box (the ring follows `rounded.md`).
+  imageStop: {
+    alignSelf: 'flex-start',
+    marginBottom: spacing['6'],
+  },
+  imageStopBox: {
+    borderRadius: rounded.md,
+    overflow: 'hidden',
+    backgroundColor: colors.surface,
+  },
+  imageStopLoading: {
+    backgroundColor: colors.skeleton,
+  },
+  imageStopFailed: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing['6'],
   },
   // Story 6.1 text styles. Bold is the bundled SemiBold file (tokens: a
   // `fontWeight` would make Android synthesize bold); italic is synthesized

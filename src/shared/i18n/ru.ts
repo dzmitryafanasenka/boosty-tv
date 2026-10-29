@@ -251,6 +251,8 @@ export const ru = {
   // `{n}`. No comment count anywhere.
   post: {
     loading: 'Загружаем пост',
+    // Story 6.2: an inline image that failed to load.
+    imageUnavailable: 'Изображение недоступно',
     unavailableTitle: 'Пост недоступен',
     unavailableBody: 'Этого поста нет или он удалён.',
     errorTitle: 'Не удалось загрузить пост',
