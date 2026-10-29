@@ -2,6 +2,7 @@ import {
   audioBlockDtoSchema,
   blockTypeDtoSchema,
   fileBlockDtoSchema,
+  headerBlockDtoSchema,
   imageBlockDtoSchema,
   linkBlockDtoSchema,
   listBlockDtoSchema,
@@ -11,7 +12,9 @@ import {
   postDtoSchema,
   smileBlockDtoSchema,
   textBlockDtoSchema,
+  videoBlockDtoSchema,
 } from '../../api/dto/post';
+import { safeHttpUrl } from '../externalUrls';
 import { logger as appLogger, type Logger } from '../../services/logger';
 import type { Block, ListItem, Post, PostKind, TextSpan, TextStyle } from './types';
 
@@ -202,6 +205,14 @@ function mapBlock(raw: unknown, depth: number): Block {
             sizeBytes: finite(b.data.size),
           }
         : unknown;
+    }
+    case 'video': {
+      const b = videoBlockDtoSchema.safeParse(raw);
+      return b.success ? { type: 'video', url: safeHttpUrl(b.data.url) } : unknown;
+    }
+    case 'header': {
+      const b = headerBlockDtoSchema.safeParse(raw);
+      return b.success ? { type: 'header', text: textOf(b.data.content).trim() } : unknown;
     }
     case 'poll': {
       const b = pollBlockDtoSchema.safeParse(raw);

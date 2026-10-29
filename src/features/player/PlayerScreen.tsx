@@ -86,8 +86,12 @@ const KEY_UP = 1;
 
 type Phase = 'loading' | 'playing' | 'recovering' | 'error' | 'locked' | 'unavailable';
 
-/** Where playback starts (Story 4.2): the resume point, or 0 («С начала»). */
-export type PlayerStart = 'resume' | 'beginning';
+/**
+ * Where playback starts (Story 4.2): the resume point, or 0 («С начала»);
+ * Story 6.3 (owner decision 2026-10-29, option b): a timestamp link's
+ * second (`{atSec}`, clamped into the video).
+ */
+export type PlayerStart = 'resume' | 'beginning' | { atSec: number };
 
 /**
  * Where a source that broke was (Story 4.4), for the recovery and a manual
@@ -120,7 +124,10 @@ export type PlayerScreenProps = {
    * paused at the end (a later play starts over from 0).
    */
   onEnded?: () => void;
-  /** Story 4.2: `resume` (default) starts at the resume point, `beginning` at 0. */
+  /**
+   * Story 4.2: `resume` (default) starts at the resume point, `beginning` at
+   * 0; Story 6.3: `{atSec}` at that second (a timestamp link).
+   */
   start?: PlayerStart;
 };
 
@@ -1012,12 +1019,16 @@ export function PlayerScreen({
       // Story 4.2: the start position, once per source: the resume point
       // (local, else the server `timeCode`; 0 when none or finished), or 0
       // for «С начала». Reports wait until the seek there is done.
+      const mode = startMode.current;
       const target =
         explicit !== undefined
           ? explicit
-          : progress === null || startMode.current === 'beginning'
-            ? 0
-            : progress.resumePoint(live.current.mediaRef, d > 0 ? d : null);
+          : typeof mode === 'object'
+            ? // A timestamp link (Story 6.3): that second, kept inside the video.
+              Math.max(0, d > 0 ? Math.min(mode.atSec, Math.max(0, d - 1)) : mode.atSec)
+            : progress === null || mode === 'beginning'
+              ? 0
+              : progress.resumePoint(live.current.mediaRef, d > 0 ? d : null);
       if (explicit === undefined) {
         startMode.current = 'resume';
       }

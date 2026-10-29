@@ -1,3 +1,11 @@
+import {
+  boostyPostRef,
+  safeHttpUrl,
+  timestampRef,
+  youtubeId,
+  type BoostyPostRef,
+  type TimestampRef,
+} from '../externalUrls';
 import type { Block, ListItem, TextSpan } from './types';
 
 /**
@@ -41,10 +49,25 @@ import type { Block, ListItem, TextSpan } from './types';
  *   `image` item; otherwise every other block (image, file, audio, poll,
  *   unknown or malformed) is one placeholder.
  *
+ * - Story 6.3, with `qr`: a paragraph's `link` fragments with an http(s)
+ *   URL and text become `links` (LinkChips under it; the text stays inline),
+ *   deduped by URL within the paragraph (the first text wins); a `file`
+ *   block is a `file` item, a `video` block with an http(s) URL an
+ *   `externalVideo` item (with its YouTube id when the host is YouTube).
+ *   A link to another Boosty post (`boosty.to/<blog>/posts/<id>`, not
+ *   `selfPost`) carries `post`: its chip opens that post in the app (owner
+ *   decision 2026-10-29); a timestamp link to a video of `selfPost`
+ *   carries `timestamp` (option b: it plays that video from that time).
+ *   Without `qr` (a locked post's teaser) they stay as before. A `header`
+ *   block with text is a non-focusable `heading` (owner decision
+ *   2026-10-29, Q1 b) that ends the paragraph in progress; an empty one is
+ *   dropped.
+ *
  * Keys (focus-map §1.5, block keys): `<type>:<id>` when the block has an
  * id, else `<type>@<index in data[]>`; a paragraph uses its first fragment's
  * key; the parts after the first of a split stop (or of a list's items)
- * are `<key>#<n>` (n from 1). Pure and total: no block shape throws.
+ * are `<key>#<n>` (n from 1); a link chip is `<key>/link/<n>` (n from 0,
+ * `<key>` the paragraph's first stop). Pure and total: no block shape throws.
  */
 
 /**
@@ -145,6 +168,26 @@ export type Segment =
 /** What a placeholder stands for (its label in the `ru` catalog). */
 export type PlaceholderKind = 'video' | 'image' | 'file' | 'audio' | 'poll' | 'unknown';
 
+/**
+ * A LinkChip under a paragraph (Story 6.3): the link's text (trimmed) and
+ * its http(s) URL; `key` is `<paragraph key>/link/<n>`. `post`: the link
+ * points to another Boosty post (owner decision 2026-10-29: OK opens it in
+ * the app instead of the QR); null for any other link, a blog page or the
+ * current post.
+ */
+export type ParagraphLink = {
+  key: string;
+  text: string;
+  url: string;
+  post: BoostyPostRef | null;
+  /**
+   * A timestamp link to a video of the current post (owner decision
+   * 2026-10-29, option b): OK plays that video from `seconds`. Null
+   * otherwise (then `post`, else the QR).
+   */
+  timestamp: TimestampRef | null;
+};
+
 export type PostBodyItem =
   | {
       kind: 'paragraph';
@@ -153,7 +196,21 @@ export type PostBodyItem =
       text: string;
       /** The styled text runs and inline emoji, in order (Story 6.1). */
       segments: Segment[];
+      /**
+       * Story 6.3: the paragraph's link chips, on its last stop (a split
+       * paragraph's other parts have none). Empty without `qr`.
+       */
+      links: ParagraphLink[];
     }
+  /** A file (Story 6.3, with `qr`): a FileChip focus stop. Its URL is resolved on OK. */
+  | { kind: 'file'; key: string; title: string; sizeBytes: number | null }
+  /**
+   * An external video page (Story 6.3, with `qr`): a chip focus stop; never
+   * played. `youtubeId` when the host is YouTube (the thumbnail).
+   */
+  | { kind: 'externalVideo'; key: string; url: string; youtubeId: string | null }
+  /** A heading line (Story 6.3, `header` block): bold text, never a focus stop. */
+  | { kind: 'heading'; key: string; text: string }
   | { kind: 'placeholder'; key: string; block: PlaceholderKind }
   /**
    * An image with a URL (only with `images`): a locked post's teaser
@@ -197,6 +254,7 @@ export function blockKey(block: Block, index: number): string {
 function placeholderKind(block: Block): PlaceholderKind {
   switch (block.type) {
     case 'ok_video':
+    case 'video':
       return 'video';
     case 'image':
       return 'image';
@@ -225,9 +283,27 @@ const EMOJI_CHAR = '\uFFFC';
  * `EMOJI_CHAR`) and the style-range offset of the next fragment (every
  * fragment's text plus one per `smile`, shown or not).
  */
-type Line = { segments: Segment[]; plain: string; offset: number };
+type Line = {
+  segments: Segment[];
+  plain: string;
+  offset: number;
+  /** Story 6.3: the line's safe link targets in order, deduped by URL. */
+  links: { text: string; url: string }[];
+};
 
-const emptyLine = (): Line => ({ segments: [], plain: '', offset: 0 });
+const emptyLine = (): Line => ({ segments: [], plain: '', offset: 0, links: [] });
+
+/** Records a `link` fragment's chip on its line (http(s) URL and text only, one per URL). */
+function addLink(line: Line, block: Block): void {
+  if (block.type !== 'link') {
+    return;
+  }
+  const url = safeHttpUrl(block.url);
+  const text = block.text.trim();
+  if (url !== null && text.length > 0 && !line.links.some(link => link.url === url)) {
+    line.links.push({ text, url });
+  }
+}
 
 const sameStyle = (
   a: Segment & { kind: 'text' },
@@ -291,8 +367,11 @@ function appendFragment(line: Line, text: string, spans: readonly TextSpan[]): v
 function appendInline(line: Line, block: Block, index: number): boolean {
   switch (block.type) {
     case 'text':
+      appendFragment(line, block.text, block.spans);
+      return true;
     case 'link':
       appendFragment(line, block.text, block.spans);
+      addLink(line, block);
       return true;
     case 'smile':
       // One offset unit per smile, as the reference's inline content (unverified live).
@@ -380,14 +459,19 @@ function listLines(items: readonly ListItem[], depth: number, out: Line[]): void
 }
 
 /**
- * Whether a body item is a focus stop: a paragraph with plain text, or an
- * accessible post's image (Story 6.2). A paragraph (or split part) of emoji
+ * Whether a body item is a focus stop: a paragraph with plain text, an
+ * accessible post's image (Story 6.2), a file or an external video (Story
+ * 6.3). A paragraph's link chips are stops of their own inside it; a heading
+ * is never one. A paragraph (or split part) of emoji
  * only has no text to read or land on, so it is shown as non-focusable
  * content (Story 6.1); a teaser image is never a stop (Story 3.6).
  */
 export function isFocusStop(item: PostBodyItem): boolean {
   return (
-    (item.kind === 'paragraph' && item.text.length > 0) || (item.kind === 'image' && item.stop)
+    (item.kind === 'paragraph' && item.text.length > 0) ||
+    (item.kind === 'image' && item.stop) ||
+    item.kind === 'file' ||
+    item.kind === 'externalVideo'
   );
 }
 
@@ -401,13 +485,24 @@ export type PostBodyOptions = {
    * Default false (placeholders).
    */
   images?: boolean | 'stops';
+  /**
+   * Story 6.3: link chips, file and external-video items (an accessible
+   * post). Default false: links stay inline text only, files and videos
+   * placeholders (a locked post's teaser keeps Story 3.6).
+   */
+  qr?: boolean;
+  /**
+   * The post being shown (with `qr`): a link to it keeps the QR chip
+   * instead of opening itself again.
+   */
+  selfPost?: BoostyPostRef;
 };
 
 const positive = (n: number | null): number | null => (n !== null && n > 0 ? n : null);
 
 export function postBodyItems(
   blocks: readonly Block[],
-  { videoRows = false, images = false }: PostBodyOptions = {},
+  { videoRows = false, images = false, qr = false, selfPost }: PostBodyOptions = {},
 ): PostBodyItem[] {
   const items: PostBodyItem[] = [];
   const used = new Set<string>();
@@ -420,21 +515,57 @@ export function postBodyItems(
     used.add(unique);
     items.push({ ...item, key: unique });
   };
-  /** Stops for `lines` (each split by the budget): `key`, then `key#1`, `key#2`, … */
+  /**
+   * Stops for `lines` (each split by the budget): `key`, then `key#1`,
+   * `key#2`, … Story 6.3: each line's link chips go on its last stop, keyed
+   * by its first stop (`<key>/link/<n>`).
+   */
   const pushStops = (base: string, lines: readonly Line[], index: number) => {
-    lines
-      .flatMap(lineStops)
-      .forEach((segments, n) =>
+    let n = 0;
+    for (const line of lines) {
+      const stops = lineStops(line);
+      let lineKey: string | null = null;
+      stops.forEach((segments, i) => {
         push(
           {
             kind: 'paragraph',
             key: n === 0 ? base : `${base}#${n}`,
             text: segmentsText(segments),
             segments,
+            links: [],
           },
           index,
-        ),
-      );
+        );
+        n += 1;
+        const pushed = items[items.length - 1];
+        lineKey ??= pushed.key;
+        if (qr && i === stops.length - 1 && pushed.kind === 'paragraph') {
+          const first = lineKey;
+          pushed.links = line.links.map((link, k) => ({
+            key: `${first}/link/${k}`,
+            ...link,
+            post: otherPost(link.url),
+            timestamp:
+              selfPost === undefined
+                ? null
+                : timestampRef(link.url, { ...selfPost, mediaIds: selfMediaIds }),
+          }));
+        }
+      });
+    }
+  };
+  /** The current post's videos with an id (a timestamp link's targets). */
+  const selfMediaIds = blocks.flatMap(b => (b.type === 'ok_video' && b.id.length > 0 ? [b.id] : []));
+  /** The Boosty post a link opens in the app (not the current one), else null. */
+  const otherPost = (url: string): BoostyPostRef | null => {
+    const ref = boostyPostRef(url);
+    return ref === null ||
+      (selfPost !== undefined &&
+        // Boosty blog URLs are case-insensitive: a differently-cased self link is still this post.
+        ref.blogUrl.toLowerCase() === selfPost.blogUrl.toLowerCase() &&
+        ref.postId === selfPost.postId)
+      ? null
+      : ref;
   };
   let line = emptyLine();
   let key: string | null = null;
@@ -474,6 +605,31 @@ export function postBodyItems(
       return;
     }
     flush();
+    if (block.type === 'header') {
+      if (block.text.length > 0) {
+        push({ kind: 'heading', key: blockKey(block, index), text: block.text }, index);
+      }
+      return;
+    }
+    if (qr && block.type === 'file') {
+      push(
+        {
+          kind: 'file',
+          key: blockKey(block, index),
+          title: block.title.trim(),
+          sizeBytes: block.sizeBytes !== null && block.sizeBytes >= 0 ? block.sizeBytes : null,
+        },
+        index,
+      );
+      return;
+    }
+    if (qr && block.type === 'video' && block.url !== null) {
+      push(
+        { kind: 'externalVideo', key: blockKey(block, index), url: block.url, youtubeId: youtubeId(block.url) },
+        index,
+      );
+      return;
+    }
     if (images && block.type === 'image' && block.url !== null) {
       push(
         {

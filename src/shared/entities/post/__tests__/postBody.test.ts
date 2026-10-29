@@ -21,6 +21,11 @@ const bodyItems = (data: unknown[]) =>
 const plain = (items: readonly PostBodyItem[]) =>
   items.map(i => (i.kind === 'paragraph' ? { kind: i.kind, key: i.key, text: i.text } : i));
 const body = (data: unknown[]) => plain(bodyItems(data));
+/**
+ * The live accessible E8's blocks without the three synthetic blocks Story
+ * 6.3 appended (`header`, `file`, `video`; tested in «Story 6.3» below).
+ */
+const liveBlocks = () => mapped(e8Accessible()).blocks.slice(0, -3);
 
 describe('postBodyItems (Story 3.4)', () => {
   it('merges text fragments until BLOCK_END into one paragraph; blank paragraphs are dropped', () => {
@@ -130,7 +135,7 @@ describe('postBodyItems (Story 3.4)', () => {
   });
 
   it('the live accessible E8: its video is a MediaRow, the body is paragraphs only (inline links merged)', () => {
-    const items = postBodyItems(mapped(e8Accessible()).blocks, { videoRows: true });
+    const items = postBodyItems(liveBlocks(), { videoRows: true });
     expect(items.filter(i => i.kind === 'paragraph').length).toBeGreaterThan(10);
     expect(items.filter(i => i.kind === 'placeholder')).toHaveLength(0);
     expect(items.every(i => i.kind === 'paragraph' && /^(Sample text)+$/.test(i.text))).toBe(true);
@@ -353,6 +358,7 @@ describe('postBodyItems: styled segments and emoji (Story 6.1)', () => {
         kind: 'paragraph',
         key: 'text@0',
         text: 'Привет мир',
+        links: [],
         segments: [run('Привет', { bold: true }), run(' '), run('мир', { italic: true })],
       },
     ]);
@@ -394,6 +400,7 @@ describe('postBodyItems: styled segments and emoji (Story 6.1)', () => {
         kind: 'paragraph',
         key: 'text@0',
         text: 'Смотрите здесь и дальше',
+        links: [],
         segments: [
           run('Смотрите', { bold: true }),
           run(' '),
@@ -451,6 +458,7 @@ describe('postBodyItems: styled segments and emoji (Story 6.1)', () => {
         kind: 'paragraph',
         key: 'text@0',
         text: 'Привет  мир',
+        links: [],
         segments: [
           run('Привет '),
           { kind: 'emoji', key: 'smile@1', url: 'https://example.invalid/emoji' },
@@ -462,7 +470,7 @@ describe('postBodyItems: styled segments and emoji (Story 6.1)', () => {
 
   it('a smile without an image takes no space; a smile can start a paragraph (keyed by it)', () => {
     expect(bodyItems([text('A'), smile(null), text('B'), blockEnd()])).toEqual([
-      { kind: 'paragraph', key: 'text@0', text: 'AB', segments: [run('AB')] },
+      { kind: 'paragraph', key: 'text@0', text: 'AB', segments: [run('AB')], links: [] },
     ]);
     expect(bodyItems([smile(null), blockEnd()])).toEqual([]);
     expect(bodyItems([smile(), blockEnd(), ...paragraph('Next')])).toEqual([
@@ -470,9 +478,10 @@ describe('postBodyItems: styled segments and emoji (Story 6.1)', () => {
         kind: 'paragraph',
         key: 'smile@0',
         text: '',
+        links: [],
         segments: [{ kind: 'emoji', key: 'smile@0', url: 'https://example.invalid/emoji' }],
       },
-      { kind: 'paragraph', key: 'text@2', text: 'Next', segments: [run('Next')] },
+      { kind: 'paragraph', key: 'text@2', text: 'Next', segments: [run('Next')], links: [] },
     ]);
   });
 
@@ -540,13 +549,14 @@ describe('postBodyItems: styled segments and emoji (Story 6.1)', () => {
         kind: 'paragraph',
         key: 'list@0',
         text: 'Пункт',
+        links: [],
         segments: [run('Пункт', { bold: true }), { kind: 'emoji', key: 'smile@1', url: 'https://example.invalid/emoji' }],
       },
     ]);
   });
 
   it('the live accessible E8 (sanitized ranges, a synthetic smile): styles and the emoji, keys unchanged', () => {
-    const items = postBodyItems(mapped(e8Accessible()).blocks, { videoRows: true });
+    const items = postBodyItems(liveBlocks(), { videoRows: true });
     const paras = items.filter((i): i is PostBodyItem & { kind: 'paragraph' } => i.kind === 'paragraph');
     expect(paras.length).toBe(items.length);
     expect(paras[0]).toMatchObject({ key: 'text@1', text: 'Sample text' });
@@ -591,5 +601,211 @@ describe('postBodyItems: images of an accessible post (Story 6.2)', () => {
       { images: true },
     );
     expect(isFocusStop(item)).toBe(false);
+  });
+});
+
+/* eslint-disable no-script-url -- Story 6.3: unsafe URLs are inputs the code must reject */
+describe('postBodyItems: links, files, external videos and headings (Story 6.3)', () => {
+  const linkBlock = (s: string, url: unknown) => ({ type: 'link', content: JSON.stringify([s, 'unstyled', []]), url });
+  /** As the Post body of an accessible post (Story 6.3: `qr`). */
+  const qrItems = (data: unknown[]) =>
+    postBodyItems(mapped(postDetail('b', 'p', data as never)).blocks, { videoRows: true, images: 'stops', qr: true });
+  const para = (items: PostBodyItem[], i: number) => items[i] as PostBodyItem & { kind: 'paragraph' };
+
+  it('matrix «Link»: a paragraph with 2 links (one repeated) → inline text + 2 chips; a non-http URL → no chip', () => {
+    const items = qrItems([
+      text('Читайте '),
+      linkBlock('тут', 'https://example.invalid/a'),
+      text(', '),
+      linkBlock('там', 'https://example.invalid/b'),
+      text(' и снова '),
+      linkBlock('тут ещё', 'https://example.invalid/a'),
+      text(' '),
+      linkBlock('скрипт', 'javascript:alert(1)'),
+      text(' '),
+      linkBlock('пусто', ''),
+      blockEnd(),
+    ]);
+    expect(items).toHaveLength(1);
+    const p = para(items, 0);
+    expect(p.text).toBe('Читайте тут, там и снова тут ещё скрипт пусто');
+    expect(p.links).toEqual([
+      { key: 'text@0/link/0', text: 'тут', url: 'https://example.invalid/a', post: null, timestamp: null },
+      { key: 'text@0/link/1', text: 'там', url: 'https://example.invalid/b', post: null, timestamp: null },
+    ]);
+  });
+
+  it('matrix «Boosty post link»: a link to another Boosty post carries it; the current post, a blog page or another Boosty URL do not', () => {
+    const items = postBodyItems(
+      mapped(
+        postDetail('b', 'p', [
+          text('См. '),
+          linkBlock('другой', 'https://boosty.to/other-blog/posts/abc-123?share=1#top'),
+          text(' '),
+          linkBlock('этот', 'https://www.boosty.to/self-blog/posts/self-id'),
+          text(' '),
+          linkBlock('этот иначе', 'https://boosty.to/Self-Blog/posts/self-id'),
+          text(' '),
+          linkBlock('блог', 'https://boosty.to/other-blog'),
+          text(' '),
+          linkBlock('подписка', 'https://boosty.to/other-blog/purchase/1'),
+          blockEnd(),
+        ] as never),
+      ).blocks,
+      { qr: true, selfPost: { blogUrl: 'self-blog', postId: 'self-id' } },
+    );
+    expect(para(items, 0).links.map(l => [l.text, l.post])).toEqual([
+      ['другой', { blogUrl: 'other-blog', postId: 'abc-123' }],
+      ['этот', null],
+      ['этот иначе', null],
+      ['блог', null],
+      ['подписка', null],
+    ]);
+  });
+
+  it('matrix «Timestamp»: a `?t=<s>&tmid=<video id>` link to the current post carries the video and second; another video, post or format does not', () => {
+    const self = `https://boosty.to/self-blog/posts/self-id`;
+    const items = postBodyItems(
+      mapped(
+        postDetail('self-blog', 'self-id', [
+          { type: 'ok_video', id: 'v1', title: 'x' },
+          text('Таймкоды: '),
+          linkBlock('0:00', `${self}?t=0&tmid=v1`),
+          text(' '),
+          linkBlock('3:45', `${self}?t=225&tmid=v1`),
+          text(' '),
+          linkBlock('чужое', `${self}?t=10&tmid=v9`),
+          text(' '),
+          linkBlock('формат', `${self}?t=1m2s&tmid=v1`),
+          text(' '),
+          linkBlock('другой', `https://boosty.to/self-blog/posts/other?t=10&tmid=v1`),
+          blockEnd(),
+        ] as never),
+      ).blocks,
+      { videoRows: true, qr: true, selfPost: { blogUrl: 'self-blog', postId: 'self-id' } },
+    );
+    expect(para(items, 0).links.map(l => [l.text, l.timestamp, l.post])).toEqual([
+      ['0:00', { mediaId: 'v1', seconds: 0 }, null],
+      ['3:45', { mediaId: 'v1', seconds: 225 }, null],
+      ['чужое', null, null],
+      ['формат', null, null],
+      ['другой', null, { blogUrl: 'self-blog', postId: 'other' }],
+    ]);
+  });
+
+  it('a link-only paragraph is keyed by the link; links never cross a paragraph end', () => {
+    const items = qrItems([
+      linkBlock('Ссылка', 'https://example.invalid/a'),
+      blockEnd(),
+      ...paragraph('Без ссылок'),
+      text('Снова '),
+      linkBlock('ссылка', 'https://example.invalid/a'),
+      blockEnd(),
+    ]);
+    expect(items.map(i => (i.kind === 'paragraph' ? [i.key, i.links.map(l => l.key)] : i.kind))).toEqual([
+      ['link@0', ['link@0/link/0']],
+      ['text@2', []],
+      ['text@4', ['text@4/link/0']],
+    ]);
+  });
+
+  it('a split paragraph keeps its chips on the last stop, keyed by the first', () => {
+    const long = 'Слово '.repeat(150).trim();
+    const items = qrItems([text(long), linkBlock('ссылка', 'https://example.invalid/a'), blockEnd()]);
+    expect(items.length).toBeGreaterThan(1);
+    expect(items.slice(0, -1).every(i => i.kind === 'paragraph' && i.links.length === 0)).toBe(true);
+    expect(para(items, items.length - 1).links.map(l => l.key)).toEqual(['text@0/link/0']);
+  });
+
+  it('list items get their own chips', () => {
+    const items = qrItems([
+      {
+        type: 'list',
+        items: [{ data: [text('Пункт '), linkBlock('ссылка', 'https://example.invalid/a')], items: [] }],
+      },
+    ]);
+    expect(para(items, 0).links).toEqual([{ key: 'list@0/link/0', text: 'ссылка', url: 'https://example.invalid/a', post: null, timestamp: null }]);
+  });
+
+  it('matrix «File»: a file block is a file stop with its title and size (no URL in the domain)', () => {
+    const items = qrItems([
+      { type: 'file', id: 'f1', title: ' report.pdf ', size: 2048, url: 'https://example.invalid/file' },
+      { type: 'file', title: '', url: 'https://example.invalid/file' },
+    ]);
+    expect(items).toEqual([
+      { kind: 'file', key: 'file:f1', title: 'report.pdf', sizeBytes: 2048 },
+      { kind: 'file', key: 'file@1', title: '', sizeBytes: null },
+    ]);
+    expect(JSON.stringify(mapped(postDetail('b', 'p', [{ type: 'file', id: 'f1', url: 'https://example.invalid/file' }] as never)))).not.toContain('example.invalid/file');
+    expect(items.every(isFocusStop)).toBe(true);
+  });
+
+  it('matrix «YouTube» / «Other video»: a video with an http(s) URL is an externalVideo stop; a YouTube host gives its id', () => {
+    const items = qrItems([
+      { type: 'video', url: 'https://youtu.be/dQw4w9WgXcQ' },
+      { type: 'video', url: 'https://example.invalid/video' },
+      { type: 'video', url: 'javascript:alert(1)' },
+      { type: 'video' },
+    ]);
+    expect(items).toEqual([
+      { kind: 'externalVideo', key: 'video@0', url: 'https://youtu.be/dQw4w9WgXcQ', youtubeId: 'dQw4w9WgXcQ' },
+      { kind: 'externalVideo', key: 'video@1', url: 'https://example.invalid/video', youtubeId: null },
+      { kind: 'placeholder', key: 'video@2', block: 'video' },
+      { kind: 'placeholder', key: 'video@3', block: 'video' },
+    ]);
+    expect(isFocusStop(items[0])).toBe(true);
+    expect(isFocusStop(items[2])).toBe(false);
+  });
+
+  it('matrix «Header»: a bold, non-focusable heading that ends the paragraph in progress; an empty one is dropped', () => {
+    const items = qrItems([
+      text('До'),
+      { type: 'header', content: JSON.stringify(['Заголовок', 'unstyled', []]), modificator: '' },
+      text('После'),
+      blockEnd(),
+      { type: 'header', content: JSON.stringify(['  ', 'unstyled', []]), modificator: '' },
+      { type: 'header', content: '' },
+      { type: 'header', content: 'Сырой' },
+    ]);
+    expect(plain(items)).toEqual([
+      { kind: 'paragraph', key: 'text@0', text: 'До' },
+      { kind: 'heading', key: 'header@1', text: 'Заголовок' },
+      { kind: 'paragraph', key: 'text@2', text: 'После' },
+      { kind: 'heading', key: 'header@6', text: 'Сырой' },
+    ]);
+    expect(isFocusStop(items[1])).toBe(false);
+  });
+
+  it('without `qr` (a locked teaser): no chips; files and videos stay placeholders; headings still show', () => {
+    const items = postBodyItems(
+      mapped(
+        postDetail('b', 'p', [
+          text('a '),
+          linkBlock('b', 'https://example.invalid/a'),
+          blockEnd(),
+          { type: 'file', id: 'f1' },
+          { type: 'video', url: 'https://example.invalid/video' },
+          { type: 'header', content: JSON.stringify(['H', 'unstyled', []]) },
+        ] as never),
+      ).blocks,
+    );
+    expect(items.map(i => (i.kind === 'paragraph' ? i.links.length : i.kind === 'placeholder' ? i.block : i.kind))).toEqual([
+      0,
+      'file',
+      'video',
+      'heading',
+    ]);
+  });
+
+  it('the live accessible E8 with its synthetic Story 6.3 blocks: links chipped (deduped per paragraph), heading, file and video', () => {
+    const items = postBodyItems(mapped(e8Accessible()).blocks, { videoRows: true, images: 'stops', qr: true });
+    const chips = items.flatMap(i => (i.kind === 'paragraph' ? i.links : []));
+    expect(chips.length).toBeGreaterThan(5);
+    expect(new Set(chips.map(c => c.key)).size).toBe(chips.length);
+    expect(items.slice(-3)).toEqual([
+      { kind: 'heading', key: 'header@113', text: 'Sample text' },
+      { kind: 'file', key: 'file:synthetic-id-13', title: 'redacted', sizeBytes: 204800 },
+      { kind: 'externalVideo', key: 'video@115', url: 'https://example.invalid/video', youtubeId: null },
+    ]);
   });
 });

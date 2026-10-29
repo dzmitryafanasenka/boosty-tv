@@ -21,6 +21,7 @@ import {
 import {
   mayTakeScreenFocus,
   useLatestRef,
+  useModal,
   usePhaseChange,
   useZoneItem,
 } from '../../shared/focus';
@@ -32,17 +33,20 @@ import {
   type ProgressSnapshot,
   type ProgressStatus,
 } from '../../shared/services/progress';
-import { StateView, requestHostFocus, spacing, type HostView } from '../../shared/ui';
+import { QrDialog, StateView, requestHostFocus, spacing, type HostView } from '../../shared/ui';
 import {
   PostBody,
   PostBodySkeleton,
   PostPrimaryAction,
   PostVideoRows,
   TEASER_IMAGE_GAP,
+  type OpenPost,
+  type PlayAt,
+  type OpenQr,
 } from './PostBody';
 import { LOCKED_NOTICE_GAP, LockedNotice } from './LockedNotice';
 import { PostHeader, PostHeaderSkeleton } from './PostHeader';
-import { usePost } from './usePost';
+import { useFileTarget, usePost } from './usePost';
 
 /** Focus ids (docs/focus-map.md §1.5). */
 export const POST_STATE_ACTION_ID = 'state/post/action';
@@ -164,7 +168,12 @@ export type PostScreenProps = {
    * `focusId` is the element that opened it (exit returns focus there).
    * «С начала» (Story 4.2) passes `beginning`: the video starts at 0.
    */
-  onOpenPlayer: (ref: MediaRef, focusId: string, start?: 'beginning') => void;
+  onOpenPlayer: (ref: MediaRef, focusId: string, start?: 'beginning' | { atSec: number }) => void;
+  /**
+   * Story 6.3 (owner decision 2026-10-29): OK on a link chip to another
+   * Boosty post opens that Пост on top (Back returns to the chip).
+   */
+  onOpenPost?: OpenPost;
   /**
    * `phaseFlags.player` (AD-20), passed by the route: off → no «Смотреть»
    * and the MediaRows have no action.
@@ -223,6 +232,7 @@ export function PostScreen({
   onBack,
   onOpenAuthor,
   onOpenPlayer,
+  onOpenPost,
   playerEnabled,
 }: PostScreenProps) {
   const progress = useProgressRepository();
@@ -252,7 +262,12 @@ export function PostScreen({
       post === null
         ? []
         : post.hasAccess
-          ? postBodyItems(post.blocks, { videoRows: true, images: 'stops' })
+          ? postBodyItems(post.blocks, {
+              videoRows: true,
+              images: 'stops',
+              qr: true,
+              selfPost: { blogUrl: post.author.blogUrl, postId: post.id },
+            })
           : postBodyItems(post.teaser, { images: true }),
     [post],
   );
@@ -503,6 +518,34 @@ export function PostScreen({
     }
   }, [rows, items, showPrimary, showRestart, blockPrefix, videoPrefix, primaryId, restartId, focusInitial, phaseRef]);
 
+  // Story 6.3: OK on a link, file or external-video chip → the QrDialog in
+  // the modal host (focus trapped; «Закрыть» or Back returns it to the chip).
+  // Only while Пост is the focused route (a file's E8 can land after a pop).
+  const modal = useModal();
+  const onOpenQr = useCallback<OpenQr>(
+    (title, value, initiator) => {
+      if (!focusRef.current.isActive() || modal.isOpen()) {
+        return;
+      }
+      modal.open(<QrDialog title={title} value={value} onClose={() => modal.close()} />, initiator);
+    },
+    [modal],
+  );
+  const resolveFile = useFileTarget(http, blogUrl, postId);
+  // Story 6.3 (owner decision 2026-10-29, option b): a timestamp chip plays
+  // this post's video from that second; the Player returns focus to the chip.
+  // Only while the player is on (else the chip keeps its QR).
+  const postAuthorBlogUrl = post?.author.blogUrl ?? null;
+  const postEntityId = post?.id ?? null;
+  const onPlayAt = useCallback<PlayAt>(
+    (mediaId, seconds, focusId) => {
+      if (postAuthorBlogUrl !== null && postEntityId !== null) {
+        onOpenPlayer({ blogUrl: postAuthorBlogUrl, postId: postEntityId, mediaId }, focusId, { atSec: seconds });
+      }
+    },
+    [onOpenPlayer, postAuthorBlogUrl, postEntityId],
+  );
+
   const authorBlogUrl = post?.author.blogUrl ?? null;
   const onAuthorPress = useCallback(() => {
     if (authorBlogUrl !== null) {
@@ -590,6 +633,10 @@ export function PostScreen({
               onParagraphFocus={onStopFocus}
               imageMaxHeight={imageMaxHeight}
               columnWidth={columnWidth}
+              onOpenQr={onOpenQr}
+              resolveFile={resolveFile}
+              onOpenPost={onOpenPost}
+              onPlayAt={playerEnabled ? onPlayAt : undefined}
             />
           </ScrollView>
         ) : (

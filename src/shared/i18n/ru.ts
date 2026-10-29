@@ -249,6 +249,20 @@ export const ru = {
   // `not_found` verified): «Назад» only, no retry. Videos are MediaRows
   // (Story 3.5); other blocks are neutral placeholders until Epic 6. `likes` forms carry
   // `{n}`. No comment count anywhere.
+  // QrDialog (Story 6.3, focus-map §4 F7): nothing opens on the TV.
+  qr: {
+    hint: 'Откроется на телефоне',
+    close: 'Закрыть',
+    a11yCode: 'QR-код',
+    error: 'Не удалось показать QR-код',
+  },
+  // File sizes (Story 6.3): `{n}` is already formatted (a decimal comma).
+  fileSize: {
+    b: '{n} Б',
+    kb: '{n} КБ',
+    mb: '{n} МБ',
+    gb: '{n} ГБ',
+  },
   post: {
     loading: 'Загружаем пост',
     // Story 6.2: an inline image that failed to load.
@@ -267,6 +281,28 @@ export const ru = {
         'Нет доступа. Этот пост доступен подписчикам уровня «{level}». Оформить подписку можно на сайте или в приложении Boosty.',
       noLevel:
         'Нет доступа. Этот пост доступен подписчикам автора. Оформить подписку можно на сайте или в приложении Boosty.',
+    },
+    // Story 6.3: LinkChip, FileChip, external-video chip (OK → QrDialog).
+    // `{label}` is the chip's text; the visible «QR» suffix is the
+    // `link-chip` token. A file chip: «{title} · {size}».
+    chip: {
+      a11y: '{label}. Показать QR-код',
+      a11yBusy: '{label}. Загружаем ссылку',
+      // After a failed OK on a file chip; `{error}` is `fileError` or `fileLocked`.
+      a11yFailed: '{label}. {error}. Показать QR-код',
+      // A link to another Boosty post (owner decision 2026-10-29): opens it in the app.
+      openSuffix: '· Открыть',
+      a11yOpenPost: '{label}. Открыть пост',
+      // A timestamp link to a video of this post (option b): plays it from that time.
+      watchSuffix: '· Смотреть',
+      a11yWatchAt: '{label}. Смотреть видео с этого момента',
+      file: 'Файл',
+      fileWithSize: '{title} · {size}',
+      fileError: 'Не удалось открыть файл',
+      // The fresh E8 said the post is locked now.
+      fileLocked: 'Нет доступа к файлу',
+      youtube: 'Видео на YouTube',
+      externalVideo: 'Внешнее видео',
     },
     block: {
       video: 'Видео',

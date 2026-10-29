@@ -309,14 +309,15 @@ export function PostRoute({ navigation, route }: StackScreenProps<RootStackParam
   // OK on «Смотреть» or a MediaRow (Story 4.1): the Player for exactly that
   // video; exit returns focus to `focusId` on this route. Only while Пост is
   // the focused route (a second OK during the transition is dropped).
-  // «С начала» (Story 4.2) passes `beginning`: that video starts at 0.
+  // «С начала» (Story 4.2) passes `beginning`: that video starts at 0; a
+  // timestamp link chip (Story 6.3) passes `{atSec}`.
   const onOpenPlayer = useCallback(
-    (ref: MediaRef, focusId: string, start?: 'beginning') => {
+    (ref: MediaRef, focusId: string, start?: 'beginning' | { atSec: number }) => {
       if (navigation.isFocused()) {
         navigation.push('Player', {
           ref,
           origin: { routeKey, focusId },
-          ...(start === 'beginning' ? { start } : {}),
+          ...(start !== undefined ? { start } : {}),
         });
       }
     },
@@ -340,6 +341,18 @@ export function PostRoute({ navigation, route }: StackScreenProps<RootStackParam
     },
     [navigation, origin],
   );
+  // Story 6.3 (owner decision 2026-10-29): OK on a link chip to another
+  // Boosty post pushes that Пост with this one's sidebar origin; only while
+  // Пост is the focused route (as the Author push). Back pops here, and the
+  // content zone restores the chip.
+  const onOpenPost = useCallback(
+    (linkedBlogUrl: string, linkedPostId: string) => {
+      if (navigation.isFocused()) {
+        navigation.push('Post', { blogUrl: linkedBlogUrl, postId: linkedPostId, section: origin });
+      }
+    },
+    [navigation, origin],
+  );
 
   return (
     <StackSidebarRoute navigation={navigation} routeKey={routeKey} origin={origin} name="post">
@@ -352,6 +365,7 @@ export function PostRoute({ navigation, route }: StackScreenProps<RootStackParam
           onBack={onBack}
           onOpenAuthor={onOpenAuthor}
           onOpenPlayer={onOpenPlayer}
+          onOpenPost={onOpenPost}
           playerEnabled={phaseFlags.player}
         />
       )}

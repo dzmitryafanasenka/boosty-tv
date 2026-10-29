@@ -23,7 +23,10 @@ import type { ReadResult, SecureStore } from '../../shared/platform/secureStore'
  * `demo-blog-3` no posts, the last demo blog missing; Story 5.7: the E4
  * Filter params, E7 blog search and E14 blog tags), E8 (Пост, Story 3.4:
  * every demo post with several paragraphs and a like count, every fourth
- * one also with image, file, audio, poll and unknown blocks and an inline link;
+ * one also with image, audio, poll and unknown blocks, an inline link (a
+ * LinkChip), a heading, a file and an external video (Story 6.3: QR chips;
+ * their URLs are `example.invalid` placeholders, only drawn as a QR, and the
+ * demo `signedQuery` is a fake);
  * `demo-post-9` answers 404 `not_found`; locked posts (every seventh) have a
  * teaser image without a URL, and `demo-post-6`/`-20` a level name while
  * `demo-post-13`/`-27` have none, Story 3.6), E9 progress writes 200 (Story
@@ -343,9 +346,17 @@ function demoPostDetail(blogUrl: string, postId: string) {
       ? [
           { type: 'image', id: `demo-image-${n}`, width: 1280, height: 720 },
           { type: 'text', content: '["Абзац со ","unstyled",[]]', modificator: '' },
-          { type: 'link', content: '["ссылкой","unstyled",[]]' },
+          { type: 'link', content: '["ссылкой","unstyled",[]]', url: 'https://example.invalid/demo-link' },
           ...textBlock(' между заглушками.'),
-          { type: 'file', id: `demo-file-${n}`, title: 'Файл' },
+          { type: 'header', content: '["Файлы и видео","unstyled",[]]', modificator: '' },
+          {
+            type: 'file',
+            id: `demo-file-${n}`,
+            title: 'Демо-файл.pdf',
+            size: 1536000,
+            url: 'https://example.invalid/demo-file',
+          },
+          { type: 'video', url: 'https://example.invalid/demo-video' },
           { type: 'audio_file', id: `demo-audio-${n}`, title: 'Аудио' },
           { type: 'poll', id: 1000 + n },
           { type: 'demo_unknown_block' },
@@ -356,6 +367,8 @@ function demoPostDetail(blogUrl: string, postId: string) {
     data: base.hasAccess ? [...videos, ...DEMO_PARAGRAPHS.flatMap(textBlock), ...mixed] : [],
     teaser: base.hasAccess ? [] : [{ type: 'image', id: `demo-teaser-${n}`, width: 1280, height: 720 }],
     count: { likes: (n * 7) % 40, comments: 0 },
+    // Story 6.3: a fake signed query (the file QR's target), never a real one.
+    signedQuery: base.hasAccess ? '?demo=1' : '',
   };
 }
 

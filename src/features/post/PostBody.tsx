@@ -1,15 +1,19 @@
-import { memo, useCallback, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import {
   Image,
   StyleSheet,
+  TVFocusGuideView,
   Text as RNText,
   View,
   type ImageLoadEvent,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
+import { youtubeThumbnail } from '../../shared/entities/externalUrls';
 import type {
+  FileTargetResult,
   MediaRef,
+  ParagraphLink,
   PlaceholderKind,
   PostBodyItem,
   Segment,
@@ -17,14 +21,18 @@ import type {
 } from '../../shared/entities/post';
 import { useZoneItem } from '../../shared/focus';
 import { t, tf } from '../../shared/i18n';
+import { formatFileSize } from '../../shared/i18n/format';
 import type { ProgressStatus } from '../../shared/services/progress';
 import {
   Button,
   FocusableSurface,
   MediaRow,
+  Spinner,
   Text,
   mediaRowLabel,
   colors,
+  components,
+  focus,
   fontFiles,
   rounded,
   spacing,
@@ -373,6 +381,436 @@ const ImageStop = memo(function ImageStopView({
   );
 });
 
+/**
+ * Story 6.3: opens the QrDialog in the modal host for `value`, with
+ * `initiator` (the chip) getting focus back when it closes.
+ */
+export type OpenQr = (
+  title: string,
+  value: string,
+  initiator: RefObject<HostView | null>,
+) => void;
+
+/** Story 6.3: a file's QR target from a fresh E8 (`useFileTarget`). */
+/** `title`: the shown (trimmed) title; an id-less file must still carry it. */
+export type ResolveFileTarget = (fileKey: string, title: string) => Promise<FileTargetResult>;
+
+const CHIP = components['link-chip'];
+
+/**
+ * A chip as a column stop: a content zone item, its host view reported by
+ * focus id (the column guide, the refetch fallback) and kept for the modal
+ * host (focus returns to it when the QrDialog closes).
+ */
+function useChipStop(
+  id: string,
+  onView: (id: string, view: HostView | null) => void,
+  onFocus: (id: string) => void,
+) {
+  const zone = useZoneItem(id);
+  const zoneRef = zone.ref;
+  const viewRef = useRef<HostView | null>(null);
+  const ref = useCallback(
+    (view: HostView | null) => {
+      viewRef.current = view;
+      zoneRef?.(view);
+      onView(id, view);
+    },
+    [zoneRef, onView, id],
+  );
+  const handleFocus = useCallback(() => {
+    zone.onFocus();
+    onFocus(id);
+  }, [zone, onFocus, id]);
+  return { ref, viewRef, handleFocus };
+}
+
+/**
+ * A full-measure focus guide around chips (Story 6.3, device): Android's
+ * focus search weighs the horizontal offset of centers, so ↓ from a wide
+ * paragraph preferred the next wide paragraph over a narrow, left-aligned
+ * chip right below it (the chip was skipped both ways). The guide spans the
+ * column like a paragraph and hands focus to its last focused chip, else
+ * the first (`autoFocus`, react-native-tvos).
+ */
+function ChipGuide({
+  testID,
+  children,
+}: {
+  testID: string;
+  children: ReactNode;
+}) {
+  return (
+    <TVFocusGuideView testID={testID} autoFocus style={styles.chipGuide}>
+      {children}
+    </TVFocusGuideView>
+  );
+}
+
+/** The chip's visible «QR» suffix (`link-chip` token), or a spinner while busy. */
+function QrSuffix({ busy, testID }: { busy?: boolean; testID: string }) {
+  return busy ? (
+    <View style={styles.suffix}>
+      <Spinner testID={`${testID}/busy`} />
+    </View>
+  ) : (
+    <Text variant="button-s" color="accent-text" style={styles.suffix}>
+      {CHIP.suffix}
+    </Text>
+  );
+}
+
+const chipSurface = ({ focused }: SurfaceState) => [
+  styles.chip,
+  { backgroundColor: focused ? colors['surface-focus-button'] : CHIP.bg },
+];
+
+const videoChipSurface = ({ focused }: SurfaceState) => [
+  styles.videoChip,
+  { backgroundColor: focused ? colors['surface-focus-button'] : CHIP.bg },
+];
+
+/**
+ * Story 6.3 (owner decision 2026-10-29): opens another Boosty post in the
+ * app (a Пост pushed on top; Back returns to the chip).
+ */
+export type OpenPost = (blogUrl: string, postId: string) => void;
+
+/**
+ * Story 6.3 (owner decision 2026-10-29, option b): plays a video of this
+ * post from `seconds`; `focusId` (the chip) gets focus back after the Player.
+ */
+export type PlayAt = (mediaId: string, seconds: number, focusId: string) => void;
+
+type LinkChipProps = {
+  id: string;
+  link: ParagraphLink;
+  onView: (id: string, view: HostView | null) => void;
+  onFocus: (id: string) => void;
+  onOpenQr?: OpenQr;
+  onOpenPost?: OpenPost;
+  onPlayAt?: PlayAt;
+};
+
+/** What OK on a link chip does: play at a time, open a post, else the QR. */
+type LinkAction = 'play' | 'post' | 'qr';
+
+/**
+ * DESIGN.md LinkChip (Story 6.3, `link-chip` tokens): a 32 dp pill under its
+ * paragraph with the link text and a «QR» suffix. OK opens the QrDialog for
+ * the link (nothing opens on the TV); focus returns here when it closes. A
+ * link to another Boosty post (owner decision 2026-10-29) reads «<text> ·
+ * Открыть» with no QR suffix, and OK opens that post in the app instead. A
+ * timestamp link to a video of this post (option b) reads «<text> ·
+ * Смотреть» and OK plays that video from that time. Without the handler
+ * (no route to push, the player off) a chip falls back to the QR.
+ */
+const LinkChip = memo(function LinkChipView({
+  id,
+  link,
+  onView,
+  onFocus,
+  onOpenQr,
+  onOpenPost,
+  onPlayAt,
+}: LinkChipProps) {
+  const { ref, viewRef, handleFocus } = useChipStop(id, onView, onFocus);
+  const { text, url, post, timestamp } = link;
+  const action: LinkAction =
+    timestamp !== null && onPlayAt !== undefined
+      ? 'play'
+      : post !== null && onOpenPost !== undefined
+        ? 'post'
+        : 'qr';
+  const onPress = useCallback(() => {
+    if (action === 'play' && timestamp !== null) {
+      onPlayAt?.(timestamp.mediaId, timestamp.seconds, id);
+    } else if (action === 'post' && post !== null) {
+      onOpenPost?.(post.blogUrl, post.postId);
+    } else {
+      onOpenQr?.(text, url, viewRef);
+    }
+  }, [action, timestamp, post, onPlayAt, onOpenPost, onOpenQr, id, text, url, viewRef]);
+  // The action word is its own text, so a long link text is cut before it,
+  // never the action (device: «… · От…»).
+  const suffix =
+    action === 'play' ? t('post.chip.watchSuffix') : action === 'post' ? t('post.chip.openSuffix') : null;
+  const a11yLabel =
+    action === 'play'
+      ? tf('post.chip.a11yWatchAt', { label: text })
+      : action === 'post'
+        ? tf('post.chip.a11yOpenPost', { label: text })
+        : tf('post.chip.a11y', { label: text });
+  return (
+    <FocusableSurface
+      ref={ref}
+      testID={id}
+      radius={CHIP.height / 2}
+      scaleFocus={focus['scale-button']}
+      accessibilityRole="button"
+      accessibilityLabel={a11yLabel}
+      onPress={onPress}
+      onFocus={handleFocus}
+      surfaceStyle={chipSurface}
+      style={styles.chipGap}
+    >
+      <View style={styles.chipContent}>
+        <Text variant="button-s" numberOfLines={1} style={styles.chipLabel}>
+          {text}
+        </Text>
+        {suffix === null ? (
+          <QrSuffix testID={id} />
+        ) : (
+          <Text testID={`${id}/action`} variant="button-s" style={styles.actionSuffix}>
+            {suffix}
+          </Text>
+        )}
+      </View>
+    </FocusableSurface>
+  );
+});
+
+type FileChipProps = {
+  id: string;
+  /** The file's block key (`file:<id>`, else `file@<index>`). */
+  fileKey: string;
+  title: string;
+  sizeBytes: number | null;
+  onView: (id: string, view: HostView | null) => void;
+  onFocus: (id: string) => void;
+  onOpenQr?: OpenQr;
+  resolveFile?: ResolveFileTarget;
+};
+
+/**
+ * DESIGN.md FileChip (Story 6.3): «{title} · {size}» and the «QR» suffix.
+ * OK sends a fresh E8 (busy meanwhile: a spinner, a repeated OK ignored),
+ * then opens the QrDialog with the file's signed target, which is held only
+ * by the dialog (never in state here, a cache or a log). A failure shows
+ * «Не удалось открыть файл» under the chip and opens no dialog; OK tries
+ * again.
+ */
+const FileChip = memo(function FileChipView({
+  id,
+  fileKey,
+  title,
+  sizeBytes,
+  onView,
+  onFocus,
+  onOpenQr,
+  resolveFile,
+}: FileChipProps) {
+  const { ref, viewRef, handleFocus } = useChipStop(id, onView, onFocus);
+  const [busy, setBusy] = useState(false);
+  /** The last failure: `locked` («Нет доступа к файлу») or any other (`error`). */
+  const [failed, setFailed] = useState<'locked' | 'error' | null>(null);
+  const inFlight = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const name = title.length > 0 ? title : t('post.chip.file');
+  const label =
+    sizeBytes === null
+      ? name
+      : tf('post.chip.fileWithSize', {
+          title: name,
+          size: formatFileSize(sizeBytes),
+        });
+  const onPress = useCallback(() => {
+    if (inFlight.current || resolveFile === undefined) {
+      return;
+    }
+    inFlight.current = true;
+    setBusy(true);
+    setFailed(null);
+    const done = (result: FileTargetResult | null) => {
+      inFlight.current = false;
+      if (!mounted.current) {
+        return;
+      }
+      setBusy(false);
+      if (result?.kind === 'ok') {
+        onOpenQr?.(name, result.target, viewRef);
+      } else {
+        setFailed(result?.kind === 'locked' ? 'locked' : 'error');
+      }
+    };
+    resolveFile(fileKey, title).then(done, () => done(null));
+  }, [resolveFile, fileKey, title, onOpenQr, name, viewRef]);
+  return (
+    <ChipGuide testID={`${id}/guide`}>
+      <View style={styles.blockGap}>
+        <FocusableSurface
+          ref={ref}
+          testID={id}
+          radius={CHIP.height / 2}
+          scaleFocus={focus['scale-button']}
+          accessibilityRole="button"
+          accessibilityLabel={
+            busy
+              ? tf('post.chip.a11yBusy', { label })
+              : failed !== null
+                ? // The failure is part of the label (TalkBack reads it on focus).
+                  tf('post.chip.a11yFailed', {
+                    label,
+                    error: failed === 'locked' ? t('post.chip.fileLocked') : t('post.chip.fileError'),
+                  })
+                : tf('post.chip.a11y', { label })
+          }
+          accessibilityState={{ busy }}
+          onPress={onPress}
+          onFocus={handleFocus}
+          surfaceStyle={chipSurface}
+          style={styles.chipAlone}
+        >
+          <View style={styles.chipContent}>
+            <Text variant="button-s" numberOfLines={1} style={styles.chipLabel}>
+              {label}
+            </Text>
+            <QrSuffix busy={busy} testID={id} />
+          </View>
+        </FocusableSurface>
+        {failed ? (
+          <Text
+            testID={`${id}/error`}
+            accessibilityLiveRegion="polite"
+            variant="body-s"
+            color="error-text"
+            style={styles.chipError}
+          >
+            {failed === 'locked' ? t('post.chip.fileLocked') : t('post.chip.fileError')}
+          </Text>
+        ) : null}
+      </View>
+    </ChipGuide>
+  );
+});
+
+type ExternalVideoChipProps = {
+  id: string;
+  url: string;
+  youtubeId: string | null;
+  onView: (id: string, view: HostView | null) => void;
+  onFocus: (id: string) => void;
+  onOpenQr?: OpenQr;
+};
+
+/**
+ * An external video (Story 6.3): never played in the app. A chip with the
+ * YouTube thumbnail (a plain `{uri}`, no headers) when the host is YouTube,
+ * «Видео на YouTube» / «Внешнее видео» and the «QR» suffix; a failed
+ * thumbnail leaves the text. OK opens the QrDialog for the page.
+ */
+const ExternalVideoChip = memo(function ExternalVideoChipView({
+  id,
+  url,
+  youtubeId,
+  onView,
+  onFocus,
+  onOpenQr,
+}: ExternalVideoChipProps) {
+  const { ref, viewRef, handleFocus } = useChipStop(id, onView, onFocus);
+  const thumb = youtubeId === null ? null : youtubeThumbnail(youtubeId);
+  const [failedThumb, setFailedThumb] = useState<string | null>(null);
+  const label =
+    youtubeId === null ? t('post.chip.externalVideo') : t('post.chip.youtube');
+  const onPress = useCallback(
+    () => onOpenQr?.(label, url, viewRef),
+    [onOpenQr, label, url, viewRef],
+  );
+  const showThumb = thumb !== null && failedThumb !== thumb;
+  return (
+    <ChipGuide testID={`${id}/guide`}>
+      <FocusableSurface
+        ref={ref}
+        testID={id}
+        radius={rounded.md}
+        scaleFocus={focus['scale-button']}
+        accessibilityRole="button"
+        accessibilityLabel={tf('post.chip.a11y', { label })}
+        onPress={onPress}
+        onFocus={handleFocus}
+        surfaceStyle={videoChipSurface}
+        style={[styles.chipAlone, styles.blockGap]}
+      >
+        <View style={styles.chipContent}>
+          {showThumb ? (
+            <Image
+              key={thumb}
+              testID={`${id}/thumb`}
+              source={{ uri: thumb }}
+              resizeMode="cover"
+              resizeMethod="resize"
+              fadeDuration={0}
+              onError={() => setFailedThumb(thumb)}
+              accessible={false}
+              focusable={false}
+              style={styles.videoThumb}
+            />
+          ) : null}
+          <Text variant="button-s" numberOfLines={1} style={styles.chipLabel}>
+            {label}
+          </Text>
+          <QrSuffix testID={id} />
+        </View>
+      </FocusableSurface>
+    </ChipGuide>
+  );
+});
+
+/** A paragraph's link chips (Story 6.3), in one wrapping row under it: ← → move between them. */
+function LinkChips({
+  idPrefix,
+  links,
+  onView,
+  onFocus,
+  onOpenQr,
+  onOpenPost,
+  onPlayAt,
+}: {
+  idPrefix: string;
+  links: readonly ParagraphLink[];
+  onView: (id: string, view: HostView | null) => void;
+  onFocus: (id: string) => void;
+  onOpenQr?: OpenQr;
+  onOpenPost?: OpenPost;
+  onPlayAt?: PlayAt;
+}) {
+  return (
+    <ChipGuide testID={`${idPrefix}${links[0].key}/guide`}>
+      <View style={styles.chipRow}>
+        {links.map(link => (
+          <LinkChip
+            key={link.key}
+            id={`${idPrefix}${link.key}`}
+            link={link}
+            onView={onView}
+            onFocus={onFocus}
+            onOpenQr={onOpenQr}
+            onOpenPost={onOpenPost}
+            onPlayAt={onPlayAt}
+          />
+        ))}
+      </View>
+    </ChipGuide>
+  );
+}
+
+/** A `header` block (Story 6.3, owner decision 2026-10-29 Q1 b): a bold line, never a focus stop. */
+function Heading({ id, text }: { id: string; text: string }) {
+  return (
+    <View testID={id} focusable={false} style={[styles.heading, styles.text]}>
+      <Text variant="section" accessibilityRole="header">
+        {text}
+      </Text>
+    </View>
+  );
+}
+
 export type PostBodyProps = {
   items: readonly PostBodyItem[];
   /** `post/<postId>/block/` */
@@ -383,6 +821,14 @@ export type PostBodyProps = {
   imageMaxHeight: number;
   /** The column's measured inner width (teaser images); null until measured. */
   columnWidth: number | null;
+  /** Story 6.3: OK on a chip opens the QrDialog. */
+  onOpenQr?: OpenQr;
+  /** Story 6.3: a file chip's QR target (a fresh E8). */
+  resolveFile?: ResolveFileTarget;
+  /** Story 6.3: OK on a link to another Boosty post opens it. */
+  onOpenPost?: OpenPost;
+  /** Story 6.3 (option b): OK on a timestamp link plays this post's video from that time. */
+  onPlayAt?: PlayAt;
 };
 
 /**
@@ -398,30 +844,82 @@ export function PostBody({
   onParagraphFocus,
   imageMaxHeight,
   columnWidth,
+  onOpenQr,
+  resolveFile,
+  onOpenPost,
+  onPlayAt,
 }: PostBodyProps) {
   return (
     <>
       {items.map(item => {
         const id = `${idPrefix}${item.key}`;
         switch (item.kind) {
-          case 'paragraph':
+          case 'paragraph': {
             // Emoji only (no plain text): shown, never a focus stop.
-            return item.text.length === 0 ? (
-              <View key={item.key} testID={id} focusable={false} style={[styles.paragraph, styles.text]}>
-                <Text variant="body">
-                  <Segments id={id} segments={item.segments} />
-                </Text>
+            const paragraph =
+              item.text.length === 0 ? (
+                <View key={item.key} testID={id} focusable={false} style={[styles.paragraph, styles.text]}>
+                  <Text variant="body">
+                    <Segments id={id} segments={item.segments} />
+                  </Text>
+                </View>
+              ) : (
+                <ParagraphStop
+                  key={item.key}
+                  id={id}
+                  text={item.text}
+                  segments={item.segments}
+                  onView={onParagraphView}
+                  onFocus={onParagraphFocus}
+                />
+              );
+            if (item.links.length === 0) {
+              return paragraph;
+            }
+            // Story 6.3: the link chips right under their paragraph.
+            return (
+              <View key={item.key} testID={`${id}/links`}>
+                {paragraph}
+                <LinkChips
+                  idPrefix={idPrefix}
+                  links={item.links}
+                  onView={onParagraphView}
+                  onFocus={onParagraphFocus}
+                  onOpenQr={onOpenQr}
+                  onOpenPost={onOpenPost}
+                  onPlayAt={onPlayAt}
+                />
               </View>
-            ) : (
-              <ParagraphStop
+            );
+          }
+          case 'file':
+            return (
+              <FileChip
                 key={item.key}
                 id={id}
-                text={item.text}
-                segments={item.segments}
+                fileKey={item.key}
+                title={item.title}
+                sizeBytes={item.sizeBytes}
                 onView={onParagraphView}
                 onFocus={onParagraphFocus}
+                onOpenQr={onOpenQr}
+                resolveFile={resolveFile}
               />
             );
+          case 'externalVideo':
+            return (
+              <ExternalVideoChip
+                key={item.key}
+                id={id}
+                url={item.url}
+                youtubeId={item.youtubeId}
+                onView={onParagraphView}
+                onFocus={onParagraphFocus}
+                onOpenQr={onOpenQr}
+              />
+            );
+          case 'heading':
+            return <Heading key={item.key} id={id} text={item.text} />;
           case 'image':
             return item.stop ? (
               <ImageStop
@@ -453,8 +951,11 @@ export function PostBody({
   );
 }
 
-/** How the Player is opened (Story 4.2): `beginning` for «С начала». */
-export type OpenPlayer = (ref: MediaRef, focusId: string, start?: 'beginning') => void;
+/**
+ * How the Player is opened (Story 4.2): `beginning` for «С начала»; Story
+ * 6.3: `{atSec}` for a timestamp link chip.
+ */
+export type OpenPlayer = (ref: MediaRef, focusId: string, start?: 'beginning' | { atSec: number }) => void;
 
 type VideoRowStopProps = {
   id: string;
@@ -756,6 +1257,67 @@ const styles = StyleSheet.create({
   emoji: {
     width: EMOJI_SIZE,
     height: EMOJI_SIZE,
+  },
+  // Story 6.3 chips (`link-chip`: 32 dp pill on `surface-raised`).
+  chipGuide: {
+    alignSelf: 'stretch',
+    maxWidth: spacing['text-measure'],
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    maxWidth: spacing['text-measure'],
+    marginTop: -spacing['3'],
+    marginBottom: spacing['4'],
+  },
+  chipGap: {
+    marginRight: spacing['4'],
+    marginBottom: spacing['4'],
+  },
+  chipAlone: {
+    alignSelf: 'flex-start',
+  },
+  blockGap: {
+    marginBottom: spacing['6'],
+  },
+  chip: {
+    height: CHIP.height,
+    paddingHorizontal: components['button-small'].paddingX,
+    justifyContent: 'center',
+  },
+  chipContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  chipLabel: {
+    maxWidth: 420,
+  },
+  suffix: {
+    marginLeft: spacing['4'],
+  },
+  actionSuffix: {
+    marginLeft: spacing['2'],
+  },
+  chipError: {
+    marginTop: spacing['3'],
+  },
+  videoChip: {
+    minHeight: CHIP.height,
+    padding: spacing['3'],
+    paddingRight: components['button-small'].paddingX,
+    justifyContent: 'center',
+  },
+  videoThumb: {
+    width: 96,
+    height: 54,
+    borderRadius: rounded.sm,
+    marginRight: spacing['5'],
+    backgroundColor: colors.skeleton,
+  },
+  heading: {
+    paddingTop: spacing['4'],
+    paddingLeft: spacing['4'] + BAR_WIDTH,
+    paddingRight: spacing['4'],
   },
   placeholder: {
     paddingVertical: spacing['5'],

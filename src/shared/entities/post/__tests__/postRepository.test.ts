@@ -575,3 +575,75 @@ describe('PostRepository.feedSearchPage (E6, Story 5.6)', () => {
     );
   });
 });
+
+/* eslint-disable no-script-url -- Story 6.3: unsafe URLs are inputs the code must reject */
+describe('PostRepository.fileTarget (Story 6.3)', () => {
+  const SQ = '?sig=REDACTED';
+  const withFiles = (data: unknown[], extra: Record<string, unknown> = {}) => ({
+    ...e8Accessible(),
+    data,
+    signedQuery: SQ,
+    ...extra,
+  });
+  const file = (id: string | undefined, url: string) => ({ type: 'file', ...(id ? { id } : {}), title: 'f', url });
+
+  it('a fresh E8 (content profile), then the file by id: url + signedQuery', async () => {
+    const { http, transport } = client(() => ({
+      status: 200,
+      body: withFiles([file('f0', 'https://example.invalid/zero'), file('f1', 'https://example.invalid/file')]),
+    }));
+    const result = await PostRepository.fileTarget(http, 'synthetic-blog-1', 'synthetic-id-4', 'file:f1');
+    expect(result).toEqual({ kind: 'ok', target: 'https://example.invalid/file?sig=REDACTED' });
+    expect(transport.calls).toHaveLength(1);
+    expect(transport.calls[0].url).toBe(
+      'https://api.boosty.to/v1/blog/synthetic-blog-1/post/synthetic-id-4?comments_limit=0&reply_limit=0',
+    );
+  });
+
+  it('a file without an id is found by its index with the shown title; a wrong key, a missing or unsafe URL → unavailable', async () => {
+    const body = withFiles([{ type: 'text', content: '' }, file(undefined, 'https://example.invalid/file'), file('bad', 'javascript:x')]);
+    const { http } = client(() => ({ status: 200, body }));
+    expect(await PostRepository.fileTarget(http, 'b', 'p', 'file@1', { title: 'f' })).toEqual({
+      kind: 'ok',
+      target: 'https://example.invalid/file?sig=REDACTED',
+    });
+    expect(await PostRepository.fileTarget(http, 'b', 'p', 'file@0')).toEqual({ kind: 'unavailable' });
+    expect(await PostRepository.fileTarget(http, 'b', 'p', 'file:gone')).toEqual({ kind: 'unavailable' });
+    expect(await PostRepository.fileTarget(http, 'b', 'p', 'file:bad')).toEqual({ kind: 'unavailable' });
+  });
+
+  it('an id-less file whose title changed at that index (an edited post) → unavailable, never another file\'s link', async () => {
+    const body = withFiles([{ type: 'text', content: '' }, { type: 'file', title: 'other.zip', url: 'https://example.invalid/other' }]);
+    const { http } = client(() => ({ status: 200, body }));
+    expect(await PostRepository.fileTarget(http, 'b', 'p', 'file@1', { title: 'report.pdf' })).toEqual({ kind: 'unavailable' });
+    expect(await PostRepository.fileTarget(http, 'b', 'p', 'file@1', { title: ' other.zip ' })).toEqual({
+      kind: 'ok',
+      target: 'https://example.invalid/other?sig=REDACTED',
+    });
+  });
+
+  it('an empty or missing signedQuery → unavailable (the bare file URL answers 403, live)', async () => {
+    for (const extra of [{ signedQuery: '' }, { signedQuery: '?' }, { signedQuery: null }]) {
+      const { http } = client(() => ({ status: 200, body: withFiles([file('f1', 'https://example.invalid/file')], extra) }));
+      expect(await PostRepository.fileTarget(http, 'b', 'p', 'file:f1')).toEqual({ kind: 'unavailable' });
+    }
+  });
+
+  it('locked → locked; 404 → unavailable; other failures reject with their kind', async () => {
+    expect(await PostRepository.fileTarget(client(() => ({ status: 200, body: e8Locked() })).http, 'b', 'p', 'file:f1')).toEqual({
+      kind: 'locked',
+    });
+    expect(await PostRepository.fileTarget(client(() => e8MissingReply()).http, 'b', 'p', 'file:f1')).toEqual({
+      kind: 'unavailable',
+    });
+    const failing = client(() => ({ status: 400, body: { error: 'bad_request' } }));
+    await expect(PostRepository.fileTarget(failing.http, 'b', 'p', 'file:f1')).rejects.toEqual(new AppError('Client'));
+  });
+
+  it('logs nothing of the target', async () => {
+    const logger = createLogger();
+    const { http } = client(() => ({ status: 200, body: withFiles([file('f1', 'https://example.invalid/file')]) }));
+    await PostRepository.fileTarget(http, 'b', 'p', 'file:f1', { logger });
+    expect(JSON.stringify(logger.entries())).not.toMatch(/REDACTED|example\.invalid\/file/);
+  });
+});

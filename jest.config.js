@@ -8,6 +8,11 @@ module.exports = {
   transformIgnorePatterns: [
     'node_modules/(?!((jest-)?react-native[^/]*|@react-native(-community|-tvos)?|@react-navigation|@shopify/flash-list)/)',
   ],
+  // react-native-qrcode-svg imports `react-native-svg/css` (ADR 0014): mocked,
+  // like react-native-svg itself (`__mocks__/react-native-svg.js`).
+  moduleNameMapper: {
+    '^react-native-svg/css$': '<rootDir>/__mocks__/react-native-svg-css.js',
+  },
   setupFiles: [
     '<rootDir>/node_modules/react-native-gesture-handler/jestSetup.js',
     // FlashList's own jest setup: fixed measurements (no native layout in Jest).

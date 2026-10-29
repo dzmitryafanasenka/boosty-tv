@@ -15,6 +15,7 @@ import { StyleSheet } from 'react-native';
 import App, { navigationRef } from '../src/app/App';
 import { queryClient, resetQueryCache } from '../src/app/queryClient';
 import { QUERY_STALE_TIME_MS, queryKeys } from '../src/shared/api';
+import { QR_CLOSE_ID } from '../src/shared/ui';
 import { DEFAULT_FILTER } from '../src/shared/filters';
 import {
   type FixtureReply,
@@ -98,6 +99,20 @@ jest.mock('../src/app/phaseFlags', () => {
     },
   };
 });
+
+/**
+ * Story 6.3: the QrRenderer port records the values it draws (the test reads
+ * the QR target from here; the host tree carries only a testID, so a signed
+ * value never reaches the rendered JSON through the mock).
+ */
+const mockQrValues: string[] = [];
+jest.mock('../src/shared/platform/qrRenderer', () => ({
+  QR_QUIET_ZONE: 16,
+  QrCode: (props: { value: string; testID?: string }) => {
+    mockQrValues.push(props.value);
+    return require('react').createElement('QrCodeMock', { testID: props.testID });
+  },
+}));
 
 const focusMock = requestHostFocus as jest.Mock;
 
@@ -345,7 +360,7 @@ describe('open from Главная (matrix «Text post», «Likes»)', () => {
 });
 
 describe('blocks (matrix «Mixed blocks», «Malformed block»)', () => {
-  it('image, file, audio, poll, unknown: one non-focusable placeholder each, in order; text (and a standalone link\'s text) between them; the video is a MediaRow on top', async () => {
+  it('image, audio, poll, unknown: one non-focusable placeholder each, in order; text (and a standalone link\'s text, with its chip) and a file chip (Story 6.3) between them; the video is a MediaRow on top', async () => {
     e8 = (_req, blogUrl, postId) => ({
       status: 200,
       body: postDetail(blogUrl, postId, [
@@ -366,7 +381,6 @@ describe('blocks (matrix «Mixed blocks», «Malformed block»)', () => {
     expect(visible(root, BLOCK(id, 'ok_video:v1'))).toBe(false);
     const placeholders = [
       [BLOCK(id, 'image:i1'), 'Изображение'],
-      [BLOCK(id, 'file:f1'), 'Файл'],
       [BLOCK(id, 'audio_file:a1'), 'Аудио'],
       [BLOCK(id, 'poll:7'), 'Опрос'],
       [BLOCK(id, 'brand_new_block@8'), 'Блок'],
@@ -386,14 +400,17 @@ describe('blocks (matrix «Mixed blocks», «Malformed block»)', () => {
       VIDEO(id, 'v1'),
       BLOCK(id, 'text@1'),
       BLOCK(id, 'link@4'),
+      BLOCK(id, 'link@4/link/0'),
+      BLOCK(id, 'file:f1'),
       BLOCK(id, 'text@9'),
     ]);
     expect(one(root, BLOCK(id, 'link@4')).props.accessibilityLabel).toBe('Link');
+    expect(one(root, BLOCK(id, 'file:f1')).props.accessibilityLabel).toBe('File. Показать QR-код');
     // Order on the page: Between, image, link (as text), file, audio, poll, unknown, After.
     const order = byTestId(root, 'post/body')[0]
       .queryAll(n => typeof n.props.testID === 'string' && n.props.testID.startsWith(`post/${id}/block/`) && !n.props.testID.endsWith('/scale'))
       .map(n => n.props.testID as string);
-    expect([...new Set(order)]).toEqual([
+    expect([...new Set(order)].filter(o => !/\/(links|busy|guide)$|\/link\/0$/.test(o))).toEqual([
       BLOCK(id, 'text@1'),
       BLOCK(id, 'image:i1'),
       BLOCK(id, 'link@4'),
@@ -412,7 +429,7 @@ describe('blocks (matrix «Mixed blocks», «Malformed block»)', () => {
     await unmount(root);
   });
 
-  it('an inline link (matrix «Inline link»): one paragraph with the link text, no placeholder', async () => {
+  it('an inline link (matrix «Inline link»): one paragraph with the link text, no placeholder; its LinkChip under it (Story 6.3)', async () => {
     e8 = (_req, blogUrl, postId) => ({
       status: 200,
       body: postDetail(blogUrl, postId, [
@@ -424,7 +441,7 @@ describe('blocks (matrix «Mixed blocks», «Malformed block»)', () => {
     });
     const root = await openFromHome();
     const id = FEED_ID(0);
-    expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, 'text@0')]);
+    expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, 'text@0'), BLOCK(id, 'text@0/link/0')]);
     expect(one(root, BLOCK(id, 'text@0')).props.accessibilityLabel).toBe('Подробнее здесь и ниже.');
     expect(pageText(root)).not.toContain('Ссылка');
     await unmount(root);
@@ -445,7 +462,7 @@ describe('blocks (matrix «Mixed blocks», «Malformed block»)', () => {
     const root = await openFromHome();
     const id = FEED_ID(0);
     const block = BLOCK(id, 'text@0');
-    expect(contentIds(root)).toEqual([AUTHOR(id), block]);
+    expect(contentIds(root)).toEqual([AUTHOR(id), block, `${block}/link/0`]);
     // The accessibility label stays the plain text (the emoji left out).
     expect(one(root, block).props.accessibilityLabel).toBe('Привет мир ссылка хвост');
     const node = byTestId(root, block)[0];
@@ -468,7 +485,7 @@ describe('blocks (matrix «Mixed blocks», «Malformed block»)', () => {
     expect(byTestId(root, emojiId)).toHaveLength(0);
     expect(one(root, block).props.accessibilityLabel).toBe('Привет мир ссылка хвост');
     expect(text(byTestId(root, block)[0])).toContain('хвост');
-    expect(contentIds(root)).toEqual([AUTHOR(id), block]);
+    expect(contentIds(root)).toEqual([AUTHOR(id), block, `${block}/link/0`]);
     await unmount(root);
   });
 
@@ -1739,7 +1756,8 @@ describe('locked posts (Story 3.6, focus-map §4 F)', () => {
     it('a placeholder-only post: scrolls when it overflows, not when it fits', async () => {
       e8 = (_req, blogUrl, postId) => ({
         status: 200,
-        body: postDetail(blogUrl, postId, [{ type: 'file', id: 'f1' }, { type: 'poll', id: 1 }]),
+        // Placeholders only (a file is a chip stop since Story 6.3).
+        body: postDetail(blogUrl, postId, [{ type: 'audio_file', id: 'a1' }, { type: 'poll', id: 1 }]),
       });
       const root = await openFromHome();
       await layoutColumn(root, VIEWPORT);
@@ -1963,6 +1981,392 @@ describe('Story 6.2: images in a post', () => {
     await act(async () => byTestId(root, `${image}/image`)[0].props.onLoad({ nativeEvent: {} }));
     expect(box().width as number).toBeCloseTo(533.33, 1);
     expect(box().backgroundColor).toBe(colors.surface);
+    await unmount(root);
+  });
+});
+
+/* eslint-disable no-script-url -- Story 6.3: unsafe URLs are inputs the code must reject */
+describe('Story 6.3: links, files and external videos via QR', () => {
+  const SECRET = 'SECRETSIGNATURE';
+  const SIGNED = `?user_id=1001&content_id=1002&expire_time=1700003600&sign=${SECRET}`;
+  const FILE_URL = 'https://example.invalid/file/report';
+  const link = (s: string, url: string) => ({ type: 'link', content: JSON.stringify([s, 'unstyled', []]), url });
+  const lastQr = () => mockQrValues[mockQrValues.length - 1];
+  const dialogOpen = (root: Root) => visible(root, 'dialog/qr');
+  const allLogs = () =>
+    JSON.stringify([
+      logger.entries(),
+      (console.log as jest.Mock).mock.calls,
+      (console.warn as jest.Mock).mock.calls,
+      (console.error as jest.Mock).mock.calls,
+    ]);
+  const cacheText = () => JSON.stringify(queryClient.getQueryCache().getAll().map(q => q.state.data ?? null));
+
+  beforeEach(() => {
+    mockQrValues.length = 0;
+  });
+
+  const BLOCKS = [
+    textBlock('Читайте '),
+    link('тут', 'https://example.invalid/a'),
+    textBlock(', '),
+    link('там', 'https://example.invalid/b'),
+    textBlock(' и снова '),
+    link('тут ещё', 'https://example.invalid/a'),
+    textBlock(' '),
+    link('скрипт', 'javascript:alert(1)'),
+    blockEnd(),
+    { type: 'header', content: JSON.stringify(['Раздел', 'unstyled', []]), modificator: '' },
+    ...paragraph('После заголовка'),
+    { type: 'file', id: 'f1', title: 'report.pdf', size: 204800, url: FILE_URL },
+    { type: 'video', url: 'https://youtu.be/dQw4w9WgXcQ' },
+    { type: 'video', url: 'https://example.invalid/video' },
+  ];
+  const withBlocks = (data: unknown[] = BLOCKS) => {
+    e8 = (_req, blogUrl, postId) => ({
+      status: 200,
+      body: postDetail(blogUrl, postId, data, { signedQuery: SIGNED }),
+    });
+  };
+  const ids = (id: string) => ({
+    para: BLOCK(id, 'text@0'),
+    linkA: BLOCK(id, 'text@0/link/0'),
+    linkB: BLOCK(id, 'text@0/link/1'),
+    heading: BLOCK(id, 'header@9'),
+    after: BLOCK(id, 'text@10'),
+    file: BLOCK(id, 'file:f1'),
+    youtube: BLOCK(id, 'video@13'),
+    other: BLOCK(id, 'video@14'),
+  });
+
+  it('matrix «Link», «Header»: inline text + 2 chips (the repeat collapsed, no chip for javascript:); a bold non-focusable heading; chips, file and videos are stops in column order', async () => {
+    withBlocks();
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    const b = ids(id);
+    expect(contentIds(root)).toEqual([AUTHOR(id), b.para, b.linkA, b.linkB, b.after, b.file, b.youtube, b.other]);
+    expect(one(root, b.para).props.accessibilityLabel).toBe('Читайте тут, там и снова тут ещё скрипт');
+    expect(one(root, b.linkA).props.accessibilityLabel).toBe('тут. Показать QR-код');
+    expect(one(root, b.linkB).props.accessibilityLabel).toBe('там. Показать QR-код');
+    expect(text(byTestId(root, b.linkA)[0])).toContain('QR');
+    // LinkChip: a 32 dp pill on `surface-raised`.
+    const surface = byTestId(root, `${b.linkA}/scale`)[0];
+    expect(StyleSheet.flatten(surface.props.style)).toMatchObject({ height: 32, backgroundColor: colors['surface-raised'] });
+    // The heading: shown, bold (section, SemiBold), never focusable; the next paragraph is separate.
+    const heading = byTestId(root, b.heading)[0];
+    expect(heading.props.focusable).toBe(false);
+    expect(text(heading)).toContain('Раздел');
+    const headingText = heading.queryAll((n: any) => n.props.accessibilityRole === 'header')[0];
+    expect(StyleSheet.flatten(headingText.props.style)).toMatchObject({ fontFamily: 'GolosText-SemiBold' });
+    expect(one(root, b.after).props.accessibilityLabel).toBe('После заголовка');
+    // Initial focus unchanged: the first stop (the paragraph).
+    expect(lastFocusTarget()).toBe(b.para);
+    await unmount(root);
+  });
+
+  it('matrix «Open QR», «Close»: OK on a link chip → the QrDialog (title, QR of the URL, «Откроется на телефоне», «Закрыть» focused, trapped); Back closes it, focus back on the chip; the next Back pops', async () => {
+    withBlocks();
+    const root = await openFromHome();
+    const b = ids(FEED_ID(0));
+    focusMock.mockClear();
+    await press(root, b.linkB);
+    expect(dialogOpen(root)).toBe(true);
+    expect(currentRoute()).toBe('Post');
+    expect(lastQr()).toBe('https://example.invalid/b');
+    const [content] = byTestId(root, 'modal/content');
+    const dialogText = text(content);
+    expect(dialogText).toContain('там');
+    expect(dialogText).toContain('Откроется на телефоне');
+    expect(focusableIds(root, content)).toEqual([QR_CLOSE_ID]);
+    expect(one(root, QR_CLOSE_ID).props.hasTVPreferredFocus).toBe(true);
+    expect(focusTargets()).toContain(QR_CLOSE_ID);
+    const [trap] = byTestId(root, 'modal/trap');
+    expect(trap.props).toMatchObject({ trapFocusUp: true, trapFocusDown: true, trapFocusLeft: true, trapFocusRight: true });
+    expect(byTestId(root, 'modal/background')[0].props.importantForAccessibility).toBe('no-hide-descendants');
+    // Nothing was requested and nothing opened on the TV.
+    expect(e8Calls()).toHaveLength(1);
+    focusMock.mockClear();
+    await back();
+    expect(dialogOpen(root)).toBe(false);
+    expect(currentRoute()).toBe('Post');
+    expect(lastFocusTarget()).toBe(b.linkB);
+    await back();
+    expect(currentRoute()).toBe('Shell');
+    await unmount(root);
+  });
+
+  it('device fix: every chip sits in a full-measure autoFocus guide (↓ from a wide paragraph reaches a narrow chip right below it)', async () => {
+    withBlocks();
+    const root = await openFromHome();
+    const b = ids(FEED_ID(0));
+    for (const guide of [`${b.linkA}/guide`, `${b.file}/guide`, `${b.youtube}/guide`, `${b.other}/guide`]) {
+      const [node] = byTestId(root, guide);
+      expect(node.props.autoFocus).toBe(true);
+      expect(StyleSheet.flatten(node.props.style)).toMatchObject({ alignSelf: 'stretch', maxWidth: spacing['text-measure'] });
+    }
+    // Both link chips share their paragraph's guide.
+    const [row] = byTestId(root, `${b.linkA}/guide`);
+    expect(focusableIds(root, row)).toEqual([b.linkA, b.linkB]);
+    await unmount(root);
+  });
+
+  it('«Закрыть» closes the dialog, focus back on the chip', async () => {
+    withBlocks();
+    const root = await openFromHome();
+    const b = ids(FEED_ID(0));
+    await press(root, b.linkA);
+    expect(lastQr()).toBe('https://example.invalid/a');
+    focusMock.mockClear();
+    await press(root, QR_CLOSE_ID);
+    expect(dialogOpen(root)).toBe(false);
+    expect(lastFocusTarget()).toBe(b.linkA);
+    expect(currentRoute()).toBe('Post');
+    await unmount(root);
+  });
+
+  it('matrix «File», «Privacy»: «report.pdf · 200 КБ»; OK → one fresh E8 → QR of url + signedQuery, never in text, logs or the cache; close → the chip', async () => {
+    withBlocks();
+    const root = await openFromHome();
+    const b = ids(FEED_ID(0));
+    expect(text(byTestId(root, b.file)[0])).toContain('report.pdf · 200 КБ');
+    expect(one(root, b.file).props.accessibilityLabel).toBe('report.pdf · 200 КБ. Показать QR-код');
+    expect(e8Calls()).toHaveLength(1);
+    focusMock.mockClear();
+    await press(root, b.file);
+    expect(e8Calls()).toHaveLength(2);
+    expect(dialogOpen(root)).toBe(true);
+    expect(lastQr()).toBe(`${FILE_URL}${SIGNED}`);
+    expect(text(byTestId(root, 'modal/content')[0])).toContain('report.pdf');
+    // The signed value is drawn only: not in the tree, the logs or any query cache entry.
+    expect(text(root)).not.toContain(SECRET);
+    expect(text(root)).not.toContain(FILE_URL);
+    expect(allLogs()).not.toContain(SECRET);
+    expect(allLogs()).not.toContain(FILE_URL);
+    expect(cacheText()).not.toContain(SECRET);
+    expect(cacheText()).not.toContain(FILE_URL);
+    await back();
+    expect(dialogOpen(root)).toBe(false);
+    expect(lastFocusTarget()).toBe(b.file);
+    await unmount(root);
+  });
+
+  it('matrix «File» error: busy while E8 runs (a second OK sends nothing); a failure → «Не удалось открыть файл» on the chip, no dialog; OK again retries', async () => {
+    withBlocks();
+    const root = await openFromHome();
+    const b = ids(FEED_ID(0));
+    const pending = deferred();
+    e8 = () => pending.promise as never;
+    await press(root, b.file);
+    expect(visible(root, `${b.file}/busy`)).toBe(true);
+    expect(one(root, b.file).props.accessibilityLabel).toBe('report.pdf · 200 КБ. Загружаем ссылку');
+    await press(root, b.file);
+    expect(e8Calls()).toHaveLength(2);
+    await act(async () => pending.resolve({ status: 500, body: {} }));
+    await settle(WITH_TIMERS);
+    expect(dialogOpen(root)).toBe(false);
+    expect(visible(root, `${b.file}/busy`)).toBe(false);
+    expect(text(byTestId(root, `${b.file}/error`)[0])).toContain('Не удалось открыть файл');
+    expect(one(root, b.file).props.accessibilityLabel).toBe('report.pdf · 200 КБ. Не удалось открыть файл. Показать QR-код');
+    // The chip and the focus order are unchanged.
+    expect(contentIds(root)).toContain(b.file);
+    withBlocks();
+    await press(root, b.file);
+    expect(dialogOpen(root)).toBe(true);
+    expect(visible(root, `${b.file}/error`)).toBe(false);
+    expect(lastQr()).toBe(`${FILE_URL}${SIGNED}`);
+    await unmount(root);
+  });
+
+  it('an id-less file (`file@<n>`): OK opens the dialog with url + signedQuery (found by index and title)', async () => {
+    withBlocks([...paragraph('Файл без id'), { type: 'file', title: 'report.pdf', size: 204800, url: FILE_URL }]);
+    const root = await openFromHome();
+    const chip = BLOCK(FEED_ID(0), 'file@2');
+    expect(one(root, chip).props.accessibilityLabel).toBe('report.pdf · 200 КБ. Показать QR-код');
+    await press(root, chip);
+    expect(dialogOpen(root)).toBe(true);
+    expect(lastQr()).toBe(`${FILE_URL}${SIGNED}`);
+    await unmount(root);
+  });
+
+  it('a file gone from the fresh E8 (or a locked one) → the inline error, no dialog', async () => {
+    withBlocks();
+    const root = await openFromHome();
+    const b = ids(FEED_ID(0));
+    withBlocks(paragraph('Файл удалён'));
+    await press(root, b.file);
+    expect(dialogOpen(root)).toBe(false);
+    expect(visible(root, `${b.file}/error`)).toBe(true);
+    expect(mockQrValues).toHaveLength(0);
+    await unmount(root);
+  });
+
+  it('a locked fresh E8 → «Нет доступа к файлу» on the chip (not the generic error), no dialog', async () => {
+    withBlocks();
+    const root = await openFromHome();
+    const b = ids(FEED_ID(0));
+    e8 = (_req, blogUrl, postId) => ({
+      status: 200,
+      body: postDetail(blogUrl, postId, [], { hasAccess: false, signedQuery: '' }),
+    });
+    await press(root, b.file);
+    expect(dialogOpen(root)).toBe(false);
+    expect(text(byTestId(root, `${b.file}/error`)[0])).toContain('Нет доступа к файлу');
+    expect(text(byTestId(root, `${b.file}/error`)[0])).not.toContain('Не удалось открыть файл');
+    expect(one(root, b.file).props.accessibilityLabel).toBe('report.pdf · 200 КБ. Нет доступа к файлу. Показать QR-код');
+    expect(mockQrValues).toHaveLength(0);
+    await unmount(root);
+  });
+
+  it('a file E8 that lands after Пост lost focus (a Boosty post link pushed another Пост): no dialog, no QR value, no focus jump', async () => {
+    const LINKED = 'linked-post';
+    e8 = (_req, blogUrl, postId) => ({
+      status: 200,
+      body:
+        postId === LINKED
+          ? postDetail(blogUrl, postId, paragraph('Связанный пост'))
+          : postDetail(blogUrl, postId, [
+              textBlock('См. '),
+              link('другой пост', `https://boosty.to/${FEED_BLOG}/posts/${LINKED}`),
+              blockEnd(),
+              { type: 'file', id: 'f1', title: 'report.pdf', size: 204800, url: FILE_URL },
+            ], { signedQuery: SIGNED }),
+    });
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    const fileChip = BLOCK(id, 'file:f1');
+    const postChip = BLOCK(id, 'text@0/link/0');
+    const pending = deferred();
+    const live = e8;
+    e8 = (req, blogUrl, postId) => (postId === id ? (pending.promise as never) : live(req, blogUrl, postId));
+    await press(root, fileChip);
+    expect(visible(root, `${fileChip}/busy`)).toBe(true);
+    await press(root, postChip);
+    expect(routeNames()).toEqual(['Shell', 'Post', 'Post']);
+    focusMock.mockClear();
+    await act(async () =>
+      pending.resolve({
+        status: 200,
+        body: postDetail(FEED_BLOG, id, [{ type: 'file', id: 'f1', title: 'report.pdf', url: FILE_URL }], { signedQuery: SIGNED }),
+      }),
+    );
+    await settle(WITH_TIMERS);
+    expect(dialogOpen(root)).toBe(false);
+    expect(mockQrValues).toHaveLength(0);
+    expect(focusTargets()).toEqual([]);
+    expect(routeNames()).toEqual(['Shell', 'Post', 'Post']);
+    await unmount(root);
+  });
+
+  it('matrix «YouTube»: a chip with the thumbnail (plain {uri}, no headers); a failed thumbnail leaves the text; OK → QR of the page, never played', async () => {
+    withBlocks();
+    const root = await openFromHome();
+    const b = ids(FEED_ID(0));
+    const thumb = byTestId(root, `${b.youtube}/thumb`)[0];
+    expect(thumb.props.source).toEqual({ uri: 'https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg' });
+    expect(thumb.props.focusable).toBe(false);
+    expect(one(root, b.youtube).props.accessibilityLabel).toBe('Видео на YouTube. Показать QR-код');
+    await act(async () => thumb.props.onError({ nativeEvent: {} }));
+    expect(visible(root, `${b.youtube}/thumb`)).toBe(false);
+    expect(text(byTestId(root, b.youtube)[0])).toContain('Видео на YouTube');
+    await press(root, b.youtube);
+    expect(lastQr()).toBe('https://youtu.be/dQw4w9WgXcQ');
+    expect(currentRoute()).toBe('Post');
+    await back();
+    expect(lastFocusTarget()).toBe(b.youtube);
+    await unmount(root);
+  });
+
+  it('matrix «Other video»: a text chip («Внешнее видео»), no thumbnail; QR to the page', async () => {
+    withBlocks();
+    const root = await openFromHome();
+    const b = ids(FEED_ID(0));
+    expect(visible(root, `${b.other}/thumb`)).toBe(false);
+    expect(text(byTestId(root, b.other)[0])).toContain('Внешнее видео');
+    await press(root, b.other);
+    expect(lastQr()).toBe('https://example.invalid/video');
+    await unmount(root);
+  });
+
+  it('matrix «Boosty post link» (owner decision 2026-10-29): «<text> · Открыть», no QR; OK pushes that Пост (same sidebar origin); Back → the same chip; a link to the current post stays a QR chip', async () => {
+    e8 = (_req, blogUrl, postId) => ({
+      status: 200,
+      body:
+        postId === 'linked-post'
+          ? postDetail(blogUrl, postId, paragraph('Связанный пост'))
+          : postDetail(blogUrl, postId, [
+              textBlock('См. '),
+              link('другой пост', `https://boosty.to/${FEED_BLOG}/posts/linked-post?share=post_link`),
+              textBlock(' и '),
+              link('этот пост', `https://boosty.to/${FEED_BLOG}/posts/${postId}`),
+              textBlock(' и '),
+              link('блог', `https://boosty.to/${FEED_BLOG}`),
+              blockEnd(),
+            ]),
+    });
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    const other = BLOCK(id, 'text@0/link/0');
+    const self = BLOCK(id, 'text@0/link/1');
+    const blog = BLOCK(id, 'text@0/link/2');
+    expect(text(byTestId(root, other)[0])).toContain('другой пост');
+    expect(text(byTestId(root, `${other}/action`)[0])).toContain('· Открыть');
+    expect(text(byTestId(root, other)[0])).not.toContain('"QR"');
+    expect(one(root, other).props.accessibilityLabel).toBe('другой пост. Открыть пост');
+    expect(one(root, self).props.accessibilityLabel).toBe('этот пост. Показать QR-код');
+    expect(one(root, blog).props.accessibilityLabel).toBe('блог. Показать QR-код');
+    // The current post and a blog page keep the QR.
+    await press(root, self);
+    expect(dialogOpen(root)).toBe(true);
+    expect(lastQr()).toBe(`https://boosty.to/${FEED_BLOG}/posts/${id}`);
+    await back();
+    expect(dialogOpen(root)).toBe(false);
+    expect(routeNames()).toEqual(['Shell', 'Post']);
+    // OK on the other post's chip: that Пост on top, no dialog, same sidebar origin.
+    await press(root, other);
+    expect(dialogOpen(root)).toBe(false);
+    expect(routeNames()).toEqual(['Shell', 'Post', 'Post']);
+    expect(navigationRef.getCurrentRoute()?.params).toEqual({ blogUrl: FEED_BLOG, postId: 'linked-post', section: 'home' });
+    expect(e8Calls().map(c => c.path)).toContain(`/v1/blog/${FEED_BLOG}/post/linked-post`);
+    expect(visible(root, 'post/nav/home/current')).toBe(true);
+    focusMock.mockClear();
+    await back();
+    expect(routeNames()).toEqual(['Shell', 'Post']);
+    expect(lastFocusTarget()).toBe(other);
+    await unmount(root);
+  });
+
+  it('matrix «Timestamp» with the player off (phaseFlags): a timestamp link to this post\'s video keeps its QR chip', async () => {
+    e8 = (_req, blogUrl, postId) => ({
+      status: 200,
+      body: postDetail(blogUrl, postId, [
+        { type: 'ok_video', id: 'v1', title: 'Video', playerUrls: [] },
+        textBlock('Таймкоды: '),
+        link('3:45 Тема', `https://boosty.to/${blogUrl}/posts/${postId}?t=225&tmid=v1`),
+        blockEnd(),
+      ]),
+    });
+    const root = await openFromHome();
+    const chip = BLOCK(FEED_ID(0), 'text@1/link/0');
+    expect(one(root, chip).props.accessibilityLabel).toBe('3:45 Тема. Показать QR-код');
+    await press(root, chip);
+    expect(dialogOpen(root)).toBe(true);
+    expect(currentRoute()).toBe('Post');
+    await unmount(root);
+  });
+
+  it('a locked post keeps Story 3.6: its teaser link stays inline text, no chip', async () => {
+    e8 = (_req, blogUrl, postId) => ({
+      status: 200,
+      body: postDetail(blogUrl, postId, [], {
+        hasAccess: false,
+        signedQuery: '',
+        teaser: [textBlock('Тизер '), link('ссылка', 'https://example.invalid/a'), blockEnd()],
+      }),
+    });
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, 'text@0')]);
+    expect(visible(root, BLOCK(id, 'text@0/link/0'))).toBe(false);
     await unmount(root);
   });
 });

@@ -183,10 +183,24 @@ test('Story 3.4: Пост answers E8 in demo mode (paragraphs and likes, mixed b
     root.container.queryAll(n => n.props.focusable === true).map(n => n.props.testID as string);
   const text = () => JSON.stringify(root.container.toJSON());
   await press(root, 'home/feed/demo-post-1');
-  // demo-post-1: 4 paragraphs, then the mixed placeholders and one more paragraph.
-  expect(ids().filter(id => id.startsWith('post/demo-post-1/block/'))).toHaveLength(5);
+  // demo-post-1: 4 paragraphs, then the mixed placeholders, one more
+  // paragraph with its LinkChip, a file and an external video (Story 6.3).
+  expect(ids().filter(id => id.startsWith('post/demo-post-1/block/'))).toEqual([
+    'post/demo-post-1/block/text@1',
+    'post/demo-post-1/block/text@3',
+    'post/demo-post-1/block/text@5',
+    'post/demo-post-1/block/text@7',
+    'post/demo-post-1/block/text@10',
+    'post/demo-post-1/block/text@10/link/0',
+    'post/demo-post-1/block/file:demo-file-1',
+    'post/demo-post-1/block/video@16',
+  ]);
   expect(text()).toContain('лайк');
   expect(text()).toContain(t('post.block.poll'));
+  expect(text()).toContain('Файлы и видео');
+  // Story 6.3: the demo file's QR opens from the demo E8, nothing goes to the network.
+  await press(root, 'post/demo-post-1/block/file:demo-file-1');
+  expect(text()).toContain(t('qr.hint'));
   await act(async () => {
     root.unmount();
   });
