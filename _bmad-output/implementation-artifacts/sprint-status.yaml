@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 10-25-2026 14:34
-last_updated: 10-29-2026 18:36
+last_updated: 10-29-2026 19:04
 project: Boosty TV
 project_key: NOKEY
 tracking_system: file-system
@@ -90,7 +90,7 @@ development_status:
   6-1-rich-text-emoji-and-long-posts: done
   6-2-images-in-posts: done
   6-3-links-files-and-external-videos-via-qr: done
-  6-4-inline-audio: review
+  6-4-inline-audio: done
   6-5-poll-display: backlog
   6-6-vote-and-retract-in-a-single-choice-poll: backlog
   6-7-multiple-choice-poll: backlog
