@@ -1,0 +1,37 @@
+{
+  "case": "e10-poll",
+  "status": 200,
+  "body": {
+    "data": {
+      "poll": {
+        "answer": [
+          1022
+        ],
+        "counter": 5,
+        "defaultLang": "redacted",
+        "hasOther": false,
+        "id": 1020,
+        "isFinished": false,
+        "isMultiple": false,
+        "options": [
+          {
+            "counter": 0,
+            "fraction": 0,
+            "id": 1021,
+            "text": "redacted"
+          },
+          {
+            "counter": 5,
+            "fraction": 100,
+            "id": 1022,
+            "text": "redacted"
+          }
+        ],
+        "title": [
+          "redacted"
+        ],
+        "other": "redacted"
+      }
+    }
+  }
+}

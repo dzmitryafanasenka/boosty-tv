@@ -13,7 +13,8 @@
  *   synthetic (1001–9999), times are synthetic (base + n hours), sizes are
  *   multiples of 100 KiB, durations and time codes are whole minutes,
  *   structural numbers (paging, dimensions, statuses) are kept, a poll
- *   option's `fraction` (a percent) is 0 or 100, and every other number is
+ *   option's `fraction` (a percent) is 0 or 100, a poll's `answer` (the
+ *   chosen option ids) holds synthetic ids, and every other number is
  *   0 or the synthetic count;
  * - an `@`-email;
  * - any string that is not a placeholder, a synthetic value or an
@@ -36,7 +37,8 @@ const ENUM_VALUE = /^[A-Za-z][A-Za-z0-9_.-]{0,39}$/;
 const CASE_VALUE = /^[a-z0-9-]{1,40}$/;
 const SAFE_KEY = /^[A-Za-z_$][\w$-]{0,40}$/;
 // Number rules: keep in sync with createFixtureSanitizer (contentShapesApi.ts).
-const ID_KEY = /^(id|int_id|vid|uuid)$|Id$|_id$/;
+// Story 6.6: a poll's `answer` array holds option ids (each element is checked under the key `answer`).
+const ID_KEY = /^(id|int_id|vid|uuid|answer)$|Id$|_id$/;
 const PHONE_KEY = /phone/i;
 const TIME_KEY = /(At|Time|_at|_time|_ts|Timestamp|timestamp)$/;
 const SIZE_KEY = /^(size|fileSize|file_size)$/;

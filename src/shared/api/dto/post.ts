@@ -215,6 +215,21 @@ export const pollDtoSchema = z.object({
   options: z.array(z.unknown()).min(1),
 });
 
+/**
+ * Story 6.6: the E10 envelope (`GET /v1/blog/{blogUrl}/poll/{pollId}`,
+ * api-contract §3: `data.poll`, `REF`; the live shape is verified by the
+ * orchestrator's read-only probe, see api-contract §4.2 «Polls (LIVE)»).
+ * Lenient: any other key is ignored and `poll` stays `unknown` here, so
+ * `mapPoll` (one mapper, the same drop rules as the post's poll) decides.
+ * A body without `data.poll` is `Parse`, and the caller falls back to
+ * refetching the post (E8).
+ */
+export const pollRefreshDtoSchema = z.object({
+  data: z.object({
+    poll: z.unknown(),
+  }),
+});
+
 /** `list` (`LIVE`, Story 1.5): `items[]{data: ContentBlock[], items[]}`. */
 export const listBlockDtoSchema = z.object({
   type: z.literal('list'),
