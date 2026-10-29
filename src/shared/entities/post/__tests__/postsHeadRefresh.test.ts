@@ -1,5 +1,6 @@
 import { InfiniteQueryObserver, QueryClient } from '@tanstack/react-query';
 import { AppError, QUERY_STALE_TIME_MS, queryKeys } from '../../../api';
+import { DEFAULT_FILTER } from '../../../filters';
 import { createLogger } from '../../../services/logger';
 import {
   mergePostsHead,
@@ -9,8 +10,8 @@ import {
 } from '../postsHeadRefresh';
 import type { Post, PostPage } from '../types';
 
-const KEY_A = queryKeys.authorPosts('blog-a');
-const KEY_B = queryKeys.authorPosts('blog-b');
+const KEY_A = queryKeys.authorPosts('blog-a', DEFAULT_FILTER);
+const KEY_B = queryKeys.authorPosts('blog-b', DEFAULT_FILTER);
 const T0 = 1_000_000;
 
 const post = (id: string) => ({ id }) as Post;

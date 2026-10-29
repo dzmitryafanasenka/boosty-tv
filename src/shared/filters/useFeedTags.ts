@@ -35,9 +35,10 @@ function nextTagCursor(last: TagPage, used: ReadonlyArray<string | null>): strin
  * the page param. Pages load only on an explicit «Загрузить ещё» (no
  * auto-load on scroll). `refetchOnMount: false` (a refetch reloads every
  * loaded page) and no query-level retry (HttpClient owns AD-6). Mounted
- * only while the tag level is open: the first open sends page 1.
+ * only while the tag level is open: the first open sends page 1. `enabled`
+ * false (Story 5.7, an Author scope shows its blog's tags): no request.
  */
-export function useFeedTags(http: HttpClient): FeedTags {
+export function useFeedTags(http: HttpClient, enabled: boolean = true): FeedTags {
   const query = useInfiniteQuery({
     queryKey: queryKeys.feedTags(),
     queryFn: ({ pageParam }): Promise<TagPage> => TagRepository.feedTagsPage(http, pageParam),
@@ -45,6 +46,7 @@ export function useFeedTags(http: HttpClient): FeedTags {
     getNextPageParam: (last, _all, _lastParam, allParams) => nextTagCursor(last, allParams),
     refetchOnMount: false,
     retry: false,
+    enabled,
   });
   const { data, status, error, isFetching } = query;
   const tags = useMemo(() => (data ? mergeTags(...data.pages.map(page => page.tags)) : []), [data]);

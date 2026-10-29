@@ -20,6 +20,7 @@ import {
   type FixtureRequest,
   type FixtureTransport,
 } from '../src/shared/api/fixtureTransport';
+import { DEFAULT_FILTER, filtersStore, getFilter } from '../src/shared/filters';
 import { focusRestoration } from '../src/shared/focus';
 import { t } from '../src/shared/i18n';
 import { logger } from '../src/shared/services/logger';
@@ -101,10 +102,18 @@ const SYN = (n: number) => CARD(`blog-post-${n}`);
 const RETRY = `author/${BLOG}/retry`;
 const ACTION = 'state/author/action';
 const SIDEBAR_SUBS = 'author/nav/subs';
+/** Story 5.7: the action row (the field's host view is the focus target). */
+const FIELD = `author/${BLOG}/action/search`;
+const FIELD_HOST = `${FIELD}/host`;
+const CHIP = `author/${BLOG}/action/filters`;
+const RESET = `author/${BLOG}/action/reset`;
 
 type Reply = FixtureReply | Promise<FixtureReply> | undefined;
 let e3: (req: FixtureRequest) => Reply;
 let e4: (req: FixtureRequest) => Reply;
+/** Story 5.7: E7 blog search and E14 blog tags. */
+let e7: (req: FixtureRequest) => Reply;
+let e14: (req: FixtureRequest) => Reply;
 let transport: FixtureTransport;
 
 beforeAll(() => {
@@ -136,7 +145,15 @@ beforeEach(() => {
     }),
   });
   e4 = syntheticBlogPosts({ blogUrl: BLOG, total: 7 });
+  e7 = () => undefined;
+  e14 = () => undefined;
   transport = installFixtureTransport(req => {
+    if (req.path === '/v1/search/blog/post/') {
+      return e7(req);
+    }
+    if (/^\/v1\/blog\/[^/]+\/post\/tag\/$/.test(req.path)) {
+      return e14(req);
+    }
     if (req.path === E1) {
       return { status: 200, body: e1NoBlogBody() };
     }
@@ -157,6 +174,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  filtersStore.getState().clear();
   await resetQueryCache();
   clearNativeModules();
   focusRestoration.clear();
@@ -202,7 +220,7 @@ async function openAuthor(n = 1, settleOverrides?: { timerRounds: number }) {
 async function changeAuthorPosts(change: (ids: string[]) => string[]) {
   await act(async () => {
     type Data = { pages: Array<{ posts: Array<{ id: string }>; nextCursor: string | null }> };
-    queryClient.setQueryData<Data>(queryKeys.authorPosts(BLOG), data => {
+    queryClient.setQueryData<Data>(queryKeys.authorPosts(BLOG, DEFAULT_FILTER), data => {
       if (!data) {
         return data;
       }
@@ -229,7 +247,7 @@ describe('open from Подписки (matrix «Loaded»)', () => {
     expect(e4Calls()).toHaveLength(1);
     expect(e3Calls()[0].url).toBe(`https://api.boosty.to/v1/blog/${BLOG}`);
     expect(e4Calls()[0].url).toBe(
-      `https://api.boosty.to/v1/blog/${BLOG}/post/?limit=20&comments_limit=0&reply_limit=0`,
+      `https://api.boosty.to/v1/blog/${BLOG}/post/?limit=20&comments_limit=0&reply_limit=0&is_only_allowed=true&only_bought=false`,
     );
     for (const call of [...e3Calls(), ...e4Calls()]) {
       expect(call.headers.Authorization).toBe(`Bearer ${'a'.repeat(64)}`);
@@ -238,7 +256,8 @@ describe('open from Подписки (matrix «Loaded»)', () => {
     }
     // No comment, search, tag or filter parameter, no other endpoint.
     expect(transport.calls.every(c => !/comment|search|tags|is_only_allowed|from_ts/.test(c.path))).toBe(true);
-    expect(e4Calls()[0].url).not.toMatch(/is_only_allowed|tags_ids|from_ts|to_ts/);
+    // Story 5.7: the default Filter's access params only (owner decision Q2 a).
+    expect(e4Calls()[0].url).not.toMatch(/tags_ids|from_ts|to_ts/);
     // Header: title and owner, not focusable; no price, cover or subscribe action.
     const header = byTestId(root, 'author/header')[0];
     expect(text(header)).toContain('Blog Title');
@@ -325,14 +344,16 @@ describe('open from Подписки (matrix «Loaded»)', () => {
 });
 
 describe('content (matrix «No posts», «Locked posts», «Malformed post»)', () => {
-  it('no posts: header + «Публикаций нет»; nothing focusable in content; focus stays on the sidebar', async () => {
+  it('no posts: header + «Публикаций нет»; only the action row in content; focus stays on the sidebar', async () => {
     e4 = () => ({ status: 200, body: { data: [], extra: { isLast: true } } });
     const root = await openAuthor();
     expect(visible(root, 'author/header')).toBe(true);
     expect(visible(root, 'author/empty')).toBe(true);
     expect(text(root)).toContain(t('author.emptyTitle'));
+    // The chip is focusable only while the action row has focus; the field is a text input.
     expect(focusableIds(root, byTestId(root, 'author/content')[0])).toEqual([]);
-    expect(destinationIds('author/content')).toEqual([]);
+    expect(visible(root, FIELD)).toBe(true);
+    expect(destinationIds('author/content')).toEqual([FIELD_HOST]);
     expect(focusTargets().filter(Boolean)).toEqual([SIDEBAR_SUBS]);
     await unmount(root);
   });
@@ -471,7 +492,7 @@ describe('errors (matrix «Missing blog», «E3 fails», «E4 page 1/N fails»)'
     await unmount(root);
   });
 
-  it('E3 retry succeeds while E4 page 1 still loads: the action is gone, focus → author/nav/subs', async () => {
+  it('E3 retry succeeds while E4 page 1 still loads: the action is gone, focus → the search field (Story 5.7), then the first post', async () => {
     e3 = () => ({ status: 400, body: {} });
     const posts = deferred();
     e4 = () => posts.promise;
@@ -482,7 +503,7 @@ describe('errors (matrix «Missing blog», «E3 fails», «E4 page 1/N fails»)'
     focusMock.mockClear();
     await press(root, ACTION);
     expect(visible(root, 'author/skeleton')).toBe(true);
-    expect(lastFocusTarget()).toBe(SIDEBAR_SUBS);
+    expect(lastFocusTarget()).toBe(FIELD_HOST);
     posts.resolve(syntheticBlogPosts({ blogUrl: BLOG, total: 7 })({ url: 'x' } as FixtureRequest));
     await settle();
     expect(lastFocusTarget()).toBe(SYN(0));
@@ -508,7 +529,7 @@ describe('errors (matrix «Missing blog», «E3 fails», «E4 page 1/N fails»)'
     await unmount(root);
   });
 
-  it('E4 page 1 fails, «Повторить» returns no posts: «Публикаций нет», focus → author/nav/subs', async () => {
+  it('E4 page 1 fails, «Повторить» returns no posts: «Публикаций нет», focus → the search field (Story 5.7)', async () => {
     e4 = () => ({ status: 400, body: {} });
     const root = await openAuthor();
     expect(visible(root, 'author/posts-error')).toBe(true);
@@ -516,7 +537,7 @@ describe('errors (matrix «Missing blog», «E3 fails», «E4 page 1/N fails»)'
     focusMock.mockClear();
     await press(root, ACTION);
     expect(visible(root, 'author/empty')).toBe(true);
-    expect(lastFocusTarget()).toBe(SIDEBAR_SUBS);
+    expect(lastFocusTarget()).toBe(FIELD_HOST);
     await unmount(root);
   });
 
@@ -830,11 +851,11 @@ describe('account scope', () => {
   it('an account reset (sign-out, account switch) clears the cached author and posts', async () => {
     const root = await openAuthor();
     expect(queryClient.getQueryData(queryKeys.author(BLOG))).toBeDefined();
-    expect(queryClient.getQueryData(queryKeys.authorPosts(BLOG))).toBeDefined();
+    expect(queryClient.getQueryData(queryKeys.authorPosts(BLOG, DEFAULT_FILTER))).toBeDefined();
     await unmount(root);
     await accountScope.reset();
     expect(queryClient.getQueryData(queryKeys.author(BLOG))).toBeUndefined();
-    expect(queryClient.getQueryData(queryKeys.authorPosts(BLOG))).toBeUndefined();
+    expect(queryClient.getQueryData(queryKeys.authorPosts(BLOG, DEFAULT_FILTER))).toBeUndefined();
   });
 });
 
@@ -938,7 +959,7 @@ describe('head refresh on reopen and resume (spec-author-posts-refresh)', () => 
       await reopen();
       expect(e4Calls()).toHaveLength(3);
       expect(e4Calls()[2].url).toBe(
-        `https://api.boosty.to/v1/blog/${BLOG}/post/?limit=20&comments_limit=0&reply_limit=0`,
+        `https://api.boosty.to/v1/blog/${BLOG}/post/?limit=20&comments_limit=0&reply_limit=0&is_only_allowed=true&only_bought=false`,
       );
       const ids = gridPosts();
       expect(ids.slice(0, 3)).toEqual(['new-0', 'new-1', 'blog-post-0']);
@@ -1131,12 +1152,12 @@ describe('head refresh on reopen and resume (spec-author-posts-refresh)', () => 
       expect(visible(root, 'author/empty')).toBe(false);
       expect(authorCards(root)).toContain(SYN(0));
       const cached = queryClient.getQueryData<{ pages: Array<{ posts: Array<{ id: string }> }> }>(
-        queryKeys.authorPosts(BLOG),
+        queryKeys.authorPosts(BLOG, DEFAULT_FILTER),
       );
       expect(cached?.pages.flatMap(p => p.posts.map(x => x.id))).toEqual(
         Array.from({ length: 40 }, (_, i) => `blog-post-${i}`),
       );
-      expect(queryClient.getQueryState(queryKeys.authorPosts(BLOG))?.dataUpdatedAt).toBe(Date.now());
+      expect(queryClient.getQueryState(queryKeys.authorPosts(BLOG, DEFAULT_FILTER))?.dataUpdatedAt).toBe(Date.now());
       expect(focusTargets()).toEqual([SYN(0)]);
       // The next reopen within a staleTime sends nothing.
       await back();
@@ -1157,11 +1178,11 @@ describe('head refresh on reopen and resume (spec-author-posts-refresh)', () => 
 
     it('stale cache, nothing new: no visible change; the fresh copies are written', async () => {
       const { root, reopen } = await reopenAfter(QUERY_STALE_TIME_MS + 1_000);
-      const before = queryClient.getQueryState(queryKeys.authorPosts(BLOG))?.dataUpdatedAt ?? 0;
+      const before = queryClient.getQueryState(queryKeys.authorPosts(BLOG, DEFAULT_FILTER))?.dataUpdatedAt ?? 0;
       await reopen();
       expect(e4Calls()).toHaveLength(3);
       expect(gridPosts()).toEqual(Array.from({ length: 40 }, (_, i) => `blog-post-${i}`));
-      expect(queryClient.getQueryState(queryKeys.authorPosts(BLOG))?.dataUpdatedAt).toBeGreaterThan(
+      expect(queryClient.getQueryState(queryKeys.authorPosts(BLOG, DEFAULT_FILTER))?.dataUpdatedAt).toBeGreaterThan(
         before,
       );
       expect(lastFocusTarget()).toBe(SYN(0));
@@ -1327,7 +1348,7 @@ describe('head refresh on reopen and resume (spec-author-posts-refresh)', () => 
       await act(async () => {
         await Promise.resolve();
       });
-      expect(queryClient.getQueryData(queryKeys.authorPosts(BLOG))).toBeUndefined();
+      expect(queryClient.getQueryData(queryKeys.authorPosts(BLOG, DEFAULT_FILTER))).toBeUndefined();
     });
 
     it('focus on the Author sidebar: the data is merged, focus stays', async () => {
@@ -1431,12 +1452,525 @@ describe('head refresh on reopen and resume (spec-author-posts-refresh)', () => 
       await back(WITH_TIMERS);
       expect(visible(root, 'author')).toBe(false);
       queryClient.setQueryData(
-        queryKeys.authorPosts(BLOG),
+        queryKeys.authorPosts(BLOG, DEFAULT_FILTER),
         { pages: [{ posts: [], nextCursor: null }], pageParams: [null] },
         { updatedAt: Date.now() },
       );
       await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
       expect(e4Calls()).toHaveLength(1);
+      await unmount(root);
+    });
+  });
+});
+
+describe('Story 5.7: search and filters inside an author', () => {
+  /** The same flow with text input (the field) and a settling «Готово». */
+  const f = createFlow({
+    settle: { rounds: 30, timerRounds: 0 },
+    one: 'focusableOrInput',
+    pressFocuses: true,
+    submitSettles: true,
+  });
+  const E7 = '/v1/search/blog/post/';
+  const E14 = e4Path(BLOG).replace(/post\/$/, 'post/tag/');
+  const STATE = ACTION;
+  const searchCalls = () => transport.callsTo(E7);
+  const tagCalls = () => transport.callsTo(E14);
+  const queryOf = (url: string) => {
+    const match = /[?&]search_query=([^&]*)/.exec(url);
+    return match ? decodeURIComponent(match[1]) : null;
+  };
+  /** The locked twin of blog post `n` (E7 ignores the access params, live). */
+  const lockedBlogPost = (n: number) => ({
+    ...lockedPost(),
+    id: `blog-post-${n}`,
+    user: { name: 'A', blogUrl: BLOG },
+  });
+  /** An E7 handler over `total` results (pages of 20); `locked(n)` makes result n locked. */
+  function syntheticBlogSearch(total: number, locked: (n: number) => boolean = () => false) {
+    return (req: FixtureRequest): FixtureReply => {
+      const start = cursorOf(req.url) ?? 0;
+      const end = Math.min(start + 20, total);
+      const searchPosts = Array.from({ length: Math.max(0, end - start) }, (_, i) => ({
+        post: locked(start + i) ? lockedBlogPost(start + i) : blogPost(BLOG, start + i),
+        rank: 5,
+        headline: 'redacted',
+        blog: { blogUrl: BLOG },
+      }));
+      return {
+        status: 200,
+        body: { data: { searchPosts }, extra: { offset: cursorFor(end), isLast: end >= total } },
+      };
+    };
+  }
+  const emptySearch = (): FixtureReply => ({
+    status: 200,
+    body: { data: { searchPosts: [] }, extra: { offset: 'end', isLast: true } },
+  });
+  const scope = () => {
+    const key = navigationRef.getCurrentRoute()?.key;
+    return `author:${key}` as const;
+  };
+
+  /** Type `query` into the field and press «Готово». */
+  async function runSearch(root: Root, query: string) {
+    await f.focusOn(root, FIELD);
+    await f.type(root, FIELD, query);
+    await f.submit(root, FIELD);
+  }
+  /** ↑ to the field, → the chip, OK: the sheet. */
+  async function openSheet(root: Root) {
+    await f.focusOn(root, FIELD);
+    await f.focusOn(root, CHIP);
+    await f.press(root, CHIP);
+    expect(visible(root, 'filters/sheet')).toBe(true);
+  }
+
+  beforeEach(() => {
+    e4 = syntheticBlogPosts({ blogUrl: BLOG, total: 30 });
+    e7 = syntheticBlogSearch(25);
+    e14 = () => ({
+      status: 200,
+      body: {
+        data: [
+          { id: 7, title: 'Тег 7', count: 5 },
+          { id: 3, title: 'Тег 3', count: 5 },
+        ],
+      },
+    });
+  });
+
+  it('Open: E4 with the default access params; the action row (field, chip); no «Сбросить»; focus → the first post', async () => {
+    const root = await openAuthor();
+    expect(e4Calls()[0].url).toContain('&is_only_allowed=true&only_bought=false');
+    expect(visible(root, 'author/action-row')).toBe(true);
+    expect(f.one(root, FIELD).props.accessibilityLabel).toBe(t('author.search.fieldLabel'));
+    expect(text(root)).toContain(t('author.search.fieldLabel'));
+    expect(visible(root, CHIP)).toBe(true);
+    expect(visible(root, RESET)).toBe(false);
+    expect(lastFocusTarget()).toBe(SYN(0));
+    // The chip is focusable only while the row has focus (Поиск's device lesson).
+    expect(focusableIds(root)).not.toContain(CHIP);
+    await f.focusOn(root, FIELD);
+    expect(focusableIds(root)).toContain(CHIP);
+    // ↑ from the first row: the field (the row guide's destination).
+    expect(destinationIds('author/action-row')).toEqual([FIELD_HOST]);
+    expect(searchCalls()).toHaveLength(0);
+    await unmount(root);
+  });
+
+  it('Access values: the Author sheet offers «Доступные мне» and «Все посты» only (owner decision A a)', async () => {
+    const root = await openAuthor();
+    await openSheet(root);
+    expect(visible(root, 'filters/access/allowed')).toBe(true);
+    expect(visible(root, 'filters/access/all')).toBe(true);
+    expect(visible(root, 'filters/access/bought')).toBe(false);
+    await unmount(root);
+  });
+
+  it('Filter: «Все посты» refetches E4 behind the sheet; focus stays; the chip and «Сбросить»; the old list trimmed; Back → the chip', async () => {
+    const root = await openAuthor();
+    await focusOn(root, SYN(15));
+    expect(e4Calls()).toHaveLength(2);
+    const defaultKey = queryKeys.authorPosts(BLOG, DEFAULT_FILTER);
+    expect(queryClient.getQueryData<{ pages: unknown[] }>(defaultKey)?.pages).toHaveLength(2);
+    await openSheet(root);
+    focusMock.mockClear();
+    await f.press(root, 'filters/access/all');
+    const url = e4Calls()[e4Calls().length - 1].url;
+    expect(url).toContain('&is_only_allowed=false&only_bought=false');
+    expect(cursorOf(url)).toBeNull();
+    expect(focusTargets()).toEqual([]);
+    expect(visible(root, 'filters/sheet')).toBe(true);
+    expect(getFilter(scope()).access).toBe('all');
+    // Главная's and Поиск's Filters are untouched.
+    expect(getFilter('feed')).toEqual(DEFAULT_FILTER);
+    expect(getFilter('search')).toEqual(DEFAULT_FILTER);
+    expect(queryClient.getQueryData<{ pages: unknown[] }>(defaultKey)?.pages).toHaveLength(1);
+    expect(byTestId(root, `${CHIP}/count`).length).toBeGreaterThan(0);
+    await back();
+    expect(visible(root, 'filters/sheet')).toBe(false);
+    expect(lastFocusTarget()).toBe(CHIP);
+    expect(visible(root, RESET)).toBe(true);
+    await unmount(root);
+  });
+
+  it('Filter: an E4 error under the new Filter → the page-1 error state behind the sheet', async () => {
+    const root = await openAuthor();
+    await openSheet(root);
+    e4 = () => ({ status: 400, body: {} });
+    focusMock.mockClear();
+    await f.press(root, 'filters/access/all');
+    expect(visible(root, 'author/posts-error')).toBe(true);
+    // The sheet keeps focus; nothing behind it is focused.
+    expect(focusTargets()).toEqual([]);
+    await unmount(root);
+  });
+
+  it('Blog tags: E14 once (no «Загрузить ещё», no E13); a toggle sends `tags_ids` on E4; reopening the level sends nothing', async () => {
+    const root = await openAuthor();
+    await openSheet(root);
+    await f.press(root, 'filters/tags');
+    expect(tagCalls()).toHaveLength(1);
+    expect(transport.callsTo('/v1/search/feed/tag/')).toHaveLength(0);
+    expect(visible(root, 'filters/tag/7')).toBe(true);
+    expect(visible(root, 'filters/tag/3')).toBe(true);
+    expect(visible(root, 'filters/tags/load-more')).toBe(false);
+    await f.press(root, 'filters/tag/7');
+    expect(e4Calls()[e4Calls().length - 1].url).toContain('&tags_ids=7');
+    expect(getFilter(scope()).tags).toEqual([{ id: '7', title: 'Тег 7' }]);
+    await back();
+    await f.press(root, 'filters/tags');
+    expect(tagCalls()).toHaveLength(1);
+    await unmount(root);
+  });
+
+  it('Blog tags: an E14 error → the «Повторить» row; OK reloads E14', async () => {
+    e14 = () => ({ status: 400, body: {} });
+    const root = await openAuthor();
+    await openSheet(root);
+    await f.press(root, 'filters/tags');
+    expect(visible(root, 'filters/tags/retry')).toBe(true);
+    e14 = () => ({ status: 200, body: { data: [{ id: 7, title: 'Тег 7', count: 5 }] } });
+    await f.press(root, 'filters/tags/retry');
+    expect(tagCalls()).toHaveLength(2);
+    expect(visible(root, 'filters/tag/7')).toBe(true);
+    await unmount(root);
+  });
+
+  it('Search: «пирог» + «Готово» → E7 (blog_url, trimmed query, Filter params); skeleton; focus → the first result', async () => {
+    const page = deferred();
+    e7 = () => page.promise;
+    const root = await openAuthor();
+    const e1Before = transport.callsTo(E1).length;
+    await runSearch(root, '  пирог ');
+    expect(searchCalls()).toHaveLength(1);
+    const url = searchCalls()[0].url;
+    expect(queryOf(url)).toBe('пирог');
+    expect(url).toContain(`blog_url=${BLOG}&limit=20&comments_limit=0&reply_limit=0&is_only_allowed=true&only_bought=false`);
+    expect(cursorOf(url)).toBeNull();
+    expect(visible(root, 'author/skeleton')).toBe(true);
+    expect(lastFocusTarget()).toBe(FIELD_HOST);
+    expect(visible(root, RESET)).toBe(true);
+    await act(async () => {
+      page.resolve(syntheticBlogSearch(25)({ url } as FixtureRequest));
+    });
+    await settle();
+    expect(lastFocusTarget()).toBe(SYN(0));
+    expect(gridPosts().slice(0, 3)).toEqual(['blog-post-0', 'blog-post-1', 'blog-post-2']);
+    // No session check for search results.
+    expect(transport.callsTo(E1)).toHaveLength(e1Before);
+    await unmount(root);
+  });
+
+  it('Search: an E7 error → «Повторить» focused; retry → the first result', async () => {
+    e7 = () => ({ status: 400, body: {} });
+    const root = await openAuthor();
+    await runSearch(root, 'пирог');
+    expect(visible(root, 'author/search-error')).toBe(true);
+    expect(lastFocusTarget()).toBe(STATE);
+    e7 = syntheticBlogSearch(5);
+    await f.press(root, STATE);
+    expect(lastFocusTarget()).toBe(SYN(0));
+    await unmount(root);
+  });
+
+  it('Search access (owner decision B a): «Доступные мне» drops locked results; «Все посты» shows them', async () => {
+    e7 = syntheticBlogSearch(6, n => n % 2 === 1);
+    const root = await openAuthor();
+    await runSearch(root, 'пирог');
+    expect(gridPosts()).toEqual(['blog-post-0', 'blog-post-2', 'blog-post-4']);
+    await openSheet(root);
+    await f.press(root, 'filters/access/all');
+    expect(searchCalls()[searchCalls().length - 1].url).toContain('is_only_allowed=false');
+    expect(gridPosts()).toHaveLength(6);
+    await unmount(root);
+  });
+
+  it('Search access: an all-locked page with more pages goes through the auto-fetch rule (3 more), then «Ничего не найдено»', async () => {
+    e7 = syntheticBlogSearch(200, () => true);
+    const root = await openAuthor();
+    await runSearch(root, 'пирог');
+    expect(searchCalls()).toHaveLength(4);
+    expect(visible(root, 'author/search-empty')).toBe(true);
+    expect(lastFocusTarget()).toBe(FIELD_HOST);
+    await unmount(root);
+  });
+
+  it('Nothing found: «Ничего не найдено», focus → the field; with filters → «Сбросить фильтры» focused, OK resets the scope and re-runs', async () => {
+    e7 = emptySearch;
+    const root = await openAuthor();
+    await runSearch(root, 'пирог');
+    expect(visible(root, 'author/search-empty')).toBe(true);
+    expect(text(root)).toContain(t('author.search.emptyTitle'));
+    expect(visible(root, STATE)).toBe(false);
+    expect(lastFocusTarget()).toBe(FIELD_HOST);
+
+    await openSheet(root);
+    await f.press(root, 'filters/access/all');
+    await back();
+    await runSearch(root, 'пирог');
+    expect(lastFocusTarget()).toBe(STATE);
+    expect(text(root)).toContain(t('author.search.resetFilters'));
+    e7 = syntheticBlogSearch(3);
+    await f.press(root, STATE);
+    expect(getFilter(scope())).toEqual(DEFAULT_FILTER);
+    expect(searchCalls()[searchCalls().length - 1].url).toContain('is_only_allowed=true');
+    expect(lastFocusTarget()).toBe(SYN(0));
+    await unmount(root);
+  });
+
+  it('«Сбросить фильтры» onto a cached, also empty default list (no fetch, no phase change): the outcome settles, focus stays on the field; a later change moves nothing', async () => {
+    e4 = () => ({ status: 200, body: { data: [], extra: { isLast: true } } });
+    const root = await openAuthor();
+    expect(visible(root, 'author/empty')).toBe(true);
+    await openSheet(root);
+    await f.press(root, 'filters/access/all');
+    await back();
+    // The modal host's delayed return of focus to the chip runs first.
+    await act(async () => {
+      jest.advanceTimersByTime(50);
+    });
+    expect(visible(root, 'author/filtered-empty')).toBe(true);
+    const before = e4Calls().length;
+    await f.press(root, STATE);
+    // The action goes with the view: the field takes focus natively.
+    await f.focusOn(root, FIELD);
+    await act(async () => {
+      jest.advanceTimersByTime(50);
+    });
+    await settle();
+    expect(e4Calls()).toHaveLength(before);
+    expect(visible(root, 'author/empty')).toBe(true);
+    expect(lastFocusTarget()).toBe(FIELD_HOST);
+    // A later, unrelated change of the list (posts arrive): no outcome is
+    // pending any more, so focus is not moved off the field.
+    focusMock.mockClear();
+    await act(async () => {
+      queryClient.setQueryData(queryKeys.authorPosts(BLOG, DEFAULT_FILTER), {
+        pages: [{ posts: [], nextCursor: null }],
+        pageParams: [null],
+      });
+    });
+    e4 = syntheticBlogPosts({ blogUrl: BLOG, total: 7 });
+    await act(async () => {
+      await queryClient.refetchQueries({ queryKey: queryKeys.authorPosts(BLOG, DEFAULT_FILTER) });
+    });
+    await settle();
+    expect(visible(root, 'author/posts/list')).toBe(true);
+    expect(focusTargets().filter(id => id?.startsWith(`author/${BLOG}/post/`))).toEqual([]);
+    await unmount(root);
+  });
+
+  it('Trim: a multi-page search whose key changes keeps its first page only', async () => {
+    e7 = syntheticBlogSearch(60);
+    const root = await openAuthor();
+    await runSearch(root, 'пирог');
+    await focusOn(root, SYN(15));
+    expect(searchCalls()).toHaveLength(2);
+    const key = queryKeys.blogSearch(BLOG, 'пирог', DEFAULT_FILTER);
+    expect(queryClient.getQueryData<{ pages: unknown[] }>(key)?.pages).toHaveLength(2);
+    await openSheet(root);
+    await f.press(root, 'filters/access/all');
+    expect(queryClient.getQueryData<{ pages: unknown[] }>(key)?.pages).toHaveLength(1);
+    await unmount(root);
+  });
+
+  it('Filtered posts empty: «Ничего не найдено» + «Сбросить фильтры» (no search)', async () => {
+    const root = await openAuthor();
+    await openSheet(root);
+    e4 = () => ({ status: 200, body: { data: [], extra: { isLast: true } } });
+    await f.press(root, 'filters/access/all');
+    await back();
+    expect(visible(root, 'author/filtered-empty')).toBe(true);
+    expect(text(root)).toContain(t('author.search.resetFilters'));
+    await unmount(root);
+  });
+
+  it('Blank «Готово»: no request, the normal list; also after results', async () => {
+    const root = await openAuthor();
+    await runSearch(root, '   ');
+    expect(searchCalls()).toHaveLength(0);
+    await runSearch(root, 'пирог');
+    expect(searchCalls()).toHaveLength(1);
+    await runSearch(root, ' ');
+    expect(searchCalls()).toHaveLength(1);
+    expect(visible(root, RESET)).toBe(false);
+    expect(lastFocusTarget()).toBe(FIELD_HOST);
+    await unmount(root);
+  });
+
+  it('Back, search active: query cleared, the normal list, focus → the field; Back again pops', async () => {
+    e7 = syntheticBlogSearch(2);
+    const root = await openAuthor();
+    await runSearch(root, 'пирог');
+    expect(gridPosts()).toEqual(['blog-post-0', 'blog-post-1']);
+    focusMock.mockClear();
+    await f.back();
+    expect(currentRoute()).toBe('Author');
+    expect(lastFocusTarget()).toBe(FIELD_HOST);
+    // The normal list again (page 1: 18 of 20 shown, the partial row held).
+    expect(gridPosts()).toHaveLength(18);
+    expect(f.one(root, FIELD).props.value).toBe('');
+    expect(visible(root, RESET)).toBe(false);
+    await f.back();
+    expect(currentRoute()).toBe('Shell');
+    await unmount(root);
+  });
+
+  it('«Сбросить»: clears the query and the Filter, focus → the chip; hidden at the default', async () => {
+    const root = await openAuthor();
+    await openSheet(root);
+    await f.press(root, 'filters/access/all');
+    await back();
+    await runSearch(root, 'пирог');
+    await f.focusOn(root, FIELD);
+    await f.focusOn(root, CHIP);
+    await f.focusOn(root, RESET);
+    focusMock.mockClear();
+    const before = e4Calls().length;
+    await f.press(root, RESET);
+    expect(focusTargets()[0]).toBe(CHIP);
+    expect(getFilter(scope())).toEqual(DEFAULT_FILTER);
+    expect(visible(root, RESET)).toBe(false);
+    expect(gridPosts()).toHaveLength(18);
+    // The default list is cached (it was the first one): at most one request.
+    expect(e4Calls().length - before).toBeLessThanOrEqual(1);
+    await unmount(root);
+  });
+
+  it('Isolation: a Filter on author A leaves Главная, Поиск and another author at the default; a reopened A starts at the default', async () => {
+    const root = await openAuthor();
+    await openSheet(root);
+    await f.press(root, 'filters/access/all');
+    await back();
+    const scopeA = scope();
+    expect(getFilter(scopeA).access).toBe('all');
+    // The closing transition runs on timers; the route unmounts after it.
+    await back(WITH_TIMERS);
+    expect(currentRoute()).toBe('Shell');
+    expect(visible(root, 'author')).toBe(false);
+    // Dropped on unmount.
+    expect(filtersStore.getState().filters[scopeA]).toBeUndefined();
+    expect(Object.keys(filtersStore.getState().filters)).toEqual([]);
+    await press(root, TILE(1));
+    expect(getFilter(scope())).toEqual(DEFAULT_FILTER);
+    expect(visible(root, RESET)).toBe(false);
+    expect(e4Calls()[e4Calls().length - 1].url).toContain('is_only_allowed=true');
+    await back();
+    await press(root, TILE(2));
+    expect(getFilter(scope())).toEqual(DEFAULT_FILTER);
+    await unmount(root);
+  });
+
+  it('Return from Post: the same query, Filter and card (no new E7); a gone card → its neighbour', async () => {
+    e7 = syntheticBlogSearch(6);
+    const root = await openAuthor();
+    await runSearch(root, 'пирог');
+    const calls = searchCalls().length;
+    await press(root, SYN(4));
+    expect(currentRoute()).toBe('Post');
+    focusMock.mockClear();
+    await back();
+    expect(currentRoute()).toBe('Author');
+    expect(lastFocusTarget()).toBe(SYN(4));
+    expect(searchCalls()).toHaveLength(calls);
+    expect(f.one(root, FIELD).props.value).toBe('пирог');
+
+    await press(root, SYN(4));
+    await act(async () => {
+      type Data = { pages: Array<{ posts: Array<{ id: string }> }> };
+      queryClient.setQueryData<Data>(queryKeys.blogSearch(BLOG, 'пирог', DEFAULT_FILTER), data =>
+        data
+          ? { ...data, pages: data.pages.map(p => ({ ...p, posts: p.posts.filter(x => x.id !== 'blog-post-4') })) }
+          : data,
+      );
+    });
+    await settle();
+    focusMock.mockClear();
+    await back();
+    expect(lastFocusTarget()).toBe(SYN(5));
+    await unmount(root);
+  });
+
+  it('Keys: the blog search key never collides with Поиск or the author posts; the Filter is in the E4 key', async () => {
+    const root = await openAuthor();
+    await runSearch(root, 'пирог');
+    expect(queryClient.getQueryData(queryKeys.blogSearch(BLOG, 'пирог', DEFAULT_FILTER))).toBeDefined();
+    expect(queryClient.getQueryData(queryKeys.feedSearch('пирог', DEFAULT_FILTER))).toBeUndefined();
+    expect(queryClient.getQueryData(queryKeys.authorPosts(BLOG, DEFAULT_FILTER))).toBeDefined();
+    expect(transport.callsTo('/v1/search/feed/post/')).toHaveLength(0);
+    await unmount(root);
+  });
+
+  it('300 results: paged by the opaque cursor without duplicates; stable row keys; focus never moves', async () => {
+    e7 = syntheticBlogSearch(300);
+    const root = await openAuthor();
+    await runSearch(root, 'пирог');
+    focusMock.mockClear();
+    for (let i = 0; i < 30 && gridPosts().length < 300; i += 1) {
+      await act(async () => {
+        grid().onEndReached();
+      });
+      await settle();
+    }
+    const ids = gridPosts();
+    expect(ids).toEqual(Array.from({ length: 300 }, (_, i) => `blog-post-${i}`));
+    expect(searchCalls().map(c => cursorOf(c.url))).toEqual([
+      null,
+      ...Array.from({ length: 14 }, (_, i) => (i + 1) * 20),
+    ]);
+    expect(searchCalls().every(c => queryOf(c.url) === 'пирог')).toBe(true);
+    const rows = grid().data as Array<{ key: string; posts: Array<{ id: string }> }>;
+    expect(rows.every(r => r.key === r.posts[0].id)).toBe(true);
+    expect(authorCards(root).length).toBeLessThan(300);
+    expect(focusTargets()).toEqual([]);
+    await unmount(root);
+  });
+
+  describe('resume', () => {
+    let appStateHandlers: Array<(state: string) => void> = [];
+    beforeEach(() => {
+      appStateHandlers = [];
+      jest.spyOn(AppState, 'addEventListener').mockImplementation(((
+        _type: string,
+        listener: (state: string) => void,
+      ) => {
+        appStateHandlers.push(listener);
+        return {
+          remove: () => {
+            appStateHandlers = appStateHandlers.filter(h => h !== listener);
+          },
+        };
+      }) as unknown as typeof AppState.addEventListener);
+    });
+    async function changeAppState(state: string) {
+      await act(async () => {
+        for (const h of [...appStateHandlers]) {
+          h(state);
+        }
+      });
+      await settle();
+    }
+
+    it('the head refresh uses the active Filter (E4 page 1 with is_only_allowed=false); the search results are never refreshed', async () => {
+      const root = await openAuthor();
+      await openSheet(root);
+      await f.press(root, 'filters/access/all');
+      await back();
+      await runSearch(root, 'пирог');
+      const e7Before = searchCalls().length;
+      // Leave the search so the posts list is shown, then go stale.
+      await f.back();
+      const before = e4Calls().length;
+      await changeAppState('background');
+      jest.setSystemTime(Date.now() + QUERY_STALE_TIME_MS + 1_000);
+      await changeAppState('active');
+      const fresh = e4Calls().slice(before);
+      expect(fresh).toHaveLength(1);
+      expect(fresh[0].url).toContain('&is_only_allowed=false&only_bought=false');
+      expect(cursorOf(fresh[0].url)).toBeNull();
+      expect(searchCalls()).toHaveLength(e7Before);
       await unmount(root);
     });
   });

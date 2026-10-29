@@ -13,6 +13,7 @@ import {
 } from '../../shared/entities/author';
 import { PostRepository, usePagedPosts } from '../../shared/entities/post';
 import { UserRepository } from '../../shared/entities/user';
+import { DEFAULT_FILTER } from '../../shared/filters';
 
 export type Subscriptions = {
   authors: Author[];
@@ -87,8 +88,9 @@ const NO_BLOG = '';
  * «Мой блог» (Story 5.2, SUB-02): E1 (`UserRepository.current`, the `me`
  * key), then, when the account has a `blogUrl`, E3 and E4 page 1 through
  * the Author page's own queries (`queryKeys.author`, `queryKeys.authorPosts`
- * via the shared paged posts hook, 20 per page): opening «Мой блог» then
- * finds both cached. The reference asks E4 with `limit=1`; reusing the
+ * via the shared paged posts hook, 20 per page; Story 5.7: under the
+ * default Filter, «Доступные мне», as a fresh Author route): opening «Мой
+ * блог» then finds both cached. The reference asks E4 with `limit=1`; reusing the
  * Author page's page 1 is our choice (one request either way, and no extra
  * request when Автор opens).
  *
@@ -118,11 +120,11 @@ export function useMyBlog(http: HttpClient, enabled: boolean): MyBlog {
     enabled: blogUrl !== null,
   });
   const fetchPage = useCallback(
-    (cursor: string | null) => PostRepository.blogPage(http, blogUrl ?? NO_BLOG, cursor),
+    (cursor: string | null) => PostRepository.blogPage(http, blogUrl ?? NO_BLOG, cursor, DEFAULT_FILTER),
     [http, blogUrl],
   );
   const posts = usePagedPosts({
-    queryKey: queryKeys.authorPosts(blogUrl ?? NO_BLOG),
+    queryKey: queryKeys.authorPosts(blogUrl ?? NO_BLOG, DEFAULT_FILTER),
     fetchPage,
     enabled: blogUrl !== null,
     retryOnMount: false,

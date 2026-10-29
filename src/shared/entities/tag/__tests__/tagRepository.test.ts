@@ -7,7 +7,9 @@ import { createLogger } from '../../../services/logger';
 import page1 from '../../../../test/fixtures/boosty/e13-feed-tags-1.json';
 // eslint-disable-next-line boundaries/dependencies -- test-only fixtures
 import page2 from '../../../../test/fixtures/boosty/e13-feed-tags-2.json';
-import { FEED_TAGS_PAGE_SIZE, TagRepository, feedTagsPath, mergeTags } from '..';
+// eslint-disable-next-line boundaries/dependencies -- test-only fixtures
+import e14 from '../../../../test/fixtures/boosty/e14-blog-tags.json';
+import { FEED_TAGS_PAGE_SIZE, TagRepository, blogTagsPath, feedTagsPath, mergeTags } from '..';
 
 function client(handler: FixtureHandler) {
   const transport = createFixtureTransport(handler);
@@ -124,5 +126,54 @@ describe('mergeTags', () => {
       { id: '1', title: 'a' },
       { id: '2', title: 'c' },
     ]);
+  });
+});
+
+describe('TagRepository.blogTags (E14, Story 5.7)', () => {
+  it('the path encodes the blog as a path segment; no params', () => {
+    expect(blogTagsPath('synthetic-blog-1')).toBe('/v1/blog/synthetic-blog-1/post/tag/');
+    expect(blogTagsPath('a:b')).toBe('/v1/blog/a%3Ab/post/tag/');
+  });
+
+  it('maps the fixture: ids as strings, titles; `count` is not read', async () => {
+    const { http, transport } = client(() => ({ status: e14.status, body: e14.body }));
+    const tags = await TagRepository.blogTags(http, 'synthetic-blog-1');
+    expect(tags).toEqual([
+      { id: '2001', title: 'redacted' },
+      { id: '2002', title: 'redacted' },
+      { id: '2003', title: 'redacted' },
+    ]);
+    expect(transport.calls[0].url).toBe('https://api.boosty.to/v1/blog/synthetic-blog-1/post/tag/');
+  });
+
+  it('drops a malformed tag (counted in the log, no value) and dedupes by id; never fails the list', async () => {
+    const { http, logger } = client(() => ({
+      status: 200,
+      body: {
+        data: [
+          { id: 1, title: 'A' },
+          { id: '1,2', title: 'comma' },
+          { id: 2, title: '   ' },
+          { title: 'no id' },
+          'junk',
+          { id: '3', title: ' B ' },
+          { id: 1, title: 'again' },
+        ],
+      },
+    }));
+    expect(await TagRepository.blogTags(http, 'b', logger)).toEqual([
+      { id: '1', title: 'A' },
+      { id: '3', title: 'B' },
+    ]);
+    const warnings = logger.entries().filter(e => e.scope === 'tags');
+    expect(warnings).toEqual([expect.objectContaining({ message: 'dropped', fields: { count: '4' } })]);
+    expect(JSON.stringify(warnings)).not.toContain('comma');
+  });
+
+  it('empty data: no tags; a body without a `data` array is Parse', async () => {
+    expect(await TagRepository.blogTags(client(() => ({ status: 200, body: { data: [] } })).http, 'b')).toEqual([]);
+    await expect(
+      TagRepository.blogTags(client(() => ({ status: 200, body: { data: {} } })).http, 'b'),
+    ).rejects.toEqual(new AppError('Parse'));
   });
 });

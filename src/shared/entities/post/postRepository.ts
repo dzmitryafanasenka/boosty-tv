@@ -106,13 +106,54 @@ export function mergePosts(...lists: ReadonlyArray<readonly Post[]>): Post[] {
 export const BLOG_POSTS_PAGE_SIZE = 20;
 
 /**
- * E4 path. `blogUrl` already passed `blogUrlSchema` (no `/`, `?`, `#`, `%`,
- * `..`) and is still encoded as a path segment. Comments are always off; the
- * opaque cursor goes back verbatim, URL-encoded (api-contract §5). No
- * filter, tag or date parameter (Epic 5).
+ * E4/E7 access params (Story 5.7, FILTER-01, the reference's
+ * `BlogRepository`): a blog uses `is_only_allowed` where the feed uses
+ * `only_allowed`. «Доступные мне» → `is_only_allowed=true`, «Все посты» →
+ * `false`. `only_bought` is always `false`: E4 and E7 ignore
+ * `only_bought=true` (live, api-contract §3 «E4 filters (LIVE)»), so the
+ * Author scope never offers «Только купленные» (owner decision 2026-10-29,
+ * A a). Always sent, so the default is explicit (owner decision 2026-10-29
+ * Q2 a).
  */
-export function blogPostsPath(blogUrl: string, cursor: string | null): string {
-  const base = `/v1/blog/${encodeURIComponent(blogUrl)}/post/?limit=${BLOG_POSTS_PAGE_SIZE}&comments_limit=0&reply_limit=0`;
+function blogAccessParams(filter: Filter): string {
+  return `is_only_allowed=${filter.access === 'allowed'}&only_bought=false`;
+}
+
+/**
+ * E4 path. `blogUrl` already passed `blogUrlSchema` (no `/`, `?`, `#`, `%`,
+ * `..`) and is still encoded as a path segment. Comments are always off;
+ * the Filter's blog access params follow (Story 5.7), then the shared period
+ * params (`nowMs` resolves a preset) and tag param; the opaque cursor goes
+ * back verbatim, URL-encoded (api-contract §5).
+ */
+export function blogPostsPath(
+  blogUrl: string,
+  cursor: string | null,
+  filter: Filter,
+  nowMs: number = Date.now(),
+): string {
+  const base = `/v1/blog/${encodeURIComponent(blogUrl)}/post/?limit=${BLOG_POSTS_PAGE_SIZE}&comments_limit=0&reply_limit=0&${blogAccessParams(filter)}${feedPeriodParams(filter, nowMs)}${feedTagParams(filter)}`;
+  return cursor === null ? base : `${base}&offset=${encodeURIComponent(cursor)}`;
+}
+
+/** E7 page size (the reference's blog search `limit`, as E4). */
+export const BLOG_SEARCH_PAGE_SIZE = 20;
+
+/**
+ * E7 path (Story 5.7, api-contract §3 «E7 (LIVE)», the reference's
+ * `BoostyApi.blogSearchPosts`): `blog_url` (URL-encoded), comments off, the
+ * Filter's E4 params (blog access, period, tags), `search_query` = the
+ * trimmed query, URL-encoded, then the opaque cursor, verbatim and
+ * URL-encoded. Never logged: the query is user input.
+ */
+export function blogSearchPath(
+  blogUrl: string,
+  query: string,
+  cursor: string | null,
+  filter: Filter,
+  nowMs: number = Date.now(),
+): string {
+  const base = `/v1/search/blog/post/?blog_url=${encodeURIComponent(blogUrl)}&limit=${BLOG_SEARCH_PAGE_SIZE}&comments_limit=0&reply_limit=0&${blogAccessParams(filter)}${feedPeriodParams(filter, nowMs)}${feedTagParams(filter)}&search_query=${encodeURIComponent(query)}`;
   return cursor === null ? base : `${base}&offset=${encodeURIComponent(cursor)}`;
 }
 
@@ -164,7 +205,30 @@ async function feedSearchPage(
   now: number = Date.now(),
   logger: Logger = appLogger,
 ): Promise<PostPage> {
-  const { body } = await http.get(feedSearchPath(query, cursor, filter, now), feedSearchPageDtoSchema);
+  return searchPage(http, feedSearchPath(query, cursor, filter, now), logger);
+}
+
+/**
+ * One E7 page of «Поиск в блоге» (Story 5.7) for the trimmed `query` and
+ * the route's author Filter: parsed as E6 (`data.searchPosts[].post` +
+ * `extra`, one post mapper; an item without a `post` object dropped and
+ * counted, never the page; `Parse` when `data.searchPosts` is missing).
+ */
+async function blogSearchPage(
+  http: HttpClient,
+  blogUrl: string,
+  query: string,
+  cursor: string | null,
+  filter: Filter,
+  now: number = Date.now(),
+  logger: Logger = appLogger,
+): Promise<PostPage> {
+  return searchPage(http, blogSearchPath(blogUrl, query, cursor, filter, now), logger);
+}
+
+/** One E6/E7 page: `data.searchPosts[].post` through the one post mapper. */
+async function searchPage(http: HttpClient, path: string, logger: Logger): Promise<PostPage> {
+  const { body } = await http.get(path, feedSearchPageDtoSchema);
   const raw: unknown[] = [];
   let dropped = 0;
   for (const item of body.data.searchPosts) {
@@ -182,17 +246,21 @@ async function feedSearchPage(
 }
 
 /**
- * One E4 page of a blog's posts (Story 3.3). Same rules as `feedPage`: a
- * malformed post is dropped and logged (post id only), the page never fails
- * for one post, and paging stops on `isLast` or a missing `extra`/`offset`.
+ * One E4 page of a blog's posts (Story 3.3) with the Filter's params (Story
+ * 5.7; `now` resolves the period at request time). Same rules as
+ * `feedPage`: a malformed post is dropped and logged (post id only), the
+ * page never fails for one post, and paging stops on `isLast` or a missing
+ * `extra`/`offset`.
  */
 async function blogPage(
   http: HttpClient,
   blogUrl: string,
   cursor: string | null,
+  filter: Filter,
+  now: number = Date.now(),
   logger: Logger = appLogger,
 ): Promise<PostPage> {
-  const { body } = await http.get(blogPostsPath(blogUrl, cursor), blogPostsPageDtoSchema);
+  const { body } = await http.get(blogPostsPath(blogUrl, cursor, filter, now), blogPostsPageDtoSchema);
   return toPage(body.data, body.extra, logger);
 }
 
@@ -326,6 +394,7 @@ export const PostRepository = {
   feedPage,
   feedSearchPage,
   blogPage,
+  blogSearchPage,
   post: onePost,
   videoSources,
 } as const;

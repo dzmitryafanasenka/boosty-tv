@@ -3382,6 +3382,8 @@ describe('Story 5.5: filter by tags', () => {
     const root = await openTags();
     expect(tagCalls()).toHaveLength(1);
     expect(tagCalls()[0].url).toBe(`https://api.boosty.to${E13}?limit=100`);
+    // Story 5.7: the feed's tag level never asks for blog tags (E14).
+    expect(transport.calls.some(c => c.path.includes('/post/tag/'))).toBe(false);
     expect(levelFocusables(root)).toEqual([LOADING]);
     expect(lastFocusTarget()).toBe(LOADING);
     expect(text(byTestId(root, LEVEL)[0])).toContain(t('filters.tags.title'));

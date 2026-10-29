@@ -11,6 +11,7 @@ import { e8Accessible, e8Locked, e8MissingReply } from '../../../../test/postFix
 import {
   PostRepository,
   blogPostsPath,
+  blogSearchPath,
   feedPath,
   feedSearchPath,
   mergePosts,
@@ -25,6 +26,8 @@ import e5OnlyBought from '../../../../test/fixtures/boosty/e5-feed-only-bought.j
 import e6Search1 from '../../../../test/fixtures/boosty/e6-feed-search-1.json';
 // eslint-disable-next-line boundaries/dependencies -- test-only fixtures
 import e6Search2 from '../../../../test/fixtures/boosty/e6-feed-search-2.json';
+// eslint-disable-next-line boundaries/dependencies -- test-only fixtures
+import e7Search1 from '../../../../test/fixtures/boosty/e7-blog-search-1.json';
 
 function client(handler: FixtureHandler) {
   const transport = createFixtureTransport(handler);
@@ -246,15 +249,104 @@ describe('mergePosts', () => {
 });
 
 describe('blogPostsPath (E4)', () => {
-  it('limit 20, comments off, no offset on the first page; no filter parameter', () => {
-    expect(blogPostsPath('synthetic-blog-1', null)).toBe(
-      '/v1/blog/synthetic-blog-1/post/?limit=20&comments_limit=0&reply_limit=0',
+  const E4_BASE = '/v1/blog/synthetic-blog-1/post/?limit=20&comments_limit=0&reply_limit=0';
+
+  it('limit 20, comments off, the default access params, no offset on the first page', () => {
+    expect(blogPostsPath('synthetic-blog-1', null, DEFAULT_FILTER)).toBe(
+      `${E4_BASE}&is_only_allowed=true&only_bought=false`,
     );
   });
 
   it('encodes the blogUrl as a path segment and the cursor verbatim', () => {
-    expect(blogPostsPath('a:b', 'x y&z')).toBe(
-      '/v1/blog/a%3Ab/post/?limit=20&comments_limit=0&reply_limit=0&offset=x%20y%26z',
+    expect(blogPostsPath('a:b', 'x y&z', DEFAULT_FILTER)).toBe(
+      '/v1/blog/a%3Ab/post/?limit=20&comments_limit=0&reply_limit=0&is_only_allowed=true&only_bought=false&offset=x%20y%26z',
+    );
+  });
+
+  it('Story 5.7: «Все посты» → is_only_allowed=false; only_bought is always false (live: ignored by E4)', () => {
+    expect(blogPostsPath('synthetic-blog-1', null, { ...DEFAULT_FILTER, access: 'all' })).toBe(
+      `${E4_BASE}&is_only_allowed=false&only_bought=false`,
+    );
+    expect(blogPostsPath('synthetic-blog-1', null, { ...DEFAULT_FILTER, access: 'bought' })).toBe(
+      `${E4_BASE}&is_only_allowed=false&only_bought=false`,
+    );
+  });
+
+  it('Story 5.7: the period (resolved with `now`) and the sorted, encoded tags, before the cursor', () => {
+    const now = new Date(2026, 9, 29, 12, 0, 0).getTime();
+    const from = Math.floor(new Date(2026, 9, 23, 0, 0, 0).getTime() / 1000);
+    const to = Math.floor(new Date(2026, 9, 29, 23, 59, 59).getTime() / 1000);
+    const filter = {
+      access: 'all' as const,
+      period: { kind: 'preset' as const, days: 7 as const },
+      tags: [
+        { id: '12', title: 'b' },
+        { id: '3', title: 'a' },
+      ],
+    };
+    expect(blogPostsPath('synthetic-blog-1', 'c', filter, now)).toBe(
+      `${E4_BASE}&is_only_allowed=false&only_bought=false&from_ts=${from}&to_ts=${to}&tags_ids=12,3&offset=c`,
+    );
+    expect(blogPostsPath('synthetic-blog-1', null, { ...DEFAULT_FILTER, period: ALL_TIME }, now)).not.toContain(
+      'from_ts',
+    );
+  });
+});
+
+describe('blogSearchPath (E7, Story 5.7)', () => {
+  it('blog_url, limit 20, comments off, the access params, then search_query; the cursor last', () => {
+    expect(blogSearchPath('synthetic-blog-1', 'пирог', null, DEFAULT_FILTER)).toBe(
+      `/v1/search/blog/post/?blog_url=synthetic-blog-1&limit=20&comments_limit=0&reply_limit=0&is_only_allowed=true&only_bought=false&search_query=${encodeURIComponent('пирог')}`,
+    );
+    expect(blogSearchPath('synthetic-blog-1', 'q', 'x y', { ...DEFAULT_FILTER, access: 'all' })).toBe(
+      '/v1/search/blog/post/?blog_url=synthetic-blog-1&limit=20&comments_limit=0&reply_limit=0&is_only_allowed=false&only_bought=false&search_query=q&offset=x%20y',
+    );
+  });
+
+  it('encodes the blog and the query (spaces, &, #, =, +, %, /)', () => {
+    const path = blogSearchPath('a:b', 'a b&c#d=e+f%g/h', null, DEFAULT_FILTER);
+    expect(path).toContain('blog_url=a%3Ab&');
+    expect(path).toContain('&search_query=a%20b%26c%23d%3De%2Bf%25g%2Fh');
+    expect(path.split('&search_query=')).toHaveLength(2);
+  });
+
+  it('the period and tags as E4, before search_query', () => {
+    const now = new Date(2026, 9, 29, 12, 0, 0).getTime();
+    const path = blogSearchPath(
+      'synthetic-blog-1',
+      'q',
+      null,
+      { ...DEFAULT_FILTER, period: { kind: 'preset', days: 30 }, tags: [{ id: '7', title: 't' }] },
+      now,
+    );
+    expect(path).toMatch(/&only_bought=false&from_ts=\d+&to_ts=\d+&tags_ids=7&search_query=q$/);
+  });
+});
+
+describe('PostRepository.blogSearchPage (E7, Story 5.7)', () => {
+  it('maps the fixture page through the one post mapper, locked results kept (hasAccess false)', async () => {
+    const { http, transport } = client(() => ({ status: e7Search1.status, body: e7Search1.body }));
+    const page = await PostRepository.blogSearchPage(http, 'synthetic-blog-2', 'q', null, DEFAULT_FILTER);
+    expect(page.posts.map(p => p.id)).toEqual(['synthetic-id-104', 'synthetic-id-106', 'synthetic-id-108']);
+    expect(page.posts.map(p => p.hasAccess)).toEqual([true, false, true]);
+    expect(page.nextCursor).toBe('redacted');
+    expect(transport.calls[0].url).toContain('/v1/search/blog/post/?blog_url=synthetic-blog-2&');
+  });
+
+  it('drops an item without a post (counted, no value logged); a missing searchPosts is Parse', async () => {
+    const logger = createLogger();
+    const { http } = client(() => ({
+      status: 200,
+      body: { data: { searchPosts: [{ rank: 1 }, { post: blogPost('b', 0) }] }, extra: { isLast: true } },
+    }));
+    const page = await PostRepository.blogSearchPage(http, 'b', 'q', null, DEFAULT_FILTER, Date.now(), logger);
+    expect(page.posts.map(p => p.id)).toEqual(['blog-post-0']);
+    expect(logger.entries().filter(e => e.scope === 'search')).toEqual([
+      expect.objectContaining({ message: 'dropped', fields: { count: '1' } }),
+    ]);
+    const bad = client(() => ({ status: 200, body: { data: {}, extra: { isLast: true } } }));
+    await expect(PostRepository.blogSearchPage(bad.http, 'b', 'q', null, DEFAULT_FILTER)).rejects.toEqual(
+      new AppError('Parse'),
     );
   });
 });
@@ -262,12 +354,12 @@ describe('blogPostsPath (E4)', () => {
 describe('PostRepository.blogPage (E4)', () => {
   it('sends E4 with the content profile and maps the live page', async () => {
     const { http, transport } = client(() => ({ status: 200, body: e4Page(1) }));
-    const page = await PostRepository.blogPage(http, 'synthetic-blog-1', null);
+    const page = await PostRepository.blogPage(http, 'synthetic-blog-1', null, DEFAULT_FILTER);
     expect(page.posts).toHaveLength(20);
     expect(page.nextCursor).toBe('redacted');
     const [call] = transport.calls;
     expect(call.url).toBe(
-      'https://api.boosty.to/v1/blog/synthetic-blog-1/post/?limit=20&comments_limit=0&reply_limit=0',
+      'https://api.boosty.to/v1/blog/synthetic-blog-1/post/?limit=20&comments_limit=0&reply_limit=0&is_only_allowed=true&only_bought=false',
     );
     expect(call.headers.Authorization).toBe(`Bearer ${'t'.repeat(64)}`);
     expect(call.headers['X-App']).toBeUndefined();
@@ -276,7 +368,7 @@ describe('PostRepository.blogPage (E4)', () => {
 
   it('maps the locked live posts as locked (hasAccess false), never an error', async () => {
     const { http } = client(() => ({ status: 200, body: e4Page(2, { isLast: true }) }));
-    const page = await PostRepository.blogPage(http, 'synthetic-blog-2', 'redacted');
+    const page = await PostRepository.blogPage(http, 'synthetic-blog-2', 'redacted', DEFAULT_FILTER);
     expect(page.nextCursor).toBeNull();
     expect(page.posts.some(p => !p.hasAccess)).toBe(true);
     expect(page.posts.some(p => p.hasAccess)).toBe(true);
@@ -284,12 +376,12 @@ describe('PostRepository.blogPage (E4)', () => {
 
   it('pages by the cursor of the previous page', async () => {
     const { http, transport } = client(syntheticBlogPosts({ blogUrl: 'b', total: 45 }));
-    const first = await PostRepository.blogPage(http, 'b', null);
+    const first = await PostRepository.blogPage(http, 'b', null, DEFAULT_FILTER);
     expect(first.posts).toHaveLength(20);
     expect(first.nextCursor).toBe(cursorFor(20));
-    const second = await PostRepository.blogPage(http, 'b', first.nextCursor);
+    const second = await PostRepository.blogPage(http, 'b', first.nextCursor, DEFAULT_FILTER);
     expect(transport.calls[1].url).toContain('&offset=cursor%3A20');
-    const third = await PostRepository.blogPage(http, 'b', second.nextCursor);
+    const third = await PostRepository.blogPage(http, 'b', second.nextCursor, DEFAULT_FILTER);
     expect(third.posts).toHaveLength(5);
     expect(third.nextCursor).toBeNull();
   });
@@ -300,7 +392,7 @@ describe('PostRepository.blogPage (E4)', () => {
     ['extra without offset', { isLast: false }],
   ])('stops on %s', async (_name, extra) => {
     const { http } = client(() => ({ status: 200, body: { data: [blogPost('b', 0)], extra } }));
-    expect((await PostRepository.blogPage(http, 'b', null)).nextCursor).toBeNull();
+    expect((await PostRepository.blogPage(http, 'b', null, DEFAULT_FILTER)).nextCursor).toBeNull();
   });
 
   it('drops a malformed post (logged by id only) and keeps the page', async () => {
@@ -309,19 +401,19 @@ describe('PostRepository.blogPage (E4)', () => {
       status: 200,
       body: { data: [blogPost('b', 0), { id: 'broken' }, blogPost('b', 1)], extra: { isLast: true } },
     }));
-    const page = await PostRepository.blogPage(http, 'b', null, logger);
+    const page = await PostRepository.blogPage(http, 'b', null, DEFAULT_FILTER, Date.now(), logger);
     expect(page.posts.map(p => p.id)).toEqual(['blog-post-0', 'blog-post-1']);
     expect(logger.entries().filter(e => e.scope === 'post')).toHaveLength(1);
   });
 
   it('empty data: an empty last page', async () => {
     const { http } = client(() => ({ status: 200, body: { data: [], extra: { isLast: true } } }));
-    expect(await PostRepository.blogPage(http, 'b', null)).toEqual({ posts: [], nextCursor: null });
+    expect(await PostRepository.blogPage(http, 'b', null, DEFAULT_FILTER)).toEqual({ posts: [], nextCursor: null });
   });
 
   it('a body without `data` is a Parse error', async () => {
     const { http } = client(() => ({ status: 200, body: { extra: { isLast: true } } }));
-    await expect(PostRepository.blogPage(http, 'b', null)).rejects.toEqual(new AppError('Parse'));
+    await expect(PostRepository.blogPage(http, 'b', null, DEFAULT_FILTER)).rejects.toEqual(new AppError('Parse'));
   });
 });
 

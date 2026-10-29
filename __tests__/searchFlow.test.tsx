@@ -531,6 +531,8 @@ describe('matrix «Filter change»', () => {
     await press(root, 'filters/tags');
     await press(root, 'filters/tag/7');
     expect(getFilter('search').tags).toEqual([{ id: '7', title: 'Тег 7' }]);
+    // Story 5.7: the `search` tag level never asks for blog tags (E14).
+    expect(transport.calls.some(c => c.path.includes('/post/tag/'))).toBe(false);
     const url = searchCalls()[searchCalls().length - 1].url;
     expect(url).toContain('tags_ids=7');
     expect(queryOf(url)).toBe('капуста');

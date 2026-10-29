@@ -1,28 +1,45 @@
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { FlashListRef } from '@shopify/flash-list';
-import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
+import { StyleSheet, TVFocusGuideView, View, useWindowDimensions } from 'react-native';
 import type { HttpClient } from '../../shared/api';
 import {
+  DEFAULT_FILTER,
+  FilterSheet,
+  authorFilterScope,
+  chipLabels,
+  filtersStore,
+  isDefaultFilter,
+  useFilter,
+} from '../../shared/filters';
+import {
   MAIN_SECTION,
+  focusRestoration,
   mayTakeScreenFocus,
   restoreElseFirst,
   useFocusRestoration,
   useLatestRef,
+  useModal,
   usePhaseChange,
   useZoneItem,
 } from '../../shared/focus';
 import { t } from '../../shared/i18n';
 import {
+  Button,
+  FilterChip,
   POST_GRID_CARD_WIDTH,
   POST_GRID_COLUMNS,
   POST_GRID_LIST_TOP_GAP,
   PostCardSkeleton,
   PostGrid,
   StateView,
+  TextField,
+  components,
   postGridListAdapter,
   requestHostFocus,
   spacing,
+  typography,
   useHeadChangeRefocus,
   useHeldRowAutoFetch,
   useLoadMoreRetry,
@@ -34,6 +51,7 @@ import {
 import { AUTHOR_HEADER_HEIGHT, AuthorHeader, AuthorHeaderSkeleton } from './AuthorHeader';
 import { useAuthor } from './useAuthor';
 import { useAuthorPosts } from './useAuthorPosts';
+import { submitBlogSearch, useBlogSearch } from './useBlogSearch';
 
 /** Focus ids (docs/focus-map.md §1.5). */
 export const AUTHOR_STATE_ACTION_ID = 'state/author/action';
@@ -41,8 +59,20 @@ export const authorCardPrefix = (blogUrl: string) => `author/${blogUrl}/post/`;
 export const authorCardId = (blogUrl: string, postId: string) =>
   `${authorCardPrefix(blogUrl)}${postId}`;
 export const authorRetryId = (blogUrl: string) => `author/${blogUrl}/retry`;
+/** The action row (Story 5.7): «Поиск в блоге», «Фильтры», «Сбросить». */
+export const authorSearchId = (blogUrl: string) => `author/${blogUrl}/action/search`;
+export const authorFiltersId = (blogUrl: string) => `author/${blogUrl}/action/filters`;
+export const authorResetId = (blogUrl: string) => `author/${blogUrl}/action/reset`;
 
 const SKELETON_ROWS = 2;
+const FIELD = components['text-field'];
+/** The action row: the label above the 50 dp field, and a little room under it. */
+export const AUTHOR_ACTION_ROW_HEIGHT =
+  typography['body-s'].lineHeight + spacing['4'] + FIELD.height + spacing['2'];
+/** The gap between the header and the action row. */
+const ACTION_ROW_TOP = spacing['4'];
+const FIELD_WIDTH = 440;
+const FIELD_MIN_WIDTH = 160;
 
 /** What the route tells the Author page about focus (it owns the sidebar and zones). */
 export type AuthorFocusInfo = {
@@ -75,6 +105,16 @@ export type AuthorScreenProps = {
   onBack: () => void;
   /** OK on a post: open Пост (Story 3.4) by its identity. */
   onOpenPost?: (blogUrl: string, postId: string) => void;
+  /** `phaseFlags.search`: «Поиск в блоге» in the action row (Story 5.7). */
+  searchEnabled?: boolean;
+  /** `phaseFlags.filters`: the «Фильтры» chip; off → the default Filter. */
+  filtersEnabled?: boolean;
+  /**
+   * Story 5.7: the route's Back hook. The page sets it to its handler (an
+   * active search: clear it, focus the field, return true); the route calls
+   * it first on Back.
+   */
+  backHandlerRef?: RefObject<(() => boolean) | null>;
 };
 
 type Phase = 'unavailable' | 'error' | 'loading' | 'postsError' | 'empty' | 'grid';
@@ -112,6 +152,14 @@ type Phase = 'unavailable' | 'error' | 'loading' | 'postsError' | 'empty' | 'gri
  *   above / the sidebar item).
  * - OK on a post opens Пост (Story 3.4); the card is remembered (by its
  *   focus) and restored by id on return.
+ *
+ * Story 5.7 (AUTH-PAGE-02/03, docs/focus-map.md §4 D): the action row above
+ * the grid: «Поиск в блоге» (E7 on «Готово», Поиск's rules; the results in
+ * the same grid and card ids), the «Фильтры» chip (the route's own scope
+ * `author:<routeKey>`, dropped on unmount; the blog's E14 tags) and
+ * «Сбросить» (while a search or a filter is active). Back clears an active
+ * search first (the route asks `backHandlerRef`). The field is the nearest
+ * action above the grid (the fallback chain's last step).
  */
 export function AuthorScreen({
   http,
@@ -120,17 +168,45 @@ export function AuthorScreen({
   focus,
   onBack,
   onOpenPost,
+  searchEnabled = false,
+  filtersEnabled = false,
+  backHandlerRef,
 }: AuthorScreenProps) {
+  // Story 5.7: the route's own Filter (owner decision 2026-10-29 Q3 b) and
+  // its submitted query (local state; null: the normal list).
+  const scope = authorFilterScope(routeKey);
+  const storedFilter = useFilter(scope);
+  const filter = filtersEnabled ? storedFilter : DEFAULT_FILTER;
+  const filtered = !isDefaultFilter(filter);
+  const [query, setQuery] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
+  const searching = query !== null;
+  const rowShown = searchEnabled || filtersEnabled;
+  useEffect(() => () => filtersStore.getState().reset(scope), [scope]);
+
   const author = useAuthor(http, blogUrl);
-  const posts = useAuthorPosts(http, blogUrl);
+  const posts = useAuthorPosts(http, blogUrl, filter);
+  const search = useBlogSearch(http, blogUrl, query, filter);
+  /** What the grid shows: the search results while a query is active, else the posts. */
+  const list = searching ? search : posts;
+  const client = useQueryClient();
+  const modal = useModal();
   const windowHeight = useWindowDimensions().height;
   // A bounded viewport (Story 2.4 device lesson): the content zone's height
-  // (window − 2 × safe-y) minus the header and the grid's top gap.
+  // (window − 2 × safe-y) minus the header, the action row and the grid's
+  // top gap.
   const listHeight =
-    windowHeight - 2 * spacing['safe-y'] - AUTHOR_HEADER_HEIGHT - POST_GRID_LIST_TOP_GAP;
+    windowHeight -
+    2 * spacing['safe-y'] -
+    AUTHOR_HEADER_HEIGHT -
+    (rowShown ? ACTION_ROW_TOP + AUTHOR_ACTION_ROW_HEIGHT : 0) -
+    POST_GRID_LIST_TOP_GAP;
 
   const cardPrefix = authorCardPrefix(blogUrl);
   const retryId = authorRetryId(blogUrl);
+  const fieldId = authorSearchId(blogUrl);
+  const chipId = authorFiltersId(blogUrl);
+  const resetId = authorResetId(blogUrl);
   const listRef = useRef<FlashListRef<PostRowItem>>(null);
   const adapterRef = useRef(postGridListAdapter(listRef));
 
@@ -138,13 +214,13 @@ export function AuthorScreen({
   // a failing next page shows it, and so does a focused card in it (a head
   // refresh can move the focused card there; `useShownGridPosts`).
   const shownPosts = useShownGridPosts(
-    posts.posts,
-    posts.hasNextPage && !posts.loadMoreFailed,
+    list.posts,
+    list.hasNextPage && !list.loadMoreFailed,
     focus.current(),
     cardPrefix,
   );
   const ids = useMemo(() => shownPosts.map(post => `${cardPrefix}${post.id}`), [shownPosts, cardPrefix]);
-  useHeldRowAutoFetch(posts, shownPosts.length);
+  useHeldRowAutoFetch(list, shownPosts.length);
 
   const focusRef = useRef(focus);
   focusRef.current = focus;
@@ -157,10 +233,25 @@ export function AuthorScreen({
     },
     [stateAction],
   );
+
+  // The field: a content zone item (Back, ← → zones, the route's tracking).
+  const fieldZone = useZoneItem(fieldId);
+  const [fieldView, setFieldView] = useState<HostView | null>(null);
+  const fieldViewRef = useRef<HostView | null>(null);
+  const fieldHostRef = useCallback(
+    (view: HostView | null) => {
+      fieldViewRef.current = view;
+      setFieldView(view);
+      fieldZone.ref?.(view);
+    },
+    [fieldZone],
+  );
+  const focusField = useCallback(() => requestHostFocus(fieldViewRef.current), []);
+
   // "The user has not moved since the page opened" (reopen focus, owner
   // decision 2026-10-27; shared with Главная, `useNotMovedLatch`): armed
   // from the start; every element the page focuses by itself (the sidebar
-  // item, the StateView action, a card) is recorded as automatic.
+  // item, the StateView action, a card, the field) is recorded as automatic.
   const latch = useNotMovedLatch(focus.onFocusChange, { armed: true });
   /** The page's own sidebar focus (recorded as automatic). */
   const autoFocusSidebar = useCallback(() => {
@@ -172,21 +263,46 @@ export function AuthorScreen({
     latch.auto(AUTHOR_STATE_ACTION_ID);
     requestHostFocus(stateActionView.current);
   }, [latch]);
-  // Nothing above the grid (no search or filters before Epic 5): the
-  // StateView action when shown, else the sidebar's current item.
+  /**
+   * The field holds the page's own focus (content lost: the nearest action
+   * above), not one the user chose: the first post may still take it when
+   * posts arrive (as from the sidebar item). Cleared by any other focus.
+   */
+  const fieldAuto = useRef(false);
+  /** The page's own field focus (recorded as automatic). */
+  const autoFocusField = useCallback(() => {
+    latch.auto(fieldId);
+    fieldAuto.current = true;
+    focusField();
+  }, [latch, fieldId, focusField]);
+  // The nearest action above the grid: the field (Story 5.7) when the action
+  // row is shown, else the StateView action when shown, else the sidebar's
+  // current item.
+  const rowShownRef = useLatestRef(rowShown);
   const focusAbove = useCallback(() => {
-    if (stateActionView.current) {
+    if (rowShownRef.current && fieldViewRef.current) {
+      autoFocusField();
+    } else if (stateActionView.current) {
       autoFocusAction();
     } else {
       autoFocusSidebar();
     }
-  }, [autoFocusAction, autoFocusSidebar]);
-  // A pending card focus lands only while the route is active and focus is
-  // still where the page may take it: none yet, the sidebar's current item,
-  // a card, the StateView action or the load-more «Повторить».
+  }, [autoFocusAction, autoFocusSidebar, autoFocusField, rowShownRef]);
+  /** Content focus is gone (nothing focusable left there): the field, else the sidebar. */
+  const focusAfterLoss = useCallback(() => {
+    if (rowShownRef.current && fieldViewRef.current) {
+      autoFocusField();
+    } else {
+      autoFocusSidebar();
+    }
+  }, [autoFocusField, autoFocusSidebar, rowShownRef]);
+  // A pending card focus lands only while the route is active, no modal is
+  // open and focus is still where the page may take it: none yet, the
+  // sidebar's current item, a card, the StateView action, the load-more
+  // «Повторить» or the action row (Story 5.7: the row is content).
   const canFocus = useCallback(() => {
     const info = focusRef.current;
-    if (!info.isActive()) {
+    if (!info.isActive() || modal.isOpen()) {
       return false;
     }
     const current = info.current();
@@ -195,9 +311,12 @@ export function AuthorScreen({
       current === info.sectionItemId ||
       current === AUTHOR_STATE_ACTION_ID ||
       current === retryId ||
+      current === fieldId ||
+      current === chipId ||
+      current === resetId ||
       current.startsWith(cardPrefix)
     );
-  }, [cardPrefix, retryId]);
+  }, [cardPrefix, retryId, fieldId, chipId, resetId, modal]);
 
   const restoration = useFocusRestoration({
     routeKey,
@@ -212,20 +331,26 @@ export function AuthorScreen({
     ? 'unavailable'
     : author.error !== null
       ? 'error'
-      : posts.isPending
+      : list.isPending
         ? 'loading'
-        : posts.firstPageError !== null
+        : list.firstPageError !== null
           ? 'postsError'
-          : posts.posts.length === 0
+          : list.posts.length === 0
             ? 'empty'
             : 'grid';
   const phaseRef = useLatestRef(phase);
 
   /** The user has not moved focus away from where the page may take it. */
-  const mayTakeFocus = useCallback(
-    () => mayTakeScreenFocus(focusRef.current, AUTHOR_STATE_ACTION_ID),
-    [],
-  );
+  const mayTakeFocus = useCallback(() => {
+    if (modal.isOpen()) {
+      return false;
+    }
+    const info = focusRef.current;
+    return (
+      mayTakeScreenFocus(info, AUTHOR_STATE_ACTION_ID) ||
+      (fieldAuto.current && info.isActive() && info.current() === fieldId)
+    );
+  }, [modal, fieldId]);
 
   const idsRef = useRef(ids);
   idsRef.current = ids;
@@ -273,30 +398,114 @@ export function AuthorScreen({
     }, [cardPrefix, restoreOrFirst, restoration, autoFocusSidebar, phaseRef]),
   );
 
+  /**
+   * Story 5.7 (Поиск's rules): «Готово», a search «Повторить» or «Сбросить
+   * фильтры» waits for its outcome: the first result, else the field /
+   * «Сбросить фильтры», else «Повторить». It lands only while focus is
+   * still on the element that started the wait and no modal is open.
+   */
+  const pendingOutcome = useRef(false);
+  const outcomeFetchSeen = useRef(false);
+  const listFetchingRef = useLatestRef(list.isFetching);
+  /** The latest `resolveOutcome` (set below; read by the next-frame check). */
+  const resolveLater = useRef<() => boolean>(() => false);
+  const outcomeFrame = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (outcomeFrame.current !== null) {
+        cancelAnimationFrame(outcomeFrame.current);
+      }
+    },
+    [],
+  );
+  const awaitOutcome = useCallback(() => {
+    pendingOutcome.current = true;
+    outcomeFetchSeen.current = false;
+    // No fetch followed (e.g. «Сбросить фильтры» onto a cached, also empty
+    // list: no phase change, no fetching cycle): settle on the next frame
+    // with the same rules, so the flag never outlives its action.
+    if (outcomeFrame.current !== null) {
+      cancelAnimationFrame(outcomeFrame.current);
+    }
+    outcomeFrame.current = requestAnimationFrame(() => {
+      outcomeFrame.current = null;
+      if (pendingOutcome.current && !outcomeFetchSeen.current && !listFetchingRef.current) {
+        resolveLater.current();
+      }
+    });
+  }, [listFetchingRef]);
+  const mayTakeOutcomeFocus = useCallback(() => {
+    const info = focusRef.current;
+    if (!info.isActive() || modal.isOpen()) {
+      return false;
+    }
+    const current = info.current();
+    return current === null || current === fieldId || current === AUTHOR_STATE_ACTION_ID;
+  }, [modal, fieldId]);
+  /** Settles a pending outcome on the current phase; true when it did (focus handled). */
+  const resolveOutcome = (): boolean => {
+    if (!pendingOutcome.current || phase === 'loading') {
+      return false;
+    }
+    pendingOutcome.current = false;
+    if (!mayTakeOutcomeFocus()) {
+      return true;
+    }
+    if (phase === 'grid') {
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+      restoration.focusInitial();
+    } else if (phase === 'postsError' || (phase === 'empty' && filtered)) {
+      requestHostFocus(stateActionView.current);
+    } else {
+      focusField();
+    }
+    return true;
+  };
+  const resolveRef = useLatestRef(resolveOutcome);
+  resolveLater.current = resolveOutcome;
+  // The awaited fetch settled with the phase unchanged (the held error
+  // through a failed retry): settle the outcome too.
+  useEffect(() => {
+    if (!pendingOutcome.current) {
+      return;
+    }
+    if (list.isFetching) {
+      outcomeFetchSeen.current = true;
+    } else if (outcomeFetchSeen.current) {
+      outcomeFetchSeen.current = false;
+      resolveRef.current();
+    }
+  }, [list.isFetching, resolveRef]);
+
   usePhaseChange(phase, () => {
+    if (resolveOutcome()) {
+      return;
+    }
     const info = focusRef.current;
     const current = info.current();
     const contentLost =
       info.isActive() &&
+      !modal.isOpen() &&
       current !== null &&
       (current.startsWith(cardPrefix) || current === retryId || current === AUTHOR_STATE_ACTION_ID);
+    const emptyAction = phase === 'empty' && filtered;
     if (phase === 'loading') {
       // The skeleton has nothing focusable: a focused action (an E3 retry
       // that succeeded while E4 still loads) or card is gone.
       if (contentLost) {
-        autoFocusSidebar();
+        focusAfterLoss();
       }
     } else if (phase === 'grid') {
       if (mayTakeFocus()) {
         restoreOrFirst();
       }
-    } else if (phase === 'empty') {
-      // Nothing focusable in content: a focused action or card is gone.
+    } else if (phase === 'empty' && !emptyAction) {
+      // Nothing focusable in the empty view: a focused action or card is gone.
       if (contentLost) {
-        autoFocusSidebar();
+        focusAfterLoss();
       }
     } else if (mayTakeFocus() || contentLost) {
-      // A StateView with its one action (Повторить / Назад).
+      // A StateView with its one action (Повторить / Назад / Сбросить фильтры).
       autoFocusAction();
     }
   });
@@ -317,7 +526,7 @@ export function AuthorScreen({
     onFollowHead: latch.onFollowHead,
   });
 
-  const onRetryLoadMore = useLoadMoreRetry(posts, ids, restoration, () => {
+  const onRetryLoadMore = useLoadMoreRetry(list, ids, restoration, () => {
     const info = focusRef.current;
     return info.isActive() && info.current() === retryId;
   });
@@ -329,6 +538,176 @@ export function AuthorScreen({
       posts.refetch();
     }
   }, [author, posts]);
+
+  // «Повторить» of a failed list page 1 (posts or search results).
+  const onRetryList = useCallback(() => {
+    if (searching) {
+      awaitOutcome();
+    }
+    list.refetch();
+  }, [list, searching, awaitOutcome]);
+
+  /** Back to the normal list (the search memory starts over at the field). */
+  const leaveSearch = useCallback(() => {
+    pendingOutcome.current = false;
+    restoration.cancel();
+    focusRestoration.remember(routeKey, MAIN_SECTION, fieldId, 0);
+    setQuery(null);
+  }, [restoration, routeKey, fieldId]);
+
+  const onChangeDraft = useCallback((text: string) => {
+    // Typing is the user's: the field is theirs now.
+    fieldAuto.current = false;
+    setDraft(text);
+  }, []);
+
+  // «Готово» (Поиск's rules): the trimmed query; blank → the normal list.
+  const filterRef = useLatestRef(filter);
+  const queryRef = useLatestRef(query);
+  const onSubmit = useCallback(() => {
+    // The system closes the keyboard; focus stays on the field explicitly.
+    fieldAuto.current = false;
+    focusField();
+    const next = draft.trim();
+    if (next === '') {
+      if (queryRef.current !== null) {
+        leaveSearch();
+      }
+      return;
+    }
+    restoration.cancel();
+    focusRestoration.remember(routeKey, MAIN_SECTION, fieldId, 0);
+    awaitOutcome();
+    submitBlogSearch(client, blogUrl, next, filterRef.current).catch(() => {});
+    setQuery(next);
+  }, [
+    draft,
+    focusField,
+    queryRef,
+    leaveSearch,
+    restoration,
+    routeKey,
+    fieldId,
+    awaitOutcome,
+    client,
+    blogUrl,
+    filterRef,
+  ]);
+
+  // Back (the route asks first): an active search is cleared, focus → the field.
+  useEffect(() => {
+    if (!backHandlerRef) {
+      return;
+    }
+    backHandlerRef.current = () => {
+      if (queryRef.current === null) {
+        return false;
+      }
+      setDraft('');
+      leaveSearch();
+      focusField();
+      return true;
+    };
+    return () => {
+      backHandlerRef.current = null;
+    };
+  }, [backHandlerRef, queryRef, leaveSearch, focusField]);
+
+  // «Сбросить фильтры» in the filtered «Ничего не найдено»: the action goes
+  // with the empty view, so the field keeps focus while the list reloads.
+  // While searching, the query runs again under the default Filter (a
+  // cached result for it is not reused).
+  const onResetFilters = useCallback(() => {
+    focusField();
+    awaitOutcome();
+    if (queryRef.current !== null) {
+      submitBlogSearch(client, blogUrl, queryRef.current, DEFAULT_FILTER).catch(() => {});
+    }
+    filtersStore.getState().reset(scope);
+  }, [focusField, awaitOutcome, scope, queryRef, client, blogUrl]);
+
+  // «Фильтры»: the shared sheet with the route's scope and the blog's tags;
+  // Back returns to the chip.
+  const chipView = useRef<HostView | null>(null);
+  const chipZone = useZoneItem(chipId);
+  const chipRef = useCallback((view: HostView | null) => {
+    chipView.current = view;
+  }, []);
+  const httpRef = useLatestRef(http);
+  const onOpenFilters = useCallback(() => {
+    if (modal.isOpen()) {
+      return;
+    }
+    modal.open(<FilterSheet scope={scope} http={httpRef.current} blogUrl={blogUrl} />, chipView, {
+      placement: 'end',
+    });
+  }, [modal, httpRef, scope, blogUrl]);
+
+  // «Сбросить» (shown while a search or a filter is active): both cleared,
+  // focus → the chip (it stays; «Сбросить» goes away).
+  const resetZone = useZoneItem(resetId);
+  const onResetAll = useCallback(() => {
+    if (chipView.current) {
+      requestHostFocus(chipView.current);
+    } else {
+      focusField();
+    }
+    setDraft('');
+    if (queryRef.current !== null) {
+      leaveSearch();
+    }
+    filtersStore.getState().reset(scope);
+  }, [focusField, queryRef, leaveSearch, scope]);
+
+  // The chip and «Сбросить» are focusable only while the action row has
+  // focus (Поиск's device lesson, Story 5.6: ↑ from a later column would
+  // otherwise find them first and the row guide never redirects to the
+  // field). ↓ from the row: the last focused card, else its neighbour by
+  // index, else the first (the guide around the grid).
+  const lastCard = useRef<{ id: string; index: number } | null>(null);
+  const [rowFocus, setRowFocus] = useState(false);
+  useEffect(
+    () =>
+      focus.onFocusChange(focusId => {
+        if (focusId.startsWith(cardPrefix)) {
+          lastCard.current = { id: focusId, index: Math.max(idsRef.current.indexOf(focusId), 0) };
+        }
+        if (focusId !== fieldId) {
+          fieldAuto.current = false;
+        }
+        setRowFocus(focusId === fieldId || focusId === chipId || focusId === resetId);
+      }),
+    [focus, cardPrefix, fieldId, chipId, resetId],
+  );
+  const [downTarget, setDownTarget] = useState<HostView | null>(null);
+  useEffect(() => {
+    if (!rowFocus || phase !== 'grid') {
+      setDownTarget(null);
+      return;
+    }
+    const pick = () => {
+      const remembered = lastCard.current;
+      const id =
+        remembered === null
+          ? ids[0]
+          : ids.includes(remembered.id)
+            ? remembered.id
+            : ids[Math.min(remembered.index, ids.length - 1)];
+      return (
+        (id !== undefined ? restoration.viewOf(id) : null) ??
+        (ids[0] !== undefined ? restoration.viewOf(ids[0]) : null)
+      );
+    };
+    setDownTarget(pick());
+    // A row that mounts after the list's layout pass: look again next frame.
+    const frame = requestAnimationFrame(() => setDownTarget(pick()));
+    return () => cancelAnimationFrame(frame);
+  }, [rowFocus, phase, ids, restoration]);
+
+  const chip = filtersEnabled ? chipLabels(filter) : null;
+  const showReset = rowShown && (searching || filtered);
+  const rowDestinations = useMemo(() => (fieldView ? [fieldView] : []), [fieldView]);
+  const downDestinations = useMemo(() => (downTarget ? [downTarget] : []), [downTarget]);
 
   if (phase === 'unavailable' || phase === 'error') {
     const unavailable = phase === 'unavailable';
@@ -357,6 +736,13 @@ export function AuthorScreen({
     );
   }
 
+  const emptyTestID = searching ? 'author/search-empty' : filtered ? 'author/filtered-empty' : 'author/empty';
+  const emptyBody = searching
+    ? t(filtered ? 'author.search.filteredEmptyBody' : 'author.search.emptyBody')
+    : filtered
+      ? t('author.search.filteredPostsEmptyBody')
+      : t('author.emptyBody');
+
   return (
     <View testID="author/page" style={styles.root}>
       {author.author ? (
@@ -364,12 +750,63 @@ export function AuthorScreen({
       ) : (
         <AuthorHeaderSkeleton testID="author/header-skeleton" />
       )}
+      {rowShown ? (
+        <TVFocusGuideView
+          testID="author/action-row"
+          destinations={rowDestinations}
+          trapFocusRight
+          style={styles.actionRow}
+        >
+          {searchEnabled ? (
+            <View style={styles.fieldColumn}>
+              <TextField
+                testID={fieldId}
+                label={t('author.search.fieldLabel')}
+                placeholder={t('author.search.placeholder')}
+                value={draft}
+                onChangeText={onChangeDraft}
+                onSubmitEditing={onSubmit}
+                onFocus={fieldZone.onFocus}
+                hostRef={fieldHostRef}
+              />
+            </View>
+          ) : null}
+          {chip !== null ? (
+            <View style={styles.chipColumn}>
+              <FilterChip
+                ref={chipRef}
+                testID={chipId}
+                label={chip.label}
+                count={chip.count}
+                accessibilityLabel={chip.a11y}
+                onPress={onOpenFilters}
+                onFocus={chipZone.onFocus}
+                focusable={rowFocus || !searchEnabled}
+              />
+            </View>
+          ) : null}
+          {showReset ? (
+            <View style={styles.chipColumn}>
+              <Button
+                testID={resetId}
+                kind="secondary"
+                size="small"
+                label={t('author.search.reset')}
+                accessibilityLabel={t('author.search.resetA11y')}
+                onPress={onResetAll}
+                onFocus={resetZone.onFocus}
+                focusable={rowFocus || !searchEnabled}
+              />
+            </View>
+          ) : null}
+        </TVFocusGuideView>
+      ) : null}
       {phase === 'loading' ? (
         <View
           testID="author/skeleton"
           style={styles.skeleton}
           accessible
-          accessibilityLabel={t('author.loadingPosts')}
+          accessibilityLabel={searching ? t('author.search.loading') : t('author.loadingPosts')}
         >
           {Array.from({ length: SKELETON_ROWS }, (_, row) => (
             <View key={row} style={styles.skeletonRow}>
@@ -384,15 +821,15 @@ export function AuthorScreen({
           ))}
         </View>
       ) : null}
-      {phase === 'postsError' && posts.firstPageError !== null ? (
-        <View testID="author/posts-error" style={styles.state}>
+      {phase === 'postsError' && list.firstPageError !== null ? (
+        <View testID={searching ? 'author/search-error' : 'author/posts-error'} style={styles.state}>
           <StateView
-            title={t('author.postsErrorTitle')}
-            body={t(`error.${posts.firstPageError}`)}
+            title={searching ? t('author.search.errorTitle') : t('author.postsErrorTitle')}
+            body={t(`error.${list.firstPageError}`)}
             action={{
               label: t('common.retry'),
-              onPress: posts.refetch,
-              busy: posts.isFetching,
+              onPress: onRetryList,
+              busy: list.isFetching,
               testID: AUTHOR_STATE_ACTION_ID,
               ref: stateActionRef,
               onFocus: stateAction.onFocus,
@@ -402,32 +839,54 @@ export function AuthorScreen({
         </View>
       ) : null}
       {phase === 'empty' ? (
-        <View testID="author/empty" style={styles.state}>
+        <View testID={emptyTestID} style={styles.state}>
           <StateView
-            title={t('author.emptyTitle')}
-            body={t('author.emptyBody')}
+            title={searching || filtered ? t('author.search.emptyTitle') : t('author.emptyTitle')}
+            body={emptyBody}
+            action={
+              filtered
+                ? {
+                    label: t('author.search.resetFilters'),
+                    onPress: onResetFilters,
+                    testID: AUTHOR_STATE_ACTION_ID,
+                    ref: stateActionRef,
+                    onFocus: stateAction.onFocus,
+                  }
+                : undefined
+            }
             style={styles.withAction}
           />
         </View>
       ) : null}
       {phase === 'grid' ? (
-        <PostGrid
-          posts={shownPosts}
-          height={listHeight}
-          restoration={restoration}
-          listRef={listRef}
-          hasNextPage={posts.hasNextPage}
-          isFetchingNextPage={posts.isFetchingNextPage}
-          loadMoreFailed={posts.loadMoreFailed}
-          onLoadMore={posts.fetchNextPage}
-          onRetry={onRetryLoadMore}
-          onCardPress={onCardPress}
-          cardIdPrefix={cardPrefix}
-          retryId={retryId}
-          testIDPrefix="author/posts"
-          showPinned
-          loadMoreErrorLabel={t('author.loadMoreError')}
-        />
+        // ↓ from the action row enters the grid through this guide (the
+        // remembered card, else the first; Поиск's device lesson). An
+        // explicit box: unstyled, the guide collapses the list.
+        <TVFocusGuideView
+          testID="author/posts/guide"
+          destinations={downDestinations}
+          style={[styles.gridGuide, { height: listHeight + POST_GRID_LIST_TOP_GAP }]}
+        >
+          <PostGrid
+            posts={shownPosts}
+            height={listHeight}
+            restoration={restoration}
+            listRef={listRef}
+            hasNextPage={list.hasNextPage}
+            isFetchingNextPage={list.isFetchingNextPage}
+            loadMoreFailed={list.loadMoreFailed}
+            onLoadMore={list.fetchNextPage}
+            onRetry={onRetryLoadMore}
+            onCardPress={onCardPress}
+            cardIdPrefix={cardPrefix}
+            retryId={retryId}
+            testIDPrefix="author/posts"
+            showPinned
+            loadMoreErrorLabel={
+              searching ? t('author.search.loadMoreError') : t('author.loadMoreError')
+            }
+          />
+        </TVFocusGuideView>
       ) : null}
     </View>
   );
@@ -436,6 +895,35 @@ export function AuthorScreen({
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+  },
+  // The row keeps inside the content width (device check): the field takes
+  // what the chip and «Сбросить» leave, up to 440 dp (a long chip label
+  // would otherwise push «Сбросить» off the screen).
+  actionRow: {
+    height: AUTHOR_ACTION_ROW_HEIGHT,
+    width: spacing['content-width'] - 2 * spacing['focus-headroom'],
+    marginTop: ACTION_ROW_TOP,
+    marginLeft: spacing['focus-headroom'],
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  fieldColumn: {
+    flexGrow: 0,
+    flexShrink: 1,
+    flexBasis: FIELD_WIDTH,
+    minWidth: FIELD_MIN_WIDTH,
+  },
+  chipColumn: {
+    flexShrink: 0,
+    marginLeft: spacing['6'],
+    // Level with the field: below the label, centred on the 50 dp field.
+    marginTop:
+      typography['body-s'].lineHeight +
+      spacing['4'] +
+      (FIELD.height - components['filter-chip'].height) / 2,
+  },
+  gridGuide: {
+    width: spacing['content-width'],
   },
   skeleton: {
     marginTop: spacing['8'],

@@ -20,7 +20,8 @@ import type { ReadResult, SecureStore } from '../../shared/platform/secureStore'
  * pages of 8), E2 (Подписки, Story 3.2)
  * synthetic authors, E1 the account's own blog `demo-blog-2` (Story 5.2),
  * E3/E4 (Автор, Story 3.3: `demo-blog-1` 2 pages,
- * `demo-blog-3` no posts, the last demo blog missing), E8 (Пост, Story 3.4:
+ * `demo-blog-3` no posts, the last demo blog missing; Story 5.7: the E4
+ * Filter params, E7 blog search and E14 blog tags), E8 (Пост, Story 3.4:
  * every demo post with several paragraphs and a like count, every fourth
  * one also with image, file, audio, poll and unknown blocks and an inline link;
  * `demo-post-9` answers 404 `not_found`; locked posts (every seventh) have a
@@ -229,20 +230,80 @@ function demoBlog(blogUrl: string) {
   };
 }
 
-/** The E4 page after `offset` (the demo cursor is the next post number). */
-function demoBlogPage(url: string, blogUrl: string) {
+/**
+ * The demo blog's posts that pass the E4 Filter params of `url` (Story 5.7,
+ * as live, api-contract §3 «E4 filters (LIVE)»): `is_only_allowed=true` →
+ * the accessible posts only, absent or `false` → every post (a blog's
+ * server default is «Все посты»); `only_bought` is ignored; `from_ts` /
+ * `to_ts` and `tags_ids` as on E5.
+ */
+function demoBlogPosts(url: string, blogUrl: string) {
   const total = DEMO_BLOG_POSTS[blogUrl] ?? 5;
+  const index = demoBlogIndex(blogUrl);
+  const onlyAllowed = /[?&]is_only_allowed=true(&|$)/.test(url);
+  const fromTs = numberParam(url, 'from_ts') ?? -Infinity;
+  const toTs = numberParam(url, 'to_ts') ?? Infinity;
+  const tagsMatch = /[?&]tags_ids=([^&]*)/.exec(url);
+  const tagIds = tagsMatch
+    ? decodeURIComponent(tagsMatch[1]).split(',').filter(id => id !== '')
+    : [];
+  return Array.from({ length: total }, (_, n) => demoPost(n, { blogUrl, index }))
+    .map(post => ({ ...post, id: `${blogUrl}-post-${post.int_id}` }))
+    .filter(
+      post =>
+        (!onlyAllowed || post.hasAccess) &&
+        post.publishTime >= fromTs &&
+        post.publishTime <= toTs &&
+        tagIds.every(id => post.tags.some(tag => String(tag.id) === id)),
+    );
+}
+
+/** The page of `all` after the demo cursor `offset` (the next index), `size` per page. */
+function demoSizedPage<T>(url: string, all: readonly T[], size: number) {
   const match = /[?&]offset=([^&]*)/.exec(url);
   const start = match ? Number(decodeURIComponent(match[1])) || 0 : 0;
-  const end = Math.min(start + BLOG_PAGE, total);
-  const index = demoBlogIndex(blogUrl);
-  const data = Array.from({ length: Math.max(0, end - start) }, (_, i) =>
-    demoPost(start + i, { blogUrl, index }),
-  ).map(post => ({ ...post, id: `${blogUrl}-post-${post.int_id}` }));
-  return { data, extra: { offset: String(end), isLast: end >= total } };
+  const end = Math.min(start + size, all.length);
+  return { items: all.slice(start, end), extra: { offset: String(end), isLast: end >= all.length } };
+}
+
+/** The E4 page after `offset` (the demo cursor is the next index in the filtered list). */
+function demoBlogPage(url: string, blogUrl: string) {
+  const page = demoSizedPage(url, demoBlogPosts(url, blogUrl), BLOG_PAGE);
+  return { data: page.items, extra: page.extra };
+}
+
+/**
+ * E7 «Поиск в блоге» (Story 5.7): the blog's posts with the E4 period and
+ * tag params, but every access value (as live: E7 ignores them), matched by
+ * a case-insensitive title substring of `search_query`.
+ */
+function demoBlogSearchPage(url: string) {
+  const blogMatch = /[?&]blog_url=([^&]*)/.exec(url);
+  const blogUrl = blogMatch ? decodeURIComponent(blogMatch[1]) : '';
+  const match = /[?&]search_query=([^&]*)/.exec(url);
+  const query = match ? decodeURIComponent(match[1].replace(/\+/g, ' ')).trim().toLowerCase() : '';
+  const all = DEMO_BLOGS.includes(blogUrl)
+    ? demoBlogPosts(url.replace(/([?&])is_only_allowed=true/, '$1is_only_allowed=false'), blogUrl)
+    : [];
+  const found = all.filter(post => query !== '' && post.title.toLowerCase().includes(query));
+  const page = demoSizedPage(url, found, BLOG_PAGE);
+  return { data: { searchPosts: page.items.map(post => ({ post })) }, extra: page.extra };
+}
+
+/** E14 (Story 5.7): the tags carried by the demo blog's posts, one page. */
+function demoBlogTags(blogUrl: string) {
+  const seen = new Map<string, { id: number; title: string }>();
+  for (const post of demoBlogPosts('', blogUrl)) {
+    for (const tag of post.tags) {
+      seen.set(String(tag.id), { id: tag.id, title: tag.title });
+    }
+  }
+  return { data: [...seen.values()] };
 }
 
 const DEMO_BLOG_PATH = /^\/v1\/blog\/(demo-blog-\d+)(\/post\/)?$/;
+/** E14 (Story 5.7). */
+const DEMO_BLOG_TAGS_PATH = /^\/v1\/blog\/(demo-blog-\d+)\/post\/tag\/$/;
 const DEMO_POST_PATH = /^\/v1\/blog\/(demo-blog-\d+)\/post\/([^/]+)$/;
 /** E9: `PUT /v1/viewstat/video/{mediaId}/timecode/` (Story 4.2). */
 const DEMO_TIMECODE_PATH = /^\/v1\/viewstat\/video\/[^/]+\/timecode\/$/;
@@ -347,6 +408,10 @@ export function createDemoSessionManager(): SessionManager {
     if (request.method === 'PUT' && DEMO_TIMECODE_PATH.test(request.path)) {
       return { status: 200, delayMs: 300 };
     }
+    const blogTags = DEMO_BLOG_TAGS_PATH.exec(request.path);
+    if (blogTags) {
+      return { status: 200, body: demoBlogTags(blogTags[1]), delayMs: 300 };
+    }
     const single = DEMO_POST_PATH.exec(request.path);
     if (single) {
       const [, blogUrl, postId] = single;
@@ -371,6 +436,8 @@ export function createDemoSessionManager(): SessionManager {
         return { status: 200, body: demoFeedPage(request.url, DEMO_FEED_POSTS), delayMs: 300 };
       case '/v1/search/feed/post/':
         return { status: 200, body: demoFeedSearchPage(request.url, DEMO_FEED_POSTS), delayMs: 300 };
+      case '/v1/search/blog/post/':
+        return { status: 200, body: demoBlogSearchPage(request.url), delayMs: 300 };
       case '/v1/search/feed/tag/':
         return { status: 200, body: demoFeedTagsPage(request.url), delayMs: 300 };
       case '/v1/user/subscriptions':

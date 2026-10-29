@@ -1,6 +1,9 @@
 import {
   ACCESS_VALUES,
   DEFAULT_FILTER,
+  accessValuesFor,
+  authorFilterScope,
+  isAuthorScope,
   activeFilterCount,
   filtersAccountStore,
   filtersStore,
@@ -92,5 +95,31 @@ describe('filtersStore', () => {
     filtersStore.getState().setAccess('feed', 'bought');
     await filtersAccountStore.reset();
     expect(getFilter('feed')).toBe(DEFAULT_FILTER);
+  });
+});
+
+describe('Story 5.7: the Author scope', () => {
+  it('one scope per Author route; access values without «Только купленные»; reset drops the scope only', () => {
+    const a = authorFilterScope('route-a');
+    const b = authorFilterScope('route-b');
+    expect(a).toBe('author:route-a');
+    expect(isAuthorScope(a)).toBe(true);
+    expect(isAuthorScope('feed')).toBe(false);
+    expect(accessValuesFor(a)).toEqual(['allowed', 'all']);
+    expect(accessValuesFor('feed')).toEqual(ACCESS_VALUES);
+    expect(accessValuesFor('search')).toEqual(ACCESS_VALUES);
+    filtersStore.getState().setAccess(a, 'all');
+    filtersStore.getState().setAccess('feed', 'bought');
+    expect(getFilter(a).access).toBe('all');
+    expect(getFilter(b)).toBe(DEFAULT_FILTER);
+    filtersStore.getState().reset(a);
+    expect(filtersStore.getState().filters[a]).toBeUndefined();
+    expect(getFilter('feed').access).toBe('bought');
+  });
+
+  it('the account wipe clears the Author scopes too', () => {
+    filtersStore.getState().setAccess(authorFilterScope('r'), 'all');
+    filtersStore.getState().clear();
+    expect(filtersStore.getState().filters).toEqual({});
   });
 });

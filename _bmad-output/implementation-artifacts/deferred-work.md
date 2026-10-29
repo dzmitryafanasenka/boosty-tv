@@ -298,3 +298,7 @@
   summary: A Continue entry whose post later becomes locked or is deleted stays in the row until its player is opened (no E8 per card, spec decision).
   evidence: Spec Decisions «No E8 per card».
   note: Owner decision 2026-10-28, implemented (host-tested): when the player's E8 says locked (session checked; also the 4.4 no-access exit) or unavailable (E8 404 / the video gone), `ProgressRepository.forget` drops the entry (no request), so the card leaves the row and Главная focuses its neighbour, else the first feed card. Not run on the device.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-5-7-search-and-filters-inside-an-author.md`
+  summary: An occasional jest run executes fewer tests than expected with no failure (one of 30 in Story 5.7, a similar one in Story 5.6).
+  evidence: settled 2026-10-29 by a full log: «Test suite failed to run — A jest worker process was terminated by another process: signal=SIGSEGV» (postsHeadRefresh.test.ts, unchanged by the story); a Node/jest-worker crash on the host, not a test failure. Worth a look if it grows (e.g. `--workerIdleMemoryLimit`, Node version).

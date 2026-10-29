@@ -1,0 +1,23 @@
+{
+  "case": "e14-blog-tags",
+  "status": 200,
+  "body": {
+    "data": [
+      {
+        "id": 2001,
+        "title": "redacted",
+        "count": 5
+      },
+      {
+        "id": 2002,
+        "title": "redacted",
+        "count": 5
+      },
+      {
+        "id": 2003,
+        "title": "redacted",
+        "count": 5
+      }
+    ]
+  }
+}

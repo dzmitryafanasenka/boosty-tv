@@ -248,7 +248,9 @@ export function StackSidebarRoute({
  * D Автор (Story 3.3) with the Shell's sidebar (owner decision 2026-10-27,
  * option A; ADR 0012): current item = the origin section (Подписки, or
  * Главная for an Автор opened from a feed post). OK on a post opens Пост
- * (Story 3.4) with the same origin section.
+ * (Story 3.4) with the same origin section. Story 5.7: the route key is the
+ * page's Filter scope (`author:<routeKey>`); Back first clears an active
+ * blog search (the page's handler), else pops.
  */
 export function AuthorRoute({
   navigation,
@@ -266,8 +268,18 @@ export function AuthorRoute({
     [navigation, origin],
   );
 
+  // Story 5.7: Back asks the page first (an active blog search is cleared).
+  const pageBack = useRef<(() => boolean) | null>(null);
+  const onBackPress = useCallback(() => pageBack.current?.() === true, []);
+
   return (
-    <StackSidebarRoute navigation={navigation} routeKey={routeKey} origin={origin} name="author">
+    <StackSidebarRoute
+      navigation={navigation}
+      routeKey={routeKey}
+      origin={origin}
+      name="author"
+      onBackPress={onBackPress}
+    >
       {({ focus, onBack }) => (
         <AuthorScreen
           http={session.http}
@@ -276,6 +288,9 @@ export function AuthorRoute({
           focus={focus}
           onBack={onBack}
           onOpenPost={onOpenPost}
+          searchEnabled={phaseFlags.search}
+          filtersEnabled={phaseFlags.filters}
+          backHandlerRef={pageBack}
         />
       )}
     </StackSidebarRoute>
