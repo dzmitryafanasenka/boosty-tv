@@ -165,6 +165,7 @@ describe('postBodyItems: teaser images (Story 3.6)', () => {
         url: 'https://example.invalid/image',
         width: 1111,
         height: 625,
+        stop: false,
       },
     ]);
   });
@@ -180,8 +181,8 @@ describe('postBodyItems: teaser images (Story 3.6)', () => {
       ]),
     ).toEqual([
       { kind: 'placeholder', key: 'image:a', block: 'image' },
-      { kind: 'image', key: 'image:b', url: 'https://example.invalid/b', width: null, height: null },
-      { kind: 'image', key: 'image@2', url: 'https://example.invalid/c', width: null, height: null },
+      { kind: 'image', key: 'image:b', url: 'https://example.invalid/b', width: null, height: null, stop: false },
+      { kind: 'image', key: 'image@2', url: 'https://example.invalid/c', width: null, height: null, stop: false },
       { kind: 'paragraph', key: 'text@3', text: 'T' },
       { kind: 'placeholder', key: 'ok_video:v', block: 'video' },
     ]);
@@ -563,5 +564,32 @@ describe('postBodyItems: styled segments and emoji (Story 6.1)', () => {
       key: 'smile@110',
       url: 'https://example.invalid/emoji',
     });
+  });
+});
+
+describe('postBodyItems: images of an accessible post (Story 6.2)', () => {
+  const blocks = (data: unknown[]) => mapped({ ...e8Locked(), hasAccess: true, data }).blocks;
+
+  it("`images: 'stops'`: an image with a URL is a focus stop; one without a URL stays a placeholder", () => {
+    const items = postBodyItems(
+      blocks([
+        { type: 'image', id: 'a', url: 'https://example.invalid/a', width: 800, height: 600 },
+        { type: 'image', id: 'b' },
+      ]),
+      { images: 'stops' },
+    );
+    expect(items).toEqual([
+      { kind: 'image', key: 'image:a', url: 'https://example.invalid/a', width: 800, height: 600, stop: true },
+      { kind: 'placeholder', key: 'image:b', block: 'image' },
+    ]);
+    expect(items.map(isFocusStop)).toEqual([true, false]);
+  });
+
+  it('a teaser image (`images: true`) is never a focus stop', () => {
+    const [item] = postBodyItems(
+      blocks([{ type: 'image', id: 'a', url: 'https://example.invalid/a' }]),
+      { images: true },
+    );
+    expect(isFocusStop(item)).toBe(false);
   });
 });

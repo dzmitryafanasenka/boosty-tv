@@ -252,7 +252,7 @@ export function PostScreen({
       post === null
         ? []
         : post.hasAccess
-          ? postBodyItems(post.blocks, { videoRows: true })
+          ? postBodyItems(post.blocks, { videoRows: true, images: 'stops' })
           : postBodyItems(post.teaser, { images: true }),
     [post],
   );

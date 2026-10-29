@@ -32,6 +32,7 @@ describe('teaser image box', () => {
     kind: 'image',
     key: 'image:i',
     url,
+    stop: false,
     width,
     height,
   });

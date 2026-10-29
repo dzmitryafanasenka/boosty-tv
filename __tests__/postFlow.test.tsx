@@ -351,7 +351,8 @@ describe('blocks (matrix «Mixed blocks», «Malformed block»)', () => {
       body: postDetail(blogUrl, postId, [
         { type: 'ok_video', id: 'v1', title: 'Video', playerUrls: [{ type: 'hd', url: '' }] },
         ...paragraph('Between'),
-        { type: 'image', id: 'i1', url: 'https://example.invalid/image' },
+        // No URL: still a placeholder (an image with a URL is a stop, Story 6.2).
+        { type: 'image', id: 'i1' },
         { type: 'link', content: '["Link","unstyled",[]]', url: 'https://example.invalid/link' },
         { type: 'file', id: 'f1', title: 'File' },
         { type: 'audio_file', id: 'a1', title: 'Audio' },
@@ -1883,6 +1884,85 @@ describe('locked posts (Story 3.6, focus-map §4 F)', () => {
     await back();
     expect(currentRoute()).toBe('Author');
     expect(lastFocusTarget()).toBe(AUTHOR_CARD(2));
+    await unmount(root);
+  });
+});
+
+describe('Story 6.2: images in a post', () => {
+  const IMG = 'https://example.invalid/image';
+  const flat = (node: { props: Record<string, unknown> }) =>
+    (StyleSheet.flatten(node.props.style as never) ?? {}) as Record<string, unknown>;
+
+  it('an image is a focus stop between paragraphs: column-capped, aspect kept, max 300 dp, skeleton until loaded; loading never moves focus', async () => {
+    e8 = (_req, blogUrl, postId) => ({
+      status: 200,
+      body: postDetail(blogUrl, postId, [
+        ...paragraph('Before'),
+        { type: 'image', id: 'i1', url: IMG, width: 800, height: 600 },
+        ...paragraph('After'),
+      ]),
+    });
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    const image = BLOCK(id, 'image:i1');
+    expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, 'text@0'), image, BLOCK(id, 'text@3')]);
+    expect(lastFocusTarget()).toBe(BLOCK(id, 'text@0'));
+    expect(one(root, image).props.accessibilityLabel).toBe('Изображение');
+    const img = byTestId(root, `${image}/image`)[0];
+    expect(img.props.source).toEqual({ uri: IMG });
+    // 4:3 at most 300 dp tall → 400 × 300 (under the 600 dp text measure).
+    const box = () => flat(byTestId(root, `${image}/box`)[0]);
+    expect(box()).toMatchObject({ width: 400, height: 300, backgroundColor: colors.skeleton });
+    focusMock.mockClear();
+    // The real image is 16:9: the box follows it (600 × 337.5 under the 300 cap → 533.3 × 300).
+    await act(async () => img.props.onLoad({ nativeEvent: { source: { width: 1600, height: 900 } } }));
+    expect(box().height).toBe(300);
+    expect(box().width as number).toBeCloseTo(533.33, 1);
+    expect(box().backgroundColor).toBe(colors.surface);
+    expect(focusTargets()).toEqual([]);
+    await unmount(root);
+  });
+
+  it('a failed image: «Изображение недоступно» in the same stop; the rest of the post unaffected', async () => {
+    e8 = (_req, blogUrl, postId) => ({
+      status: 200,
+      body: postDetail(blogUrl, postId, [
+        { type: 'image', id: 'i1', url: IMG },
+        ...paragraph('After'),
+      ]),
+    });
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    const image = BLOCK(id, 'image:i1');
+    // No video, the image first: the image is the initial focus.
+    expect(lastFocusTarget()).toBe(image);
+    focusMock.mockClear();
+    await act(async () => byTestId(root, `${image}/image`)[0].props.onError({ nativeEvent: {} }));
+    expect(byTestId(root, `${image}/image`)).toHaveLength(0);
+    expect(text(byTestId(root, `${image}/failed`)[0])).toContain('Изображение недоступно');
+    expect(one(root, image).props.accessibilityLabel).toBe('Изображение недоступно');
+    // A neutral box (not the loading skeleton), large enough for the message.
+    const failedBox = flat(byTestId(root, `${image}/box`)[0]);
+    expect(failedBox.backgroundColor).toBe(colors.surface);
+    expect(failedBox.height as number).toBeGreaterThanOrEqual(96);
+    expect(contentIds(root)).toEqual([AUTHOR(id), image, BLOCK(id, 'text@1')]);
+    expect(focusTargets()).toEqual([]);
+    await unmount(root);
+  });
+
+  it('no size in the block: a 16:9 box (533 × 300); an onLoad without a size keeps it and clears the skeleton', async () => {
+    e8 = (_req, blogUrl, postId) => ({
+      status: 200,
+      body: postDetail(blogUrl, postId, [{ type: 'image', id: 'i1', url: IMG }, ...paragraph('After')]),
+    });
+    const root = await openFromHome();
+    const image = BLOCK(FEED_ID(0), 'image:i1');
+    const box = () => flat(byTestId(root, `${image}/box`)[0]);
+    expect(box().height).toBe(300);
+    expect(box().width as number).toBeCloseTo(533.33, 1);
+    await act(async () => byTestId(root, `${image}/image`)[0].props.onLoad({ nativeEvent: {} }));
+    expect(box().width as number).toBeCloseTo(533.33, 1);
+    expect(box().backgroundColor).toBe(colors.surface);
     await unmount(root);
   });
 });

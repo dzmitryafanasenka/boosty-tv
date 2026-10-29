@@ -310,3 +310,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-6-1-rich-text-emoji-and-long-posts.md`
   summary: Verify with the first live `smile` sample that a smile counts as one style-offset unit, its field set, and how a failed inline image renders on Android.
   evidence: unverified (maybe-false; medium if wrong: every later range in that paragraph shifts by one); no smile seen in 612 live posts.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-2-images-in-posts.md`
+  summary: A post with many large images decodes all of them in the Post column's plain ScrollView; check a gallery-style post on the Chromecast for memory and scroll.
+  evidence: unverified (maybe-false; medium if real: decoder memory on a low-RAM device); `resizeMethod="resize"` downsamples, but nothing is virtualized.
