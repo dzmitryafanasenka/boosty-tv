@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 10-25-2026 14:34
-last_updated: 10-29-2026 12:52
+last_updated: 10-29-2026 13:03
 project: Boosty TV
 project_key: NOKEY
 tracking_system: file-system
@@ -83,7 +83,7 @@ development_status:
   5-4-filter-by-period: done
   5-5-filter-by-tags: done
   5-6-search-in-subscriptions: done
-  5-7-search-and-filters-inside-an-author: review
+  5-7-search-and-filters-inside-an-author: done
   epic-5-retrospective: optional
 
   epic-6: backlog
