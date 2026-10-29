@@ -52,9 +52,33 @@ export type Filter = {
 /**
  * Where a Filter applies. Story 5.3 added `feed` (Главная), Story 5.6
  * `search` (Поиск по подпискам, its own Filter, AD-18; the reference shares
- * the feed's). Story 5.7 adds `author:<blogUrl>`.
+ * the feed's). Story 5.7 adds `author:<routeKey>`: one Filter per Author
+ * route (owner decision 2026-10-29 Q3 b), so two Author routes of one blog
+ * never share it; the route resets it when it unmounts.
  */
-export type FilterScope = 'feed' | 'search';
+export type FilterScope = 'feed' | 'search' | `author:${string}`;
+
+/** The Filter scope of one Author route (Story 5.7). */
+export function authorFilterScope(routeKey: string): FilterScope {
+  return `author:${routeKey}`;
+}
+
+/** An Author route's scope (Story 5.7). */
+export function isAuthorScope(scope: FilterScope): boolean {
+  return scope.startsWith('author:');
+}
+
+/** «Доступные мне» and «Все посты» (Story 5.7, the Author scope). */
+const BLOG_ACCESS_VALUES: readonly AccessFilter[] = ['allowed', 'all'];
+
+/**
+ * The access values a scope offers, in sheet order. An Author scope has no
+ * «Только купленные» (owner decision 2026-10-29, A a: E4 and E7 ignore
+ * `only_bought`, live); Главная and Поиск offer all three.
+ */
+export function accessValuesFor(scope: FilterScope): readonly AccessFilter[] {
+  return isAuthorScope(scope) ? BLOG_ACCESS_VALUES : ACCESS_VALUES;
+}
 
 export const ALL_TIME: Period = Object.freeze({ kind: 'all' });
 

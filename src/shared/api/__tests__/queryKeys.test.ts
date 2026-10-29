@@ -2,14 +2,18 @@ import { DEFAULT_FILTER } from '../../filters';
 import { queryKeys } from '../queryKeys';
 
 describe('queryKeys (Story 3.3 author keys)', () => {
-  it('E3 and E4 keys carry the blogUrl only (no cursor, URL or signed value)', () => {
+  it('E3 carries the blogUrl only; E4 the blogUrl and the symbolic Filter (no cursor, URL or signed value)', () => {
     expect(queryKeys.author('synthetic-blog-1')).toEqual(['author', 'synthetic-blog-1']);
-    expect(queryKeys.authorPosts('synthetic-blog-1')).toEqual(['authorPosts', 'synthetic-blog-1']);
+    expect(queryKeys.authorPosts('synthetic-blog-1', DEFAULT_FILTER)).toEqual([
+      'authorPosts',
+      'synthetic-blog-1',
+      { access: 'allowed', period: { kind: 'all' }, tagIds: [] },
+    ]);
   });
 
   it('E3 and E4 keys never prefix-match each other or another blog', () => {
     const header = queryKeys.author('a');
-    const posts = queryKeys.authorPosts('a');
+    const posts = queryKeys.authorPosts('a', DEFAULT_FILTER);
     expect(posts.slice(0, header.length)).not.toEqual(header);
     expect(queryKeys.author('b')).not.toEqual(header);
   });
@@ -19,7 +23,7 @@ describe('queryKeys.post (Story 3.4)', () => {
   it('carries the post identity only; never a prefix of a list or author key', () => {
     expect(queryKeys.post('b', 'p')).toEqual(['post', 'b', 'p']);
     expect(queryKeys.post('b', 'p')[0]).not.toBe(queryKeys.author('b')[0]);
-    expect(queryKeys.post('b', 'p')[0]).not.toBe(queryKeys.authorPosts('b')[0]);
+    expect(queryKeys.post('b', 'p')[0]).not.toBe(queryKeys.authorPosts('b', DEFAULT_FILTER)[0]);
   });
 });
 
@@ -30,7 +34,7 @@ describe('queryKeys.me (Story 5.2)', () => {
       queryKeys.subscriptions(),
       queryKeys.subscriptionFeed(DEFAULT_FILTER),
       queryKeys.author('me'),
-      queryKeys.authorPosts('me'),
+      queryKeys.authorPosts('me', DEFAULT_FILTER),
     ]) {
       expect(key[0]).not.toBe('me');
     }
@@ -164,7 +168,7 @@ describe('queryKeys.feedSearch (Story 5.6)', () => {
     const others = [
       queryKeys.subscriptionFeed(base),
       queryKeys.allSubscriptionFeeds(),
-      queryKeys.authorPosts('search'),
+      queryKeys.authorPosts('search', base),
       queryKeys.allAuthorPosts(),
       queryKeys.author('search'),
       queryKeys.feedTags(),
@@ -177,5 +181,88 @@ describe('queryKeys.feedSearch (Story 5.6)', () => {
         queryKeys.allFeedSearches(),
       );
     }
+  });
+});
+
+describe('Story 5.7: author posts, blog search and blog tags keys', () => {
+  const base = DEFAULT_FILTER;
+
+  it('authorPosts: one key per Filter (tags as sorted ids, no titles), under the allAuthorPosts prefix', () => {
+    const keys = [
+      queryKeys.authorPosts('b', base),
+      queryKeys.authorPosts('b', { ...base, access: 'all' }),
+      queryKeys.authorPosts('b', { ...base, period: { kind: 'preset', days: 7 } }),
+      queryKeys.authorPosts('b', { ...base, tags: [{ id: '2', title: 'x' }] }),
+      queryKeys.authorPosts('c', base),
+    ].map(key => JSON.stringify(key));
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(
+      queryKeys.authorPosts('b', {
+        ...base,
+        tags: [
+          { id: '9', title: 'z' },
+          { id: '10', title: 'y' },
+        ],
+      }),
+    ).toEqual(queryKeys.authorPosts('b', { ...base, tags: [{ id: '10', title: 'other' }, { id: '9', title: '' }] }));
+    const prefix = queryKeys.allAuthorPosts();
+    expect(queryKeys.authorPosts('b', base).slice(0, prefix.length)).toEqual(prefix);
+  });
+
+  it('blogSearch: blog, query and Filter in the key; its own search/blog prefix', () => {
+    expect(queryKeys.blogSearch('b', 'q', base)).toEqual([
+      'search',
+      'blog',
+      'b',
+      { query: 'q', access: 'allowed', period: { kind: 'all' }, tagIds: [] },
+    ]);
+    const keys = [
+      queryKeys.blogSearch('b', 'q', base),
+      queryKeys.blogSearch('b', 'r', base),
+      queryKeys.blogSearch('c', 'q', base),
+      queryKeys.blogSearch('b', 'q', { ...base, access: 'all' }),
+    ].map(key => JSON.stringify(key));
+    expect(new Set(keys).size).toBe(keys.length);
+    const prefix = queryKeys.allBlogSearches();
+    expect(queryKeys.blogSearch('b', 'q', base).slice(0, prefix.length)).toEqual(prefix);
+  });
+
+  it('feed, Поиск, author posts and blog search keys never collide or prefix-match each other', () => {
+    const keys = [
+      queryKeys.subscriptionFeed(base),
+      queryKeys.feedSearch('q', base),
+      queryKeys.authorPosts('q', base),
+      queryKeys.blogSearch('q', 'q', base),
+      queryKeys.author('q'),
+      queryKeys.feedTags(),
+      queryKeys.blogTags('q'),
+    ];
+    const prefixes = [
+      queryKeys.allSubscriptionFeeds(),
+      queryKeys.allFeedSearches(),
+      queryKeys.allAuthorPosts(),
+      queryKeys.allBlogSearches(),
+    ];
+    keys.forEach((a, i) =>
+      keys.forEach((b, j) => {
+        if (i !== j) {
+          expect(JSON.stringify(a)).not.toBe(JSON.stringify(b));
+          expect(JSON.stringify(a.slice(0, b.length))).not.toBe(JSON.stringify(b));
+        }
+      }),
+    );
+    // Each list prefix matches its own keys only.
+    prefixes.forEach((prefix, i) => {
+      const own = [keys[0], keys[1], keys[2], keys[3]][i];
+      for (const key of keys) {
+        const matches = JSON.stringify(key.slice(0, prefix.length)) === JSON.stringify(prefix);
+        expect(matches).toBe(key === own);
+      }
+    });
+  });
+
+  it('blogTags: its own root, never a prefix of feedTags', () => {
+    expect(queryKeys.blogTags('b')).toEqual(['blogTags', 'b']);
+    expect(queryKeys.feedTags()[0]).not.toBe(queryKeys.blogTags('b')[0]);
   });
 });

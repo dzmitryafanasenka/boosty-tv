@@ -1,10 +1,13 @@
 export {
   ACCESS_VALUES,
+  accessValuesFor,
+  isAuthorScope,
   ALL_TIME,
   DEFAULT_FILTER,
   NO_TAGS,
   PERIOD_PRESET_DAYS,
   activeFilterCount,
+  authorFilterScope,
   addDays,
   calendarDayOf,
   daysInMonth,
@@ -69,3 +72,4 @@ export {
   type TagListProps,
 } from './TagList';
 export { useFeedTags, type FeedTags } from './useFeedTags';
+export { useBlogTags } from './useBlogTags';

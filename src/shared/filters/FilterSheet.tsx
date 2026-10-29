@@ -4,8 +4,8 @@ import type { HttpClient } from '../api';
 import { t } from '../i18n';
 import { SettingRow, SideSheet, Text, spacing, type HostView } from '../ui';
 import {
-  ACCESS_VALUES,
   PERIOD_PRESET_DAYS,
+  accessValuesFor,
   addDays,
   calendarDayOf,
   formatDayKey,
@@ -38,10 +38,15 @@ export const periodPresetId = (days: PeriodPresetDays) => `filters/period/${days
 export const CUSTOM_DEFAULT_SPAN_DAYS = 30;
 
 export type FilterSheetProps = {
-  /** Whose Filter the sheet edits (Story 5.3: `feed`). */
+  /** Whose Filter the sheet edits (Story 5.3: `feed`; 5.6 `search`; 5.7 `author:<routeKey>`). */
   scope: FilterScope;
-  /** The active session's client: the tag level's E13 (Story 5.5). */
+  /** The active session's client: the tag level's E13 (Story 5.5) or E14 (Story 5.7). */
   http: HttpClient;
+  /**
+   * Story 5.7 (an Author scope): the blog whose tags the tag level lists
+   * (E14); absent: the feed's tags (E13).
+   */
+  blogUrl?: string;
 };
 
 type Level = 'sheet' | 'period' | 'custom' | 'tags';
@@ -76,7 +81,8 @@ function stepperRange(period: Period, today: CalendarDay): { from: CalendarDay; 
  * host with `placement: 'end'` (focus trapped, ← → do nothing, Back closes
  * it and focus returns to the chip). Four levels:
  *
- * - **sheet (D8):** the «Доступ» values as radio rows, the «Период» row
+ * - **sheet (D8):** the «Доступ» values as radio rows (an Author scope:
+ *   «Доступные мне» and «Все посты» only, Story 5.7), the «Период» row
  *   (its value: the current period), the «Теги» row (its value: the
  *   checked titles, else «Все»), then «Сбросить» while the Filter is not
  *   the default. Opens with focus on the selected access value. OK on a
@@ -99,7 +105,7 @@ function stepperRange(period: Period, today: CalendarDay): { from: CalendarDay; 
  * `filtersStore` itself: the modal host renders this element once, the
  * Filter changes under it.
  */
-export function FilterSheet({ scope, http }: FilterSheetProps) {
+export function FilterSheet({ scope, http, blogUrl }: FilterSheetProps) {
   const filter = useFilter(scope);
   const showReset = !isDefaultFilter(filter);
   const [level, setLevel] = useState<Level>('sheet');
@@ -219,7 +225,7 @@ export function FilterSheet({ scope, http }: FilterSheetProps) {
   }
 
   if (level === 'tags') {
-    return <TagList scope={scope} http={http} />;
+    return <TagList scope={scope} http={http} blogUrl={blogUrl} />;
   }
 
   if (level === 'custom' && today !== null) {
@@ -242,7 +248,7 @@ export function FilterSheet({ scope, http }: FilterSheetProps) {
         {t('filters.accessTitle')}
       </Text>
       <View accessibilityRole="radiogroup" style={styles.rows}>
-        {ACCESS_VALUES.map(access => {
+        {accessValuesFor(scope).map(access => {
           const id = filterAccessId(access);
           return (
             <SettingRow

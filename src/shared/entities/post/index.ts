@@ -7,10 +7,12 @@ export {
 } from './mapPost';
 export {
   BLOG_POSTS_PAGE_SIZE,
+  BLOG_SEARCH_PAGE_SIZE,
   FEED_PAGE_SIZE,
   FEED_SEARCH_PAGE_SIZE,
   PostRepository,
   blogPostsPath,
+  blogSearchPath,
   feedPath,
   feedSearchPath,
   mergePosts,

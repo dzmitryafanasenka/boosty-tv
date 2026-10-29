@@ -1016,7 +1016,7 @@ describe('Back to the origin card (matrix «Back»)', () => {
     expect(currentRoute()).toBe('Post');
     await act(async () => {
       type Data = { pages: Array<{ posts: Array<{ id: string }> }> };
-      queryClient.setQueryData<Data>(queryKeys.authorPosts(AUTHOR_BLOG), data =>
+      queryClient.setQueryData<Data>(queryKeys.authorPosts(AUTHOR_BLOG, DEFAULT_FILTER), data =>
         data
           ? { ...data, pages: data.pages.map(p => ({ ...p, posts: p.posts.filter(x => x.id !== 'blog-post-2') })) }
           : data,

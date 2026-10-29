@@ -28,7 +28,7 @@ export const queryKeys = {
    * query and `search` Filter (the trimmed query, the symbolic Filter as in
    * `subscriptionFeed`; never request params, a cursor or a URL). Its own
    * root `search`: never a prefix of a feed or author key (AD-7). Story
-   * 5.7's blog search will be `['search', 'blog', blogUrl, …]`.
+   * 5.7's blog search is `['search', 'blog', blogUrl, …]` (`blogSearch`).
    */
   feedSearch: (query: string, filter: Filter) =>
     [
@@ -39,11 +39,31 @@ export const queryKeys = {
   /** Every E6 search query (a prefix of `feedSearch`). */
   allFeedSearches: () => ['search', 'feed'] as const,
   /**
+   * E7 «Поиск в блоге» (Story 5.7), an infinite query per blog, submitted
+   * (trimmed) query and the route's author Filter (symbolic, as in
+   * `authorPosts`). Under the `search` root but its own `blog` segment:
+   * never a prefix of a feed search, feed, author or author-posts key.
+   */
+  blogSearch: (blogUrl: string, query: string, filter: Filter) =>
+    [
+      'search',
+      'blog',
+      blogUrl,
+      { query, access: filter.access, period: filter.period, tagIds: tagIdsKey(filter) },
+    ] as const,
+  /** Every E7 search query (a prefix of `blogSearch`). */
+  allBlogSearches: () => ['search', 'blog'] as const,
+  /**
    * E13 the feed's tags for the filter sheet (Story 5.5), an infinite query
    * (the opaque cursors are page params). Its own root: never a prefix of a
    * feed key.
    */
   feedTags: () => ['feedTags'] as const,
+  /**
+   * E14 a blog's tags for the filter sheet (Story 5.7), one request, no
+   * paging. Its own root: never a prefix of `feedTags` or a posts key.
+   */
+  blogTags: (blogUrl: string) => ['blogTags', blogUrl] as const,
   /** E2 the subscribed authors (Story 3.2), one request, no paging. */
   subscriptions: () => ['subscriptions'] as const,
   /**
@@ -58,8 +78,18 @@ export const queryKeys = {
    * the other.
    */
   author: (blogUrl: string) => ['author', blogUrl] as const,
-  /** E4 a blog's posts (Story 3.3), an infinite query (cursors are page params). */
-  authorPosts: (blogUrl: string) => ['authorPosts', blogUrl] as const,
+  /**
+   * E4 a blog's posts (Story 3.3), an infinite query (cursors are page
+   * params), one per Filter (Story 5.7: the symbolic Filter as in
+   * `subscriptionFeed`; the tags as their sorted ids). The resume refresh
+   * rebuilds the request params from the third segment.
+   */
+  authorPosts: (blogUrl: string, filter: Filter) =>
+    [
+      'authorPosts',
+      blogUrl,
+      { access: filter.access, period: filter.period, tagIds: tagIdsKey(filter) },
+    ] as const,
   /** Every blog's E4 posts query (a prefix of `authorPosts`): the resume refresh. */
   allAuthorPosts: () => ['authorPosts'] as const,
   /**

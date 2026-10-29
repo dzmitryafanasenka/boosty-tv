@@ -245,17 +245,17 @@ All of these are under `https://api.boosty.to` and use a Bearer token.
 | E1 | `GET /v1/user/current` | Validate session, profile | — | `id`, `blogUrl?`. Boosty TV: the session (validate, the sign-in check) reads `id` only; `blogUrl` is read only by `UserRepository.current` (Story 5.2, content profile, the `me` query) for «Мой блог». A missing, blank or unsafe `blogUrl` (fails the E2 `blogUrlSchema` rule, §5) is absent, never a parse failure. `blogUrl` presence is in the sanitized fixture `e1-user-current.json`; a live answer with it was not observed by the app (the owner's account showed no tile, Story 5.2) |
 | E2 | `GET /v1/user/subscriptions` | Subscriptions | `limit=30`, `with_follow=true` | `data[].blog{title, blogUrl, owner{name, avatarUrl?}}` (1.16.0 stopped parsing price fields after a crash). No pagination is used. Possible top-level `offset/limit/total` are commented out. |
 | E3 | `GET /v1/blog/{blogUrl}` | Blog header (Story 5.2: Подписки also sends it for the own blog, with the Author page's query key, to decide and draw «Мой блог»; `unavailable` or a failure → no tile) | — | `title`, `blogUrl`, `owner{name, avatarUrl}` |
-| E4 | `GET /v1/blog/{blogUrl}/post/` | Blog posts (Story 5.2: Подписки sends page 1 for the own blog, with the Author page's params and query key, to decide «Мой блог»; the reference's `limit=1` is not used. A failed own-blog E1/E3/E4 is not re-sent when Подписки mounts again. While Подписки is mounted, the resume head refresh also refreshes this page 1, because it observes `authorPosts(ownBlogUrl)`) | `limit` (20), `offset?` (opaque string), `comments_limit=0`, `reply_limit=0`, `is_only_allowed?`, `only_bought?`, `from_ts?`, `to_ts?` (epoch s), `tags_ids?` (comma-joined) | `data[]: Post`, `extra{offset, isLast}`. A pinned post (`isPinned: true`) comes first, out of date order (seen live on 2 of 3 blogs, 2026-10-27); the app keeps that order and marks the card with a pin badge on the Author page |
+| E4 | `GET /v1/blog/{blogUrl}/post/` | Blog posts (Story 5.2: Подписки sends page 1 for the own blog, with the Author page's default params and query key, to decide «Мой блог»; the reference's `limit=1` is not used. A failed own-blog E1/E3/E4 is not re-sent when Подписки mounts again. While Подписки is mounted, the resume head refresh also refreshes this page 1, because it observes `authorPosts(ownBlogUrl)`) | `limit` (20), `offset?` (opaque string), `comments_limit=0`, `reply_limit=0`, `is_only_allowed`, `only_bought` (Story 5.7: always sent, `only_bought=false`), `from_ts?`, `to_ts?` (epoch s), `tags_ids?` (comma-joined); see «E4 filters (LIVE)» | `data[]: Post`, `extra{offset, isLast}`. A pinned post (`isPinned: true`) comes first, out of date order (seen live on 2 of 3 blogs, 2026-10-27); the app keeps that order and marks the card with a pin badge on the Author page |
 | E5 | `GET /v1/feed/post/` | Feed (Story 5.3: Главная always sends the access params of the active `feed` Filter, see «E5 access params (LIVE)» below; Story 5.4: plus `from_ts`/`to_ts` for a period other than «За всё время», see «E5 period (LIVE)»; Story 5.5: plus `tags_ids` when tags are checked, see «E5 tags (LIVE)») | `limit` (10), `offset?`, `comments_limit=0`, `reply_limit=0`, `only_allowed?`, `only_bought?`, `tags_ids?`, `from_ts?`, `to_ts?` | `data.posts[]: Post`, `extra` |
 | E6 | `GET /v1/search/feed/post/` | Feed search (Story 5.6: Поиск по подпискам, content profile, see «E6 (LIVE)») | `limit` (10), `comments_limit=0`, `reply_limit=0`, the E5 access / period / tag params of the `search` Filter, `search_query`, `offset?` | `data.searchPosts[].post: Post`, `extra{offset, isLast}` |
-| E7 | `GET /v1/search/blog/post/` | Blog search | `blog_url`, `search_query`, E4 params (with `is_only_allowed`) | `data.searchPosts[].post: Post`, `extra` |
+| E7 | `GET /v1/search/blog/post/` | Blog search (Story 5.7: «Поиск в блоге» on Автор, content profile, see «E7 (LIVE)») | `blog_url`, `limit` (20), `comments_limit=0`, `reply_limit=0`, the E4 access / period / tag params of the route's Filter, `search_query`, `offset?` | `data.searchPosts[].post: Post`, `extra{offset, isLast}` |
 | E8 | `GET /v1/blog/{blogUrl}/post/{postId}` | Single post (the reference uses it to refresh media URLs and `timeCode`) | `comments_limit`, `reply_limit` (the reference sends 20. **We must send 0**. 0 is accepted: `LIVE`, Story 1.5) | `Post` (top level, no `data` wrapper) |
 | E9 | `PUT /v1/viewstat/video/{videoId}/timecode/` | Save playback progress | form `time_code` = integer seconds | body ignored. **HTTP 200** on every write; the value comes back as `ok_video.timeCode` on the next E8 and on the website (`LIVE`, Story 1.6, §6, web profile). Sent by the app with the content profile since Story 4.2 (§6 «Production client: progress»; content profile `LIVE`, Story 4.2: the website showed the written position) |
 | E10 | `GET /v1/blog/{blogUrl}/poll/{pollId}` | Refresh poll | — | `data.poll: Poll` |
 | E11 | `POST /v1/poll/{pollId}/vote` | Vote | form `answer` = comma-joined option ids | body ignored |
 | E12 | `DELETE /v1/poll/{pollId}/vote` | Retract vote | — | body ignored |
 | E13 | `GET /v1/search/feed/tag/` | Feed tags (filter; Story 5.5: the filter sheet's tag level, content profile, see «E13 (LIVE)») | `limit` (100), `offset?` | `data.searchTags[]{tag{id, title}, rank}`, `extra{offset, isLast}` |
-| E14 | `GET /v1/blog/{blogUrl}/post/tag/` | Blog tags | — | `data[]{id, title}` |
+| E14 | `GET /v1/blog/{blogUrl}/post/tag/` | Blog tags (Story 5.7: the filter sheet's tag level on Автор, see «E14 (LIVE)») | — | `data[]{id, title}` (`count` not read) |
 | E15 | `GET /v1/blog/{blogUrl}/video_stream` | Active or scheduled live stream | — | **`204 No Content` = none.** Otherwise: `id`, `int_id`, `title`, `isOnline`, `isTemplate`, `hasAccess`, `startTime` (epoch s), `signedQuery`, `isLiked`, `data[]` (content blocks incl. `ok_stream`/`ok_video`), `teaser[]`, `count{viewers, likes}`, `subscriptionLevel{name, currencyPrices{RUB, USD, EUR}}` |
 | E16 | `PUT /v1/blog/{blogUrl}/video_stream/heartbeat/viewer` | Live viewer heartbeat (every 30 s) | `stop=true` query param on exit | body discarded |
 | E17 | `POST` / `DELETE /v1/blog/{blogUrl}/video_stream/like` | Like / unlike a stream | — | body discarded |
@@ -338,7 +338,7 @@ Live check (debug build with a temporary log, removed before the commit; Chromec
 | «Последние 3 месяца» | pages 1–2: 10 + 10, more pages, every post inside the bounds |
 | «Свой период…» 28 Sep – 26 Oct 2026 | page 1: 10, page 2: 8 (last), every post inside the bounds |
 
-So E5 honours `from_ts`/`to_ts` in seconds with both ends inclusive; 23:59:59 as the end of the last day therefore includes a post published in that last second. Paging (`offset`, `isLast`) works as without a period. One account, one run; E4 (`from_ts`/`to_ts` on a blog, Story 5.7) was not checked.
+So E5 honours `from_ts`/`to_ts` in seconds with both ends inclusive; 23:59:59 as the end of the last day therefore includes a post published in that last second. Paging (`offset`, `isLast`) works as without a period. One account, one run; E4 was checked later (Story 5.7, «E4 filters (LIVE)»).
 
 ### E13 (`LIVE`, Story 5.5)
 
@@ -362,7 +362,7 @@ Live check (same run; default access params, `limit` 20/50 for the probe request
 | `tags_ids=A,B'` | 1 post, carrying A and B' |
 | `A,B` encoded as `A%2CB`, and `B,A` | the same posts as `A,B` |
 
-So E5 honours `tags_ids` and **intersects** the listed tags: a post must carry every listed tag (a union would have returned at least A's 50 posts). A literal and an encoded comma behave the same; the order does not matter. One account, two runs; E4 `tags_ids` (Story 5.7) was not checked.
+So E5 honours `tags_ids` and **intersects** the listed tags: a post must carry every listed tag (a union would have returned at least A's 50 posts). A literal and an encoded comma behave the same; the order does not matter. One account, two runs; E4 was checked later (Story 5.7, «E4 filters (LIVE)»).
 
 ### E6 (`LIVE`, Story 5.6)
 
@@ -385,6 +385,55 @@ Live check (debug build with Metro and a temporary counts-only log, removed befo
 | `Q & #` (spaces, `&`, `#` encoded) | HTTP 200, 10 posts (the encoding keeps it one param) |
 
 So E6 has the reference's shape, pages by the opaque cursor without overlap, and honours the period, tag and «Только купленные» params together with `search_query`. «Все посты» returned no locked post for this query, so the access split under search is not proven beyond «Только купленные»; one account, one run. Sanitized shape fixtures: `src/test/fixtures/boosty/e6-feed-search-1.json` (3 items, `isLast: false`) and `e6-feed-search-2.json` (2 items, `isLast: true`), built from the sanitized E5 posts (the live run logged counts only, no body was captured).
+
+### E4 filters (`LIVE`, Story 5.7)
+
+The reference (`BlogRepository`, `BoostyApi.blogPosts`, SHA `87c0852`) sends `is_only_allowed = (access == Allowed)` and `only_bought = (access == Bought)`, plus the feed's period and tag params. Boosty TV sends `GET /v1/blog/{blogUrl}/post/?limit=20&comments_limit=0&reply_limit=0&is_only_allowed=<true|false>&only_bought=false[&from_ts=…&to_ts=…][&tags_ids=…][&offset=…]` (the same period and tag builders as E5, from the Author route's Filter):
+
+| Filter value (Автор) | Params |
+|---|---|
+| «Доступные мне» (default, owner decision 2026-10-29 Q2 a) | `is_only_allowed=true&only_bought=false` |
+| «Все посты» | `is_only_allowed=false&only_bought=false` |
+| «Только купленные» | not offered on Автор (owner decision 2026-10-29, A a): the server ignores `only_bought=true` |
+
+Live check (debug build with Metro and a temporary counts-only log, removed before the commit; Chromecast with Google TV 4K, the owner's session, 2026-10-29; HTTP 200 for every request; only keys, types, counts and booleans were logged, never ids, titles, the query or URLs). Blogs A, B, C = the three subscriptions (B has 14 locked posts on its page 1), D = the blog of the account's one purchased post (found through E5 «Только купленные», not subscribed):
+
+| Request | Result |
+|---|---|
+| No access params | A, C: 20 posts, 0 locked; **B: 20 posts, 14 locked**; D: 20, 3 locked. A blog's server default is «Все посты» (unlike E5) |
+| `is_only_allowed=true&only_bought=false` | B: 20, **0 locked** (6 shared with the no-params page); D: 20, 0 locked |
+| `is_only_allowed=false&only_bought=false` | the no-params page (B: 14 locked) |
+| `is_only_allowed=false&only_bought=true` | **the «Все посты» page on every blog** (B: 20 with 14 locked; D: 20 with 3 locked, the purchased post not among them): `only_bought` is ignored |
+| `only_bought=true` alone / `is_only_allowed=true&only_bought=true` | the no-params page / the «Доступные мне» page |
+| Pages 2 of «Все посты» (`offset`) | 20 posts, no overlap with page 1 |
+| `from_ts=T&to_ts=T` (T = the newest allowed post's publish time) | 1 post, the newest: both bounds inclusive (A, B, C) |
+| `from_ts=T−30 d&to_ts=T−1` / `T+1..T+30 d` | posts all inside the bounds, not the newest / 0 posts |
+| Presets 7 / 30 / 90 days (from the app's builder) | every post inside the bounds (A: 2 / 8 / 20+, B: 0 / 9 / 11, C: 0 / 2 / 9) |
+| `tags_ids=X` (the tag most frequent on A's page) | 20 posts, every one carries X, including the 8 unfiltered posts with X |
+| `tags_ids=Y` (never with X) / `X,Y` | 16 posts all carrying Y / **0**: intersected, as E5 |
+
+So E4 honours `is_only_allowed`, the period and the tags, and ignores `only_bought`; the reference's blog «Только купленные» therefore shows «Все посты». One account, one run. No body was captured: shape fixtures stay `e4-blog-posts-1.json` / `-2.json`.
+
+### E7 (`LIVE`, Story 5.7)
+
+Boosty TV sends `GET /v1/search/blog/post/?blog_url=<encoded>&limit=20&comments_limit=0&reply_limit=0&is_only_allowed=…&only_bought=false[&from_ts=…&to_ts=…][&tags_ids=…]&search_query=<URL-encoded>[&offset=<extra.offset>]` (the trimmed query, never logged). `PostRepository.blogSearchPage` parses it as E6 (`data.searchPosts[].post` through the one post mapper; an item without a `post` object dropped and counted; a missing `data.searchPosts` is `Parse`). Under «Доступные мне» the Author page drops results with `hasAccess: false` (owner decision 2026-10-29, B a); a page left empty with a next cursor goes through the shared auto-fetch rule (at most 3 in a row).
+
+Live check (same run; `Q` = the longest word of the newest allowed post's title):
+
+| Request | Result |
+|---|---|
+| `search_query=Q` (A) | top level `{data, extra}`; `data` keys `searchPosts` only; items `{post, rank, headline, blog}`, every `post` an object of that blog; 20 results, the newest post among them; `extra{offset: string, isLast: false}`; through `blogSearchPage`: 20 mapped posts and a cursor |
+| Page 2 (`offset`) | 18 results, no overlap, last page |
+| Presets 7 / 30 / 90 days | 1 / 4 / 8 results, every one inside the bounds |
+| `tags_ids` = a tag carried by a result | 13 results, every one carries it |
+| A nonsense Latin query | 0 results, last page |
+| **D, a title word of the purchased post, every access combination** | the identical page every time: 20 results, **1 locked**, the purchased post included, also with `is_only_allowed=true`: **E7 ignores both access params** |
+
+Sanitized shape fixture: `src/test/fixtures/boosty/e7-blog-search-1.json` (3 items, one locked, `isLast: false`), built from the sanitized E4 posts (the live run logged counts only).
+
+### E14 (`LIVE`, Story 5.7)
+
+`TagRepository.blogTags` sends `GET /v1/blog/{blogUrl}/post/tag/` (no params) and reads `data[]{id, title}`; `count` is not read. One item without a non-negative integer (or digits-only string) `id` or a non-blank `title` is dropped and counted in the log, never the list; a `data` that is not an array is `Parse`. Live (same run): top level `{data}` only, `data` an array of `{id, title, count}`: 13, 23 and 10 tags on A, B, C, every `id` a number and distinct, every `title` a non-blank string; one page (no cursor); every tag seen on A's and C's posts was in E14. Sanitized shape fixture: `src/test/fixtures/boosty/e14-blog-tags.json`.
 
 ## 4. Post object (`REF`)
 
@@ -464,7 +513,7 @@ Required by the reference: `id`, `isMultiple`, `isFinished`, a non-empty `option
 
 - Cursor-based. `extra.offset` is an **opaque string** and must be passed back verbatim as `offset`.
 - End of list: `extra.isLast == true`. When `extra` or `extra.offset` is missing, the reference treats it as having no next page.
-- Page sizes used: feed 10, blog 20, feed tags 100.
+- Page sizes used: feed 10, blog 20, blog search 20, feed tags 100 (blog tags: one page).
 - Merge rule (reference): append, then deduplicate by post `id`, keeping the first occurrence.
 - `LIVE` (Story 1.7): E4 pages 2 and 3 fetched with the previous `extra.offset` (URL-encoded) returned the next posts, HTTP 200, for 3 blogs.
 - Unverified: whether the cursor stays stable while new posts arrive, and how long a cursor is valid.

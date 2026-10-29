@@ -228,6 +228,22 @@ export const ru = {
     unavailableTitle: 'Автор недоступен',
     unavailableBody: 'Этой страницы нет или она закрыта.',
     loadMoreError: 'Не удалось загрузить следующие публикации.',
+    // Story 5.7 (docs/focus-map.md §4 D): the action row, «Поиск в блоге»
+    // (E7, runs on «Готово» only) and the filtered / search states.
+    search: {
+      fieldLabel: 'В этом блоге',
+      placeholder: 'Поиск в блоге',
+      reset: 'Сбросить',
+      resetA11y: 'Сбросить поиск и фильтры',
+      loading: 'Ищем…',
+      emptyTitle: 'Ничего не найдено',
+      emptyBody: 'Ищем только в этом блоге. Проверьте написание или сократите запрос.',
+      filteredEmptyBody: 'Ищем только в этом блоге. Фильтры тоже влияют на поиск.',
+      filteredPostsEmptyBody: 'Нет публикаций с такими фильтрами.',
+      resetFilters: 'Сбросить фильтры',
+      errorTitle: 'Не удалось выполнить поиск',
+      loadMoreError: 'Не удалось загрузить следующие результаты.',
+    },
   },
   // Пост (Story 3.4, E8; docs/focus-map.md §4 F). Missing post (E8 404,
   // `not_found` verified): «Назад» only, no retry. Videos are MediaRows

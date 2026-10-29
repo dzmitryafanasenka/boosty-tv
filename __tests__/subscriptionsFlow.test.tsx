@@ -12,6 +12,7 @@ import { act } from 'react';
 import App, { navigationRef } from '../src/app/App';
 import { queryClient, resetQueryCache } from '../src/app/queryClient';
 import { accountScope } from '../src/shared/account';
+import { DEFAULT_FILTER } from '../src/shared/filters';
 import { queryKeys } from '../src/shared/api';
 import { type FixtureReply, type FixtureRequest, type FixtureTransport } from '../src/shared/api/fixtureTransport';
 import { focusRestoration } from '../src/shared/focus';
@@ -661,7 +662,7 @@ describe('«Мой блог» (Story 5.2, SUB-02, focus-map §3 C)', () => {
   /** The own blog's cached E4 page 1 now has `posts` (as a refetch would), then settles. */
   async function setOwnPosts(blogUrl: string, posts: unknown[]) {
     await act(async () => {
-      queryClient.setQueryData(queryKeys.authorPosts(blogUrl), {
+      queryClient.setQueryData(queryKeys.authorPosts(blogUrl, DEFAULT_FILTER), {
         pages: [{ posts, nextCursor: null }],
         pageParams: [null],
       });
@@ -686,7 +687,7 @@ describe('«Мой блог» (Story 5.2, SUB-02, focus-map §3 C)', () => {
     expect(e3Calls()).toHaveLength(1);
     expect(e4Calls()).toHaveLength(1);
     expect(e4Calls()[0].url).toBe(
-      `https://api.boosty.to/v1/blog/${MINE}/post/?limit=20&comments_limit=0&reply_limit=0`,
+      `https://api.boosty.to/v1/blog/${MINE}/post/?limit=20&comments_limit=0&reply_limit=0&is_only_allowed=true&only_bought=false`,
     );
     for (const call of [...profileCalls(), ...e3Calls(), ...e4Calls()]) {
       expect(call.headers.Authorization).toBe(`Bearer ${'a'.repeat(64)}`);

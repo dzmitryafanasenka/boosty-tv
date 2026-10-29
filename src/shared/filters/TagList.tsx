@@ -6,6 +6,7 @@ import { t } from '../i18n';
 import { SettingRow, SideSheet, requestHostFocus, spacing, type HostView } from '../ui';
 import type { FilterScope } from './filter';
 import { filtersStore, useFilter } from './filtersStore';
+import { useBlogTags } from './useBlogTags';
 import { useFeedTags } from './useFeedTags';
 
 /** Focus ids (docs/focus-map.md §1.5, D11). */
@@ -34,8 +35,13 @@ const FOOTER_IDS = new Set([TAGS_LOADING_ID, TAGS_EMPTY_ID, TAGS_RETRY_ID, TAGS_
 
 export type TagListProps = {
   scope: FilterScope;
-  /** The active session's client (E13). */
+  /** The active session's client (E13, or E14 with `blogUrl`). */
   http: HttpClient;
+  /**
+   * Story 5.7 (an Author scope): the blog whose tags are listed (E14, one
+   * page, no «Загрузить ещё»); absent: the feed's tags (E13).
+   */
+  blogUrl?: string;
 };
 
 /**
@@ -58,9 +64,12 @@ export type TagListProps = {
  * after a page, the list scrolls to the end so it stays in view. Back is
  * the sheet's (→ the sheet on «Теги»).
  */
-export function TagList({ scope, http }: TagListProps) {
+export function TagList({ scope, http, blogUrl }: TagListProps) {
   const filter = useFilter(scope);
-  const feedTags = useFeedTags(http);
+  // The tag source is fixed for a mounted level: the blog's (E14) or the feed's (E13).
+  const fromFeed = useFeedTags(http, blogUrl === undefined);
+  const fromBlog = useBlogTags(http, blogUrl ?? null);
+  const feedTags = blogUrl === undefined ? fromFeed : fromBlog;
   /** The tags checked when the level opened: listed first, in that order. */
   const opened = useRef(filter.tags);
   const checked = useMemo(() => new Set(filter.tags.map(tag => tag.id)), [filter.tags]);

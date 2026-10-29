@@ -349,6 +349,40 @@ test('Story 5.6: the demo E6 matches titles (case-insensitive) with the feed\'s 
   }
 });
 
+test('Story 5.7: the demo E4 honours is_only_allowed (only_bought ignored), E7 ignores access (as live), E14 lists the blog tags', async () => {
+  const root = await renderApp();
+  try {
+    const wait = async <T,>(pending: Promise<T>): Promise<T> => {
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(1000);
+      });
+      return pending;
+    };
+    const blog = 'demo-blog-1';
+    const allowed = await wait(PostRepository.blogPage(session.http, blog, null, DEFAULT_FILTER));
+    expect(allowed.posts.every(p => p.hasAccess)).toBe(true);
+    expect(allowed.posts).toHaveLength(20);
+    const all = await wait(PostRepository.blogPage(session.http, blog, null, { ...DEFAULT_FILTER, access: 'all' }));
+    expect(all.posts.some(p => !p.hasAccess)).toBe(true);
+    const tagged = await wait(
+      PostRepository.blogPage(session.http, blog, null, { ...DEFAULT_FILTER, tags: [{ id: '1', title: '' }] }),
+    );
+    expect(tagged.posts.length).toBeGreaterThan(0);
+    expect(tagged.posts.length).toBeLessThan(20);
+    // E7 «пост 1»: posts n = 0, 9–18 (11), the locked n = 13 included under «Доступные мне».
+    const found = await wait(PostRepository.blogSearchPage(session.http, blog, 'пост 1', null, DEFAULT_FILTER));
+    expect(found.posts).toHaveLength(11);
+    expect(found.posts.some(p => !p.hasAccess)).toBe(true);
+    expect(found.nextCursor).toBeNull();
+    const tags = await wait(TagRepository.blogTags(session.http, blog));
+    expect(tags.map(tag => tag.id).sort()).toEqual(['1', '2', '3', '4', '5', '6', '7']);
+  } finally {
+    await act(async () => {
+      root.unmount();
+    });
+  }
+});
+
 test('Story 2.8: demo expiry → A11 → A2 → A5 → sign-in with another id: the demo hook wipes the stores; the keychain is never touched', async () => {
   // PhoneScreen's send still goes through the real AuthApiClient (global
   // fetch); answer it here. Confirm and E1 go to the demo's FixtureTransport.
