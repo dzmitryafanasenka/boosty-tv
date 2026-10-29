@@ -20,6 +20,7 @@ export {
   mergePosts,
   postPath,
   type E8Options,
+  type FileTargetResult,
 } from './postRepository';
 export {
   blockKey,
@@ -27,6 +28,7 @@ export {
   PARAGRAPH_STOP_MAX_CHARS,
   splitParagraph,
   postBodyItems,
+  type ParagraphLink,
   type PlaceholderKind,
   type PostBodyOptions,
   type PostBodyItem,

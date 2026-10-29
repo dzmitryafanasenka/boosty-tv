@@ -26,6 +26,11 @@ export const e8Path = (blogUrl: string, postId: string) => `/v1/blog/${blogUrl}/
  * Story 6.1 additions: sanitized style ranges on its first two fragments
  * (bold is seen live) and one synthetic `smile` block (name
  * `synthetic-key-1`, before the last paragraph end; no emoji was seen live).
+ * Story 6.3 additions: three synthetic blocks at the end of `data` in the
+ * live key sets (api-contract §4.1 «File and video blocks (LIVE)»): a
+ * `header`, a `file` (`synthetic-id-13`, `https://example.invalid/file`,
+ * 200 KiB) and a `video` (`https://example.invalid/video`; a real YouTube
+ * URL cannot pass `check:fixtures`).
  */
 export function e8Accessible(): Json {
   return clone(e8Accessible_.body as unknown as Json);

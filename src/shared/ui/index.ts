@@ -18,6 +18,7 @@ export { FilterChip, type FilterChipProps } from './FilterChip';
 export { CheckIcon, GearIcon, SkipIcon, type IconProps } from './icons';
 export { StateView, type StateViewAction, type StateViewProps } from './StateView';
 export { Dialog, type DialogAction, type DialogProps } from './Dialog';
+export { QR_CLOSE_ID, QrDialog, type QrDialogProps } from './QrDialog';
 export {
   PostCard,
   PostCardSkeleton,

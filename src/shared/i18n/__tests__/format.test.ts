@@ -1,4 +1,4 @@
-import { formatCardDate, formatDuration } from '../format';
+import { formatCardDate, formatDuration, formatFileSize } from '../format';
 
 /** Epoch seconds of a local date-time (the device's zone, like the app). */
 const local = (y: number, mo: number, d: number, h = 12, mi = 0) =>
@@ -50,5 +50,22 @@ describe('formatDuration', () => {
     [-5, '0:00'],
   ])('%p s → %s', (sec, text) => {
     expect(formatDuration(sec)).toBe(text);
+  });
+});
+
+describe('formatFileSize (Story 6.3)', () => {
+  it('binary units; one decimal below 10, else whole; a decimal comma', () => {
+    expect(formatFileSize(0)).toBe('0 Б');
+    expect(formatFileSize(512)).toBe('512 Б');
+    expect(formatFileSize(1024)).toBe('1 КБ');
+    expect(formatFileSize(1536)).toBe('1,5 КБ');
+    expect(formatFileSize(204800)).toBe('200 КБ');
+    expect(formatFileSize(4.5 * 1024 * 1024)).toBe('4,5 МБ');
+    expect(formatFileSize(1.2 * 1024 ** 3)).toBe('1,2 ГБ');
+    expect(formatFileSize(5000 * 1024 ** 3)).toBe('5000 ГБ');
+    expect(formatFileSize(-1)).toBe('0 Б');
+    // A value that rounds to 1024 moves to the next unit.
+    expect(formatFileSize(1048575)).toBe('1 МБ');
+    expect(formatFileSize(1023)).toBe('1023 Б');
   });
 });

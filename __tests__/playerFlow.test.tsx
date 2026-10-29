@@ -32,7 +32,15 @@ import e1Unauthorized from '../src/test/fixtures/boosty/e1-no-token.json';
 import e8NoToken from '../src/test/fixtures/boosty/e8-no-token.json';
 import refreshRejected from '../src/test/fixtures/boosty/refresh-invalid-grant.json';
 import refreshOk from '../src/test/fixtures/boosty/refresh-ok.json';
-import { e8Accessible, e8Locked, e8MissingReply, paragraph, postDetail } from '../src/test/postFixtures';
+import {
+  blockEnd,
+  e8Accessible,
+  e8Locked,
+  e8MissingReply,
+  paragraph,
+  postDetail,
+  text as textBlock,
+} from '../src/test/postFixtures';
 import {
   byTestId,
   clearNativeModules,
@@ -2847,3 +2855,77 @@ describe('sleep, background and audio focus (Story 4.6)', () => {
   });
 });
 
+
+describe('Story 6.3: timestamp link chips (owner decision 2026-10-29, option b)', () => {
+  const REF = { blogUrl: FEED_BLOG, postId: POST, mediaId: 'v2' };
+  const CHIP = (n: number) => `post/${POST}/block/text@2/link/${n}`;
+  const link = (s: string, url: string) => ({ type: 'link', content: JSON.stringify([s, 'unstyled', []]), url });
+  const e9Calls = () => transport.calls.filter(c => c.method === 'PUT' && E9_RE.test(c.path));
+  const label = (root: Root, id: string) => one(root, id).props.accessibilityLabel as string;
+  const DATA = (t = '225') => [
+    okVideo('v1', ALL),
+    okVideo('v2', ALL, { title: '' }),
+    textBlock('Таймкоды: '),
+    link('3:45 Тема', `https://boosty.to/${FEED_BLOG}/posts/${POST}?t=${t}&tmid=v2`),
+    textBlock(' '),
+    link('чужое видео', `https://boosty.to/${FEED_BLOG}/posts/${POST}?t=10&tmid=zzz`),
+    textBlock(' '),
+    link('другой пост', `https://boosty.to/${FEED_BLOG}/posts/other-post?t=10&tmid=v1`),
+    textBlock(' '),
+    link('формат', `https://boosty.to/${FEED_BLOG}/posts/${POST}?t=1m2s&tmid=v1`),
+    blockEnd(),
+  ];
+
+  it('matrix «Timestamp»: «<text> · Смотреть»; another video or format keeps the QR, another post «Открыть»', async () => {
+    withData(DATA());
+    const root = await openPost();
+    expect(label(root, CHIP(0))).toBe('3:45 Тема. Смотреть видео с этого момента');
+    expect(text(byTestId(root, CHIP(0))[0])).toContain('3:45 Тема');
+    // The action word is its own text (a long link text is cut before it).
+    expect(text(byTestId(root, `${CHIP(0)}/action`)[0])).toContain('· Смотреть');
+    expect(text(byTestId(root, CHIP(0))[0])).not.toContain('"QR"');
+    expect(label(root, CHIP(1))).toBe('чужое видео. Показать QR-код');
+    expect(label(root, CHIP(2))).toBe('другой пост. Открыть пост');
+    expect(label(root, CHIP(3))).toBe('формат. Показать QR-код');
+    await unmount(root);
+  });
+
+  it('OK → the Player for that video starting at that second; a short visit writes nothing; Back → the same chip', async () => {
+    withData(DATA());
+    const root = await openPost();
+    focusMock.mockClear();
+    await press(root, CHIP(0));
+    expect(currentRoute()).toBe('Player');
+    expect(navigationRef.getCurrentRoute()?.params).toEqual({
+      ref: REF,
+      origin: { routeKey: expect.any(String), focusId: CHIP(0) },
+      start: { atSec: 225 },
+    });
+    await focusOn(root, SURFACE);
+    await advance(600);
+    await fire('onLoad', { durationSec: 600 });
+    expect(engine.seek).toHaveBeenCalledWith(225);
+    await fire('onSeekDone', 225);
+    for (let sec = 225; sec <= 230; sec += 1) {
+      await fire('onProgress', sec);
+    }
+    focusMock.mockClear();
+    await back();
+    expect(currentRoute()).toBe('Post');
+    await advance(1_000);
+    expect(e9Calls()).toEqual([]);
+    expect(lastFocusTarget()).toBe(CHIP(0));
+    await unmount(root);
+  });
+
+  it('a time past the end is kept inside the video (the last second)', async () => {
+    withData(DATA('9999'));
+    const root = await openPost();
+    await press(root, CHIP(0));
+    await focusOn(root, SURFACE);
+    await advance(600);
+    await fire('onLoad', { durationSec: 600 });
+    expect(engine.seek).toHaveBeenCalledWith(599);
+    await unmount(root);
+  });
+});

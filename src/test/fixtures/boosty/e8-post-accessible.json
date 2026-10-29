@@ -770,6 +770,24 @@
         "content": "",
         "type": "text",
         "modificator": "BLOCK_END"
+      },
+      {
+        "type": "header",
+        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "modificator": ""
+      },
+      {
+        "complete": true,
+        "id": "synthetic-id-13",
+        "isInvalid": null,
+        "size": 204800,
+        "title": "redacted",
+        "type": "file",
+        "url": "https://example.invalid/file"
+      },
+      {
+        "type": "video",
+        "url": "https://example.invalid/video"
       }
     ],
     "contentCounters": [

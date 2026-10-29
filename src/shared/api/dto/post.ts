@@ -17,7 +17,8 @@ import { blogUrlSchema } from './subscriptions';
  *   the mapper, and an unknown `type` becomes `Block.Unknown`.
  * - Of `count`, only `likes` is read (Story 3.4, the read-only like count);
  *   a missing or invalid value is no like line.
- * - Never parsed into the post: `signedQuery`, `playerUrls`, `timeCode`,
+ * - Never parsed into the post: `signedQuery` (Story 6.3 reads it beside
+ *   the mapper for a file's QR only, `signedQueryDtoSchema`), `playerUrls`, `timeCode`,
  *   `comments`, `count.comments`, reactions, prices. They are not part of
  *   the domain (AD-9; comments are excluded). `playerUrls` (Story 4.1) and
  *   `timeCode` (Story 4.2) have their own schemas below, read beside the
@@ -119,6 +120,38 @@ export const fileBlockDtoSchema = z.object({
   id: optionalString,
   title: optionalString,
   size: optionalNumber,
+});
+
+/**
+ * File-QR-only (Story 6.3): a `file` block's `url` (api-contract §4.1
+ * «File and video blocks (LIVE)»). Parsed only by `PostRepository.fileTarget`
+ * from a fresh E8 when the QR opens; never part of the Post entity, a query
+ * cache, a route, storage or a log (with `Post.signedQuery` it is a personal,
+ * signed link).
+ */
+export const fileUrlDtoSchema = z.object({
+  type: z.literal('file'),
+  id: optionalString,
+  title: optionalString,
+  url: optionalString,
+});
+
+/** File-QR-only (Story 6.3): the post's `signedQuery`, read beside the mapper. */
+export const signedQueryDtoSchema = z.object({ signedQuery: optionalString });
+
+/** `video` (`LIVE`, Story 6.3: keys `type`, `url`): an external video page. */
+export const videoBlockDtoSchema = z.object({
+  type: z.literal('video'),
+  url: optionalString,
+});
+
+/**
+ * `header` (`LIVE`, Story 6.3: keys `type`, `content`, `modificator`;
+ * `content` in the `text` format, `modificator` empty). Not in the reference.
+ */
+export const headerBlockDtoSchema = z.object({
+  type: z.literal('header'),
+  content: optionalString,
 });
 
 export const pollBlockDtoSchema = z.object({

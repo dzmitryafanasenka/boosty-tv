@@ -314,3 +314,11 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-6-2-images-in-posts.md`
   summary: A post with many large images decodes all of them in the Post column's plain ScrollView; check a gallery-style post on the Chromecast for memory and scroll.
   evidence: unverified (maybe-false; medium if real: decoder memory on a low-RAM device); `resizeMethod="resize"` downsamples, but nothing is virtualized.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-3-links-files-and-external-videos-via-qr.md`
+  summary: Owner idea (2026-10-29): show a post's timestamps as chapter marks on the player timeline (as YouTube), and possibly jump to a timestamp from the post; plan with Epic 8 (player options).
+  evidence: Owner request during Story 6.3; timestamps arrive as YouTube links with `t=` in the post text; the live format for Boosty videos is not checked yet.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-3-links-files-and-external-videos-via-qr.md`
+  summary: Device check of a file chip (busy state, the dialog with a signed target, «Не удалось открыть файл», «Нет доступа к файлу», the accessibility labels while busy and after a failure) and an owner phone scan of a file QR (no photo kept).
+  evidence: Story 6.3 checked link and YouTube chips on the device only; the file path is host-tested.

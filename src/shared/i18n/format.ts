@@ -67,3 +67,30 @@ export function formatDuration(totalSec: number): string {
   const s = sec % 60;
   return h > 0 ? `${h}:${pad2(m)}:${pad2(s)}` : `${m}:${pad2(s)}`;
 }
+
+/**
+ * A file size (Story 6.3): «512 Б», «12 КБ», «4,5 МБ», «1,2 ГБ» (binary
+ * units; one decimal below 10, else whole; a decimal comma).
+ */
+export function formatFileSize(bytes: number): string {
+  const units = ['fileSize.b', 'fileSize.kb', 'fileSize.mb', 'fileSize.gb'] as const;
+  let value = Math.max(0, bytes);
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  // A value that rounds up to 1024 is the next unit (1048575 B → «1 МБ», not «1024 КБ»).
+  if (unit < units.length - 1 && Math.round(value) >= 1024) {
+    value /= 1024;
+    unit += 1;
+  }
+  let n: string;
+  if (unit === 0 || value >= 10) {
+    n = String(Math.round(value));
+  } else {
+    const rounded = Math.round(value * 10) / 10;
+    n = (Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1)).replace('.', ',');
+  }
+  return tf(units[unit], { n });
+}

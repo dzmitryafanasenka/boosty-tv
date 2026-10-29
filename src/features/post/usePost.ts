@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import {
   SESSION_CHECK_KEYS,
   queryKeys,
@@ -8,7 +8,12 @@ import {
   type AppErrorKind,
   type HttpClient,
 } from '../../shared/api';
-import { PostRepository, type Post, type ServerProgressSink } from '../../shared/entities/post';
+import {
+  PostRepository,
+  type FileTargetResult,
+  type Post,
+  type ServerProgressSink,
+} from '../../shared/entities/post';
 
 export type PostState = {
   /** The post (E8 200, accessible or locked); null while loading, failed or unavailable. */
@@ -76,4 +81,21 @@ export function usePost(
       refetch().catch(() => {});
     },
   };
+}
+
+/**
+ * Story 6.3: resolves a file's QR target on OK (a fresh E8 through
+ * `PostRepository.fileTarget`, by the file's block key). Not a query: the
+ * signed target lives only in the caller's memory (the QR dialog), never in
+ * a query cache. Rejects with the E8 `AppError`.
+ */
+export function useFileTarget(
+  http: HttpClient,
+  blogUrl: string,
+  postId: string,
+): (fileKey: string, title: string) => Promise<FileTargetResult> {
+  return useCallback(
+    (fileKey: string, title: string) => PostRepository.fileTarget(http, blogUrl, postId, fileKey, { title }),
+    [http, blogUrl, postId],
+  );
 }

@@ -5,11 +5,17 @@ import {
   feedSearchItemDtoSchema,
   feedSearchPageDtoSchema,
 } from '../../api/dto/feed';
-import { blockTypeDtoSchema, okVideoTimeCodeDtoSchema } from '../../api/dto/post';
+import {
+  blockTypeDtoSchema,
+  fileUrlDtoSchema,
+  okVideoTimeCodeDtoSchema,
+  signedQueryDtoSchema,
+} from '../../api/dto/post';
 import { blogUrlSchema } from '../../api/dto/subscriptions';
 import type { HttpClient } from '../../api/httpClient';
 import { periodBounds, tagIdsKey, type Filter } from '../../filters/filter';
 import { logger as appLogger, type Logger } from '../../services/logger';
+import { fileTarget as joinFileTarget } from '../externalUrls';
 import { mapPost } from './mapPost';
 import type { MediaRef, Post, PostPage, PostResult, ServerProgressSink } from './types';
 import { videoSourcesOf, type VideoSourcesResult } from './videoSources';
@@ -336,7 +342,7 @@ async function fetchPost(
   postId: string,
   logger: Logger,
   onServerProgress?: ServerProgressSink,
-): Promise<{ post: Post; rawData: readonly unknown[] } | null> {
+): Promise<{ post: Post; rawData: readonly unknown[]; raw: unknown } | null> {
   const path = postPath(blogUrl, postId);
   try {
     const { body } = await http.get(path);
@@ -349,7 +355,7 @@ async function fetchPost(
     if (onServerProgress && mapped.hasAccess) {
       reportServerProgress(rawData, onServerProgress);
     }
-    return { post: mapped, rawData };
+    return { post: mapped, rawData, raw: body };
   } catch (error) {
     if (isAppError(error) && error.kind === 'NotFound') {
       return null;
@@ -390,6 +396,73 @@ async function videoSources(
   return { kind: 'ok', post, videoTitle: block.title.trim(), sources };
 }
 
+/**
+ * A file's QR target (Story 6.3): `ok` with the target, `locked` when the
+ * fresh E8 says `hasAccess=false`, `unavailable` for E8 404, a file no
+ * longer in the post or one without a usable URL.
+ */
+export type FileTargetResult =
+  | { kind: 'ok'; target: string }
+  | { kind: 'locked' }
+  | { kind: 'unavailable' };
+
+/**
+ * The raw `file` block of `fileKey` (`file:<id>` → the block with that id;
+ * else `file@<index>` → the file at that index of `data[]`, only when its
+ * trimmed title is the one shown: an edited post must never hand out
+ * another file's signed link under this title).
+ */
+function rawFileBlock(rawData: readonly unknown[], fileKey: string, title: string) {
+  const byId = /^file:(.+)$/.exec(fileKey);
+  if (byId) {
+    for (const raw of rawData) {
+      const block = fileUrlDtoSchema.safeParse(raw);
+      if (block.success && block.data.id === byId[1]) {
+        return block.data;
+      }
+    }
+  }
+  const byIndex = /^file@(\d+)$/.exec(fileKey);
+  if (byIndex) {
+    const block = fileUrlDtoSchema.safeParse(rawData[Number(byIndex[1])]);
+    return block.success && (block.data.title ?? '').trim() === title ? block.data : null;
+  }
+  return null;
+}
+
+/**
+ * File-QR-only (Story 6.3, api-contract §4.1 «File and video blocks
+ * (LIVE)»): a fresh E8 (content profile, the same request and mapper as
+ * `post()`), then the file's raw `url` + the post's `signedQuery` (live: the
+ * file host answers 403 without it, 200 with it). The file is found by its
+ * block key: its id, else its index (`file@<n>`) with the shown `title`.
+ * An empty `signedQuery` is `unavailable` (the bare URL answers 403). The target is a personal
+ * signed link: the caller holds it in memory for the QR dialog only; it never
+ * enters the Post entity, a query cache, storage or a log (nothing here logs
+ * it). Rejects with the E8 `AppError` (404 → `unavailable`).
+ */
+async function fileTarget(
+  http: HttpClient,
+  blogUrl: string,
+  postId: string,
+  fileKey: string,
+  { logger = appLogger, title = '' }: { logger?: Logger; title?: string } = {},
+): Promise<FileTargetResult> {
+  const fetched = await fetchPost(http, blogUrl, postId, logger);
+  if (fetched === null) {
+    return { kind: 'unavailable' };
+  }
+  if (!fetched.post.hasAccess) {
+    return { kind: 'locked' };
+  }
+  const block = rawFileBlock(fetched.rawData, fileKey, title.trim());
+  const parsed = signedQueryDtoSchema.safeParse(fetched.raw);
+  const query = parsed.success ? (parsed.data.signedQuery ?? '').trim().replace(/^[?&]+/, '') : '';
+  // Live: the bare file URL answers 403, so no query is no target.
+  const target = block === null || query.length === 0 ? null : joinFileTarget(block.url, query);
+  return target === null ? { kind: 'unavailable' } : { kind: 'ok', target };
+}
+
 export const PostRepository = {
   feedPage,
   feedSearchPage,
@@ -397,4 +470,5 @@ export const PostRepository = {
   blogSearchPage,
   post: onePost,
   videoSources,
+  fileTarget,
 } as const;

@@ -58,7 +58,24 @@ export type Block =
       previewUrl: string | null;
     }
   | { type: 'audio_file'; id: string | null; title: string; durationSec: number | null }
+  /**
+   * A file (Story 6.3): its title and size only. Its `url` needs
+   * `Post.signedQuery` (403 without it, live): it is read beside the mapper
+   * from a fresh E8 when the QR opens (`PostRepository.fileTarget`), never
+   * kept here.
+   */
   | { type: 'file'; id: string | null; title: string; sizeBytes: number | null }
+  /**
+   * An external video page (Story 6.3; live: a YouTube `watch` URL): never
+   * played in the app, only shown as a QR. `url` is null unless it is an
+   * absolute http(s) URL.
+   */
+  | { type: 'video'; url: string | null }
+  /**
+   * A heading (Story 6.3, owner decision 2026-10-29 Q1 b; not in the
+   * reference): `content` in the `text` format, its plain text here.
+   */
+  | { type: 'header'; text: string }
   | { type: 'poll'; id: string | null }
   | { type: 'list'; items: ListItem[] }
   /** Any other or malformed block: the unsupported-block placeholder. */

@@ -482,9 +482,10 @@ The type is selected by `type`. Fields come from `ContentResponse`.
 | `image` | `url` | — |
 | `ok_video` | `id` (media id, used for progress), `vid`, `title?`, `preview?` or `defaultPreview?`, `playerUrls[]{type, url}`, `timeCode?` (seconds, saved progress) | Dropped if no usable URL or no preview. **`id` is the progress identity, never the URL.** |
 | `ok_stream` | as `ok_video`. `playerUrls` include `live_*` and `live_playback_*` | The reference keeps only live-edge URLs and drops `live_playback_*` (DVR) |
-| `video` | `url` | External player page (e.g. YouTube) |
+| `video` | `url` | External player page (e.g. YouTube; `LIVE`, Story 6.3: keys `type`, `url`) |
+| `header` (`LIVE`, Story 6.3) | `content` (the `text` format), `modificator` (empty) | Not in the reference. A heading line (our addition) |
 | `audio_file` | `url`, `title?`, `duration` (seconds) | Playable URL = `url + Post.signedQuery` |
-| `file` | `url`, `title?`, `size?` (bytes, inferred) | Download URL = `url + Post.signedQuery` |
+| `file` | `url`, `title?`, `size?` (bytes, inferred) | Download URL = `url + Post.signedQuery` (`LIVE`, Story 6.3: 403 without the query, 200 with it) |
 | `list` (`LIVE`, Story 1.5) | `items[]{data: ContentBlock[], items[]}` | Nested list of blocks. Not in the reference. Render the text of the nested blocks (our improvement) or fall back to the placeholder |
 | anything else | — | Must render as an "unsupported block" placeholder |
 
@@ -504,6 +505,32 @@ A temporary counts-only probe (`__DEV__`, removed before the commit; it logged o
 | Other block types seen | `text`, `link`, `ok_video`, `image`, `video` (3), `list` (11), **`file` (9)** and **`header` (42)**. `file` is a first live sample for Story 6.3 (keys not logged). `header` is not in the reference; it renders as the unsupported-block placeholder (keys not logged) | `LIVE` (types only) |
 
 Boosty TV (Story 6.1): each fragment's ranges are placed at its offset in the paragraph and clamped to the fragment, so a range never styles another fragment's text. Unknown codes are normal text; a malformed range list drops only the styles.
+
+#### File and video blocks (LIVE, Story 6.3, 2026-10-29)
+
+A temporary probe (`__DEV__`, `TEMP63`, removed before the commit; it logged only counts, key names with value types, booleans, host classes and HTTP statuses, never a URL, title, text or query value) ran on the pinned device in a debug build with Metro, in the owner's session. It read E5 (content profile, 10 pages of 20, paged with `extra.offset`) and E2 → E4 for the 3 subscribed blogs (8 pages each): 32 requests, all HTTP 200, 612 posts. Blocks were deduplicated by post id and position (a post can come from both E5 and E4). For up to 3 accessible files it sent one fresh E8 each (content profile) and status-only requests to the file host (no Boosty `Authorization`, the app's default headers; the range GET was aborted at the headers).
+
+| Item | Result | Level |
+|---|---|---|
+| `file` keys | 6 distinct blocks, all `complete` (boolean), `id` (string), `isInvalid` (null), `size` (number), `title` (string), `type`, `url` (string). `url` is an `https` URL on a `boosty.to` host without a query, on accessible posts whose `signedQuery` is non-empty | `LIVE` |
+| `file` target | For 3 files: HEAD to `url` alone → **403** (`application/json`); HEAD to `url + signedQuery` (the fresh E8's, joined with `?`) → **200** (`application/octet-stream`, `Content-Length` present); a `Range: bytes=0-0` GET → 403 bare, **206** signed. So a file opens only with `signedQuery`. The fresh E8 found the same block by `id` with the same `url`. The joined target was 192 characters (a QR at `ecl=M` holds it). Whether the host rejects it after `expire_time` stays unverified | `LIVE` |
+| `video` keys | 2 distinct blocks: `type`, `url` only. Both `url`s were `https` `youtube.com/watch?v=…` pages (no `youtu.be`, `embed` or `shorts` form seen; those are parsed per the reference's behavior and tests only). No non-YouTube sample, so «always an external page» rests on these 2 plus the reference | `LIVE` (2 samples) |
+| `header` keys | 21 distinct blocks (the 42 of Story 6.1 counted repeats across E5/E4): all `content` (string), `modificator` (empty string), `type`. `content` is the `text` JSON array on all 21, with a non-empty text and no style ranges. 20 follow a paragraph end (`BLOCK_END`), 1 an image; all are followed by a `text` block | `LIVE` |
+
+Boosty TV (Story 6.3): a `file` is a FileChip (title and size); OK sends a fresh E8 (`PostRepository.fileTarget`, the file by block id, else by index) and joins `url` + `signedQuery` (`shared/entities/externalUrls.fileTarget`: a leading `?`/`&` dropped, `?` or `&` join). An empty `signedQuery` gives no target (the bare URL answers 403), and an id-less file found by index must still carry the shown title, else no target. The target carries the ~24 h signature (`expire_time`) and is resolved once per OK: a QrDialog left open is not refreshed, so a very old open dialog may show an expired link (whether the host enforces `expire_time` is unverified); closing and pressing OK again resolves a fresh one. The target is held only by the QrDialog: never in the Post entity, a query cache, storage, a log or a fixture; no request goes to the file host from the TV. A `video` with an http(s) `url` is a chip (YouTube thumbnail when the host is YouTube) whose QR is the page; any other scheme or an empty `url` stays the placeholder. A `header` is a non-focusable heading with the `content` text (owner decision 2026-10-29, Q1 b); an empty one is dropped. A link fragment's `url` is used only when it is http(s).
+
+#### Timestamp links (LIVE, Story 6.3, 2026-10-29)
+
+A temporary probe (`__DEV__`, `TEMP63C`, removed before the commit; it logged only path shapes with placeholders, query key names, value classes, booleans and counts, never a URL, id or title) ran on the pinned device in a debug build with Metro, in the owner's session: E2, then E4 (content profile, `is_only_allowed=true`, up to 4 pages of 20) for the subscribed blogs, 13 requests, all HTTP 200. It read the `link` blocks after a «Таймкоды» text in each post.
+
+| Item | Result | Level |
+|---|---|---|
+| Posts with «Таймкоды» | 101 (100 with one `ok_video`, 1 with two) | `LIVE` |
+| Link shape | All 1 327 links: `https://boosty.to/<blogUrl>/posts/<postId>?t=<int>&tmid=<id>`; no fragment, no other host, no other time key | `LIVE` |
+| Target video | 1 304 links: `<blogUrl>`/`<postId>` are the post's own and `tmid` equals the `id` (media id) of one of the post's `ok_video` blocks. 23 links point at another post (`tmid` not a video of this post) | `LIVE` |
+| Time | `t` is whole seconds (digits only); it equals the `m:ss`/`h:mm:ss` time in the link text for 1 326 of 1 327 links (1 differs; `t` wins) | `LIVE` |
+
+Boosty TV (Story 6.3, owner decision 2026-10-29, option b): `shared/entities/externalUrls.timestampRef` accepts only this shape — the current post (blog compared case-insensitively), `t` as digits, `tmid` one of the post's `ok_video` ids — and the chip plays that video from `t` (the Player clamps it into the video). Any other link keeps its chip (QR, or «Открыть» for another post).
 
 #### Live evidence (Story 1.7, 2026-10-25): no sample in the scanned posts
 
@@ -527,7 +554,7 @@ The Story 1.7 spike screen («Аудио и файлы», `src/app/spike/AudioFi
 POST-06 and POST-07 rest on the reference code until a subscribed blog has an accessible `audio_file` or `file` post within the scanned range (owner decision 2026-10-25: auto-scan only, no blog typed in). The spike screen is ready for a re-run: it builds `url + signedQuery` in memory (dropping a leading `?`/`&` of the query and joining with `?` or `&`), logs the `signedQuery` shape (keys and value classes only) and the expiry field, plays audio with react-native-video, shows a file link only as a QR, and probes the URL status.
 
 Open:
-- The `video` block's live field set (keys only) and whether its `url` is always an external page.
+- ~~The `video` block's live field set (keys only) and whether its `url` is always an external page.~~ Story 6.3: keys `type`, `url`; both samples were YouTube pages (above).
 - Whether `audio_file`/`file` URLs reject requests after `expire_time`, and whether `signedQuery` depends on the request profile (E4 here used web-style headers; no `srcAg`-like key was seen).
 
 ### 4.2 Poll
