@@ -1,0 +1,43 @@
+__tests__/postFlow.test.tsx
+  s_3889105f87e0de::t_2f1d5543be7960 354-355,1890-1968
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_3889105f87e0de::t_ea72d9d45524ab 313-316
+_bmad-output/implementation-artifacts/spec-6-2-images-in-posts.md
+  s_3889105f87e0de::t_d0eb3e9fad4e4b 1-57
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_3889105f87e0de::t_083a5d234a2eff 32,91
+docs/feature-parity.md
+  s_3889105f87e0de::t_d155335de305e0 82
+docs/focus-map.md
+  s_3889105f87e0de::t_864656b80a9648 341
+docs/testing.md
+  s_3889105f87e0de::t_3f677c0c2465ac 896-905
+src/features/post/PostBody.tsx
+  s_3889105f87e0de::t_b495a1af8b646d 258-375,426-437,725-743
+src/features/post/PostScreen.tsx
+  s_3889105f87e0de::t_21823f22a2a82f 255
+src/features/post/__tests__/teaser.test.tsx
+  s_3889105f87e0de::t_a7d26986c82384 35
+src/shared/entities/post/__tests__/postBody.test.ts
+  s_3889105f87e0de::t_58186f3c5fea10 168,184-185,569-595
+src/shared/entities/post/postBody.ts
+  s_3889105f87e0de::t_79b1e4c782d9b4 5-6,39-42,159-162,164-172,383-386,389-391,398-401,403,485
+src/shared/i18n/ru.ts
+  s_3889105f87e0de::t_b109868f83d5c8 254-255
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "3a8914269df87bcf19007d9e247b6a600546bdb9",
+  "prompts": {},
+  "sessions": {
+    "s_3889105f87e0de": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6900e7f-f881-4858-9cce-006384a7dd3e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
