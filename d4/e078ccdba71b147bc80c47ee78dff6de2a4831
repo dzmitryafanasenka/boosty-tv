@@ -1,0 +1,21 @@
+_bmad-output/implementation-artifacts/epic-5-retro-2026-10-29.md
+  s_3889105f87e0de::t_1131a2a8d41a60 1-132
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_3889105f87e0de::t_fded2e43c33705 32,79,87,237,244,246-296
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "d4e078ccdba71b147bc80c47ee78dff6de2a4831",
+  "prompts": {},
+  "sessions": {
+    "s_3889105f87e0de": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6900e7f-f881-4858-9cce-006384a7dd3e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
