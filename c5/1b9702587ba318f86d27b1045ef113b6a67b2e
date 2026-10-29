@@ -1,0 +1,81 @@
+__tests__/checkFixtures.test.js
+  s_3889105f87e0de::t_45e9a4befc1371 101
+__tests__/demoFlow.test.tsx
+  s_3889105f87e0de::t_4238f76f2d3dbe 8,201-202,207-215,234-256
+__tests__/postFlow.test.tsx
+  s_3889105f87e0de::t_d652ec0bede76c 2541-2689
+_bmad-output/implementation-artifacts/spec-6-5-poll-display.md
+  s_3889105f87e0de::t_1bcb6e2d4c6110 1-142
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_3889105f87e0de::t_bc029d34a1c3b4 32,94
+docs/api-contract.md
+  s_3889105f87e0de::t_61676ff20f4ed3 582-604,703
+docs/feature-parity.md
+  s_3889105f87e0de::t_005fd4b36ba9f8 96,100
+docs/focus-map.md
+  s_3889105f87e0de::t_b13cd14b0f6823 366-368,427
+docs/testing.md
+  s_3889105f87e0de::t_3bf6a1d20fb0a2 896-915
+scripts/check-fixtures.mjs
+  s_3889105f87e0de::t_e024466a67bc83 15-17,44-45,83-85
+src/app/dev/demo.ts
+  s_3889105f87e0de::t_827324f288ec76 76-117,149
+src/features/polls/PollWidget.tsx
+  s_3889105f87e0de::t_aa0b3068daae52 1-227
+src/features/polls/__tests__/PollWidget.test.tsx
+  s_3889105f87e0de::t_dfd83ba0fac6d1 1-179
+src/features/polls/index.ts
+  s_3889105f87e0de::t_ccf00a6d69908e 1
+src/features/post/PostBody.tsx
+  s_3889105f87e0de::t_a8aa321e089e89 14,945-955
+src/features/post/PostScreen.tsx
+  s_3889105f87e0de::t_db8aee960852b6 272-274
+src/features/post/__tests__/endedReturnFocus.test.ts
+  s_3889105f87e0de::t_12ffa450fd0aa1 30-31
+src/shared/api/dto/post.ts
+  s_3889105f87e0de::t_76a8755c8e559a 56-61,183-217
+src/shared/entities/poll/__tests__/mapPoll.test.ts
+  s_3889105f87e0de::t_e85d148bd141ad 1-159
+src/shared/entities/poll/index.ts
+  s_3889105f87e0de::t_30f1fd860ad27a 1-2
+src/shared/entities/poll/mapPoll.ts
+  s_3889105f87e0de::t_7c1878d29ef85c 1-82
+src/shared/entities/poll/types.ts
+  s_3889105f87e0de::t_415ed9c76588f3 1-30
+src/shared/entities/post/__tests__/mapPost.test.ts
+  s_3889105f87e0de::t_6ff3c40206606d 203-209,364-430
+src/shared/entities/post/__tests__/postBody.test.ts
+  s_3889105f87e0de::t_6fcd29f50b4c66 872-979
+src/shared/entities/post/mapPost.ts
+  s_3889105f87e0de::t_cf4278378ce11f 18,240-245,263,302-309,326-335,353,363-364
+src/shared/entities/post/postBody.ts
+  s_3889105f87e0de::t_02a5270ce937eb 9,68-75,230-231,481,492-493,524-531,538-546,611-624,714-717,730-734
+src/shared/entities/post/types.ts
+  s_3889105f87e0de::t_ddc9eeaf9fa897 1-2,115,131-144
+src/shared/i18n/__tests__/format.test.ts
+  s_3889105f87e0de::t_abff958f3a1913 1,72-88
+src/shared/i18n/format.ts
+  s_3889105f87e0de::t_4233292435b482 97-110
+src/shared/i18n/ru.ts
+  s_3889105f87e0de::t_957c2cd3326613 398-419
+src/test/fixtures/boosty/e8-post-accessible.json
+  s_3889105f87e0de::t_b218b70eaee6e2 1032-1065
+src/test/postFixtures.ts
+  s_3889105f87e0de::t_9582c4c09ad55c 37-40,69-72,80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "c51b9702587ba318f86d27b1045ef113b6a67b2e",
+  "prompts": {},
+  "sessions": {
+    "s_3889105f87e0de": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6900e7f-f881-4858-9cce-006384a7dd3e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
