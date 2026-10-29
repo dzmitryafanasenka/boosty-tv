@@ -15,6 +15,7 @@ import {
   videoBlockDtoSchema,
 } from '../../api/dto/post';
 import { safeHttpUrl } from '../externalUrls';
+import { mapPoll } from '../poll/mapPoll';
 import { logger as appLogger, type Logger } from '../../services/logger';
 import type { Block, ListItem, Post, PostKind, TextSpan, TextStyle } from './types';
 
@@ -236,8 +237,12 @@ function mapBlocks(raw: readonly unknown[] | null | undefined, depth = 0): Block
   return raw ? raw.map(block => mapBlock(block, depth)) : [];
 }
 
-/** The badge kind: locked, then video(s), audio, poll, file, text and photos. */
-export function kindOf(hasAccess: boolean, blocks: readonly Block[]): PostKind {
+/**
+ * The badge kind: locked, then video(s), audio, poll, file, text and photos.
+ * `hasPoll` (Story 6.5): the post carries a top-level `poll` (live, polls
+ * are never blocks), usable or not.
+ */
+export function kindOf(hasAccess: boolean, blocks: readonly Block[], hasPoll = false): PostKind {
   if (!hasAccess) {
     return { kind: 'locked' };
   }
@@ -255,7 +260,7 @@ export function kindOf(hasAccess: boolean, blocks: readonly Block[]): PostKind {
   if (blocks.some(b => b.type === 'audio_file')) {
     return { kind: 'audio' };
   }
-  if (blocks.some(b => b.type === 'poll')) {
+  if (hasPoll || blocks.some(b => b.type === 'poll')) {
     return { kind: 'poll' };
   }
   if (blocks.some(b => b.type === 'file')) {
@@ -294,6 +299,14 @@ export function firstText(blocks: readonly Block[]): string {
   return '';
 }
 
+/** A rejected poll's raw `id` as a string (a finite number or a non-empty string), else null. */
+function rawPollId(raw: unknown): string | null {
+  const id = raw !== null && typeof raw === 'object' ? (raw as { id?: unknown }).id : undefined;
+  return (typeof id === 'number' && Number.isFinite(id)) || (typeof id === 'string' && id.length > 0)
+    ? String(id)
+    : null;
+}
+
 export function mapPost(raw: unknown, logger: Logger = appLogger): Post | null {
   const parsed = postDtoSchema.safeParse(raw);
   if (!parsed.success) {
@@ -310,7 +323,16 @@ export function mapPost(raw: unknown, logger: Logger = appLogger): Post | null {
   const dto = parsed.data;
   const blocks = mapBlocks(dto.data);
   const teaser = mapBlocks(dto.teaser);
-  const hasAccess = dto.hasAccess !== false && blocks.length > 0;
+  // Story 6.5: a top-level poll of a post that does not say `hasAccess:
+  // false` is content too, so a post whose only content is a usable poll
+  // is accessible (api-contract §7: «empty `data`» alone means locked). A
+  // locked post shows no poll (its teaser never has one).
+  const offeredPoll =
+    dto.hasAccess !== false && dto.poll !== null && dto.poll !== undefined ? dto.poll : undefined;
+  const mappedPoll = offeredPoll === undefined ? null : mapPoll(offeredPoll);
+  const hasAccess = dto.hasAccess !== false && (blocks.length > 0 || mappedPoll !== null);
+  const rawPoll = hasAccess ? offeredPoll : undefined;
+  const poll = hasAccess ? mappedPoll : null;
   const videos = blocks.filter(b => b.type === 'ok_video');
   return {
     id: dto.id,
@@ -328,7 +350,7 @@ export function mapPost(raw: unknown, logger: Logger = appLogger): Post | null {
     hasAccess,
     blocks: hasAccess ? blocks : [],
     teaser,
-    kind: kindOf(hasAccess, blocks),
+    kind: kindOf(hasAccess, blocks, rawPoll !== undefined),
     previewUrl: previewOf(hasAccess ? blocks : [], teaser),
     durationSec:
       hasAccess && videos.length === 1 && videos[0].type === 'ok_video'
@@ -338,5 +360,7 @@ export function mapPost(raw: unknown, logger: Logger = appLogger): Post | null {
     levelName: nonEmpty(dto.subscriptionLevel?.name?.trim()),
     likeCount: dto.count?.likes ?? null,
     pinned: dto.isPinned === true,
+    poll,
+    pollUnsupported: rawPoll !== undefined && poll === null ? { id: rawPollId(rawPoll) } : null,
   };
 }

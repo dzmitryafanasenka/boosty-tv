@@ -34,6 +34,10 @@ export const e8Path = (blogUrl: string, postId: string) => `/v1/blog/${blogUrl}/
  * Story 6.4 addition: one synthetic `audio_file` block after them, in the
  * live key set (api-contract §4.1 «Audio blocks (LIVE)»): `synthetic-id-14`,
  * `https://example.invalid/audio`, 3:00.
+ * Story 6.5 addition: a live-sanitized top-level `poll` in the live key set
+ * (api-contract §4.2 «Polls (LIVE)»; one live sample): id 1020, an open
+ * single-choice poll, 2 options (1021: counter 5, fraction 100; 1022: 0, 0; as live, the fractions sum to 100 and the counters to the poll's `counter`),
+ * no `answer` (as live), values synthetic.
  */
 export function e8Accessible(): Json {
   return clone(e8Accessible_.body as unknown as Json);
@@ -62,7 +66,10 @@ export const blockEnd = (): Json => ({ type: 'text', content: '', modificator: '
 /** One paragraph: a fragment and the paragraph end. */
 export const paragraph = (s: string): Json[] => [text(s), blockEnd()];
 
-/** A synthetic E8 body: the live accessible post with these blocks and ids. */
+/**
+ * A synthetic E8 body: the live accessible post with these blocks and ids.
+ * Its poll is left out (Story 6.5): pass `poll` in `overrides` for one.
+ */
 export function postDetail(
   blogUrl: string,
   postId: string,
@@ -70,6 +77,7 @@ export function postDetail(
   overrides: Json = {},
 ): Json {
   const body = e8Accessible();
+  delete body.poll;
   return {
     ...body,
     id: postId,

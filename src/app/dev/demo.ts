@@ -73,6 +73,48 @@ function demoFeedTagsPage(url: string) {
   return { data: { searchTags }, extra: { offset: String(end), isLast: end >= DEMO_TAGS } };
 }
 
+/**
+ * Story 6.5: a top-level `poll` (the live shape, api-contract §4.2) on
+ * every odd post (every second one): an open one with the user's choice on
+ * its second option (n % 4 = 1) or a finished one with no voters (n % 4 =
+ * 3); none otherwise (a locked post never gets one).
+ */
+function demoPoll(n: number) {
+  if (n % 4 === 1) {
+    return {
+      id: 2000 + n,
+      title: ['Какой формат выпусков удобнее?'],
+      isMultiple: false,
+      isFinished: false,
+      counter: 128,
+      answer: [2],
+      defaultLang: 'ru',
+      hasOther: false,
+      options: [
+        { id: 1, text: 'Длинные разборы', counter: 64, fraction: 50, voters: {} },
+        { id: 2, text: 'Короткие выпуски', counter: 48, fraction: 38, voters: {} },
+        { id: 3, text: 'Прямые эфиры', counter: 16, fraction: 13, voters: {} },
+      ],
+    };
+  }
+  if (n % 4 === 3) {
+    return {
+      id: 2000 + n,
+      title: ['Тема следующего выпуска'],
+      isMultiple: false,
+      isFinished: true,
+      counter: 0,
+      defaultLang: 'ru',
+      hasOther: false,
+      options: [
+        { id: 1, text: 'История', counter: 0, fraction: 0, voters: {} },
+        { id: 2, text: 'Наука', counter: 0, fraction: 0, voters: {} },
+      ],
+    };
+  }
+  return undefined;
+}
+
 /** One synthetic E5/E4 post (shape of `src/test/fixtures/boosty/e5-feed.json`). */
 function demoPost(n: number, blog?: { blogUrl: string; index: number }) {
   const blogUrl = blog?.blogUrl ?? DEMO_BLOGS[n % DEMO_BLOGS.length];
@@ -104,6 +146,7 @@ function demoPost(n: number, blog?: { blogUrl: string; index: number }) {
     user: { name: `Демо-автор ${authorIndex + 1}`, blogUrl },
     data,
     teaser: [],
+    ...(locked ? {} : { poll: demoPoll(n) }),
     tags: demoPostTags(n),
     // Story 3.6: every other locked post names its level (only `name`; no
     // price fields in the demo), the rest show the copy without a level.
@@ -368,7 +411,6 @@ function demoPostDetail(blogUrl: string, postId: string) {
             // «Не удалось воспроизвести»).
             url: 'https://example.invalid/demo-audio.mp3',
           },
-          { type: 'poll', id: 1000 + n },
           { type: 'demo_unknown_block' },
         ]
       : [];

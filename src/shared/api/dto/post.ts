@@ -53,6 +53,12 @@ export const postDtoSchema = z.object({
     .catch(undefined),
   /** E4: the author's pinned post comes first (Boosty's order); a wrong type → not pinned. */
   isPinned: z.boolean().nullish().catch(undefined),
+  /**
+   * Story 6.5: the post's poll (live: top-level, never a `poll` block;
+   * api-contract §4.2 «Polls (LIVE)»). Kept `unknown` here: `pollDtoSchema`
+   * parses it in `entities/poll`, so a malformed poll never drops the post.
+   */
+  poll: z.unknown().optional(),
   /** Present only as a key in live posts; only `name` is read. */
   subscriptionLevel: z
     .object({ name: optionalString })
@@ -172,6 +178,41 @@ export const headerBlockDtoSchema = z.object({
 export const pollBlockDtoSchema = z.object({
   type: z.literal('poll'),
   id: z.union([z.number(), z.string()]).nullish().catch(undefined),
+});
+
+const pollIdSchema = z.union([z.number().finite(), z.string().min(1)]);
+
+/**
+ * Story 6.5: one poll option (api-contract §4.2). `id`, `counter` and
+ * `fraction` are required (an option without them is dropped on its own;
+ * no valid option left makes the poll the «Опрос» placeholder); `text`
+ * falls back to empty. `voters` is never read.
+ */
+export const pollOptionDtoSchema = z.object({
+  id: pollIdSchema,
+  text: optionalString,
+  counter: z.number(),
+  fraction: z.number(),
+});
+
+/**
+ * Story 6.5: the post's top-level `poll` (api-contract §4.2; live keys
+ * `counter`, `defaultLang`, `hasOther`, `id`, `isFinished`, `isMultiple`,
+ * `options`, `title`; `answer` only after a vote, as in the reference).
+ * Required as in the reference: `id`, `isMultiple`, `isFinished`, a
+ * non-empty `options`; options are parsed one by one (a bad one dropped) by
+ * `pollOptionDtoSchema` in the mapper. `title` is an array of strings
+ * (non-strings dropped), `counter` and `answer` are optional.
+ * `defaultLang`, `hasOther` and the options' `voters` are never read.
+ */
+export const pollDtoSchema = z.object({
+  id: pollIdSchema,
+  title: z.array(z.unknown()).nullish().catch(undefined),
+  isMultiple: z.boolean(),
+  isFinished: z.boolean(),
+  counter: z.number().nullish().catch(undefined),
+  answer: z.array(z.unknown()).nullish().catch(undefined),
+  options: z.array(z.unknown()).min(1),
 });
 
 /** `list` (`LIVE`, Story 1.5): `items[]{data: ContentBlock[], items[]}`. */

@@ -12,8 +12,9 @@
  * - a number that does not follow the sanitizer's number rules: ids are
  *   synthetic (1001–9999), times are synthetic (base + n hours), sizes are
  *   multiples of 100 KiB, durations and time codes are whole minutes,
- *   structural numbers (paging, dimensions, statuses) are kept, and every
- *   other number is 0 or the synthetic count;
+ *   structural numbers (paging, dimensions, statuses) are kept, a poll
+ *   option's `fraction` (a percent) is 0 or 100, and every other number is
+ *   0 or the synthetic count;
  * - an `@`-email;
  * - any string that is not a placeholder, a synthetic value or an
  *   allowlisted enum.
@@ -40,6 +41,8 @@ const PHONE_KEY = /phone/i;
 const TIME_KEY = /(At|Time|_at|_time|_ts|Timestamp|timestamp)$/;
 const SIZE_KEY = /^(size|fileSize|file_size)$/;
 const DURATION_KEY = /^(duration|timeCode|time_code)$/;
+/** A poll option's share in percent (Story 6.5): only 0 or 100, so no real result is kept. */
+const PERCENT_KEY = /^fraction$/;
 const KEEP_NUMBER_KEY =
   /^(status|statusCode|width|height|offset|limit|period|priority|showcase|expiresIn|expires_in)$/;
 const SYNTHETIC_TIME_BASE = 1_700_000_000;
@@ -76,6 +79,9 @@ function numberProblem(value, key) {
     return Number.isInteger(value) && value % 60 === 0
       ? null
       : 'duration/time code is not whole minutes';
+  }
+  if (PERCENT_KEY.test(key)) {
+    return value === 0 || value === 100 ? null : 'percent is not 0 or 100';
   }
   if (KEEP_NUMBER_KEY.test(key)) {
     return Math.abs(Math.trunc(value)) >= 1e8

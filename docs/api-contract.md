@@ -579,6 +579,29 @@ Poll { id: int, title: string[] (joined for display), isMultiple: bool, isFinish
 ```
 Required by the reference: `id`, `isMultiple`, `isFinished`, a non-empty `options`, and `counter` and `fraction` on each option.
 
+#### Polls (LIVE, Story 6.5, 2026-10-29)
+
+A temporary probe (`__DEV__`, `TEMP65`, mounted by the Shell, removed before the commit; it logged only counts, key names with value types, booleans and feed/blog positions, never a title, option text, id, URL or user data) ran on the pinned device in a debug build with Metro, in the owner's session. It read E5 (content profile, `only_allowed=true`, 10 pages of 20, paged with `extra.offset`), then E2 → E4 for every subscribed blog (3 blogs; `is_only_allowed=false`, up to 10 pages of 20 each, stopping on `isLast`), then one E8 for each post with a poll. 37 requests, all HTTP 200. Posts were deduplicated by id across E5 and E4.
+
+| Scope | Pages | Posts (new after dedup) |
+|---|---|---|
+| E5 feed | 10 | 200 |
+| Blog 1 (E4) | 10 (not the end) | 76 |
+| Blog 2 (E4) | 10 (not the end) | 169 |
+| Blog 3 (E4) | 5 (`isLast`) | 48 |
+| Total | 35 | 493 (363 accessible) |
+
+| Item | Result | Level |
+|---|---|---|
+| Where the poll lives | **1 post** with a poll (accessible; in the feed and in blog 3, its 34th post). It is the **top-level `poll`** only: **no `poll` block** in `data[]` or `teaser[]` of any of the 493 posts (including `list` items). Its E8 `data[]` is `text` blocks only. No locked post carried a poll | `LIVE` (one sample) |
+| `poll` keys | `counter` (number), `defaultLang` (string), `hasOther` (boolean), `id` (number), `isFinished` (boolean, `false`), `isMultiple` (boolean, `false`), `options` (array, 2), `title` (array of strings). The same in the E8 | `LIVE` |
+| `answer` | **Absent** (no key) in E5, E4 and E8. The owner had not voted on it (presumably): whether `answer` appears after a vote, and its element type, stay `REF` (Story 6.6) | `LIVE` (absent), `REF` (present) |
+| Option keys | `counter` (number), `fraction` (number), `id` (number), `text` (string), `voters` (object `{data, extra}`, never read) | `LIVE` |
+| `fraction` | An **integer** percent on both options; the fractions sum to 100. The option `counter`s sum to the poll's `counter` (single choice) | `LIVE` |
+| Other poll shapes | No multiple-choice, finished or voted poll was seen; those states rest on the reference | unverified (`REF`) |
+
+Boosty TV (Story 6.5): `Post.poll` comes from the top-level `poll` of an accessible post (a locked post shows no poll). `entities/poll.mapPoll` keeps the ids as strings, joins `title` with «, » (the reference's `joinToString()`), defaults a `counter` that is not a non-negative integer to 0 and a missing `answer` to none chosen, keeps the first of duplicate option ids (1 and "1" alike), drops an option that lacks `id`, `counter` or `fraction` on its own (owner decision 2026-10-29, option a: the reference's `mapNotNull`), and returns null — the «Опрос» placeholder, never a crash — when `id`, `isMultiple` or `isFinished` is missing or no valid option is left. The poll renders where a `poll` block with its id sits, else after the body (the live case). Each option shows «N %» (`fraction` rounded) and its `counter` (POLL-01); the bar is `fraction`% clamped to 0…100. A usable poll is content: a post with `hasAccess` not false whose only content is the poll is accessible (§7). No E10 is sent in this story.
+
 ## 5. Pagination
 
 - Cursor-based. `extra.offset` is an **opaque string** and must be passed back verbatim as `offset`.
@@ -677,7 +700,7 @@ These are not `playerUrls`: the URL is the block `url` plus `Post.signedQuery` (
 | Unauthorized / expired access token | HTTP **401** `{error: "unauthorized", error_description}` on E1 (`/v1/user/current`) without a token, and with a corrupted token (Story 1.4) | `LIVE` |
 | **Content request without a token** | E8 for a post the user can access returns HTTP **200** as for an anonymous viewer: `hasAccess=false`, empty `data`, teaser only. **Not a 401.** Observed on one paid post; free posts without a token were not checked, so the general rule is inferred. A missing `Authorization` header on content endpoints looks like "locked", not like a session problem. The client must always attach the token when signed in and must not show "subscribe to access" for posts fetched without one | `LIVE` (one post, Story 1.5) |
 | **Content request with an expired or invalid token** | E8 with a synthetic 64-character Bearer returns HTTP **200 as an anonymous viewer** (`hasAccess=false`, empty `data`, no `error`), **not 401**. So an invalid or expired token on content endpoints never triggers the 401 refresh path and makes everything look locked. The session must be validated separately: proactive refresh by expiry, and E1 (which does return 401) at app start and on resume before trusting `hasAccess=false`. One request on E8; E4/E5 inferred to behave the same | `LIVE` (E8, Story 1.6) |
-| Accessible post with empty `data` (`hasAccess: true`, `data: []`) | **Not observed.** Debug-build counter (count and post ids only, removed afterwards) over 37 E5 pages (`limit=10`) and 23 E4 pages (`limit=20`) of the 3 subscribed blogs, owner's session, 2026-10-27: 0 posts with `hasAccess: true` and an empty or missing `data`. The mapper keeps treating such a post as locked (`hasAccess = dto.hasAccess !== false && blocks.length > 0`) | not observed (60 pages, one account; Epic 3 retro A6) |
+| Accessible post with empty `data` (`hasAccess: true`, `data: []`) | **Not observed.** Debug-build counter (count and post ids only, removed afterwards) over 37 E5 pages (`limit=10`) and 23 E4 pages (`limit=20`) of the 3 subscribed blogs, owner's session, 2026-10-27: 0 posts with `hasAccess: true` and an empty or missing `data`. The mapper keeps treating such a post as locked (`hasAccess = dto.hasAccess !== false && blocks.length > 0`), except (Story 6.5) when it carries a usable top-level `poll`: a poll is content too, so a post whose only content is a poll is accessible (not observed live; the one live poll post had `text` blocks) | not observed (60 pages, one account; Epic 3 retro A6) |
 | Nonexistent post | E8 with a random UUID: HTTP **404** `{error: "not_found", error_description}` | `LIVE` (Story 1.5) |
 | Nonexistent blog | E3 with a random slug: HTTP **404** `{error: "blog_not_found", error_description}` | `LIVE` (Story 1.5) |
 | 403, 410, 429 (content), 5xx | **Not observed.** A locked post is a 200 with `hasAccess=false`, not a 403. 429 was seen only on the phone-auth send (§2.2) | unverified. **Do not treat 403 as an expired session.** Map unobserved 4xx to a generic non-retried error |

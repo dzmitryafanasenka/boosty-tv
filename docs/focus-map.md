@@ -363,7 +363,9 @@ Implementation notes (Story 6.4, inline audio; host-tested, the device rows are 
 
 **AudioBlock exception:** ← and → seek inside the block, so ← does not move to the sidebar from an audio row; ↑ ↓ leave the block first (to reach the sidebar: ↑ or ↓ to another element, then ←). **Single playback (AD-19):** opening the Player from the post stops a playing AudioBlock; it does not resume on return, and focus returns to the initiator as usual.
 
-Block focus stops: ImageBlock (so tall images scroll into view), each paragraph of expanded long text (ParagraphStop), LinkChip, FileChip and the external-video chip (Story 6.3), AudioBlock, MediaRow, PollOption. A heading is not a stop. LikeCount is **not** focusable. A finished poll is one focus stop. Comments are not shown and have no counter or focus stop.
+**PollWidget (Story 6.5, results only):** the post's poll is **one focus stop** (`post/<postId>/block/poll:<pollId>`), placed where its `poll` block sits, else after the body (live: polls are top-level only, so after the body). This holds for every poll in 6.5, open or finished: its options are not focusable, OK does nothing, ↑ ↓ move natively to the neighbouring stops, ← goes to the sidebar as from any block. Focused: the ring, no scale; the stop's vertical padding keeps the ring inside the column when it is the last block *(device: Story 6.5, release-like build: the ring was cut at the column's bottom without it)*. Initial focus is unchanged: the poll is a stop in body order (first only when no other block is a stop). A poll with no valid option left (a bad option is dropped on its own) or no `id`/`isMultiple`/`isFinished` is the non-focusable «Опрос» placeholder; a locked post shows no poll. Stories 6.6–6.7 make an open poll's options focusable (the I rows below).
+
+Block focus stops: ImageBlock (so tall images scroll into view), each paragraph of expanded long text (ParagraphStop), LinkChip, FileChip and the external-video chip (Story 6.3), AudioBlock, MediaRow, the PollWidget (Story 6.5; PollOption from Story 6.6). A heading is not a stop. LikeCount is **not** focusable. A finished poll is one focus stop. Comments are not shown and have no counter or focus stop.
 
 ### G Плеер
 
@@ -422,6 +424,7 @@ Implementation notes (Story 4.4, recovery; host-tested only, the device rows are
 | I Poll, single choice | Options in order (no option is focused on entry; the post's normal ↑ ↓ reaches them) | ↑ ↓ between options | 1st OK: pending («Нажмите OK ещё раз»); 2nd OK on the same option: vote. On the chosen option: 1st OK pending «Нажмите OK ещё раз, чтобы отозвать», 2nd OK retracts. Moving focus cancels pending | Leave the post | After every response the poll is re-fetched; focus stays on the option. On failure: inline error, previous state kept, no automatic retry |
 | I Poll, multiple choice | The first option on entry from above | ↑ ↓; «Проголосовать» is focusable only while at least one option is checked | Option: toggle the check. «Проголосовать»: send (no extra confirm) | Leave the post | After voting: results with «Отозвать голос» (two OKs: pending, then confirm) |
 | I Finished poll | The whole poll is one stop | — | Nothing | Leave the post | — |
+| I Poll, Story 6.5 (display only, any poll) | The whole poll is one stop (`…/block/poll:<pollId>`); no option is focusable | ↑ ↓ to the neighbouring stops; ← the sidebar | Nothing | Leave the post | As any block stop (the guide remembers it) |
 
 ## 5. Events, settings and states
 

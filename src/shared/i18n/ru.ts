@@ -395,6 +395,28 @@ export const ru = {
     a11yFailed: 'Аудио. {title}. {time}. {error}. Повторить',
     a11yLocked: 'Аудио. {title}. {time}. {error}',
   },
+  // DESIGN.md PollWidget (Story 6.5): results only (voting is Stories
+  // 6.6–6.7). «Проголосовали» reads right for any N (the reference's
+  // «Проголосовал: N» does not). `{n}` in `percent` is the rounded
+  // percent. The label (PollWidget): «Опрос», the title, each option
+  // (`a11yOption*`), the voters, `finished`, as sentences.
+  poll: {
+    untitled: 'Опрос',
+    // An option without text (1-based position, display only).
+    optionFallback: 'Вариант {n}',
+    // `{n}` is `formatCount` (thousands with a narrow no-break space).
+    voters: 'Проголосовали: {n}',
+    finished: 'Опрос завершен',
+    percent: '{n}\u00A0%',
+    // POLL-01: each option's percent and its vote count («48 % · 1 210»).
+    result: '{percent} · {count}',
+    votes: ['голос', 'голоса', 'голосов'] as RuPluralForms,
+    // The label starts with this, then the title (only when there is one).
+    a11yPrefix: 'Опрос',
+    // `{count}` is the count with its plural word («1 210 голосов»).
+    a11yOption: '{text}, {percent}, {count}',
+    a11yOptionChosen: '{text}, {percent}, {count}, ваш выбор',
+  },
   // DESIGN.md PostCard (Story 3.1). `{n}` is the video count. The card's
   // accessibility label reads «Видео. {title}. {author}, {date}.».
   postCard: {

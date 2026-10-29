@@ -1029,6 +1029,39 @@
         "type": "folded-hands",
         "count": 0
       }
-    ]
+    ],
+    "poll": {
+      "counter": 5,
+      "defaultLang": "redacted",
+      "hasOther": false,
+      "id": 1020,
+      "isFinished": false,
+      "isMultiple": false,
+      "options": [
+        {
+          "counter": 5,
+          "fraction": 100,
+          "id": 1021,
+          "text": "redacted",
+          "voters": {
+            "data": {},
+            "extra": {}
+          }
+        },
+        {
+          "counter": 0,
+          "fraction": 0,
+          "id": 1022,
+          "text": "redacted",
+          "voters": {
+            "data": {},
+            "extra": {}
+          }
+        }
+      ],
+      "title": [
+        "redacted"
+      ]
+    }
   }
 }

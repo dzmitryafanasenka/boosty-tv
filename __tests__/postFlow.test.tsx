@@ -2538,3 +2538,152 @@ describe('Story 6.4: inline audio', () => {
     await unmount(root);
   });
 });
+
+describe('Story 6.5: poll display', () => {
+  /** The live poll shape (api-contract §4.2 «Polls (LIVE)»): top-level, no `answer` before a vote. */
+  const option = (id: number, text_: string, counter: number, fraction: number) => ({
+    counter,
+    fraction,
+    id,
+    text: text_,
+    voters: { data: {}, extra: {} },
+  });
+  const POLL = {
+    counter: 21,
+    defaultLang: 'ru',
+    hasOther: false,
+    id: 9,
+    isFinished: false,
+    isMultiple: false,
+    options: [option(1, 'Длинные', 10, 48), option(2, 'Короткие', 8, 38), option(3, 'Эфиры', 3, 14)],
+    title: ['Какой формат удобнее?'],
+  };
+  const POLL_KEY = 'poll:9';
+  const withPoll = (poll: unknown, data: unknown[] = [...paragraph('До'), ...paragraph('После')]) => {
+    e8 = (_req, blogUrl, postId) => ({ status: 200, body: postDetail(blogUrl, postId, data, { poll }) });
+  };
+  const pollNode = (root: Root, id: string) =>
+    byTestId(root, BLOCK(id, POLL_KEY)).find(n => n.props.focusable === true);
+  const pollCalls = () => transport.calls.filter(c => c.path.includes('/poll'));
+
+  it('matrix «Open poll»: after the body, title, 3 rows with bars and %, «Проголосовали: N»; one focus stop, no option focusable; initial focus unchanged', async () => {
+    withPoll(POLL);
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, 'text@0'), BLOCK(id, 'text@2'), BLOCK(id, POLL_KEY)]);
+    expect(lastFocusTarget()).toBe(BLOCK(id, 'text@0'));
+    const page = pageText(root);
+    for (const s of ['Какой формат удобнее?', 'Длинные', 'Короткие', 'Эфиры', '48\u00A0% · 10', '38\u00A0% · 8', '14\u00A0% · 3', 'Проголосовали: 21']) {
+      expect(page).toContain(s);
+    }
+    expect(page).not.toContain(t('poll.finished'));
+    expect(byTestId(root, `${BLOCK(id, POLL_KEY)}/option/1/bar`)).toHaveLength(1);
+    expect(pollNode(root, id)?.props.accessibilityLabel).toBe(
+      'Опрос. Какой формат удобнее? Длинные, 48\u00A0%, 10 голосов. Короткие, 38\u00A0%, 8 голосов. ' +
+        'Эфиры, 14\u00A0%, 3 голоса. Проголосовали: 21',
+    );
+    // No poll request (no E10, no vote): the poll is the cached post's.
+    expect(pollCalls()).toEqual([]);
+    await unmount(root);
+  });
+
+  it('matrix «My choice»: the chosen option carries the accent check', async () => {
+    withPoll({ ...POLL, answer: [2] });
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    expect(byTestId(root, `${BLOCK(id, POLL_KEY)}/option/2/chosen`)).toHaveLength(1);
+    expect(byTestId(root, `${BLOCK(id, POLL_KEY)}/option/1/chosen`)).toHaveLength(0);
+    expect(pollNode(root, id)?.props.accessibilityLabel).toContain('Короткие, 38\u00A0%, 8 голосов, ваш выбор');
+    await unmount(root);
+  });
+
+  it('matrix «Finished»: «Опрос завершен», the results; one stop', async () => {
+    withPoll({ ...POLL, isFinished: true });
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    expect(contentIds(root).filter(c => c.startsWith(BLOCK(id, 'poll')))).toEqual([BLOCK(id, POLL_KEY)]);
+    expect(pageText(root)).toContain(t('poll.finished'));
+    expect(pageText(root)).toContain('48\u00A0%');
+    await unmount(root);
+  });
+
+  it('matrix «Malformed option»: an option without `fraction` is dropped, the rest of the poll shown (owner decision, option a)', async () => {
+    const broken: Record<string, unknown> = option(2, 'Короткие', 8, 38);
+    delete broken.fraction;
+    withPoll({ ...POLL, options: [option(1, 'Длинные', 10, 48), broken, option(3, 'Эфиры', 3, 14)] });
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, 'text@0'), BLOCK(id, 'text@2'), BLOCK(id, POLL_KEY)]);
+    expect(byTestId(root, `${BLOCK(id, POLL_KEY)}/option/1`)).toHaveLength(1);
+    expect(byTestId(root, `${BLOCK(id, POLL_KEY)}/option/2`)).toHaveLength(0);
+    expect(byTestId(root, `${BLOCK(id, POLL_KEY)}/option/3`)).toHaveLength(1);
+    expect(pageText(root)).not.toContain('Короткие');
+    expect(pageText(root)).toContain('Проголосовали: 21');
+    await unmount(root);
+  });
+
+  it('matrix «Malformed option», every option invalid → the «Опрос» placeholder, the rest of the post fine', async () => {
+    const broken: Record<string, unknown> = option(2, 'Короткие', 8, 38);
+    delete broken.fraction;
+    withPoll({ ...POLL, options: [broken, { id: 3, text: 'Эфиры', fraction: 14 }] });
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, 'text@0'), BLOCK(id, 'text@2')]);
+    const [placeholder] = byTestId(root, BLOCK(id, 'poll@4'));
+    expect(placeholder.props.focusable).toBe(false);
+    expect(placeholder.props.accessibilityLabel).toBe(t('post.block.poll'));
+    expect(pageText(root)).toContain('После');
+    expect(pageText(root)).not.toContain('Проголосовали');
+    await unmount(root);
+  });
+
+  it('matrix «Zero voters»: 0 % bars, «Проголосовали: 0»', async () => {
+    withPoll({ ...POLL, counter: 0, options: [option(1, 'A', 0, 0), option(2, 'B', 0, 0)] });
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    const bar = byTestId(root, `${BLOCK(id, POLL_KEY)}/option/1/bar`)[0];
+    expect(StyleSheet.flatten(bar.props.style).width).toBe('0%');
+    expect(pageText(root)).toContain('0\u00A0%');
+    expect(pageText(root)).toContain('Проголосовали: 0');
+    await unmount(root);
+  });
+
+  it('matrix «Locked post»: `hasAccess` false with a poll → no poll in the teaser; focus on the author', async () => {
+    e8 = (_req, blogUrl, postId) => {
+      const body = e8Locked();
+      return {
+        status: 200,
+        body: { ...body, id: postId, user: { ...(body.user as object), blogUrl }, poll: POLL },
+      };
+    };
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    expect(contentIds(root)).toEqual([AUTHOR(id)]);
+    expect(lastFocusTarget()).toBe(AUTHOR(id));
+    expect(byTestId(root, BLOCK(id, POLL_KEY))).toHaveLength(0);
+    expect(pageText(root)).not.toContain('Проголосовали');
+    await unmount(root);
+  });
+
+  it('a poll is a stop in body order: a heading and the poll only → initial focus on the poll', async () => {
+    withPoll(POLL, [{ type: 'header', content: JSON.stringify(['Опрос недели', 'unstyled', []]), modificator: '' }]);
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, POLL_KEY)]);
+    expect(lastFocusTarget()).toBe(BLOCK(id, POLL_KEY));
+    await unmount(root);
+  });
+
+  it('the live-sanitized fixture: its poll is the last stop, after the audio placeholder (player off)', async () => {
+    e8 = (_req, blogUrl, postId) => {
+      const body = e8Accessible();
+      return { status: 200, body: { ...body, id: postId, user: { ...(body.user as object), blogUrl } } };
+    };
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    const ids = contentIds(root);
+    expect(ids[ids.length - 1]).toBe(BLOCK(id, 'poll:1020'));
+    expect(pageText(root)).toContain('Проголосовали: 5');
+    await unmount(root);
+  });
+});

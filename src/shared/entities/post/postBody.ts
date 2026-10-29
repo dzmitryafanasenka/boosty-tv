@@ -6,6 +6,7 @@ import {
   type BoostyPostRef,
   type TimestampRef,
 } from '../externalUrls';
+import type { Poll } from '../poll/types';
 import type { Block, ListItem, TextSpan } from './types';
 
 /**
@@ -63,6 +64,14 @@ import type { Block, ListItem, TextSpan } from './types';
  *   block with text is a non-focusable `heading` (owner decision
  *   2026-10-29, Q1 b) that ends the paragraph in progress; an empty one is
  *   dropped.
+ *
+ * - Story 6.5, with `poll`: the post's poll is a `poll` item (a PollWidget,
+ *   one focus stop) at the position of its `poll` block (the one with the
+ *   poll's id, else the first id-less one), else after the body (live: polls are
+ *   top-level only, never a block; the reference renders `post.poll` below
+ *   the content). With `pollUnsupported` (a malformed poll) and no `poll`
+ *   block of its id (or id-less), an «Опрос» placeholder goes after the body. Every other `poll`
+ *   block stays a placeholder. A teaser never passes a poll.
  *
  * Keys (focus-map §1.5, block keys): `<type>:<id>` when the block has an
  * id, else `<type>@<index in data[]>`; a paragraph uses its first fragment's
@@ -218,6 +227,8 @@ export type PostBodyItem =
   /** A heading line (Story 6.3, `header` block): bold text, never a focus stop. */
   | { kind: 'heading'; key: string; text: string }
   | { kind: 'placeholder'; key: string; block: PlaceholderKind }
+  /** The post's poll (Story 6.5): one focus stop; key `poll:<id>`. */
+  | { kind: 'poll'; key: string; poll: Poll }
   /**
    * An image with a URL (only with `images`): a locked post's teaser
    * (Story 3.6, owner decision 2026-10-27, option A; not a stop) or, with
@@ -467,7 +478,7 @@ function listLines(items: readonly ListItem[], depth: number, out: Line[]): void
 /**
  * Whether a body item is a focus stop: a paragraph with plain text, an
  * accessible post's image (Story 6.2), a file or an external video (Story
- * 6.3), an audio track (Story 6.4). A paragraph's link chips are stops of their own inside it; a heading
+ * 6.3), an audio track (Story 6.4), a poll (Story 6.5). A paragraph's link chips are stops of their own inside it; a heading
  * is never one. A paragraph (or split part) of emoji
  * only has no text to read or land on, so it is shown as non-focusable
  * content (Story 6.1); a teaser image is never a stop (Story 3.6).
@@ -478,7 +489,8 @@ export function isFocusStop(item: PostBodyItem): boolean {
     (item.kind === 'image' && item.stop) ||
     item.kind === 'file' ||
     item.kind === 'audio' ||
-    item.kind === 'externalVideo'
+    item.kind === 'externalVideo' ||
+    item.kind === 'poll'
   );
 }
 
@@ -509,13 +521,29 @@ export type PostBodyOptions = {
    * instead of opening itself again.
    */
   selfPost?: BoostyPostRef;
+  /** Story 6.5: the post's poll (an accessible post only); default none. */
+  poll?: Poll | null;
+  /**
+   * Story 6.5: the post's top-level poll is malformed (`Post.pollUnsupported`):
+   * an «Опрос» placeholder after the body, unless a `poll` block of its id
+   * (or an id-less one) already shows one in place.
+   */
+  pollUnsupported?: { id: string | null } | null;
 };
 
 const positive = (n: number | null): number | null => (n !== null && n > 0 ? n : null);
 
 export function postBodyItems(
   blocks: readonly Block[],
-  { videoRows = false, images = false, qr = false, audio = qr, selfPost }: PostBodyOptions = {},
+  {
+    videoRows = false,
+    images = false,
+    qr = false,
+    audio = qr,
+    selfPost,
+    poll = null,
+    pollUnsupported = null,
+  }: PostBodyOptions = {},
 ): PostBodyItem[] {
   const items: PostBodyItem[] = [];
   const used = new Set<string>();
@@ -580,6 +608,20 @@ export function postBodyItems(
       ? null
       : ref;
   };
+  /**
+   * Story 6.5: the `poll` block that shows the post's poll (or, for a
+   * malformed one, its placeholder) in place: the one with the poll's id,
+   * else the first id-less one; -1 → after the body.
+   */
+  const pollId = poll !== null ? poll.id : pollUnsupported !== null ? pollUnsupported.id : undefined;
+  const pollBlockAt = (() => {
+    if (pollId === undefined) {
+      return -1;
+    }
+    const byId = pollId === null ? -1 : blocks.findIndex(b => b.type === 'poll' && b.id === pollId);
+    return byId >= 0 ? byId : blocks.findIndex(b => b.type === 'poll' && b.id === null);
+  })();
+  const pollKey = (p: Poll) => `poll:${p.id}`;
   let line = emptyLine();
   let key: string | null = null;
   let start = 0;
@@ -669,6 +711,10 @@ export function postBodyItems(
       );
       return;
     }
+    if (block.type === 'poll' && poll !== null && index === pollBlockAt) {
+      push({ kind: 'poll', key: pollKey(poll), poll }, index);
+      return;
+    }
     if (block.type === 'list') {
       const lines = listItemLines(block.items);
       if (lines.length > 0) {
@@ -681,5 +727,10 @@ export function postBodyItems(
     push({ kind: 'placeholder', key: blockKey(block, index), block: placeholderKind(block) }, index);
   });
   flush();
+  if (poll !== null && pollBlockAt < 0) {
+    push({ kind: 'poll', key: pollKey(poll), poll }, blocks.length);
+  } else if (poll === null && pollUnsupported !== null && pollBlockAt < 0) {
+    push({ kind: 'placeholder', key: `poll@${blocks.length}`, block: 'poll' }, blocks.length);
+  }
   return items;
 }

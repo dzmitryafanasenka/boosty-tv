@@ -98,6 +98,7 @@ test.each([
   ['real count', withBody({ likes: 313 }), 'not 0 or the synthetic count'],
   ['real price', withBody({ price: 500 }), 'not 0 or the synthetic count'],
   ['exact duration', withBody({ duration: 3903 }), 'not whole minutes'],
+  ['real poll percent', withBody({ fraction: 38 }), 'percent is not 0 or 100'],
   [
     'real id number',
     withBody({ ownerId: 48211 }),

@@ -200,6 +200,13 @@ describe('blocks and kinds', () => {
     expect(kindOf(true, [video('a')])).toEqual({ kind: 'video' });
     expect(kindOf(true, [{ type: 'audio_file', id: null, title: '', durationSec: null }])).toEqual({ kind: 'audio' });
     expect(kindOf(true, [{ type: 'poll', id: '1' }])).toEqual({ kind: 'poll' });
+    // Story 6.5: a top-level poll (live), after audio and before a file.
+    expect(kindOf(true, [], true)).toEqual({ kind: 'poll' });
+    expect(kindOf(true, [{ type: 'file', id: null, title: '', sizeBytes: null }], true)).toEqual({ kind: 'poll' });
+    expect(kindOf(true, [{ type: 'audio_file', id: null, title: '', durationSec: null }], true)).toEqual({
+      kind: 'audio',
+    });
+    expect(kindOf(false, [], true)).toEqual({ kind: 'locked' });
     expect(kindOf(true, [{ type: 'file', id: null, title: '', sizeBytes: null }])).toEqual({ kind: 'file' });
     expect(kindOf(true, [{ type: 'text', text: 'a', spans: [], paragraphEnd: false }])).toEqual({ kind: 'text' });
   });
@@ -352,5 +359,72 @@ describe('mapPost: like count (Story 3.4)', () => {
   it('a post whose user.blogUrl is not route-safe is dropped', () => {
     expect(mapPost({ ...feedPost(1), user: { name: 'n', blogUrl: 'a/b' } }, quiet())).toBeNull();
     expect(mapPost({ ...feedPost(1), user: { name: 'n', blogUrl: '..' } }, quiet())).toBeNull();
+  });
+});
+
+describe('mapPost: poll (Story 6.5)', () => {
+  const POLL = {
+    counter: 1,
+    id: 4,
+    isFinished: true,
+    isMultiple: false,
+    options: [{ id: 1, text: 'A', counter: 1, fraction: 100 }],
+    title: ['Q'],
+  };
+
+  it('an accessible post with a top-level poll: `poll` mapped, kind poll when there is no video or audio', () => {
+    const post = mapped(feedPost(1, { poll: POLL, data: [{ type: 'text', content: 'x' }] }));
+    expect(post.poll).toEqual(expect.objectContaining({ id: '4', title: 'Q', isFinished: true }));
+    expect(post.pollUnsupported).toBeNull();
+    expect(post.kind).toEqual({ kind: 'poll' });
+  });
+
+  it('a malformed poll never drops the post: `poll` null, `pollUnsupported`', () => {
+    const post = mapped(feedPost(1, { poll: { ...POLL, isMultiple: 'no' }, data: [{ type: 'text', content: 'x' }] }));
+    expect(post.poll).toBeNull();
+    expect(post.pollUnsupported).toEqual({ id: '4' });
+    // One bad option is dropped on its own (owner decision, option a): the poll stays.
+    const kept = mapped(
+      feedPost(1, {
+        poll: { ...POLL, options: [...POLL.options, { id: 2, text: 'B', counter: 0 }] },
+        data: [{ type: 'text', content: 'x' }],
+      }),
+    );
+    expect(kept.poll?.options.map(o => o.id)).toEqual(['1']);
+    expect(kept.pollUnsupported).toBeNull();
+    expect(post.kind).toEqual({ kind: 'poll' });
+  });
+
+  it('no poll, or `poll: null`: none', () => {
+    for (const extra of [{}, { poll: null }]) {
+      const post = mapped(feedPost(1, { ...extra, data: [{ type: 'text', content: 'x' }] }));
+      expect(post.poll).toBeNull();
+      expect(post.pollUnsupported).toBeNull();
+    }
+  });
+
+  it('a post whose only content is a usable top-level poll is accessible (api-contract §7, Story 6.5)', () => {
+    const post = mapped(feedPost(1, { poll: POLL, data: [] }));
+    expect(post.hasAccess).toBe(true);
+    expect(post.poll?.id).toBe('4');
+    expect(post.kind).toEqual({ kind: 'poll' });
+    // A malformed poll is no content: still locked (empty `data`), no poll.
+    const broken = mapped(feedPost(1, { poll: { ...POLL, isFinished: undefined }, data: [] }));
+    expect(broken.hasAccess).toBe(false);
+    expect(broken.poll).toBeNull();
+    expect(broken.pollUnsupported).toBeNull();
+    // `hasAccess: false` wins over a poll.
+    expect(mapped(feedPost(1, { poll: POLL, data: [], hasAccess: false })).hasAccess).toBe(false);
+  });
+
+  it('a malformed poll without an id: `pollUnsupported.id` null', () => {
+    const post = mapped(feedPost(1, { poll: { ...POLL, id: undefined }, data: [{ type: 'text', content: 'x' }] }));
+    expect(post.pollUnsupported).toEqual({ id: null });
+  });
+
+  it('a locked post keeps no poll', () => {
+    const post = mapped({ ...lockedPost(), poll: POLL });
+    expect(post.poll).toBeNull();
+    expect(post.pollUnsupported).toBeNull();
   });
 });

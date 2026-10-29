@@ -94,3 +94,17 @@ export function formatFileSize(bytes: number): string {
   }
   return tf(units[unit], { n });
 }
+
+/** U+202F NARROW NO-BREAK SPACE: the Russian thousands separator. */
+export const THOUSANDS_SEPARATOR = ' ';
+
+/**
+ * An integer count in Russian style (Story 6.5): groups of three digits
+ * split by a narrow no-break space («1 643», «12 000»); 4-digit numbers are
+ * grouped too («1 210»). Hand-written (no `Intl` on Hermes). A non-finite
+ * or negative value is 0; a fraction is rounded.
+ */
+export function formatCount(n: number): string {
+  const value = Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
+  return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, THOUSANDS_SEPARATOR);
+}
