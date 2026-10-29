@@ -1,0 +1,103 @@
+__tests__/accountScopeRegistry.test.js
+  s_3889105f87e0de::t_8d0afd2191cdb1 53
+__tests__/authorFlow.test.tsx
+  s_3889105f87e0de::t_020562bce76b27 587
+__tests__/codeFlow.test.tsx
+  s_3889105f87e0de::t_a466ec8b27f3c2 396
+__tests__/demoFlow.test.tsx
+  s_3889105f87e0de::t_2b4b684cb13372 12-13,96,98,107,110,316-351
+__tests__/postFlow.test.tsx
+  s_3889105f87e0de::t_91d8f7be603459 1081
+__tests__/searchFlow.test.tsx
+  s_3889105f87e0de::t_8dbc08cfdf09f7 1-811
+__tests__/shellFlow.test.tsx
+  s_3889105f87e0de::t_7b319c1d9c7c12 145,148,150-151
+__tests__/subscriptionsFlow.test.tsx
+  s_3889105f87e0de::t_22e924d923b965 204,208
+_bmad-output/implementation-artifacts/spec-5-6-search-in-subscriptions.md
+  s_3889105f87e0de::t_98d276d4c6166a 1-126
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_3889105f87e0de::t_9a1e5ee0dbf19f 32,85
+docs/api-contract.md
+  s_3889105f87e0de::t_4b5abd45675589 250,367-388
+docs/feature-parity.md
+  s_3889105f87e0de::t_52bcf0b63ac388 66-70
+docs/focus-map.md
+  s_3889105f87e0de::t_ec638a0ce02b3a 65,276-283
+docs/testing.md
+  s_3889105f87e0de::t_6907acb3bfc45d 896-928
+src/app/App.tsx
+  s_3889105f87e0de::t_48de4ca893c716 51,216-217,219,221
+src/app/Shell.tsx
+  s_3889105f87e0de::t_a8ada6b7f93c62 12,49-53,76,286-297,316,329,352,369,377,380-383,420-430
+src/app/__tests__/phaseFlags.test.ts
+  s_3889105f87e0de::t_fa71a5d5a17be5 3,6,14
+src/app/bootstrap.ts
+  s_3889105f87e0de::t_7b4994294fe7e5 2,43
+src/app/dev/demo.ts
+  s_3889105f87e0de::t_f16ee91f6c6193 18-19,122-130,139,148-153,155-169,171-172,372-373
+src/app/phaseFlags.ts
+  s_3889105f87e0de::t_60a680d13a3fd9 16-19,23
+src/features/home/HomeScreen.tsx
+  s_3889105f87e0de::t_91c27bfdee7005 10,25
+src/features/search/SearchScreen.tsx
+  s_3889105f87e0de::t_4cead66e78f0e3 1-634
+src/features/search/__tests__/searchQueryStore.test.ts
+  s_3889105f87e0de::t_512bed09042a09 1-27
+src/features/search/index.ts
+  s_3889105f87e0de::t_31f33a4997cd65 1-15
+src/features/search/searchQueryStore.ts
+  s_3889105f87e0de::t_008ea9f0460b34 1-39
+src/shared/api/__tests__/queryKeys.test.ts
+  s_3889105f87e0de::t_18dcd052a101b8 127-181
+src/shared/api/dto/feed.ts
+  s_3889105f87e0de::t_4c645120a01ef1 41-71
+src/shared/api/queryKeys.ts
+  s_3889105f87e0de::t_3e95ad9f048378 26-40
+src/shared/entities/post/__tests__/postRepository.test.ts
+  s_3889105f87e0de::t_2a38806e72aa6f 11-18,24-27,377-485
+src/shared/entities/post/index.ts
+  s_3889105f87e0de::t_e86de65662de69 11,15
+src/shared/entities/post/postRepository.ts
+  s_3889105f87e0de::t_e67241376357cc 2-7,70-89,151-183,325-331
+src/shared/filters/chipLabels.ts
+  s_3889105f87e0de::t_bca5e116fef6f4 1-45
+src/shared/filters/filter.ts
+  s_3889105f87e0de::t_cb420b098bf37d 53-55,57
+src/shared/filters/index.ts
+  s_3889105f87e0de::t_cfabc19f30d818 26
+src/shared/i18n/ru.ts
+  s_3889105f87e0de::t_25b3ad92232d10 190-203
+src/shared/ui/TextField.tsx
+  s_3889105f87e0de::t_1a0741a6edbd9a 1,40-43,71-72,77-82,108,117-120
+src/test/fixtures/boosty/e6-feed-search-1.json
+  s_3889105f87e0de::t_26fc5f72075ef8 1-1584
+src/test/fixtures/boosty/e6-feed-search-2.json
+  s_3889105f87e0de::t_8216979ce42af3 1-1642
+src/features/search/useFeedSearch.ts
+  s_35694c59603cca::t_6c40f4bb637bbc 1-54
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "ea8c3a32797cd87bfb6ccf4b4a6dcfd37b660bd2",
+  "prompts": {},
+  "sessions": {
+    "s_35694c59603cca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a28a007b9f6d126b0",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_3889105f87e0de": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6900e7f-f881-4858-9cce-006384a7dd3e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
