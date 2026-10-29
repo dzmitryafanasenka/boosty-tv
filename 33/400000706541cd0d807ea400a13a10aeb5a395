@@ -1,0 +1,99 @@
+__tests__/authorFlow.test.tsx
+  s_3889105f87e0de::t_8486c80ed7b7d7 23,105-109,114-116,148-149,151-156,177,223,250,259-260,347,353,355-356,495,506,532,540,854,858,962,1155,1160,1181,1185,1351,1455,1465-1977
+__tests__/demoFlow.test.tsx
+  s_3889105f87e0de::t_475c95a2e70dd1 352-385
+__tests__/homeFeedFlow.test.tsx
+  s_3889105f87e0de::t_981c0182c4343d 3385-3386
+__tests__/postFlow.test.tsx
+  s_3889105f87e0de::t_e1bfd8a7d87d01 1019
+__tests__/searchFlow.test.tsx
+  s_3889105f87e0de::t_441cf0ad02ae7b 534-535
+__tests__/subscriptionsFlow.test.tsx
+  s_3889105f87e0de::t_99675139187f22 15,665,690
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_3889105f87e0de::t_e47fdfa58476ea 301-304
+_bmad-output/implementation-artifacts/spec-5-7-search-and-filters-inside-an-author.md
+  s_3889105f87e0de::t_25b865715c5b5e 1-155
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_3889105f87e0de::t_836a9765ad4c81 32,86
+docs/api-contract.md
+  s_3889105f87e0de::t_6a7f4be39ad790 248,251,258,341,365,389-437,516
+docs/feature-parity.md
+  s_3889105f87e0de::t_834a3a72e52059 56-57,67-71
+docs/focus-map.md
+  s_3889105f87e0de::t_0891406bfee31c 235,260,269-277
+docs/testing.md
+  s_3889105f87e0de::t_f96a1a0885d0a0 896-929
+src/app/dev/demo.ts
+  s_3889105f87e0de::t_61e03f352509ba 23-24,233-240,242-262,265-301,305-306,411-414,439-440
+src/app/stackRoutes.tsx
+  s_3889105f87e0de::t_8a99edc31ba51e 251-253,271-274,276-282,291-293
+src/features/author/AuthorScreen.tsx
+  s_3889105f87e0de::t_24bb081c1fceea 2,4-5,7-15,18,23,29-30,37-38,42,54,62-65,68-75,108-117,155-162,171-173,175-186,188-193,196-197,199-203,207-209,217-218,223,236-250,254,266-281,283-285,290-302,305,314-316,319,334,336,338,344-353,401-479,481-483,488,491,496,502-503,505,508,529,542-711,739-745,753-803,809,824-825,827-828,831-832,842,844-856,862-889,899-927
+src/features/author/__tests__/authorPostsRefresh.test.ts
+  s_3889105f87e0de::t_61bd56fe7ee61a 2-13,15-19,24,27-31,37-39,46-51,53-56,58-62,65-74,76-80,84,86-88,90-97,99-103,105,109-113,117-158
+src/features/author/authorPostsRefresh.ts
+  s_3889105f87e0de::t_97982e2d1b5cab 8-16,26,31,36,42-43,54-97,100-102,114-118,120-122
+src/features/author/useAuthorPosts.ts
+  s_3889105f87e0de::t_525e6760814cab 2,4-10,19-22,24-27,29,31-32,34-36,38-44,46-51
+src/features/author/useBlogSearch.ts
+  s_3889105f87e0de::t_28ac48a213a6b7 1-69
+src/features/subscriptions/useSubscriptions.ts
+  s_3889105f87e0de::t_2910413513c162 16,91-93,123,127
+src/shared/api/__tests__/queryKeys.test.ts
+  s_3889105f87e0de::t_de8ac45158de71 5,7-11,16,26,37,171,186-268
+src/shared/api/dto/blogTags.ts
+  s_3889105f87e0de::t_78b81d5fc99240 1-27
+src/shared/api/queryKeys.ts
+  s_3889105f87e0de::t_c92415367b37f4 31,41-55,62-66,81-92
+src/shared/entities/post/__tests__/postRepository.test.ts
+  s_3889105f87e0de::t_62d0b2a6df5f19 14,29-30,252-256,261-349,357,362,371,379,382,384,395,404,411,416
+src/shared/entities/post/__tests__/postsHeadRefresh.test.ts
+  s_3889105f87e0de::t_74c6c426e9f25f 3,13-14
+src/shared/entities/post/index.ts
+  s_3889105f87e0de::t_6cae7fdf6a6a95 10,15
+src/shared/entities/post/postRepository.ts
+  s_3889105f87e0de::t_f52c55c57b10de 108-121,124-127,129-156,208-231,249-253,259-260,263,397
+src/shared/entities/tag/__tests__/tagRepository.test.ts
+  s_3889105f87e0de::t_09d9d57aa222e6 10-12,131-179
+src/shared/entities/tag/index.ts
+  s_3889105f87e0de::t_a4bfaef8f06284 1-7
+src/shared/entities/tag/tagRepository.ts
+  s_3889105f87e0de::t_74ef14b2e1f09c 1,10-11,68-104
+src/shared/filters/FilterSheet.tsx
+  s_3889105f87e0de::t_2f6169cdb937c6 8,41,43,45-49,84-85,108,228,251
+src/shared/filters/TagList.tsx
+  s_3889105f87e0de::t_051be819e608d9 9,38,40-44,67,69-72
+src/shared/filters/__tests__/filtersStore.test.ts
+  s_3889105f87e0de::t_4e0a345ca12ba2 4-6,100-125
+src/shared/filters/filter.ts
+  s_3889105f87e0de::t_4d20a1ace3e8ff 55-57,59-81
+src/shared/filters/index.ts
+  s_3889105f87e0de::t_1195382fb59e5b 3-4,10,75
+src/shared/filters/useBlogTags.ts
+  s_3889105f87e0de::t_e78d23704bb35f 1-41
+src/shared/filters/useFeedTags.ts
+  s_3889105f87e0de::t_5be926484bd2f0 38-39,41,49
+src/shared/i18n/ru.ts
+  s_3889105f87e0de::t_23467d12e8a5cf 231-246
+src/test/fixtures/boosty/e14-blog-tags.json
+  s_3889105f87e0de::t_ab7b7a6a336fd3 1-23
+src/test/fixtures/boosty/e7-blog-search-1.json
+  s_3889105f87e0de::t_1e2d14ad9af182 1-2116
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "33400000706541cd0d807ea400a13a10aeb5a395",
+  "prompts": {},
+  "sessions": {
+    "s_3889105f87e0de": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6900e7f-f881-4858-9cce-006384a7dd3e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
