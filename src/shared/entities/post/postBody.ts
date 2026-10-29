@@ -1,22 +1,34 @@
-import type { Block, ListItem } from './types';
+import type { Block, ListItem, TextSpan } from './types';
 
 /**
- * The Post screen's body (Story 3.4): the blocks as plain paragraphs and
- * neutral placeholders, in order. Styles, emoji, links, images, files,
- * audio and polls are Epic 6.
+ * The Post screen's body (Story 3.4): the blocks as paragraphs and neutral
+ * placeholders, in order. Links as chips, images, files, audio and polls
+ * are later Epic 6 stories.
  *
  * - `text` fragments are merged until a `BLOCK_END` fragment ends the
  *   paragraph. A `link` block is a fragment too (owner decision 2026-10-27,
  *   inline links): its text joins the paragraph in progress (or starts one)
- *   as plain text, never a placeholder; a link without text is skipped.
- *   Any other block ends the paragraph in progress (its text stays a
- *   paragraph before the placeholder). Blank paragraphs are dropped.
+ *   as inline text, never a placeholder; a link without text is skipped.
+ *   A `smile` block (Story 6.1) is a fragment too: an inline emoji; one
+ *   without an image URL is skipped (it takes no space). Any other block
+ *   ends the paragraph in progress (its text stays a paragraph before the
+ *   placeholder). Blank paragraphs are dropped.
+ * - Story 6.1: a paragraph is styled `segments` (text runs with bold, italic
+ *   and underline flags, and inline emoji). Live, a fragment's style range
+ *   counts from the paragraph start (UTF-16), so each fragment's ranges are
+ *   placed at its offset in the paragraph and clamped to the fragment (a
+ *   range never styles another fragment's text). A `smile` counts as one
+ *   offset unit, as in the reference (unverified live: no emoji was seen). Its `text` is the plain text
+ *   (emoji left out, trimmed) for accessibility labels and plain callers.
  * - A `list` block is one stop per item with text (items in order, nested
  *   items after their parent); a list without text is a placeholder.
  * - A stop longer than `PARAGRAPH_STOP_MAX_CHARS` is split into consecutive
  *   stops (`splitParagraph`), so ↓ walks through the text (owner decision
- *   2026-10-27, option A): Android scrolls a focused view only to its top,
- *   so a stop taller than the column would hide its rest.
+ *   2026-10-27, option A, kept by owner decision 2026-10-29, Q1 a: no
+ *   collapse): Android scrolls a focused view only to its top, so a stop
+ *   taller than the column would hide its rest. The cut is made on the
+ *   plain text (an emoji counts as one character) and mapped back to the
+ *   segments: a styled run that crosses a cut continues in the next stop.
  * - An `ok_video` block with an id is a MediaRow above the body (Story
  *   3.5, `videoRowsOf`), so it leaves the body when the caller passes
  *   `videoRows: true` (the Post body of an accessible post; default off, so a
@@ -80,30 +92,67 @@ function cutAt(text: string, start: number, max: number): number {
   return next < 0 ? text.length : end + next + 1;
 }
 
+/** `[start, end)` of `text.slice(start, end).trim()` within `text` (start = end when blank). */
+function trimmedBounds(text: string, start: number, end: number): [number, number] {
+  let a = start;
+  let b = end;
+  while (a < b && /\s/.test(text[a])) {
+    a += 1;
+  }
+  while (b > a && /\s/.test(text[b - 1])) {
+    b -= 1;
+  }
+  return [a, b];
+}
+
+/**
+ * The `[start, end)` ranges of `splitParagraph(text, max)` within `text`:
+ * each part trimmed, blank parts dropped.
+ */
+function splitRanges(text: string, max: number): [number, number][] {
+  const ranges: [number, number][] = [];
+  let start = 0;
+  while (start < text.length) {
+    const cut = text.length - start <= max ? text.length : cutAt(text, start, max);
+    const [a, b] = trimmedBounds(text, start, cut);
+    if (b > a) {
+      ranges.push([a, b]);
+    }
+    start = cut;
+  }
+  return ranges;
+}
+
 /**
  * A paragraph as consecutive stops of at most `max` characters, cut at line,
  * sentence or word boundaries (never mid-word); parts are trimmed and blank
  * ones dropped. Order and text are preserved (up to the whitespace at cuts).
  */
 export function splitParagraph(text: string, max: number = PARAGRAPH_STOP_MAX_CHARS): string[] {
-  const parts: string[] = [];
-  let start = 0;
-  while (start < text.length) {
-    const cut = text.length - start <= max ? text.length : cutAt(text, start, max);
-    const part = text.slice(start, cut).trim();
-    if (part.length > 0) {
-      parts.push(part);
-    }
-    start = cut;
-  }
-  return parts;
+  return splitRanges(text, max).map(([a, b]) => text.slice(a, b));
 }
+
+/**
+ * One piece of a paragraph (Story 6.1): a text run with its styles, or an
+ * inline emoji (a plain `{uri}` image with no auth headers; `key` is unique
+ * within the paragraph).
+ */
+export type Segment =
+  | { kind: 'text'; text: string; bold: boolean; italic: boolean; underline: boolean }
+  | { kind: 'emoji'; key: string; url: string };
 
 /** What a placeholder stands for (its label in the `ru` catalog). */
 export type PlaceholderKind = 'video' | 'image' | 'file' | 'audio' | 'poll' | 'unknown';
 
 export type PostBodyItem =
-  | { kind: 'paragraph'; key: string; text: string }
+  | {
+      kind: 'paragraph';
+      key: string;
+      /** The plain text (emoji left out, trimmed): accessibility labels and plain callers. */
+      text: string;
+      /** The styled text runs and inline emoji, in order (Story 6.1). */
+      segments: Segment[];
+    }
   | { kind: 'placeholder'; key: string; block: PlaceholderKind }
   /**
    * A teaser image of a locked post (Story 3.6, owner decision 2026-10-27,
@@ -155,32 +204,178 @@ function placeholderKind(block: Block): PlaceholderKind {
   }
 }
 
-/** The text of a list item's own blocks (text and link fragments, merged). */
-function itemText(blocks: readonly Block[]): string {
-  return blocks
-    .map(block => (block.type === 'text' || block.type === 'link' ? block.text : ''))
+/**
+ * The plain-text stand-in of an emoji in a paragraph's text: one character
+ * of the split budget, not whitespace (a cut never falls on it).
+ */
+const EMOJI_CHAR = '\uFFFC';
+
+/**
+ * A paragraph being built: its segments, their plain text (an emoji is
+ * `EMOJI_CHAR`) and the style-range offset of the next fragment (every
+ * fragment's text plus one per `smile`, shown or not).
+ */
+type Line = { segments: Segment[]; plain: string; offset: number };
+
+const emptyLine = (): Line => ({ segments: [], plain: '', offset: 0 });
+
+const sameStyle = (
+  a: Segment & { kind: 'text' },
+  b: Pick<Segment & { kind: 'text' }, 'bold' | 'italic' | 'underline'>,
+) => a.bold === b.bold && a.italic === b.italic && a.underline === b.underline;
+
+/** Appends a text run, merged into the previous run when the styles match. */
+function appendText(line: Line, run: Segment & { kind: 'text' }): void {
+  if (run.text.length === 0) {
+    return;
+  }
+  const last = line.segments[line.segments.length - 1];
+  if (last !== undefined && last.kind === 'text' && sameStyle(last, run)) {
+    line.segments[line.segments.length - 1] = { ...last, text: last.text + run.text };
+  } else {
+    line.segments.push(run);
+  }
+  line.plain += run.text;
+}
+
+/**
+ * A `text`/`link` fragment's runs: its ranges are placed at the paragraph
+ * offset (live: `from` counts from the paragraph start) and clamped to the
+ * fragment; the text is cut at every range edge, each run with the styles
+ * covering it.
+ */
+function appendFragment(line: Line, text: string, spans: readonly TextSpan[]): void {
+  const base = line.offset;
+  line.offset += text.length;
+  const local = spans
+    .map(span => ({
+      style: span.style,
+      start: Math.max(0, span.from - base),
+      end: Math.min(text.length, span.from + span.len - base),
+    }))
+    .filter(span => span.end > span.start);
+  const edges = new Set<number>([0, text.length]);
+  for (const span of local) {
+    edges.add(span.start);
+    edges.add(span.end);
+  }
+  const cuts = [...edges].sort((x, y) => x - y);
+  for (let i = 0; i + 1 < cuts.length; i += 1) {
+    const [a, b] = [cuts[i], cuts[i + 1]];
+    const covers = (style: TextSpan['style']) =>
+      local.some(span => span.style === style && span.start <= a && span.end >= b);
+    appendText(line, {
+      kind: 'text',
+      text: text.slice(a, b),
+      bold: covers('bold'),
+      italic: covers('italic'),
+      underline: covers('underline'),
+    });
+  }
+}
+
+/**
+ * Appends an inline fragment (`text`, `link`, `smile`) to `line`; false for
+ * any other block. A `smile` without an image URL adds nothing.
+ */
+function appendInline(line: Line, block: Block, index: number): boolean {
+  switch (block.type) {
+    case 'text':
+    case 'link':
+      appendFragment(line, block.text, block.spans);
+      return true;
+    case 'smile':
+      // One offset unit per smile, as the reference's inline content (unverified live).
+      line.offset += 1;
+      if (block.url !== null) {
+        line.segments.push({ kind: 'emoji', key: blockKey(block, index), url: block.url });
+        line.plain += EMOJI_CHAR;
+      }
+      return true;
+    default:
+      return false;
+  }
+}
+
+/** The segments of `line` within `[start, end)` of its plain text, adjacent equal styles merged. */
+function sliceLine(line: Line, start: number, end: number): Segment[] {
+  const out: Line = emptyLine();
+  let pos = 0;
+  for (const segment of line.segments) {
+    const length = segment.kind === 'text' ? segment.text.length : EMOJI_CHAR.length;
+    const [a, b] = [Math.max(start, pos), Math.min(end, pos + length)];
+    if (b > a) {
+      if (segment.kind === 'text') {
+        appendText(out, { ...segment, text: segment.text.slice(a - pos, b - pos) });
+      } else {
+        out.segments.push(segment);
+      }
+    }
+    pos += length;
+  }
+  return out.segments;
+}
+
+/** The plain text of segments: the text runs joined (emoji left out), trimmed. */
+function segmentsText(segments: readonly Segment[]): string {
+  return segments
+    .map(segment => (segment.kind === 'text' ? segment.text : ''))
     .join('')
     .trim();
 }
 
-/** A list's item texts in order (nested items after their parent), blank ones dropped. */
-export function listItemTexts(items: readonly ListItem[]): string[] {
-  const lines: string[] = [];
+/**
+ * A line as consecutive stops within the budget: trimmed, split on its
+ * plain text, each part mapped back to its segments. A blank line gives none.
+ */
+function lineStops(line: Line): Segment[][] {
+  const [s0, e0] = trimmedBounds(line.plain, 0, line.plain.length);
+  if (e0 <= s0) {
+    return [];
+  }
+  return splitRanges(line.plain.slice(s0, e0), PARAGRAPH_STOP_MAX_CHARS).map(([a, b]) =>
+    sliceLine(line, s0 + a, s0 + b),
+  );
+}
+
+/** A list item's own blocks (inline fragments, merged) as one line. */
+function itemLine(blocks: readonly Block[]): Line {
+  const line = emptyLine();
+  blocks.forEach((block, index) => {
+    appendInline(line, block, index);
+  });
+  return line;
+}
+
+const isBlank = (line: Line) => line.plain.trim().length === 0;
+
+/** A list's item lines in order (nested items after their parent), blank ones dropped. */
+function listItemLines(items: readonly ListItem[]): Line[] {
+  const lines: Line[] = [];
   listLines(items, 0, lines);
   return lines;
 }
 
-function listLines(items: readonly ListItem[], depth: number, out: string[]): void {
+function listLines(items: readonly ListItem[], depth: number, out: Line[]): void {
   if (depth > MAX_LIST_DEPTH) {
     return;
   }
   for (const item of items) {
-    const line = itemText(item.blocks);
-    if (line.length > 0) {
+    const line = itemLine(item.blocks);
+    if (!isBlank(line)) {
       out.push(line);
     }
     listLines(item.items, depth + 1, out);
   }
+}
+
+/**
+ * Whether a body item is a focus stop: a paragraph with plain text. A
+ * paragraph (or split part) of emoji only has no text to read or land on,
+ * so it is shown as non-focusable content (Story 6.1).
+ */
+export function isFocusStop(item: PostBodyItem): boolean {
+  return item.kind === 'paragraph' && item.text.length > 0;
 }
 
 export type PostBodyOptions = {
@@ -210,27 +405,40 @@ export function postBodyItems(
     used.add(unique);
     items.push({ ...item, key: unique });
   };
-  /** Stops for `texts` (each split by the budget): `key`, then `key#1`, `key#2`, … */
-  const pushStops = (base: string, texts: readonly string[], index: number) => {
-    texts
-      .flatMap(t => splitParagraph(t))
-      .forEach((part, n) =>
-        push({ kind: 'paragraph', key: n === 0 ? base : `${base}#${n}`, text: part }, index),
+  /** Stops for `lines` (each split by the budget): `key`, then `key#1`, `key#2`, … */
+  const pushStops = (base: string, lines: readonly Line[], index: number) => {
+    lines
+      .flatMap(lineStops)
+      .forEach((segments, n) =>
+        push(
+          {
+            kind: 'paragraph',
+            key: n === 0 ? base : `${base}#${n}`,
+            text: segmentsText(segments),
+            segments,
+          },
+          index,
+        ),
       );
   };
-  let text = '';
+  let line = emptyLine();
   let key: string | null = null;
   let start = 0;
   const flush = () => {
-    const trimmed = text.trim();
-    if (key !== null && trimmed.length > 0) {
-      pushStops(key, [trimmed], start);
+    if (key !== null && !isBlank(line)) {
+      pushStops(key, [line], start);
     }
-    text = '';
+    line = emptyLine();
     key = null;
   };
   blocks.forEach((block, index) => {
     if (block.type === 'link' && block.text.length === 0) {
+      return;
+    }
+    if (block.type === 'smile' && block.url === null) {
+      // No image: no space and never a paragraph's key, but it still counts
+      // for the style offsets of the fragments after it.
+      line.offset += 1;
       return;
     }
     if (videoRows && block.type === 'ok_video' && block.id.length > 0) {
@@ -239,12 +447,12 @@ export function postBodyItems(
       flush();
       return;
     }
-    if (block.type === 'text' || block.type === 'link') {
+    if (block.type === 'text' || block.type === 'link' || block.type === 'smile') {
       if (key === null) {
         key = blockKey(block, index);
         start = index;
       }
-      text += block.text;
+      appendInline(line, block, index);
       if (block.type === 'text' && block.paragraphEnd) {
         flush();
       }
@@ -265,7 +473,7 @@ export function postBodyItems(
       return;
     }
     if (block.type === 'list') {
-      const lines = listItemTexts(block.items);
+      const lines = listItemLines(block.items);
       if (lines.length > 0) {
         pushStops(blockKey(block, index), lines, index);
       } else {

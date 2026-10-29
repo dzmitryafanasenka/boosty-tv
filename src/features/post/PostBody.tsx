@@ -2,12 +2,19 @@ import { memo, useCallback, useState } from 'react';
 import {
   Image,
   StyleSheet,
+  Text as RNText,
   View,
   type ImageLoadEvent,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import type { MediaRef, PlaceholderKind, PostBodyItem, VideoRow } from '../../shared/entities/post';
+import type {
+  MediaRef,
+  PlaceholderKind,
+  PostBodyItem,
+  Segment,
+  VideoRow,
+} from '../../shared/entities/post';
 import { useZoneItem } from '../../shared/focus';
 import { t, tf } from '../../shared/i18n';
 import type { ProgressStatus } from '../../shared/services/progress';
@@ -18,8 +25,10 @@ import {
   Text,
   mediaRowLabel,
   colors,
+  fontFiles,
   rounded,
   spacing,
+  typography,
   type HostView,
   type SurfaceState,
 } from '../../shared/ui';
@@ -27,9 +36,68 @@ import {
 /** DESIGN.md ParagraphStop: the focused paragraph's accent bar. */
 const BAR_WIDTH = 2;
 
+/** An inline emoji's box: the body text's line height (Story 6.1). */
+const EMOJI_SIZE = typography.body.lineHeight;
+
+/**
+ * An inline emoji (Story 6.1): a plain `{uri}` image (no auth headers) at
+ * the text's line height inside the paragraph's text. A failed image is
+ * removed, so it takes no space and the text is unaffected.
+ */
+function InlineEmoji({ id, url }: { id: string; url: string }) {
+  // Remembered per URL: a refetch with a new URL tries again.
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  if (failedUrl === url) {
+    return null;
+  }
+  return (
+    <Image
+      testID={id}
+      source={{ uri: url }}
+      resizeMode="contain"
+      resizeMethod="resize"
+      fadeDuration={0}
+      onError={() => setFailedUrl(url)}
+      accessible={false}
+      focusable={false}
+      style={styles.emoji}
+    />
+  );
+}
+
+/** A paragraph's segments as nested `Text` runs and inline emoji (Story 6.1). */
+function Segments({ id, segments }: { id: string; segments: readonly Segment[] }) {
+  return (
+    <>
+      {segments.map((segment, i) => {
+        if (segment.kind === 'emoji') {
+          return <InlineEmoji key={segment.key} id={`${id}/emoji/${segment.key}`} url={segment.url} />;
+        }
+        if (!segment.bold && !segment.italic && !segment.underline) {
+          return <RNText key={i}>{segment.text}</RNText>;
+        }
+        return (
+          <RNText
+            key={i}
+            style={[
+              segment.bold ? styles.bold : null,
+              segment.italic ? styles.italic : null,
+              segment.underline ? styles.underline : null,
+            ]}
+          >
+            {segment.text}
+          </RNText>
+        );
+      })}
+    </>
+  );
+}
+
 type ParagraphStopProps = {
   id: string;
+  /** The plain text: the accessibility label. */
   text: string;
+  segments: readonly Segment[];
   /** The host view by focus id (initial focus, the column's guide). */
   onView: (id: string, view: HostView | null) => void;
   onFocus: (id: string) => void;
@@ -37,12 +105,19 @@ type ParagraphStopProps = {
 
 /**
  * DESIGN.md ParagraphStop: one paragraph, one focus stop (owner decision
- * 2026-10-27, option A, before Story 6.1's collapse). Focused: a subtle
+ * 2026-10-27, option A; no collapse, owner decision 2026-10-29). Focused: a subtle
  * `surface` background and a 2 dp accent bar on the left; no scale and no
  * ring. The bar's width is always reserved, so focus never reflows the text.
- * OK does nothing.
+ * OK does nothing. Story 6.1: styled runs (bold, italic, underline) and
+ * inline emoji; the accessibility label stays the plain text.
  */
-const ParagraphStop = memo(function ParagraphStopView({ id, text, onView, onFocus }: ParagraphStopProps) {
+const ParagraphStop = memo(function ParagraphStopView({
+  id,
+  text,
+  segments,
+  onView,
+  onFocus,
+}: ParagraphStopProps) {
   const zone = useZoneItem(id);
   const zoneRef = zone.ref;
   const ref = useCallback(
@@ -73,7 +148,9 @@ const ParagraphStop = memo(function ParagraphStopView({ id, text, onView, onFocu
       surfaceStyle={surfaceStyle}
       style={styles.text}
     >
-      <Text variant="body">{text}</Text>
+      <Text variant="body">
+        <Segments id={id} segments={segments} />
+      </Text>
     </FocusableSurface>
   );
 });
@@ -210,11 +287,19 @@ export function PostBody({
         const id = `${idPrefix}${item.key}`;
         switch (item.kind) {
           case 'paragraph':
-            return (
+            // Emoji only (no plain text): shown, never a focus stop.
+            return item.text.length === 0 ? (
+              <View key={item.key} testID={id} focusable={false} style={[styles.paragraph, styles.text]}>
+                <Text variant="body">
+                  <Segments id={id} segments={item.segments} />
+                </Text>
+              </View>
+            ) : (
               <ParagraphStop
                 key={item.key}
                 id={id}
                 text={item.text}
+                segments={item.segments}
                 onView={onParagraphView}
                 onFocus={onParagraphFocus}
               />
@@ -507,6 +592,22 @@ const styles = StyleSheet.create({
   imageFill: {
     width: '100%',
     height: '100%',
+  },
+  // Story 6.1 text styles. Bold is the bundled SemiBold file (tokens: a
+  // `fontWeight` would make Android synthesize bold); italic is synthesized
+  // (no italic file is bundled, and no custom font loading).
+  bold: {
+    fontFamily: fontFiles[600],
+  },
+  italic: {
+    fontStyle: 'italic',
+  },
+  underline: {
+    textDecorationLine: 'underline',
+  },
+  emoji: {
+    width: EMOJI_SIZE,
+    height: EMOJI_SIZE,
   },
   placeholder: {
     paddingVertical: spacing['5'],

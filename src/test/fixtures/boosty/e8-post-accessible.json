@@ -190,7 +190,7 @@
       },
       {
         "modificator": "",
-        "content": "[\"Sample text\",\"unstyled\",[]]",
+        "content": "[\"Sample text\",\"unstyled\",[[0,0,6]]]",
         "type": "text"
       },
       {
@@ -201,7 +201,7 @@
       {
         "modificator": "",
         "type": "text",
-        "content": "[\"Sample text\",\"unstyled\",[]]"
+        "content": "[\"Sample text\",\"unstyled\",[[2,7,4],[4,0,6]]]"
       },
       {
         "content": "",
@@ -753,6 +753,13 @@
         "modificator": "",
         "type": "text",
         "content": "[\"Sample text\",\"unstyled\",[]]"
+      },
+      {
+        "type": "smile",
+        "name": "synthetic-key-1",
+        "smallUrl": "https://example.invalid/emoji",
+        "mediumUrl": "https://example.invalid/emoji",
+        "largeUrl": "https://example.invalid/emoji"
       },
       {
         "content": "",

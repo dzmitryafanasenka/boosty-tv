@@ -3,7 +3,7 @@ import { createLogger } from '../../../services/logger';
 import { e5Posts, feedPost, lockedPost } from '../../../../test/feedFixtures';
 // eslint-disable-next-line boundaries/dependencies -- test-only fixtures
 import { e4Page } from '../../../../test/authorFixtures';
-import { firstText, kindOf, mapPost, previewOf, textOf } from '../mapPost';
+import { firstText, kindOf, mapPost, previewOf, styledTextOf, textOf } from '../mapPost';
 import type { Block, Post } from '../types';
 
 const quiet = () => createLogger();
@@ -54,8 +54,8 @@ describe('mapPost: the live E5 posts', () => {
     expect(post.kind).toEqual({ kind: 'text' });
     expect(post.previewUrl).toBe('https://example.invalid/image');
     expect(post.durationSec).toBeNull();
-    expect(post.blocks[0]).toEqual({ type: 'text', text: 'Sample text', paragraphEnd: false });
-    expect(post.blocks[1]).toEqual({ type: 'text', text: '', paragraphEnd: true });
+    expect(post.blocks[0]).toEqual({ type: 'text', text: 'Sample text', spans: [], paragraphEnd: false });
+    expect(post.blocks[1]).toEqual({ type: 'text', text: '', spans: [], paragraphEnd: true });
   });
 
   it('publishedAt is publishTime, else createdAt', () => {
@@ -201,7 +201,7 @@ describe('blocks and kinds', () => {
     expect(kindOf(true, [{ type: 'audio_file', id: null, title: '', durationSec: null }])).toEqual({ kind: 'audio' });
     expect(kindOf(true, [{ type: 'poll', id: '1' }])).toEqual({ kind: 'poll' });
     expect(kindOf(true, [{ type: 'file', id: null, title: '', sizeBytes: null }])).toEqual({ kind: 'file' });
-    expect(kindOf(true, [{ type: 'text', text: 'a', paragraphEnd: false }])).toEqual({ kind: 'text' });
+    expect(kindOf(true, [{ type: 'text', text: 'a', spans: [], paragraphEnd: false }])).toEqual({ kind: 'text' });
   });
 
   it('several videos: kind videos with the count and no single duration', () => {
@@ -250,7 +250,7 @@ describe('blocks and kinds', () => {
       {
         type: 'list',
         items: [
-          { blocks: [{ type: 'text', text: 'Item', paragraphEnd: false }], items: [] },
+          { blocks: [{ type: 'text', text: 'Item', spans: [], paragraphEnd: false }], items: [] },
           { blocks: [{ type: 'unknown', rawType: 'bar' }], items: [{ blocks: [], items: [] }] },
         ],
       },
@@ -258,8 +258,83 @@ describe('blocks and kinds', () => {
   });
 
   it('firstText: the first non-empty text or link', () => {
-    expect(firstText([{ type: 'text', text: '  ', paragraphEnd: true }, { type: 'link', text: ' Go ', url: null }])).toBe('Go');
+    expect(firstText([{ type: 'text', text: '  ', spans: [], paragraphEnd: true }, { type: 'link', text: ' Go ', spans: [], url: null }])).toBe('Go');
     expect(firstText([])).toBe('');
+  });
+});
+
+describe('styledTextOf / smile (Story 6.1)', () => {
+  const block = (raw: unknown) => mapped(feedPost(1, { data: [raw] })).blocks[0];
+
+  it('styles (matrix «Styles»): 0 bold, 2 italic, 4 underline at their offsets', () => {
+    expect(styledTextOf('["Привет мир","unstyled",[[0,0,6],[2,7,3]]]')).toEqual({
+      text: 'Привет мир',
+      spans: [
+        { style: 'bold', from: 0, len: 6 },
+        { style: 'italic', from: 7, len: 3 },
+      ],
+    });
+    expect(styledTextOf('["abc","unstyled",[[4,1,2]]]').spans).toEqual([{ style: 'underline', from: 1, len: 2 }]);
+  });
+
+  it('unknown code (matrix «Unknown code»): no span, normal text', () => {
+    expect(styledTextOf('["abc","unstyled",[[7,0,3],[1,0,3],[3,0,3]]]')).toEqual({ text: 'abc', spans: [] });
+  });
+
+  it('bad ranges (matrix «Bad ranges»): text intact; empty, negative and malformed ranges ignored', () => {
+    expect(styledTextOf('["abc","unstyled",{"not":"an array"}]')).toEqual({ text: 'abc', spans: [] });
+    expect(styledTextOf('["abc","unstyled","x"]')).toEqual({ text: 'abc', spans: [] });
+    expect(styledTextOf('["abc","unstyled"]')).toEqual({ text: 'abc', spans: [] });
+    expect(styledTextOf('["abcdef","unstyled",[[2,-2,4],[2,-5,3],[0,1,0],[0,1,-3],[0,"1",2],[0,1.5,2],null,[0,1],"s",[2,1,2]]]')).toEqual({
+      text: 'abcdef',
+      spans: [{ style: 'italic', from: 1, len: 2 }],
+    });
+  });
+
+  it('ranges are kept as given past the fragment: live, from counts from the paragraph start (the builder clamps)', () => {
+    expect(styledTextOf('["abc","unstyled",[[4,10,3],[0,1,99]]]').spans).toEqual([
+      { style: 'underline', from: 10, len: 3 },
+      { style: 'bold', from: 1, len: 99 },
+    ]);
+  });
+
+  it('non-JSON content (matrix «Non-JSON content»): plain text, no styles', () => {
+    expect(styledTextOf('plain')).toEqual({ text: 'plain', spans: [] });
+    expect(styledTextOf('[not json')).toEqual({ text: '[not json', spans: [] });
+    expect(styledTextOf('{"a":1}')).toEqual({ text: '{"a":1}', spans: [] });
+    expect(styledTextOf('[1,2,[]]')).toEqual({ text: '', spans: [] });
+    expect(styledTextOf(null)).toEqual({ text: '', spans: [] });
+  });
+
+  it('offsets are UTF-16 code units (as the reference\'s Kotlin strings)', () => {
+    // «😀» is two code units: the bold range [2, 3) is «b».
+    expect(styledTextOf(JSON.stringify(['😀b c', 'unstyled', [[0, 2, 1]]])).spans).toEqual([
+      { style: 'bold', from: 2, len: 1 },
+    ]);
+  });
+
+  it('text and link blocks carry their spans', () => {
+    expect(block({ type: 'text', content: '["Hi","unstyled",[[0,0,2]]]', modificator: 'BLOCK_END' })).toEqual({
+      type: 'text',
+      text: 'Hi',
+      spans: [{ style: 'bold', from: 0, len: 2 }],
+      paragraphEnd: true,
+    });
+    expect(block({ type: 'link', content: '["Go","unstyled",[[4,0,2]]]', url: 'https://example.invalid/l' })).toEqual({
+      type: 'link',
+      text: 'Go',
+      spans: [{ style: 'underline', from: 0, len: 2 }],
+      url: 'https://example.invalid/l',
+    });
+  });
+
+  it('smile: mediumUrl, else largeUrl, else smallUrl, else null; a malformed one is Block.Unknown', () => {
+    const urls = { smallUrl: 'https://example.invalid/s', mediumUrl: 'https://example.invalid/m', largeUrl: 'https://example.invalid/l' };
+    expect(block({ type: 'smile', name: 'smile', ...urls })).toEqual({ type: 'smile', name: 'smile', url: urls.mediumUrl });
+    expect(block({ type: 'smile', name: 'x', smallUrl: urls.smallUrl, largeUrl: urls.largeUrl, mediumUrl: '' })).toMatchObject({ url: urls.largeUrl });
+    expect(block({ type: 'smile', smallUrl: urls.smallUrl })).toEqual({ type: 'smile', name: '', url: urls.smallUrl });
+    expect(block({ type: 'smile', name: 5, mediumUrl: 7 })).toEqual({ type: 'smile', name: '', url: null });
+    expect(kindOf(true, [{ type: 'smile', name: '', url: null }])).toEqual({ kind: 'text' });
   });
 });
 

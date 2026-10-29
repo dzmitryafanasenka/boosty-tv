@@ -476,7 +476,7 @@ The type is selected by `type`. Fields come from `ContentResponse`.
 
 | `type` | Fields used | Notes |
 |---|---|---|
-| `text` | `content` (JSON string `[text, ?, [[styleCode, from, len], …]]`), `modificator` (`BLOCK_END` ends a paragraph) | Style codes: `0` bold, `2` italic, `4` underline, other values are normal. If `content` is not a JSON array, it is used as raw text. |
+| `text` | `content` (JSON string `[text, ?, [[styleCode, from, len], …]]`), `modificator` (`BLOCK_END` ends a paragraph) | Style codes: `0` bold, `2` italic, `4` underline, other values are normal. If `content` is not a JSON array, it is used as raw text. **`from` counts from the start of the paragraph, not the fragment** (UTF-16 code units; `LIVE`, Story 6.1, below). |
 | `link` | `content` (same JSON format), `url`, `modificator` | Inline link inside the paragraph |
 | `smile` | `name`, `smallUrl?`, `mediumUrl?`, `largeUrl?` | Inline emoji image |
 | `image` | `url` | — |
@@ -489,6 +489,21 @@ The type is selected by `type`. Fields come from `ContentResponse`.
 | anything else | — | Must render as an "unsupported block" placeholder |
 
 `fileType` (for example `MP3`) is present in the DTO but unused.
+
+#### Text styles and smile (LIVE, Story 6.1, 2026-10-29)
+
+A temporary counts-only probe (`__DEV__`, removed before the commit; it logged only counts, types and booleans, never text, URLs or titles) ran on the pinned device in a debug build with Metro, in the owner's session. It read E5 (content profile, default access params, 10 pages of 20, paged with `extra.offset`) and E2 → E4 for the 3 subscribed blogs (8 pages each). 32 requests, all HTTP 200. It scanned `data[]` and `teaser[]` of 612 posts (512 with a non-empty `data`), including blocks nested in `list` items.
+
+| Item | Result | Level |
+|---|---|---|
+| `content` format | All 17 386 non-empty `text`/`link` contents were JSON arrays; the second element was always a string; the third always an array. No raw-text content was seen | `LIVE` |
+| Style codes | 1 694 ranges: code `0` (bold) 732, `2` (italic) 48, `4` (underline) 914. No other code. 909 of the underline ranges are on `link` fragments (Boosty underlines links) | `LIVE` |
+| Range shape | Every range was `[code, from, len]` with three integers; none negative; 18 had `len = 0` (ignored) | `LIVE` |
+| **Range offsets** | **`from` counts from the start of the paragraph** (the merged `text`/`link` fragments since the last `BLOCK_END` or non-inline block), not from the fragment. All 1 694 ranges lie inside their own fragment's slot at paragraph offsets; 762 of them lie outside the fragment when read as fragment offsets (every later fragment of a paragraph). The unit is the UTF-16 code unit: 30 ranges in paragraphs with astral characters (emoji in the text) fit only as UTF-16, not as code points. The reference agrees: `mergeText` adds each fragment's styles at `from` in the paragraph's `AnnotatedString` builder | `LIVE` |
+| `smile` blocks | **None** in the 612 posts (so no live keys or URL presence). The `smile` field set (`name`, `smallUrl?`, `mediumUrl?`, `largeUrl?`) and how many offset units a smile takes in a paragraph stay `REF` (Boosty TV counts one, as the reference's inline content) | unverified (`REF`) |
+| Other block types seen | `text`, `link`, `ok_video`, `image`, `video` (3), `list` (11), **`file` (9)** and **`header` (42)**. `file` is a first live sample for Story 6.3 (keys not logged). `header` is not in the reference; it renders as the unsupported-block placeholder (keys not logged) | `LIVE` (types only) |
+
+Boosty TV (Story 6.1): each fragment's ranges are placed at its offset in the paragraph and clamped to the fragment, so a range never styles another fragment's text. Unknown codes are normal text; a malformed range list drops only the styles.
 
 #### Live evidence (Story 1.7, 2026-10-25): no sample in the scanned posts
 

@@ -12,15 +12,35 @@ export type ListItem = {
   items: ListItem[];
 };
 
+/** A style of a text run (api-contract §4.1 codes: 0 bold, 2 italic, 4 underline). */
+export type TextStyle = 'bold' | 'italic' | 'underline';
+
+/**
+ * One style range of a `text`/`link` fragment (Story 6.1): `from` and `len`
+ * are JavaScript string offsets (UTF-16 code units). Live, `from` counts
+ * from the start of the fragment's paragraph (api-contract §4.1 «Text
+ * styles and smile (LIVE)»), so the paragraph builder places the range and
+ * clamps it to the fragment. `from` ≥ 0, `len` > 0 (other ranges are dropped).
+ */
+export type TextSpan = { style: TextStyle; from: number; len: number };
+
 export type Block =
   | {
       type: 'text';
-      /** Plain text of the fragment (style ranges are Epic 6). */
+      /** Plain text of the fragment. */
       text: string;
+      /** Its style ranges (Story 6.1); unknown codes are dropped. */
+      spans: TextSpan[];
       /** `modificator: BLOCK_END`: the paragraph ends here. */
       paragraphEnd: boolean;
     }
-  | { type: 'link'; text: string; url: string | null }
+  | { type: 'link'; text: string; spans: TextSpan[]; url: string | null }
+  /**
+   * An inline emoji (Story 6.1): its image (`mediumUrl`, else `largeUrl`,
+   * else `smallUrl`), a plain URL loaded with no auth headers; null when the
+   * block has none (the emoji takes no space).
+   */
+  | { type: 'smile'; name: string; url: string | null }
   | {
       type: 'image';
       id: string | null;

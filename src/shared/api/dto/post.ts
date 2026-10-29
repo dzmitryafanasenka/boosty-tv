@@ -76,6 +76,18 @@ export const linkBlockDtoSchema = z.object({
   url: optionalString,
 });
 
+/**
+ * `smile` (Story 6.1): an inline emoji. Only the name and the image URLs are
+ * read; every field is optional (a wrong type falls back).
+ */
+export const smileBlockDtoSchema = z.object({
+  type: z.literal('smile'),
+  name: optionalString,
+  smallUrl: optionalString,
+  mediumUrl: optionalString,
+  largeUrl: optionalString,
+});
+
 export const imageBlockDtoSchema = z.object({
   type: z.literal('image'),
   id: optionalString,
