@@ -147,6 +147,8 @@ const TILE = (n: number) => `subs/tile/${blogUrlOf(n)}`;
 const AUTHOR = (postId: string) => `post/${postId}/author`;
 const BLOCK = (postId: string, key: string) => `post/${postId}/block/${key}`;
 const VIDEO = (postId: string, mediaId: string) => `post/${postId}/video/${mediaId}`;
+/** Story 6.6: an open single-choice poll's option stop. */
+const OPTION = (postId: string, optionId: string) => `post/${postId}/poll/option/${optionId}`;
 const ACTION = 'state/post/action';
 const E8_RE = /^\/v1\/blog\/([^/]+)\/post\/([^/]+)$/;
 
@@ -2565,12 +2567,14 @@ describe('Story 6.5: poll display', () => {
   const pollNode = (root: Root, id: string) =>
     byTestId(root, BLOCK(id, POLL_KEY)).find(n => n.props.focusable === true);
   const pollCalls = () => transport.calls.filter(c => c.path.includes('/poll'));
+  const optionNode = (root: Root, id: string, optionId: string) =>
+    byTestId(root, OPTION(id, optionId)).find(n => n.props.focusable === true);
 
-  it('matrix «Open poll»: after the body, title, 3 rows with bars and %, «Проголосовали: N»; one focus stop, no option focusable; initial focus unchanged', async () => {
+  it('matrix «Open poll»: after the body, title, 3 rows with bars and %, «Проголосовали: N»; Story 6.6: each option a stop (the root is not); initial focus unchanged', async () => {
     withPoll(POLL);
     const root = await openFromHome();
     const id = FEED_ID(0);
-    expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, 'text@0'), BLOCK(id, 'text@2'), BLOCK(id, POLL_KEY)]);
+    expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, 'text@0'), BLOCK(id, 'text@2'), OPTION(id, '1'), OPTION(id, '2'), OPTION(id, '3')]);
     expect(lastFocusTarget()).toBe(BLOCK(id, 'text@0'));
     const page = pageText(root);
     for (const s of ['Какой формат удобнее?', 'Длинные', 'Короткие', 'Эфиры', '48\u00A0% · 10', '38\u00A0% · 8', '14\u00A0% · 3', 'Проголосовали: 21']) {
@@ -2578,10 +2582,11 @@ describe('Story 6.5: poll display', () => {
     }
     expect(page).not.toContain(t('poll.finished'));
     expect(byTestId(root, `${BLOCK(id, POLL_KEY)}/option/1/bar`)).toHaveLength(1);
-    expect(pollNode(root, id)?.props.accessibilityLabel).toBe(
-      'Опрос. Какой формат удобнее? Длинные, 48\u00A0%, 10 голосов. Короткие, 38\u00A0%, 8 голосов. ' +
-        'Эфиры, 14\u00A0%, 3 голоса. Проголосовали: 21',
+    expect(pollNode(root, id)).toBeUndefined();
+    expect(optionNode(root, id, '1')?.props.accessibilityLabel).toBe(
+      'Опрос. Какой формат удобнее? Длинные, 48\u00A0%, 10 голосов',
     );
+    expect(optionNode(root, id, '3')?.props.accessibilityLabel).toBe('Эфиры, 14\u00A0%, 3 голоса. Проголосовали: 21');
     // No poll request (no E10, no vote): the poll is the cached post's.
     expect(pollCalls()).toEqual([]);
     await unmount(root);
@@ -2593,7 +2598,7 @@ describe('Story 6.5: poll display', () => {
     const id = FEED_ID(0);
     expect(byTestId(root, `${BLOCK(id, POLL_KEY)}/option/2/chosen`)).toHaveLength(1);
     expect(byTestId(root, `${BLOCK(id, POLL_KEY)}/option/1/chosen`)).toHaveLength(0);
-    expect(pollNode(root, id)?.props.accessibilityLabel).toContain('Короткие, 38\u00A0%, 8 голосов, ваш выбор');
+    expect(optionNode(root, id, '2')?.props.accessibilityLabel).toBe('Короткие, 38\u00A0%, 8 голосов, ваш выбор');
     await unmount(root);
   });
 
@@ -2613,7 +2618,7 @@ describe('Story 6.5: poll display', () => {
     withPoll({ ...POLL, options: [option(1, 'Длинные', 10, 48), broken, option(3, 'Эфиры', 3, 14)] });
     const root = await openFromHome();
     const id = FEED_ID(0);
-    expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, 'text@0'), BLOCK(id, 'text@2'), BLOCK(id, POLL_KEY)]);
+    expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, 'text@0'), BLOCK(id, 'text@2'), OPTION(id, '1'), OPTION(id, '3')]);
     expect(byTestId(root, `${BLOCK(id, POLL_KEY)}/option/1`)).toHaveLength(1);
     expect(byTestId(root, `${BLOCK(id, POLL_KEY)}/option/2`)).toHaveLength(0);
     expect(byTestId(root, `${BLOCK(id, POLL_KEY)}/option/3`)).toHaveLength(1);
@@ -2665,8 +2670,8 @@ describe('Story 6.5: poll display', () => {
     await unmount(root);
   });
 
-  it('a poll is a stop in body order: a heading and the poll only → initial focus on the poll', async () => {
-    withPoll(POLL, [{ type: 'header', content: JSON.stringify(['Опрос недели', 'unstyled', []]), modificator: '' }]);
+  it('a poll is a stop in body order: a heading and a finished poll only → initial focus on the poll', async () => {
+    withPoll({ ...POLL, isFinished: true }, [{ type: 'header', content: JSON.stringify(['Опрос недели', 'unstyled', []]), modificator: '' }]);
     const root = await openFromHome();
     const id = FEED_ID(0);
     expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, POLL_KEY)]);
@@ -2682,8 +2687,263 @@ describe('Story 6.5: poll display', () => {
     const root = await openFromHome();
     const id = FEED_ID(0);
     const ids = contentIds(root);
-    expect(ids[ids.length - 1]).toBe(BLOCK(id, 'poll:1020'));
+    // Story 6.6: an open single-choice poll: its options are the last stops.
+    expect(ids.slice(-2)).toEqual([OPTION(id, '1021'), OPTION(id, '1022')]);
     expect(pageText(root)).toContain('Проголосовали: 5');
     await unmount(root);
+  });
+});
+
+describe('Story 6.6: vote and retract in a single-choice poll', () => {
+  const option = (id: number, text_: string, counter: number, fraction: number) => ({
+    counter,
+    fraction,
+    id,
+    text: text_,
+    voters: { data: {}, extra: {} },
+  });
+  /** The live shape (api-contract §4.2), with `answer` when given. */
+  const apiPoll = (answer: number[] | null, counts: [number, number, number] = [10, 8, 3]) => {
+    const total = counts[0] + counts[1] + counts[2];
+    const pct = (n: number) => Math.round((n / total) * 100);
+    return {
+      counter: total,
+      defaultLang: 'ru',
+      hasOther: false,
+      id: 9,
+      isFinished: false,
+      isMultiple: false,
+      options: [
+        option(1, 'Длинные', counts[0], pct(counts[0])),
+        option(2, 'Короткие', counts[1], pct(counts[1])),
+        option(3, 'Эфиры', counts[2], pct(counts[2])),
+      ],
+      title: ['Какой формат удобнее?'],
+      ...(answer === null ? {} : { answer }),
+    };
+  };
+  const VOTE = '/v1/poll/9/vote';
+  const E10 = `/v1/blog/${FEED_BLOG}/poll/9`;
+  const POLL_ROOT = (postId: string) => BLOCK(postId, 'poll:9');
+
+  /** The post's poll on E8; E10–E12 answered by `pollReply`. */
+  let e8Poll: unknown;
+  let pollReply: (req: FixtureRequest) => Reply;
+
+  beforeEach(() => {
+    e8Poll = apiPoll(null);
+    e8 = (_req, blogUrl, postId) => ({
+      status: 200,
+      body: postDetail(blogUrl, postId, [...paragraph('До'), ...paragraph('После')], { poll: e8Poll }),
+    });
+    pollReply = () => ({ status: 200, body: {} });
+    transport = installFixtureTransport(req =>
+      req.path === VOTE || req.path === E10 ? pollReply(req) : fullHandler(req),
+    );
+  });
+
+  const pollCalls = () =>
+    transport.calls
+      .filter(c => c.path === VOTE || c.path === E10)
+      .map(c => [c.method, c.path, c.method === 'POST' ? c.form : null]);
+  /** The pending hint's text under the option ('' when not pending). */
+  const hint = (root: Root, postId: string, optionId: string) => {
+    const [node] = byTestId(root, `${POLL_ROOT(postId)}/option/${optionId}/pending`);
+    return node ? text(node) : '';
+  };
+  const isPending = (root: Root, postId: string, optionId: string) =>
+    byTestId(root, `${POLL_ROOT(postId)}/option/${optionId}/pending`).length > 0;
+  const chosen = (root: Root, postId: string, optionId: string) =>
+    byTestId(root, `${POLL_ROOT(postId)}/option/${optionId}/chosen`).length > 0;
+  const errorShown = (root: Root, postId: string) => byTestId(root, `${POLL_ROOT(postId)}/error`).length > 0;
+  const blurOption = async (root: Root, postId: string, optionId: string) => {
+    await act(async () => {
+      one(root, OPTION(postId, optionId)).props.onBlur({ nativeEvent: {} });
+    });
+  };
+
+  it('matrix «Vote»: OK, OK on 2 → E11 `answer=2`, then E10 → applyPoll; check on 2, results updated, focus not moved', async () => {
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    pollReply = req => (req.method === 'GET' ? { status: 200, body: { data: { poll: apiPoll([2], [10, 9, 3]) } } } : { status: 200, body: {} });
+    await press(root, OPTION(id, '2'));
+    expect(isPending(root, id, '2')).toBe(true);
+    expect(hint(root, id, '2')).toContain(t('poll.pendingVote'));
+    expect(pollCalls()).toEqual([]);
+    focusMock.mockClear();
+    await press(root, OPTION(id, '2'));
+    expect(pollCalls()).toEqual([
+      ['POST', VOTE, { answer: '2' }],
+      ['GET', E10, null],
+    ]);
+    expect(chosen(root, id, '2')).toBe(true);
+    expect(pageText(root)).toContain('Проголосовали: 22');
+    expect(isPending(root, id, '2')).toBe(false);
+    // Focus stays on the option: the app asked to focus nothing else.
+    expect(focusMock).not.toHaveBeenCalled();
+    expect(byTestId(root, OPTION(id, '2')).length).toBeGreaterThan(0);
+    // The cached post holds the E10 poll (no separate poll key).
+    const cached = queryClient.getQueryData<{ kind: string; post: Post }>(queryKeys.post(FEED_BLOG, id));
+    expect(cached?.post.poll?.answer).toEqual(['2']);
+    expect(queryClient.getQueryCache().findAll({ queryKey: ['poll'] })).toHaveLength(0);
+    await unmount(root);
+  });
+
+  it('matrix «Cancel»: OK on 1, then ↓ to 2 → 1 leaves pending; nothing is sent', async () => {
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    await press(root, OPTION(id, '1'));
+    expect(isPending(root, id, '1')).toBe(true);
+    await blurOption(root, id, '1');
+    await focusOn(root, OPTION(id, '2'));
+    expect(isPending(root, id, '1')).toBe(false);
+    expect(isPending(root, id, '2')).toBe(false);
+    expect(pollCalls()).toEqual([]);
+    await unmount(root);
+  });
+
+  it('matrix «Retract»: answer [2]; OK → «…, чтобы отозвать»; OK → E12, then E10; no check', async () => {
+    e8Poll = apiPoll([2]);
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    pollReply = req => (req.method === 'GET' ? { status: 200, body: { data: { poll: apiPoll(null, [10, 7, 3]) } } } : { status: 200 });
+    expect(chosen(root, id, '2')).toBe(true);
+    await press(root, OPTION(id, '2'));
+    expect(hint(root, id, '2')).toContain(t('poll.pendingRetract'));
+    await press(root, OPTION(id, '2'));
+    expect(pollCalls()).toEqual([
+      ['DELETE', VOTE, null],
+      ['GET', E10, null],
+    ]);
+    expect(chosen(root, id, '2')).toBe(false);
+    await unmount(root);
+  });
+
+  it('matrix «Change vote» (owner decision Q1 a): answer [1]; OK, OK on 2 → «Нажмите OK ещё раз», E11 `answer=2`, then E10', async () => {
+    e8Poll = apiPoll([1]);
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    pollReply = req => (req.method === 'GET' ? { status: 200, body: { data: { poll: apiPoll([2], [9, 9, 3]) } } } : { status: 200 });
+    await press(root, OPTION(id, '2'));
+    expect(hint(root, id, '2')).toContain(t('poll.pendingVote'));
+    expect(hint(root, id, '2')).not.toContain(t('poll.pendingRetract'));
+    await press(root, OPTION(id, '2'));
+    expect(pollCalls()).toEqual([
+      ['POST', VOTE, { answer: '2' }],
+      ['GET', E10, null],
+    ]);
+    expect(chosen(root, id, '2')).toBe(true);
+    expect(chosen(root, id, '1')).toBe(false);
+    await unmount(root);
+  });
+
+  it.each([
+    ['5xx', { status: 503 }],
+    ['429', { status: 429 }],
+    ['network', { network: true as const }],
+    ['server refusal', { status: 400, body: { error: 'bad_request' } }],
+  ])('matrix «Mutation fails» (%s): inline error, previous state, 1 request (no retry); the next OK clears it and starts pending', async (_name, reply) => {
+    e8Poll = apiPoll([1]);
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    pollReply = () => reply;
+    await press(root, OPTION(id, '2'));
+    await press(root, OPTION(id, '2'), { settle: WITH_TIMERS });
+    expect(pollCalls()).toEqual([['POST', VOTE, { answer: '2' }]]);
+    expect(errorShown(root, id)).toBe(true);
+    expect(pageText(root)).toContain(t('poll.voteFailed'));
+    expect(chosen(root, id, '1')).toBe(true);
+    expect(chosen(root, id, '2')).toBe(false);
+    await press(root, OPTION(id, '2'));
+    expect(errorShown(root, id)).toBe(false);
+    expect(isPending(root, id, '2')).toBe(true);
+    expect(pollCalls()).toHaveLength(1);
+    await unmount(root);
+  });
+
+  it('matrix «Double press while sending»: a 3rd OK during the request is ignored; still 1 request', async () => {
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    const held = deferred();
+    pollReply = req => (req.method === 'POST' ? held.promise : { status: 200, body: { data: { poll: apiPoll([2], [10, 9, 3]) } } });
+    await press(root, OPTION(id, '2'));
+    await press(root, OPTION(id, '2'));
+    expect(byTestId(root, `${POLL_ROOT(id)}/option/2/sending`).length).toBeGreaterThan(0);
+    await press(root, OPTION(id, '2'));
+    await press(root, OPTION(id, '2'));
+    await press(root, OPTION(id, '1'));
+    expect(pollCalls()).toEqual([['POST', VOTE, { answer: '2' }]]);
+    held.resolve({ status: 200, body: {} });
+    await settle();
+    expect(pollCalls()).toEqual([
+      ['POST', VOTE, { answer: '2' }],
+      ['GET', E10, null],
+    ]);
+    expect(chosen(root, id, '2')).toBe(true);
+    await unmount(root);
+  });
+
+  it('matrix «E10 fails»: E11 200, E10 error → the post`s E8 is re-sent and brings the poll; no error shown', async () => {
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    pollReply = req => (req.method === 'GET' ? { status: 404, body: { error: 'not_found' } } : { status: 200 });
+    const before = e8Calls().length;
+    e8Poll = apiPoll([2], [10, 9, 3]);
+    await press(root, OPTION(id, '2'));
+    await press(root, OPTION(id, '2'));
+    expect(pollCalls()).toEqual([
+      ['POST', VOTE, { answer: '2' }],
+      ['GET', E10, null],
+    ]);
+    expect(e8Calls().length).toBe(before + 1);
+    expect(errorShown(root, id)).toBe(false);
+    expect(chosen(root, id, '2')).toBe(true);
+    await unmount(root);
+  });
+
+  it('E10 returns the poll finished: the focused option is gone → focus goes to the poll`s block stop (not the top)', async () => {
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    pollReply = req =>
+      req.method === 'GET'
+        ? { status: 200, body: { data: { poll: { ...apiPoll([2], [10, 9, 3]), isFinished: true } } } }
+        : { status: 200 };
+    await press(root, OPTION(id, '2'));
+    focusMock.mockClear();
+    await press(root, OPTION(id, '2'));
+    expect(pollCalls()).toEqual([
+      ['POST', VOTE, { answer: '2' }],
+      ['GET', E10, null],
+    ]);
+    expect(contentIds(root).filter(c => c.includes('poll'))).toEqual([POLL_ROOT(id)]);
+    expect(lastFocusTarget()).toBe(POLL_ROOT(id));
+    await unmount(root);
+  });
+
+  it('an open single-choice poll as the first stop: initial focus is its first option; a stray OK only reaches pending', async () => {
+    e8 = (_req, blogUrl, postId) => ({
+      status: 200,
+      body: postDetail(blogUrl, postId, [{ type: 'header', content: JSON.stringify(['Опрос недели', 'unstyled', []]), modificator: '' }], { poll: e8Poll }),
+    });
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    expect(lastFocusTarget()).toBe(OPTION(id, '1'));
+    await press(root, OPTION(id, '1'));
+    expect(isPending(root, id, '1')).toBe(true);
+    expect(pollCalls()).toEqual([]);
+    await unmount(root);
+  });
+
+  it('matrix «Finished / multiple»: one stop, OK inert, nothing sent', async () => {
+    for (const overrides of [{ isFinished: true }, { isMultiple: true }]) {
+      e8Poll = { ...apiPoll(null), ...overrides };
+      await resetQueryCache();
+      const root = await openFromHome();
+      const id = FEED_ID(0);
+      expect(contentIds(root).filter(c => c.includes('poll'))).toEqual([POLL_ROOT(id)]);
+      await press(root, POLL_ROOT(id));
+      expect(pollCalls()).toEqual([]);
+      await unmount(root);
+    }
   });
 });

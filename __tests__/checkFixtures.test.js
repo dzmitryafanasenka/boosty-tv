@@ -67,6 +67,10 @@ const clean = {
 
 const withBody = patch => ({ ...clean, body: { ...clean.body, ...patch } });
 
+test('a poll answer of synthetic option ids passes (Story 6.6)', () => {
+  expect(run({ 'boosty/a.json': withBody({ answer: [1021] }) }).code).toBe(0);
+});
+
 test('clean fixtures pass; empty directory passes', () => {
   expect(run({ 'boosty/a.json': clean, '.gitkeep': '' })).toEqual({
     code: 0,
@@ -99,6 +103,7 @@ test.each([
   ['real price', withBody({ price: 500 }), 'not 0 or the synthetic count'],
   ['exact duration', withBody({ duration: 3903 }), 'not whole minutes'],
   ['real poll percent', withBody({ fraction: 38 }), 'percent is not 0 or 100'],
+  ['real poll answer id', withBody({ answer: [48211] }), 'id number is not synthetic'],
   [
     'real id number',
     withBody({ ownerId: 48211 }),

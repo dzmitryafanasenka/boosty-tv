@@ -26,6 +26,7 @@ import {
   useZoneItem,
 } from '../../shared/focus';
 import { t } from '../../shared/i18n';
+import { isVotablePoll } from '../../shared/entities/poll';
 import {
   progressStatus,
   useProgress,
@@ -58,6 +59,11 @@ export const postBlockId = (postId: string, blockKey: string) =>
 export const postVideoPrefix = (postId: string) => `post/${postId}/video/`;
 export const postVideoId = (postId: string, mediaId: string) =>
   `${postVideoPrefix(postId)}${mediaId}`;
+/** Story 6.6: an open single-choice poll's option stops (focus-map §1.5). */
+export const postPollPrefix = (postId: string) => `post/${postId}/poll/`;
+export const postPollOptionPrefix = (postId: string) => `${postPollPrefix(postId)}option/`;
+export const postPollOptionId = (postId: string, optionId: string) =>
+  `${postPollOptionPrefix(postId)}${optionId}`;
 /** «Смотреть» / «Продолжить» under the header (Story 4.1, 4.2). */
 export const postPrimaryId = (postId: string) => `post/${postId}/primary`;
 /** «С начала», to the right of the primary (Story 4.2, owner decision 2026-10-28). */
@@ -252,6 +258,7 @@ export function PostScreen({
   const contentPrefix = postIdPrefix(postId);
   const primaryId = postPrimaryId(postId);
   const restartId = postRestartId(postId);
+  const pollPrefix = postPollPrefix(postId);
 
   // The MediaRows (an accessible post's videos with an id, deduped) and the
   // body: the other blocks of an accessible post, the teaser of a locked one
@@ -307,8 +314,12 @@ export function PostScreen({
       return `${videoPrefix}${rows[0].ref.mediaId}`;
     }
     const first = items.find(isFocusStop);
+    if (first?.kind === 'poll' && isVotablePoll(first.poll)) {
+      // Story 6.6: a votable poll's first option (a stray OK only reaches pending).
+      return postPollOptionId(postId, first.poll.options[0].id);
+    }
     return first ? `${blockPrefix}${first.key}` : null;
-  }, [showPrimary, primaryId, rows, items, videoPrefix, blockPrefix]);
+  }, [showPrimary, primaryId, rows, items, videoPrefix, blockPrefix, postId]);
   // The column's measured viewport and content height (the ScrollView's
   // layout and content size).
   const [viewport, setViewport] = useState<{ width: number; height: number } | null>(null);
@@ -500,7 +511,8 @@ export function PostScreen({
   });
 
   // A refetch changed the blocks and the focused row or paragraph is gone:
-  // the initial target (its view is already unmounted when this runs). A
+  // the initial target (its view is already unmounted when this runs); a
+  // poll option first tries its own poll's stops (Story 6.6). A
   // focused «С начала» that disappears (Story 4.2) falls back to the
   // primary, which is the initial target whenever «С начала» exists.
   useEffect(() => {
@@ -512,6 +524,7 @@ export function PostScreen({
       current !== null &&
       (current.startsWith(blockPrefix) ||
         current.startsWith(videoPrefix) ||
+        current.startsWith(pollPrefix) ||
         current === primaryId ||
         current === restartId) &&
       !views.current.has(current)
@@ -519,9 +532,27 @@ export function PostScreen({
       if (lastFocused.current === current) {
         lastFocused.current = null;
       }
+      // Story 6.6: a vanished poll option (the poll became finished or
+      // multiple, or the option was dropped) → a nearby stop of the same
+      // poll: another mounted option, else the poll's block stop.
+      if (current.startsWith(pollPrefix)) {
+        const pollItem = items.find(item => item.kind === 'poll');
+        const candidates =
+          pollItem?.kind === 'poll'
+            ? [
+                ...pollItem.poll.options.map(option => postPollOptionId(postId, option.id)),
+                postBlockId(postId, pollItem.key),
+              ]
+            : [];
+        const nearby = candidates.map(id => views.current.get(id)).find(view => view !== undefined);
+        if (nearby) {
+          requestHostFocus(nearby);
+          return;
+        }
+      }
       focusInitial();
     }
-  }, [rows, items, showPrimary, showRestart, blockPrefix, videoPrefix, primaryId, restartId, focusInitial, phaseRef]);
+  }, [rows, items, showPrimary, showRestart, blockPrefix, videoPrefix, pollPrefix, primaryId, restartId, focusInitial, phaseRef, postId]);
 
   // Story 6.3: OK on a link, file or external-video chip → the QrDialog in
   // the modal host (focus trapped; «Закрыть» or Back returns it to the chip).
@@ -537,6 +568,12 @@ export function PostScreen({
     [modal],
   );
   const resolveFile = useFileTarget(http, blogUrl, postId);
+  // Story 6.6: an open single-choice poll takes votes (E11/E12, then E10 into
+  // the cache; on E10 failure this post's E8 query is invalidated).
+  const pollVote = useMemo(
+    () => ({ http, blogUrl, postId, optionIdPrefix: postPollOptionPrefix(postId) }),
+    [http, blogUrl, postId],
+  );
   // Story 6.4: an AudioBlock's source (a fresh E8 on play). A playing track
   // pauses while Пост is not the focused route (the Player or another Пост
   // on top) and never resumes by itself; leaving Пост unmounts it (stops).
@@ -655,6 +692,7 @@ export function PostScreen({
               onPlayAt={playerEnabled ? onPlayAt : undefined}
               resolveAudio={playerEnabled ? resolveAudio : undefined}
               active={routeFocused}
+              pollVote={pollVote}
             />
           </ScrollView>
         ) : (

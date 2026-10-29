@@ -251,9 +251,9 @@ All of these are under `https://api.boosty.to` and use a Bearer token.
 | E7 | `GET /v1/search/blog/post/` | Blog search (Story 5.7: «Поиск в блоге» on Автор, content profile, see «E7 (LIVE)») | `blog_url`, `limit` (20), `comments_limit=0`, `reply_limit=0`, the E4 access / period / tag params of the route's Filter, `search_query`, `offset?` | `data.searchPosts[].post: Post`, `extra{offset, isLast}` |
 | E8 | `GET /v1/blog/{blogUrl}/post/{postId}` | Single post (the reference uses it to refresh media URLs and `timeCode`) | `comments_limit`, `reply_limit` (the reference sends 20. **We must send 0**. 0 is accepted: `LIVE`, Story 1.5) | `Post` (top level, no `data` wrapper) |
 | E9 | `PUT /v1/viewstat/video/{videoId}/timecode/` | Save playback progress | form `time_code` = integer seconds | body ignored. **HTTP 200** on every write; the value comes back as `ok_video.timeCode` on the next E8 and on the website (`LIVE`, Story 1.6, §6, web profile). Sent by the app with the content profile since Story 4.2 (§6 «Production client: progress»; content profile `LIVE`, Story 4.2: the website showed the written position) |
-| E10 | `GET /v1/blog/{blogUrl}/poll/{pollId}` | Refresh poll | — | `data.poll: Poll` |
-| E11 | `POST /v1/poll/{pollId}/vote` | Vote | form `answer` = comma-joined option ids | body ignored |
-| E12 | `DELETE /v1/poll/{pollId}/vote` | Retract vote | — | body ignored |
+| E10 | `GET /v1/blog/{blogUrl}/poll/{pollId}` | Refresh poll (Story 6.6: after every 2xx E11/E12) | — | `data.poll: Poll` (`LIVE`, Story 6.6: see «Poll votes (LIVE)») |
+| E11 | `POST /v1/poll/{pollId}/vote` | Vote | form `answer` = comma-joined option ids | body ignored. HTTP 200; a second E11 with another option moves a single-choice vote (`LIVE`, Story 6.6) |
+| E12 | `DELETE /v1/poll/{pollId}/vote` | Retract vote | — | body ignored. HTTP 200 (`LIVE`, Story 6.6) |
 | E13 | `GET /v1/search/feed/tag/` | Feed tags (filter; Story 5.5: the filter sheet's tag level, content profile, see «E13 (LIVE)») | `limit` (100), `offset?` | `data.searchTags[]{tag{id, title}, rank}`, `extra{offset, isLast}` |
 | E14 | `GET /v1/blog/{blogUrl}/post/tag/` | Blog tags (Story 5.7: the filter sheet's tag level on Автор, see «E14 (LIVE)») | — | `data[]{id, title}` (`count` not read) |
 | E15 | `GET /v1/blog/{blogUrl}/video_stream` | Active or scheduled live stream | — | **`204 No Content` = none.** Otherwise: `id`, `int_id`, `title`, `isOnline`, `isTemplate`, `hasAccess`, `startTime` (epoch s), `signedQuery`, `isLiked`, `data[]` (content blocks incl. `ok_stream`/`ok_video`), `teaser[]`, `count{viewers, likes}`, `subscriptionLevel{name, currencyPrices{RUB, USD, EUR}}` |
@@ -598,9 +598,24 @@ A temporary probe (`__DEV__`, `TEMP65`, mounted by the Shell, removed before the
 | `answer` | **Absent** (no key) in E5, E4 and E8. The owner had not voted on it (presumably): whether `answer` appears after a vote, and its element type, stay `REF` (Story 6.6) | `LIVE` (absent), `REF` (present) |
 | Option keys | `counter` (number), `fraction` (number), `id` (number), `text` (string), `voters` (object `{data, extra}`, never read) | `LIVE` |
 | `fraction` | An **integer** percent on both options; the fractions sum to 100. The option `counter`s sum to the poll's `counter` (single choice) | `LIVE` |
-| Other poll shapes | No multiple-choice, finished or voted poll was seen; those states rest on the reference | unverified (`REF`) |
+| Other poll shapes | No multiple-choice or finished poll was seen; those states rest on the reference. The voted state was seen in Story 6.6 (see «Poll votes (LIVE)») | unverified (`REF`); voted `LIVE` |
 
 Boosty TV (Story 6.5): `Post.poll` comes from the top-level `poll` of an accessible post (a locked post shows no poll). `entities/poll.mapPoll` keeps the ids as strings, joins `title` with «, » (the reference's `joinToString()`), defaults a `counter` that is not a non-negative integer to 0 and a missing `answer` to none chosen, keeps the first of duplicate option ids (1 and "1" alike), drops an option that lacks `id`, `counter` or `fraction` on its own (owner decision 2026-10-29, option a: the reference's `mapNotNull`), and returns null — the «Опрос» placeholder, never a crash — when `id`, `isMultiple` or `isFinished` is missing or no valid option is left. The poll renders where a `poll` block with its id sits, else after the body (the live case). Each option shows «N %» (`fraction` rounded) and its `counter` (POLL-01); the bar is `fraction`% clamped to 0…100. A usable poll is content: a post with `hasAccess` not false whose only content is the poll is accessible (§7). No E10 is sent in this story.
+
+#### Poll votes (LIVE, Story 6.6, 2026-10-29)
+
+A temporary probe (`__DEV__`, `TEMP66`, in `PollRepository.fetchPoll` and on the PollWidget's mount, removed before the commit; it logged only status codes, key names with value types, `answer` element types, the index of the option each `answer` id matches, and the options' `fraction`/`counter` numbers, never a title, option text or user data) ran on the pinned device in a debug build with Metro, in the owner's session, on the one live poll (Стас Асафьев's, open single-choice, 2 options). The agent voted, changed the vote and retracted it from the app with adb key events (owner decision 2026-10-29, Q2 a). **The poll ended retracted** (counts back to their starting values).
+
+| Item | Result | Level |
+|---|---|---|
+| E10 envelope | HTTP 200, `{data: {poll}}`: `body` has only `data`, `data` only `poll`. `poll` keys before a vote: `counter`, `defaultLang`, `hasOther`, `id`, `isFinished`, `isMultiple`, `options` (2), `title` (array, 1); no `answer` key. Each option: `counter`, `fraction` (integer), `id`, `text`, and **`voters` (an object; its keys were not logged)**. `mapPoll` maps it (no `answer` → none chosen) | `LIVE` |
+| E11 vote | `POST /v1/poll/{pollId}/vote` form `answer=<optionId>` → **HTTP 200**, sent once. The next E10 has **`answer: [<number>]`** (the voted option's id) and an **`other` key (string)**; the voted option's `counter` and the poll `counter` grew by 1 | `LIVE` |
+| E11 vote change | With a vote on option 2, E11 with option 1 → **HTTP 200**. E10: `answer` = [option 1], option 1 +1, option 2 −1, poll `counter` unchanged. The server moves the vote; no E12 is needed (owner decision Q1 a confirmed) | `LIVE` |
+| E12 retract | `DELETE /v1/poll/{pollId}/vote` → **HTTP 200**. E10: no `answer` key, no `other` key, counts back to the values before the vote | `LIVE` |
+| `fraction` | Integer percent; it stayed 12/88 across ±1 vote of 1 643 (the server rounds) | `LIVE` |
+| Failures | Not provoked live. E11/E12 are never retried or replayed (HttpClient: no retry for a non-GET, no replay after a 401); any failure → the inline error, the previous state kept; one request per poll id app-wide | Boosty TV rule; host tests |
+
+Boosty TV (Story 6.6): `PollRepository.fetchPoll` reads E10 with `pollRefreshDtoSchema` (`data.poll`, lenient; the poll goes through the one `mapPoll`). No `data.poll`, a poll `mapPoll` drops, or a poll with another id → `Parse`; after a 2xx mutation the caller then invalidates the post's E8 query and shows no error. `applyPoll` writes the E10 poll into every cached post and list page holding it, keeping each query's `dataUpdatedAt`. The fixture `e10-poll.json` has the live keys and value types (values synthetic; the options' `voters` object is left out: its content was not logged). `check:fixtures` treats `answer` elements as ids (synthetic 1001–9999).
 
 ## 5. Pagination
 

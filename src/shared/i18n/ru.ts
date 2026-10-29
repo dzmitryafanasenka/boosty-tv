@@ -416,6 +416,14 @@ export const ru = {
     // `{count}` is the count with its plural word («1 210 голосов»).
     a11yOption: '{text}, {percent}, {count}',
     a11yOptionChosen: '{text}, {percent}, {count}, ваш выбор',
+    // Story 6.6: the two-OK confirmation of a single-choice vote (pending),
+    // on the chosen option a retract; the inline error under the poll; the
+    // option's label while its request runs.
+    pendingVote: 'Нажмите OK ещё раз',
+    pendingRetract: 'Нажмите OK ещё раз, чтобы отозвать',
+    voteFailed: 'Не удалось отправить голос',
+    retractFailed: 'Не удалось отозвать голос',
+    sending: 'Отправка',
   },
   // DESIGN.md PostCard (Story 3.1). `{n}` is the video count. The card's
   // accessibility label reads «Видео. {title}. {author}, {date}.».

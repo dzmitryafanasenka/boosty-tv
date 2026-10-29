@@ -80,3 +80,12 @@ export function pollBarPercent(fraction: number): number {
 export function isChosen(poll: Poll, optionId: string): boolean {
   return poll.answer.includes(optionId);
 }
+
+/**
+ * Story 6.6: an open single-choice poll, whose options are focus stops and
+ * take a vote (two OKs). A finished poll and a multiple-choice one (Story
+ * 6.7) stay one stop with OK inert (Story 6.5).
+ */
+export function isVotablePoll(poll: Poll): boolean {
+  return !poll.isFinished && !poll.isMultiple;
+}

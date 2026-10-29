@@ -326,3 +326,9 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-6-4-inline-audio.md`
   summary: The screen stays on while an AudioBlock is paused with its source held (react-native-video keep-screen-on); the reference holds the wakelock only while playing. Owner decision 2026-10-29: keep as is for now; a later option is to release the source after a long pause.
   evidence: Device check in Story 6.4: `KEEP_SCREEN_ON` present 2 s after a pause, released after Back.
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-6-vote-and-retract-in-a-single-choice-poll.md`
+  summary: Add the PollOption pending-outline values (accent, 2 dp, 1.2 s pulse to opacity 0.35) to the DESIGN.md frontmatter, then move them from local constants in PollWidget.tsx into tokens.ts `poll-option`.
+  evidence: tokens.test.js requires tokens.ts to match DESIGN.md exactly and DESIGN.md has no pending tokens; changing DESIGN.md is the owner's call (Story 6.6 review).
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-6-vote-and-retract-in-a-single-choice-poll.md`
+  summary: Add a demoFlow test that votes, changes and retracts on the demo open poll (demo transport E10–E12).
+  evidence: demo.ts routes E10–E12 in memory but no test presses OK in demo mode; a path regex or form-parse slip would show «Не удалось отправить голос» unnoticed (Story 6.6 verification-gap review).

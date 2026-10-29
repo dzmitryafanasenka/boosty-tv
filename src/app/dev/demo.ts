@@ -32,7 +32,8 @@ import type { ReadResult, SecureStore } from '../../shared/platform/secureStore'
  * teaser image without a URL, and `demo-post-6`/`-20` a level name while
  * `demo-post-13`/`-27` have none, Story 3.6), E9 progress writes 200 (Story
  * 4.2; demo videos have no `playerUrls`, so the player itself cannot play
- * them), every other request a 404. The
+ * them), E10–E12 (Story 6.6: the open demo polls take a vote, a change and
+ * a retract, kept in memory for the app run), every other request a 404. The
  * keychain is never touched, so the owner's stored session survives a demo
  * run.
  *
@@ -81,21 +82,7 @@ function demoFeedTagsPage(url: string) {
  */
 function demoPoll(n: number) {
   if (n % 4 === 1) {
-    return {
-      id: 2000 + n,
-      title: ['Какой формат выпусков удобнее?'],
-      isMultiple: false,
-      isFinished: false,
-      counter: 128,
-      answer: [2],
-      defaultLang: 'ru',
-      hasOther: false,
-      options: [
-        { id: 1, text: 'Длинные разборы', counter: 64, fraction: 50, voters: {} },
-        { id: 2, text: 'Короткие выпуски', counter: 48, fraction: 38, voters: {} },
-        { id: 3, text: 'Прямые эфиры', counter: 16, fraction: 13, voters: {} },
-      ],
-    };
+    return demoOpenPoll(n);
   }
   if (n % 4 === 3) {
     return {
@@ -113,6 +100,79 @@ function demoPoll(n: number) {
     };
   }
   return undefined;
+}
+
+/** The open demo poll's id base: poll `2000 + n` belongs to demo post `n`. */
+const DEMO_POLL_BASE = 2000;
+/** The open demo poll's options: `[id, text, votes from others]`. */
+const DEMO_OPEN_OPTIONS = [
+  [1, 'Длинные разборы', 64],
+  [2, 'Короткие выпуски', 47],
+  [3, 'Прямые эфиры', 16],
+] as const;
+/**
+ * Story 6.6: the demo user's choice per open poll (absent: the initial
+ * choice, option 2), changed by the demo E11/E12. In memory only.
+ */
+const demoPollAnswers = new Map<number, number | null>();
+
+/**
+ * An open single-choice demo poll (n % 4 = 1): the others' votes plus the
+ * demo user's current choice (initially option 2), with integer fractions
+ * as live.
+ */
+function demoOpenPoll(n: number) {
+  const id = DEMO_POLL_BASE + n;
+  const answer = demoPollAnswers.has(id) ? (demoPollAnswers.get(id) ?? null) : 2;
+  const counts = DEMO_OPEN_OPTIONS.map(([optionId, , others]) => others + (optionId === answer ? 1 : 0));
+  const counter = counts.reduce((sum, c) => sum + c, 0);
+  return {
+    id,
+    title: ['Какой формат выпусков удобнее?'],
+    isMultiple: false,
+    isFinished: false,
+    counter,
+    ...(answer === null ? {} : { answer: [answer] }),
+    defaultLang: 'ru',
+    hasOther: false,
+    options: DEMO_OPEN_OPTIONS.map(([optionId, text], i) => ({
+      id: optionId,
+      text,
+      counter: counts[i],
+      fraction: counter === 0 ? 0 : Math.round((counts[i] / counter) * 100),
+      voters: {},
+    })),
+  };
+}
+
+/**
+ * Story 6.6: the demo E10/E11/E12 for an open demo poll (`2000 + n`, n % 4
+ * = 1); null for any other poll id (404). E11 takes `answer` = one known
+ * option id (else 400), E12 clears the choice.
+ */
+function demoPollReply(
+  method: string,
+  pollId: string,
+  form: Record<string, string>,
+): { status: number; body?: unknown } | null {
+  const id = Number(pollId);
+  const n = id - DEMO_POLL_BASE;
+  if (!Number.isInteger(n) || n < 0 || n % 4 !== 1) {
+    return null;
+  }
+  if (method === 'GET') {
+    return { status: 200, body: { data: { poll: demoOpenPoll(n) } } };
+  }
+  if (method === 'DELETE') {
+    demoPollAnswers.set(id, null);
+    return { status: 200, body: {} };
+  }
+  const answer = Number(form.answer);
+  if (method !== 'POST' || !DEMO_OPEN_OPTIONS.some(([optionId]) => optionId === answer)) {
+    return { status: 400, body: { error: 'bad_request' } };
+  }
+  demoPollAnswers.set(id, answer);
+  return { status: 200, body: {} };
 }
 
 /** One synthetic E5/E4 post (shape of `src/test/fixtures/boosty/e5-feed.json`). */
@@ -352,6 +412,10 @@ const DEMO_BLOG_PATH = /^\/v1\/blog\/(demo-blog-\d+)(\/post\/)?$/;
 /** E14 (Story 5.7). */
 const DEMO_BLOG_TAGS_PATH = /^\/v1\/blog\/(demo-blog-\d+)\/post\/tag\/$/;
 const DEMO_POST_PATH = /^\/v1\/blog\/(demo-blog-\d+)\/post\/([^/]+)$/;
+/** E10 (Story 6.6). */
+const DEMO_POLL_PATH = /^\/v1\/blog\/demo-blog-\d+\/poll\/([^/]+)$/;
+/** E11 / E12 (Story 6.6). */
+const DEMO_VOTE_PATH = /^\/v1\/poll\/([^/]+)\/vote$/;
 /** E9: `PUT /v1/viewstat/video/{mediaId}/timecode/` (Story 4.2). */
 const DEMO_TIMECODE_PATH = /^\/v1\/viewstat\/video\/[^/]+\/timecode\/$/;
 /** The demo post whose E8 answers 404 `not_found` («Пост недоступен»). */
@@ -473,6 +537,14 @@ export function createDemoSessionManager(): SessionManager {
     // E9 (Story 4.2): progress writes answer 200 with no body, as live.
     if (request.method === 'PUT' && DEMO_TIMECODE_PATH.test(request.path)) {
       return { status: 200, delayMs: 300 };
+    }
+    // E10–E12 (Story 6.6): the open demo polls take votes in memory.
+    const poll = DEMO_POLL_PATH.exec(request.path) ?? DEMO_VOTE_PATH.exec(request.path);
+    if (poll) {
+      const isRefresh = request.method === 'GET' && DEMO_POLL_PATH.test(request.path);
+      const isVote = request.method !== 'GET' && DEMO_VOTE_PATH.test(request.path);
+      const reply = isRefresh || isVote ? demoPollReply(request.method, decodeURIComponent(poll[1]), request.form) : null;
+      return reply ? { ...reply, delayMs: 300 } : { status: 404, body: { error: 'not_found' }, delayMs: 300 };
     }
     const blogTags = DEMO_BLOG_TAGS_PATH.exec(request.path);
     if (blogTags) {

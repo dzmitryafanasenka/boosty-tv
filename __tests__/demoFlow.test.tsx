@@ -198,8 +198,13 @@ test('Story 3.4: Пост answers E8 in demo mode (paragraphs and likes, mixed b
     'post/demo-post-1/block/video@16',
     // Story 6.4: the demo AudioBlock (its synthetic source never plays).
     'post/demo-post-1/block/audio_file:demo-audio-1',
-    // Story 6.5: the demo's top-level poll, after the body.
-    'post/demo-post-1/block/poll:2001',
+  ]);
+  // Story 6.5: the demo's top-level poll, after the body; Story 6.6: open
+  // single choice, so each option is a stop.
+  expect(ids().filter(id => id.startsWith('post/demo-post-1/poll/'))).toEqual([
+    'post/demo-post-1/poll/option/1',
+    'post/demo-post-1/poll/option/2',
+    'post/demo-post-1/poll/option/3',
   ]);
   expect(text()).toContain('Демо-аудио');
   expect(text()).toContain('0:00 / 3:12');

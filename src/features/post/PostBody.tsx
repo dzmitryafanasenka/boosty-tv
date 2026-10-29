@@ -12,6 +12,7 @@ import {
 import { youtubeThumbnail } from '../../shared/entities/externalUrls';
 import { AudioBlock, type ResolveAudioSource } from '../player';
 import { PollWidget } from '../polls';
+import type { HttpClient } from '../../shared/api';
 import type {
   FileTargetResult,
   MediaRef,
@@ -835,6 +836,12 @@ export type PostBodyProps = {
   resolveAudio?: ResolveAudioSource;
   /** Story 6.4: false while Пост is not the focused route (a playing track pauses). */
   active?: boolean;
+  /**
+   * Story 6.6: voting in an open single-choice poll: the active session's
+   * client, the post's identity (E10, the E8 query key) and the option focus
+   * id prefix (`post/<postId>/poll/option/`). Absent: the poll is display only.
+   */
+  pollVote?: { http: HttpClient; blogUrl: string; postId: string; optionIdPrefix: string };
 };
 
 /**
@@ -856,6 +863,7 @@ export function PostBody({
   onPlayAt,
   resolveAudio,
   active = true,
+  pollVote,
 }: PostBodyProps) {
   return (
     <>
@@ -943,7 +951,8 @@ export function PostBody({
           case 'heading':
             return <Heading key={item.key} id={id} text={item.text} />;
           case 'poll':
-            // Story 6.5: results only, one focus stop.
+            // Story 6.5: results, one focus stop; Story 6.6: an open
+            // single-choice poll's options are stops that take a vote.
             return (
               <PollWidget
                 key={item.key}
@@ -951,6 +960,10 @@ export function PostBody({
                 poll={item.poll}
                 onView={onParagraphView}
                 onFocus={onParagraphFocus}
+                http={pollVote?.http}
+                blogUrl={pollVote?.blogUrl}
+                postId={pollVote?.postId}
+                optionIdPrefix={pollVote?.optionIdPrefix}
               />
             );
           case 'image':
