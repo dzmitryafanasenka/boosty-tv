@@ -322,3 +322,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-6-3-links-files-and-external-videos-via-qr.md`
   summary: Device check of a file chip (busy state, the dialog with a signed target, «Не удалось открыть файл», «Нет доступа к файлу», the accessibility labels while busy and after a failure) and an owner phone scan of a file QR (no photo kept).
   evidence: Story 6.3 checked link and YouTube chips on the device only; the file path is host-tested.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-4-inline-audio.md`
+  summary: The screen stays on while an AudioBlock is paused with its source held (react-native-video keep-screen-on); the reference holds the wakelock only while playing. Owner decision 2026-10-29: keep as is for now; a later option is to release the source after a long pause.
+  evidence: Device check in Story 6.4: `KEEP_SCREEN_ON` present 2 s after a pause, released after Back.
