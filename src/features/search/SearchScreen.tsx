@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FlashListRef } from '@shopify/flash-list';
-import { useQueryClient } from '@tanstack/react-query';
+import { hashKey, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { StyleSheet, TVFocusGuideView, View, useWindowDimensions } from 'react-native';
-import type { HttpClient } from '../../shared/api';
+import { queryKeys, type HttpClient } from '../../shared/api';
 import {
   DEFAULT_FILTER,
   FilterSheet,
@@ -61,6 +61,8 @@ export const SEARCH_RESET_FILTERS_ID = 'search/reset-filters';
 export const SEARCH_LOAD_MORE_RETRY_ID = 'search/results/retry';
 
 const SKELETON_ROWS = 2;
+/** Frames the no-fetch outcome settle waits for the render and the cache. */
+const OUTCOME_FRAME_TRIES = 30;
 const FIELD = components['text-field'];
 /** The field row: the label above the 50 dp field, and a little room under it. */
 const FIELD_ROW_HEIGHT = typography['body-s'].lineHeight + spacing['4'] + FIELD.height + spacing['2'];
@@ -258,10 +260,56 @@ export function SearchScreen({
 
   /** The awaited fetch has started (so its end can settle the outcome). */
   const outcomeFetchSeen = useRef(false);
-  const awaitOutcome = useCallback(() => {
-    pendingOutcome.current = true;
-    outcomeFetchSeen.current = false;
-  }, []);
+  const listFetchingRef = useLatestRef(results.isFetching);
+  /** The shown list's key (hashed), as last rendered. */
+  const shownKeyRef = useLatestRef(hashKey(queryKeys.feedSearch(query ?? '', effectiveFilter)));
+  /** The latest `resolveOutcome` (set below; read by the next-frame check). */
+  const resolveLater = useRef<() => void>(() => {});
+  const outcomeFrame = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (outcomeFrame.current !== null) {
+        cancelAnimationFrame(outcomeFrame.current);
+      }
+    },
+    [],
+  );
+  const awaitOutcome = useCallback(
+    (awaited: QueryKey) => {
+      pendingOutcome.current = true;
+      outcomeFetchSeen.current = false;
+      // No fetch followed (e.g. an action onto a cached list with no phase
+      // change and no fetching cycle): settle on a next frame with the same
+      // rules, so the flag never outlives its action. Not while the awaited
+      // list is fetching per the cache, or the render has not reached it
+      // yet (a slow device: TanStack's batched notify can come after the
+      // frame); then look again on the next frame, at most
+      // OUTCOME_FRAME_TRIES times (a longer fetch settles through the
+      // fetching cycle or the phase change).
+      if (outcomeFrame.current !== null) {
+        cancelAnimationFrame(outcomeFrame.current);
+      }
+      const awaitedHash = hashKey(awaited);
+      let tries = 0;
+      const check = () => {
+        outcomeFrame.current = null;
+        if (!pendingOutcome.current || outcomeFetchSeen.current) {
+          return;
+        }
+        const busy =
+          listFetchingRef.current ||
+          shownKeyRef.current !== awaitedHash ||
+          client.isFetching({ queryKey: awaited, exact: true }) > 0;
+        if (!busy) {
+          resolveLater.current();
+        } else if (++tries < OUTCOME_FRAME_TRIES) {
+          outcomeFrame.current = requestAnimationFrame(check);
+        }
+      };
+      outcomeFrame.current = requestAnimationFrame(check);
+    },
+    [listFetchingRef, shownKeyRef, client],
+  );
   /** Settle the pending outcome on the current phase (focus rules above). */
   const resolveOutcome = () => {
     if (!pendingOutcome.current || phase === 'loading' || phase === 'hint') {
@@ -283,6 +331,7 @@ export function SearchScreen({
       focusField();
     }
   };
+  resolveLater.current = resolveOutcome;
   usePhaseChange(phase, resolveOutcome);
   // The awaited fetch settled with the phase unchanged (the held error
   // through a failed «Повторить», or «Готово» from the error view failing
@@ -315,7 +364,7 @@ export function SearchScreen({
     focusRestoration.remember(routeKey, SEARCH_SECTION, SEARCH_FIELD_ID, 0);
     lastResult.current = null;
     restoration.cancel();
-    awaitOutcome();
+    awaitOutcome(queryKeys.feedSearch(next, filterRef.current));
     submitFeedSearch(client, next, filterRef.current).catch(() => {});
     if (queryRef.current !== next) {
       searchQueryStore.getState().submit(next);
@@ -323,16 +372,21 @@ export function SearchScreen({
   }, [draft, focusField, routeKey, restoration, client, filterRef, queryRef, awaitOutcome]);
 
   const onRetry = useCallback(() => {
-    awaitOutcome();
+    awaitOutcome(queryKeys.feedSearch(queryRef.current ?? '', filterRef.current));
     results.refetch();
-  }, [results, awaitOutcome]);
+  }, [results, awaitOutcome, queryRef, filterRef]);
 
+  // «Сбросить фильтры»: the action goes with the empty view, so the field
+  // keeps focus meanwhile. The query runs again under the default Filter (a
+  // cached result for it is not reused; Автор's rule, Story 5.7).
   const onResetFilters = useCallback(() => {
-    // The action goes with the empty view: the field keeps focus meanwhile.
     focusField();
-    awaitOutcome();
+    awaitOutcome(queryKeys.feedSearch(queryRef.current ?? '', DEFAULT_FILTER));
+    if (queryRef.current !== null) {
+      submitFeedSearch(client, queryRef.current, DEFAULT_FILTER).catch(() => {});
+    }
     filtersStore.getState().reset('search');
-  }, [focusField, awaitOutcome]);
+  }, [focusField, awaitOutcome, queryRef, client]);
 
   // Back from Пост: the remembered result by id with the fallback chain.
   const phaseRef = useLatestRef(phase);

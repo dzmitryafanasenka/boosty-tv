@@ -293,6 +293,46 @@ describe('matrix «Submit»', () => {
     await unmount(root);
   });
 
+  it('«Готово» from the error view on a slow device (the settle frame fires before the fetching render): the outcome still lands on the fetched results', async () => {
+    search = () => ({ status: 400, body: {} });
+    const root = await openSearch();
+    await runSearch(root, 'капуста');
+    expect(lastFocusTarget()).toBe(RETRY);
+    const reply = deferred();
+    let pending: FixtureRequest | null = null;
+    search = req => {
+      pending = req;
+      return reply.promise;
+    };
+    // TanStack's notifications are held: the render still shows the error
+    // (not fetching) when the next frames fire.
+    const held: Array<() => void> = [];
+    notifyManager.setScheduler(callback => {
+      held.push(callback);
+    });
+    try {
+      await runSearch(root, 'капуста');
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+      expect(visible(root, 'search/error')).toBe(true);
+      expect(queryClient.isFetching({ queryKey: queryKeys.feedSearch('капуста', DEFAULT_FILTER) })).toBe(1);
+    } finally {
+      notifyManager.setScheduler(callback => {
+        Promise.resolve().then(callback);
+      });
+    }
+    focusMock.mockClear();
+    await act(async () => {
+      held.splice(0).forEach(callback => callback());
+    });
+    reply.resolve(syntheticSearch(5)(pending as unknown as FixtureRequest));
+    await settle();
+    expect(focusTargets()).not.toContain(RETRY);
+    expect(lastFocusTarget()).toBe(RESULT(0));
+    await unmount(root);
+  });
+
   it('«Повторить» fails again: focus stays on «Повторить»; the outcome is settled (a later change takes no focus)', async () => {
     search = () => ({ status: 403, body: {} });
     const root = await openSearch();
@@ -386,6 +426,107 @@ describe('matrix «Nothing found»', () => {
     expect(searchCalls()).toHaveLength(2);
     expect(searchCalls()[1].url).toContain('only_allowed=true&only_bought=false');
     expect(queryOf(searchCalls()[1].url)).toBe('капуста');
+    expect(resultIds(root)).toHaveLength(5);
+    expect(lastFocusTarget()).toBe(RESULT(0));
+    await unmount(root);
+  });
+});
+
+describe('Epic 5 retro A1: «Сбросить фильтры» re-runs the query under the default Filter', () => {
+  /** Default search first (cached), then a Filter set behind it, a filtered empty result. */
+  async function filteredEmptyOver(root: Root, query: string) {
+    await runSearch(root, query);
+    await act(async () => {
+      filtersStore.getState().setAccess('search', 'all');
+    });
+    await settle();
+    expect(visible(root, 'search/filtered-empty')).toBe(true);
+    await focusOn(root, RESET);
+    focusMock.mockClear();
+  }
+
+  it('onto a cached, also empty default result: E6 runs again with the default params; focus → the field; no stale outcome later', async () => {
+    search = emptySearch;
+    const root = await openSearch();
+    await filteredEmptyOver(root, 'zqxj');
+    const before = searchCalls().length;
+    expect(searchCalls()[before - 1].url).toContain('only_allowed=false&only_bought=false');
+    await press(root, RESET);
+    // The action goes with the view: the field takes focus natively.
+    await focusOn(root, FIELD);
+    await settle();
+    expect(getFilter('search')).toEqual(DEFAULT_FILTER);
+    expect(searchCalls()).toHaveLength(before + 1);
+    const url = searchCalls()[before].url;
+    expect(url).toContain('only_allowed=true&only_bought=false');
+    expect(queryOf(url)).toBe('zqxj');
+    expect(cursorOf(url)).toBeNull();
+    expect(visible(root, 'search/empty')).toBe(true);
+    expect(lastFocusTarget()).toBe(FIELD_HOST);
+    // A later, unrelated change (results arrive): no outcome is pending, so
+    // focus is not moved off the field.
+    focusMock.mockClear();
+    search = syntheticSearch(4);
+    await act(async () => {
+      await queryClient.refetchQueries({ queryKey: queryKeys.feedSearch('zqxj', DEFAULT_FILTER) });
+    });
+    await settle();
+    expect(resultIds(root)).toHaveLength(4);
+    expect(focusTargets().filter(id => id?.startsWith('search/result/'))).toEqual([]);
+    await unmount(root);
+  });
+
+  it('the re-run fails (5xx, after its retries): «Повторить» focused', async () => {
+    search = emptySearch;
+    const root = await openSearch();
+    await filteredEmptyOver(root, 'zqxj');
+    const before = searchCalls().length;
+    search = () => ({ status: 503, body: {} });
+    await press(root, RESET, { settle: { timerRounds: 30 } });
+    await focusOn(root, FIELD);
+    await settle({ timerRounds: 30 });
+    expect(getFilter('search')).toEqual(DEFAULT_FILTER);
+    // The re-run happened (with the AD-6 retries of a 5xx).
+    expect(searchCalls().length).toBeGreaterThan(before);
+    for (const call of searchCalls().slice(before)) {
+      expect(call.url).toContain('only_allowed=true&only_bought=false');
+      expect(queryOf(call.url)).toBe('zqxj');
+    }
+    expect(visible(root, 'search/error')).toBe(true);
+    expect(lastFocusTarget()).toBe(RETRY);
+    await unmount(root);
+  });
+
+  it('the default-Filter result is not cached: one E6 under the default Filter; focus → the first result', async () => {
+    filtersStore.getState().setAccess('search', 'all');
+    search = req => (/only_allowed=false/.test(req.url) ? emptySearch() : syntheticSearch(3)(req));
+    const root = await openSearch();
+    await runSearch(root, 'капуста');
+    expect(visible(root, 'search/filtered-empty')).toBe(true);
+    expect(queryClient.getQueryState(queryKeys.feedSearch('капуста', DEFAULT_FILTER))).toBeUndefined();
+    expect(lastFocusTarget()).toBe(RESET);
+    const before = searchCalls().length;
+    await press(root, RESET);
+    await focusOn(root, FIELD);
+    await settle();
+    expect(searchCalls()).toHaveLength(before + 1);
+    expect(searchCalls()[before].url).toContain('only_allowed=true&only_bought=false');
+    expect(queryOf(searchCalls()[before].url)).toBe('капуста');
+    expect(lastFocusTarget()).toBe(RESULT(0));
+    await unmount(root);
+  });
+
+  it('onto a cached default result with posts: E6 runs again; focus → the first result', async () => {
+    search = req => (/only_allowed=false/.test(req.url) ? emptySearch() : syntheticSearch(5)(req));
+    const root = await openSearch();
+    await filteredEmptyOver(root, 'капуста');
+    const before = searchCalls().length;
+    await press(root, RESET);
+    await focusOn(root, FIELD);
+    await settle();
+    expect(searchCalls()).toHaveLength(before + 1);
+    expect(searchCalls()[before].url).toContain('only_allowed=true&only_bought=false');
+    expect(queryOf(searchCalls()[before].url)).toBe('капуста');
     expect(resultIds(root)).toHaveLength(5);
     expect(lastFocusTarget()).toBe(RESULT(0));
     await unmount(root);

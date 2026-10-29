@@ -939,4 +939,184 @@ describe('«Мой блог» (Story 5.2, SUB-02, focus-map §3 C)', () => {
     await accountScope.reset();
     expect(queryClient.getQueryData(queryKeys.me())).toBeUndefined();
   });
+
+  describe('«Обновить» re-checks «Мой блог» (Epic 5 retro A3)', () => {
+    const REFRESH = 'home/refresh';
+    const emptyE4 = (): FixtureReply => ({ status: 200, body: { data: [], extra: { isLast: true } } });
+
+    /** Подписки visited once (the check settled), then «Обновить» on Главная. */
+    async function refreshFromHome(root: Root) {
+      await press(root, 'nav/home');
+      await press(root, REFRESH);
+      await settle();
+    }
+
+    it('no tile, the first own post published: «Обновить» refetches own E4 page 1 only; the tile appears', async () => {
+      e1 = e1With(MINE);
+      let e4: () => FixtureReply = emptyE4;
+      blog = ownBlog(() => e4());
+      const root = await openSubs();
+      expect(tileIds(root)).toEqual([TILE(1), TILE(2), TILE(3)]);
+      const profile = profileCalls().length;
+      e4 = () => ({ status: 200, body: e4Page(1) });
+      await refreshFromHome(root);
+      expect(e4Calls()).toHaveLength(2);
+      expect(e4Calls()[1].url).toBe(e4Calls()[0].url);
+      // E1 and E3 ended well: not asked again.
+      expect(profileCalls()).toHaveLength(profile);
+      expect(e3Calls()).toHaveLength(1);
+      await press(root, 'nav/subs');
+      expect(tileIds(root)[0]).toBe(MY_TILE);
+      // Opening Подписки again sends nothing more.
+      expect(e4Calls()).toHaveLength(2);
+      await unmount(root);
+    });
+
+    it('the re-check fails: still no tile and no error', async () => {
+      e1 = e1With(MINE);
+      let e4: () => FixtureReply = emptyE4;
+      blog = ownBlog(() => e4());
+      const root = await openSubs();
+      e4 = () => ({ status: 404, body: {} });
+      await refreshFromHome(root);
+      expect(e4Calls()).toHaveLength(2);
+      await press(root, 'nav/subs');
+      expect(tileIds(root)).toEqual([TILE(1), TILE(2), TILE(3)]);
+      expect(visible(root, 'subs/error')).toBe(false);
+      await unmount(root);
+    });
+
+    it('a multi-page empty own list is trimmed to page 1 first: one E4 request', async () => {
+      e1 = e1With(MINE);
+      blog = ownBlog(emptyE4);
+      const root = await openSubs();
+      const key = queryKeys.authorPosts(MINE, DEFAULT_FILTER);
+      await act(async () => {
+        queryClient.setQueryData(key, {
+          pages: [
+            { posts: [], nextCursor: 'c1' },
+            { posts: [], nextCursor: null },
+          ],
+          pageParams: [null, 'c1'],
+        });
+      });
+      const before = e4Calls().length;
+      await refreshFromHome(root);
+      expect(e4Calls()).toHaveLength(before + 1);
+      expect(e4Calls()[before].url).not.toContain('offset=');
+      await unmount(root);
+    });
+
+    it('the tile is shown: «Обновить» sends no E1, E3 or E4 for it', async () => {
+      e1 = e1With(MINE);
+      blog = ownBlog();
+      const root = await openSubs();
+      expect(tileIds(root)[0]).toBe(MY_TILE);
+      const profile = profileCalls().length;
+      await refreshFromHome(root);
+      expect(profileCalls()).toHaveLength(profile);
+      expect(e3Calls()).toHaveLength(1);
+      expect(e4Calls()).toHaveLength(1);
+      await unmount(root);
+    });
+
+    it('E3 unavailable: «Обновить» refetches E3 only', async () => {
+      e1 = e1With(MINE);
+      let missing = true;
+      const own = ownBlog();
+      blog = req => (req.path === e3Path(MINE) && missing ? e3MissingReply() : own(req));
+      const root = await openSubs();
+      expect(tileIds(root)).toEqual([TILE(1), TILE(2), TILE(3)]);
+      missing = false;
+      await refreshFromHome(root);
+      expect(e3Calls()).toHaveLength(2);
+      expect(e4Calls()).toHaveLength(1);
+      await press(root, 'nav/subs');
+      expect(tileIds(root)[0]).toBe(MY_TILE);
+      await unmount(root);
+    });
+
+    it('the profile E1 failed: «Обновить» refetches it; on success the tile chain runs', async () => {
+      let calls = 0;
+      // The first E1 is the cold-start validate: only the profile E1 fails.
+      e1 = () => (calls++ === 0 ? e1With(MINE)() : { status: 404, body: {} });
+      blog = ownBlog();
+      const root = await openSubs();
+      expect(tileIds(root)).toEqual([TILE(1), TILE(2), TILE(3)]);
+      expect(transport.calls.filter(c => c.path.startsWith('/v1/blog/'))).toHaveLength(0);
+      const profile = profileCalls().length;
+      e1 = e1With(MINE);
+      await refreshFromHome(root);
+      expect(profileCalls()).toHaveLength(profile + 1);
+      expect(queryClient.getQueryData(queryKeys.me())).toEqual({ id: '1001', blogUrl: MINE });
+      await press(root, 'nav/subs');
+      expect(e3Calls()).toHaveLength(1);
+      expect(e4Calls()).toHaveLength(1);
+      expect(tileIds(root)[0]).toBe(MY_TILE);
+      await unmount(root);
+    });
+
+    it('E1 had no blogUrl, the account has a blog now: «Обновить» sends one more profile E1; E3/E4 follow and the tile appears', async () => {
+      blog = ownBlog();
+      const root = await openSubs();
+      expect(tileIds(root)).toEqual([TILE(1), TILE(2), TILE(3)]);
+      const profile = profileCalls().length;
+      e1 = e1With(MINE);
+      await refreshFromHome(root);
+      expect(profileCalls()).toHaveLength(profile + 1);
+      await press(root, 'nav/subs');
+      expect(e3Calls()).toHaveLength(1);
+      expect(e4Calls()).toHaveLength(1);
+      expect(tileIds(root)[0]).toBe(MY_TILE);
+      await unmount(root);
+    });
+
+    it.each([
+      ['E3 Parse', (): FixtureReply => ({ status: 200, body: { title: 'x' } })],
+      ['E3 503', (): FixtureReply => ({ status: 503, body: {} })],
+    ])('%s on the first load: «Обновить» refetches E3; the tile appears', async (_name, reply) => {
+      e1 = e1With(MINE);
+      let failing = true;
+      const own = ownBlog();
+      blog = req => (req.path === e3Path(MINE) && failing ? reply() : own(req));
+      const root = await openSubs(WITH_TIMERS);
+      expect(tileIds(root)).toEqual([TILE(1), TILE(2), TILE(3)]);
+      const before = e3Calls().length;
+      failing = false;
+      await refreshFromHome(root);
+      expect(e3Calls()).toHaveLength(before + 1);
+      expect(e4Calls()).toHaveLength(1);
+      await press(root, 'nav/subs');
+      expect(tileIds(root)[0]).toBe(MY_TILE);
+      await unmount(root);
+    });
+
+    it('E4 404 on the first load: «Обновить» sends one E4; the tile appears', async () => {
+      e1 = e1With(MINE);
+      let e4: () => FixtureReply = () => ({ status: 404, body: {} });
+      blog = ownBlog(() => e4());
+      const root = await openSubs();
+      expect(tileIds(root)).toEqual([TILE(1), TILE(2), TILE(3)]);
+      expect(e4Calls()).toHaveLength(1);
+      e4 = () => ({ status: 200, body: e4Page(1) });
+      await refreshFromHome(root);
+      expect(e4Calls()).toHaveLength(2);
+      expect(e3Calls()).toHaveLength(1);
+      await press(root, 'nav/subs');
+      expect(tileIds(root)[0]).toBe(MY_TILE);
+      await unmount(root);
+    });
+
+    it('Подписки never visited: «Обновить» sends no profile E1, E3 or E4', async () => {
+      e1 = e1With(MINE);
+      blog = ownBlog();
+      const root = await render(<App />);
+      const profile = profileCalls().length;
+      await press(root, REFRESH);
+      await settle();
+      expect(profileCalls()).toHaveLength(profile);
+      expect(transport.calls.filter(c => c.path.startsWith('/v1/blog/'))).toHaveLength(0);
+      await unmount(root);
+    });
+  });
 });
