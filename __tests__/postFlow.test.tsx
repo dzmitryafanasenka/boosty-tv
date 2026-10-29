@@ -429,6 +429,69 @@ describe('blocks (matrix «Mixed blocks», «Malformed block»)', () => {
     await unmount(root);
   });
 
+  it('styled text and an inline emoji (Story 6.1, matrix «Styles», «Emoji»): nested runs, emoji at text size; a failed emoji leaves no gap', async () => {
+    e8 = (_req, blogUrl, postId) => ({
+      status: 200,
+      body: postDetail(blogUrl, postId, [
+        { type: 'text', content: JSON.stringify(['Привет мир ', 'unstyled', [[0, 0, 6], [2, 7, 3]]]), modificator: '' },
+        // Live, ranges count from the paragraph start: «ссылка» starts at 11.
+        { type: 'link', content: JSON.stringify(['ссылка', 'unstyled', [[4, 11, 6]]]), url: 'https://example.invalid/link' },
+        { type: 'smile', name: 'smile', mediumUrl: 'https://example.invalid/emoji' },
+        textBlock(' хвост'),
+        blockEnd(),
+      ]),
+    });
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    const block = BLOCK(id, 'text@0');
+    expect(contentIds(root)).toEqual([AUTHOR(id), block]);
+    // The accessibility label stays the plain text (the emoji left out).
+    expect(one(root, block).props.accessibilityLabel).toBe('Привет мир ссылка хвост');
+    const node = byTestId(root, block)[0];
+    const runs = node
+      .queryAll((n: any) => (n.type === 'RCTText' || n.type === 'Text') && n.children.every((c: unknown) => typeof c === 'string'))
+      .map((n: any) => ({ text: n.children.join(''), style: StyleSheet.flatten(n.props.style) ?? {} }));
+    const styleOf = (s: string) => runs.find(r => r.text === s)?.style as Record<string, unknown> | undefined;
+    expect(styleOf('Привет')).toMatchObject({ fontFamily: 'GolosText-SemiBold' });
+    expect(styleOf('Привет')?.fontWeight).toBeUndefined();
+    expect(styleOf('мир')).toMatchObject({ fontStyle: 'italic' });
+    expect(styleOf('ссылка')).toMatchObject({ textDecorationLine: 'underline' });
+    expect(styleOf(' хвост')?.fontStyle).toBeUndefined();
+    // The emoji: a plain {uri} image (no headers) at the body line height, not focusable.
+    const emojiId = `${block}/emoji/smile@2`;
+    const emoji = byTestId(root, emojiId)[0];
+    expect(emoji.props.source).toEqual({ uri: 'https://example.invalid/emoji' });
+    expect(StyleSheet.flatten(emoji.props.style)).toMatchObject({ width: 22, height: 22 });
+    expect(emoji.props.focusable).toBe(false);
+    await act(async () => emoji.props.onError({ nativeEvent: {} }));
+    expect(byTestId(root, emojiId)).toHaveLength(0);
+    expect(one(root, block).props.accessibilityLabel).toBe('Привет мир ссылка хвост');
+    expect(text(byTestId(root, block)[0])).toContain('хвост');
+    expect(contentIds(root)).toEqual([AUTHOR(id), block]);
+    await unmount(root);
+  });
+
+  it('an emoji-only paragraph (Story 6.1): shown, never a focus stop, also after its image fails', async () => {
+    e8 = (_req, blogUrl, postId) => ({
+      status: 200,
+      body: postDetail(blogUrl, postId, [
+        { type: 'smile', name: 'smile', mediumUrl: 'https://example.invalid/emoji' },
+        blockEnd(),
+        ...paragraph('Text'),
+      ]),
+    });
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    const emojiId = `${BLOCK(id, 'smile@0')}/emoji/smile@0`;
+    expect(byTestId(root, emojiId)).toHaveLength(1);
+    expect(byTestId(root, BLOCK(id, 'smile@0'))[0].props.focusable).toBe(false);
+    expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, 'text@2')]);
+    await act(async () => byTestId(root, emojiId)[0].props.onError({ nativeEvent: {} }));
+    expect(byTestId(root, emojiId)).toHaveLength(0);
+    expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, 'text@2')]);
+    await unmount(root);
+  });
+
   it('malformed blocks (no type, bad content, null, a string): placeholders or text, no crash', async () => {
     e8 = (_req, blogUrl, postId) => ({
       status: 200,

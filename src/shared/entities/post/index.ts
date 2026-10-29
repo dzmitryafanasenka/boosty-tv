@@ -3,7 +3,9 @@ export {
   kindOf,
   mapPost,
   previewOf,
+  styledTextOf,
   textOf,
+  type StyledText,
 } from './mapPost';
 export {
   BLOG_POSTS_PAGE_SIZE,
@@ -21,13 +23,14 @@ export {
 } from './postRepository';
 export {
   blockKey,
-  listItemTexts,
+  isFocusStop,
   PARAGRAPH_STOP_MAX_CHARS,
   splitParagraph,
   postBodyItems,
   type PlaceholderKind,
   type PostBodyOptions,
   type PostBodyItem,
+  type Segment,
 } from './postBody';
 export { mediaRefsOf, videoRowsOf } from './mediaRows';
 export { isGenericVideoTitle, videoDisplayTitle } from './videoTitle';
@@ -64,5 +67,7 @@ export type {
   PostPage,
   PostResult,
   ServerProgressSink,
+  TextSpan,
+  TextStyle,
   VideoRow,
 } from './types';

@@ -302,3 +302,11 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-5-7-search-and-filters-inside-an-author.md`
   summary: An occasional jest run executes fewer tests than expected with no failure (one of 30 in Story 5.7, a similar one in Story 5.6).
   evidence: settled 2026-10-29 by a full log: «Test suite failed to run — A jest worker process was terminated by another process: signal=SIGSEGV» (postsHeadRefresh.test.ts, unchanged by the story); a Node/jest-worker crash on the host, not a test failure. Worth a look if it grows (e.g. `--workerIdleMemoryLimit`, Node version).
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-1-rich-text-emoji-and-long-posts.md`
+  summary: Live `header` blocks (42 in the owner's posts) render as the unsupported placeholder; decide their rendering (reference behaviour not audited).
+  evidence: Story 6.1 live probe counts in the spec's Implementation Notes and `docs/api-contract.md`.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-1-rich-text-emoji-and-long-posts.md`
+  summary: Verify with the first live `smile` sample that a smile counts as one style-offset unit, its field set, and how a failed inline image renders on Android.
+  evidence: unverified (maybe-false; medium if wrong: every later range in that paragraph shifts by one); no smile seen in 612 live posts.

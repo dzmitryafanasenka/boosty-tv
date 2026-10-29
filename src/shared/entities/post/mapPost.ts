@@ -9,10 +9,11 @@ import {
   okVideoBlockDtoSchema,
   pollBlockDtoSchema,
   postDtoSchema,
+  smileBlockDtoSchema,
   textBlockDtoSchema,
 } from '../../api/dto/post';
 import { logger as appLogger, type Logger } from '../../services/logger';
-import type { Block, ListItem, Post, PostKind } from './types';
+import type { Block, ListItem, Post, PostKind, TextSpan, TextStyle } from './types';
 
 /**
  * The one Post mapper (AD-8): `unknown` (one post of E4/E5/E8) → `Post`, or
@@ -23,22 +24,78 @@ import type { Block, ListItem, Post, PostKind } from './types';
 
 const MAX_LIST_DEPTH = 8;
 
-/** `text`/`link` content: a JSON string `[text, style, ranges]`, else raw text. */
-export function textOf(content: string | null | undefined): string {
-  if (!content) {
-    return '';
+/** api-contract §4.1 style codes; any other code renders as normal text. */
+const STYLE_CODES: Readonly<Record<number, TextStyle>> = { 0: 'bold', 2: 'italic', 4: 'underline' };
+
+/** A fragment's plain text and its style ranges (Story 6.1). */
+export type StyledText = { text: string; spans: TextSpan[] };
+
+/** `content` parsed as the JSON array `[text, style, ranges]`; undefined when it is not one. */
+function contentArray(content: string): unknown[] | undefined {
+  if (!content.startsWith('[')) {
+    return undefined;
   }
-  if (content.startsWith('[')) {
-    try {
-      const parsed: unknown = JSON.parse(content);
-      if (Array.isArray(parsed)) {
-        return typeof parsed[0] === 'string' ? parsed[0] : '';
-      }
-    } catch {
-      // Not JSON: the content is raw text.
+  try {
+    const parsed: unknown = JSON.parse(content);
+    return Array.isArray(parsed) ? parsed : undefined;
+  } catch {
+    // Not JSON: the content is raw text.
+    return undefined;
+  }
+}
+
+const isInt = (value: unknown): value is number => typeof value === 'number' && Number.isInteger(value);
+
+/**
+ * The style ranges `[[code, from, len], …]` of a `text`/`link` fragment.
+ * Live (Story 6.1, api-contract §4.1 «Text styles and smile (LIVE)»):
+ * `from` counts from the start of the paragraph the fragment belongs to,
+ * not from the fragment, so the ranges are kept as given here and the
+ * paragraph builder places and clamps them. Only known codes are kept; an
+ * empty, negative (`from` < 0 or `len` ≤ 0) or malformed range is dropped. A value that is not an array is no ranges. Total: never throws.
+ */
+function spansOf(raw: unknown): TextSpan[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const spans: TextSpan[] = [];
+  for (const range of raw) {
+    if (!Array.isArray(range) || range.length < 3) {
+      continue;
     }
+    const [code, from, len] = range as unknown[];
+    if (!isInt(code) || !isInt(from) || !isInt(len) || from < 0 || len <= 0) {
+      continue;
+    }
+    const style = STYLE_CODES[code];
+    if (style === undefined) {
+      continue;
+    }
+    spans.push({ style, from, len });
   }
-  return content;
+  return spans;
+}
+
+/**
+ * `text`/`link` content (api-contract §4.1): a JSON string `[text, style,
+ * ranges]` gives its text and style ranges; any other content is raw text
+ * with no styles. A malformed range list drops only the styles.
+ */
+export function styledTextOf(content: string | null | undefined): StyledText {
+  if (!content) {
+    return { text: '', spans: [] };
+  }
+  const parsed = contentArray(content);
+  if (parsed === undefined) {
+    return { text: content, spans: [] };
+  }
+  const text = typeof parsed[0] === 'string' ? parsed[0] : '';
+  return { text, spans: spansOf(parsed[2]) };
+}
+
+/** `text`/`link` content as plain text (titles and other plain-text callers). */
+export function textOf(content: string | null | undefined): string {
+  return styledTextOf(content).text;
 }
 
 const nonEmpty = (value: string | null | undefined): string | null =>
@@ -76,7 +133,7 @@ function mapBlock(raw: unknown, depth: number): Block {
       return b.success
         ? {
             type: 'text',
-            text: textOf(b.data.content),
+            ...styledTextOf(b.data.content),
             paragraphEnd: b.data.modificator === 'BLOCK_END',
           }
         : unknown;
@@ -84,7 +141,18 @@ function mapBlock(raw: unknown, depth: number): Block {
     case 'link': {
       const b = linkBlockDtoSchema.safeParse(raw);
       return b.success
-        ? { type: 'link', text: textOf(b.data.content), url: nonEmpty(b.data.url) }
+        ? { type: 'link', ...styledTextOf(b.data.content), url: nonEmpty(b.data.url) }
+        : unknown;
+    }
+    case 'smile': {
+      const b = smileBlockDtoSchema.safeParse(raw);
+      return b.success
+        ? {
+            type: 'smile',
+            name: b.data.name ?? '',
+            url:
+              nonEmpty(b.data.mediumUrl) ?? nonEmpty(b.data.largeUrl) ?? nonEmpty(b.data.smallUrl),
+          }
         : unknown;
     }
     case 'image': {

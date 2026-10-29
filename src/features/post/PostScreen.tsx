@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import type { HttpClient } from '../../shared/api';
 import {
+  isFocusStop,
   postBodyItems,
   videoRowsOf,
   type MediaRef,
@@ -285,7 +286,7 @@ export function PostScreen({
     if (rows.length > 0) {
       return `${videoPrefix}${rows[0].ref.mediaId}`;
     }
-    const first = items.find(item => item.kind === 'paragraph');
+    const first = items.find(isFocusStop);
     return first ? `${blockPrefix}${first.key}` : null;
   }, [showPrimary, primaryId, rows, items, videoPrefix, blockPrefix]);
   // The column's measured viewport and content height (the ScrollView's

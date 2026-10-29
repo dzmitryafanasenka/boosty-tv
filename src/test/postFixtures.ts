@@ -21,7 +21,12 @@ const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 /** E8 path of a post (the query is not part of a FixtureRequest path). */
 export const e8Path = (blogUrl: string, postId: string) => `/v1/blog/${blogUrl}/post/${postId}`;
 
-/** The live accessible E8 body (one video, many paragraphs, inline links). */
+/**
+ * The live accessible E8 body (one video, many paragraphs, inline links).
+ * Story 6.1 additions: sanitized style ranges on its first two fragments
+ * (bold is seen live) and one synthetic `smile` block (name
+ * `synthetic-key-1`, before the last paragraph end; no emoji was seen live).
+ */
 export function e8Accessible(): Json {
   return clone(e8Accessible_.body as unknown as Json);
 }
