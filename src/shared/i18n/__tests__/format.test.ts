@@ -1,4 +1,4 @@
-import { formatCardDate, formatDuration, formatFileSize } from '../format';
+import { formatCardDate, formatCount, formatDuration, formatFileSize } from '../format';
 
 /** Epoch seconds of a local date-time (the device's zone, like the app). */
 const local = (y: number, mo: number, d: number, h = 12, mi = 0) =>
@@ -67,5 +67,22 @@ describe('formatFileSize (Story 6.3)', () => {
     // A value that rounds to 1024 moves to the next unit.
     expect(formatFileSize(1048575)).toBe('1 МБ');
     expect(formatFileSize(1023)).toBe('1023 Б');
+  });
+});
+
+describe('formatCount (Story 6.5)', () => {
+  it('groups thousands with a narrow no-break space', () => {
+    expect(formatCount(0)).toBe('0');
+    expect(formatCount(999)).toBe('999');
+    expect(formatCount(1210)).toBe('1 210');
+    expect(formatCount(1643)).toBe('1 643');
+    expect(formatCount(1234567)).toBe('1 234 567');
+  });
+
+  it('rounds a fraction; a negative or non-finite value is 0', () => {
+    expect(formatCount(12.6)).toBe('13');
+    expect(formatCount(-5)).toBe('0');
+    expect(formatCount(Number.NaN)).toBe('0');
+    expect(formatCount(Number.POSITIVE_INFINITY)).toBe('0');
   });
 });

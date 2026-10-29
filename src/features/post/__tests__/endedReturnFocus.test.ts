@@ -27,6 +27,8 @@ const post = (blocks: Post['blocks']): Post => ({
   levelName: null,
   likeCount: null,
   pinned: false,
+  poll: null,
+  pollUnsupported: null,
 });
 
 const snapshots =

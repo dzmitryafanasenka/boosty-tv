@@ -869,3 +869,111 @@ describe('postBodyItems: audio (Story 6.4)', () => {
     expect(isFocusStop({ kind: 'placeholder', key: 'audio_file:a1', block: 'audio' })).toBe(false);
   });
 });
+
+describe('postBodyItems: polls (Story 6.5)', () => {
+  const POLL = {
+    counter: 3,
+    id: 9,
+    isFinished: false,
+    isMultiple: false,
+    options: [
+      { id: 1, text: 'Yes', counter: 2, fraction: 67 },
+      { id: 2, text: 'No', counter: 1, fraction: 33 },
+    ],
+    title: ['Q'],
+  };
+  /** As the Post screen: the post's poll and its malformed flag. */
+  const pollItems = (data: unknown[], overrides: Record<string, unknown> = { poll: POLL }) => {
+    const post = mapped(postDetail('b', 'p', data as never, overrides));
+    return postBodyItems(post.blocks, {
+      videoRows: true,
+      images: 'stops',
+      qr: true,
+      poll: post.poll,
+      pollUnsupported: post.pollUnsupported,
+    });
+  };
+
+  it('live shape (top-level only): the poll is one stop after the body, keyed `poll:<id>`', () => {
+    const items = pollItems([...paragraph('Before'), ...paragraph('After')]);
+    expect(items.map(i => [i.kind, i.key])).toEqual([
+      ['paragraph', 'text@0'],
+      ['paragraph', 'text@2'],
+      ['poll', 'poll:9'],
+    ]);
+    const poll = items[2];
+    expect(poll.kind === 'poll' && poll.poll.options.map(o => o.id)).toEqual(['1', '2']);
+    expect(items.map(isFocusStop)).toEqual([true, true, true]);
+  });
+
+  it('a `poll` block with the poll\'s id (or none) places the poll there', () => {
+    expect(
+      pollItems([...paragraph('Before'), { type: 'poll', id: 9 }, ...paragraph('After')]).map(i => i.key),
+    ).toEqual(['text@0', 'poll:9', 'text@3']);
+    expect(pollItems([{ type: 'poll' }, ...paragraph('After')]).map(i => i.key)).toEqual(['poll:9', 'text@1']);
+  });
+
+  it('a `poll` block of another id stays a placeholder; the poll goes after the body', () => {
+    expect(pollItems([{ type: 'poll', id: 5 }, ...paragraph('After')])).toEqual([
+      { kind: 'placeholder', key: 'poll:5', block: 'poll' },
+      expect.objectContaining({ kind: 'paragraph', key: 'text@1' }),
+      expect.objectContaining({ kind: 'poll', key: 'poll:9' }),
+    ]);
+  });
+
+  it('a malformed poll (its only option without `fraction`, so no valid option left): the «Опрос» placeholder after the body, the rest fine', () => {
+    const malformed = { ...POLL, options: [{ id: 1, text: 'Yes', counter: 2 }] };
+    const items = pollItems([...paragraph('Text')], { poll: malformed });
+    expect(items).toEqual([
+      expect.objectContaining({ kind: 'paragraph', key: 'text@0', text: 'Text' }),
+      { kind: 'placeholder', key: 'poll@2', block: 'poll' },
+    ]);
+    expect(items.map(isFocusStop)).toEqual([true, false]);
+    // With a `poll` block, that block is the one placeholder.
+    expect(pollItems([{ type: 'poll', id: 9 }], { poll: malformed })).toEqual([
+      { kind: 'placeholder', key: 'poll:9', block: 'poll' },
+    ]);
+  });
+
+  it('the block with the poll\'s id wins over an earlier id-less block; the id-less one stays a placeholder', () => {
+    expect(pollItems([{ type: 'poll' }, ...paragraph('Mid'), { type: 'poll', id: 9 }])).toEqual([
+      { kind: 'placeholder', key: 'poll@0', block: 'poll' },
+      expect.objectContaining({ kind: 'paragraph', key: 'text@1' }),
+      expect.objectContaining({ kind: 'poll', key: 'poll:9' }),
+    ]);
+  });
+
+  it('a malformed poll and a `poll` block of another id: that block stays a placeholder and the poll\'s goes after the body', () => {
+    const malformed = { ...POLL, options: [{ id: 1, text: 'Yes', counter: 2 }] };
+    expect(pollItems([{ type: 'poll', id: 5 }, ...paragraph('Text')], { poll: malformed })).toEqual([
+      { kind: 'placeholder', key: 'poll:5', block: 'poll' },
+      expect.objectContaining({ kind: 'paragraph', key: 'text@1' }),
+      { kind: 'placeholder', key: 'poll@3', block: 'poll' },
+    ]);
+    // An id-less block shows the malformed poll's placeholder in place.
+    expect(pollItems([{ type: 'poll' }, ...paragraph('Text')], { poll: malformed })).toEqual([
+      { kind: 'placeholder', key: 'poll@0', block: 'poll' },
+      expect.objectContaining({ kind: 'paragraph', key: 'text@1' }),
+    ]);
+  });
+
+  it('a post whose only content is the poll: accessible, the poll its only stop', () => {
+    expect(pollItems([]).map(i => [i.kind, isFocusStop(i)])).toEqual([['poll', true]]);
+  });
+
+  it('no poll: nothing added; `poll: null` or `{}` adds nothing either', () => {
+    expect(pollItems([...paragraph('Text')], {}).map(i => i.kind)).toEqual(['paragraph']);
+    expect(pollItems([...paragraph('Text')], { poll: null }).map(i => i.kind)).toEqual(['paragraph']);
+  });
+
+  it('a video and a poll: the video is a MediaRow, the poll the body\'s only stop', () => {
+    expect(pollItems([{ type: 'ok_video', id: 'v' }]).map(i => [i.kind, isFocusStop(i)])).toEqual([['poll', true]]);
+  });
+
+  it('a locked post (Story 3.6 rule): no poll in the teaser', () => {
+    const locked = mapped({ ...e8Locked(), poll: POLL });
+    expect(locked.poll).toBeNull();
+    expect(locked.pollUnsupported).toBeNull();
+    expect(postBodyItems(locked.teaser, { images: true }).some(i => i.kind === 'poll')).toBe(false);
+  });
+});

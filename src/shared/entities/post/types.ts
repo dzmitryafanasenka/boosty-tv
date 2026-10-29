@@ -1,3 +1,5 @@
+import type { Poll } from '../poll/types';
+
 /**
  * The Post entity (AD-8, AD-9): portable domain types, no raw DTO fields.
  *
@@ -110,7 +112,7 @@ export type Post = {
   /** Epoch seconds: `publishTime`, else `createdAt`. */
   publishedAt: number;
   author: PostAuthor;
-  /** False when `hasAccess` is false or `data` is empty (api-contract §7). */
+  /** False when `hasAccess` is false, or `data` is empty and there is no usable top-level poll (api-contract §7, Story 6.5). */
   hasAccess: boolean;
   blocks: Block[];
   /** Shown when the post is locked (usually one image). */
@@ -126,6 +128,20 @@ export type Post = {
   likeCount: number | null;
   /** `isPinned`: the author pinned it (E4 puts it first); the Author page marks it. */
   pinned: boolean;
+  /**
+   * Story 6.5: the post's poll (live: the top-level `poll`, api-contract
+   * §4.2). Null when there is none, the post is locked (a teaser shows no
+   * poll, Story 3.6) or the poll is malformed (`pollUnsupported`).
+   */
+  poll: Poll | null;
+  /**
+   * Story 6.5: an accessible post carries a top-level `poll` that the
+   * mapper rejected (the reference would drop it): the body shows the
+   * «Опрос» placeholder instead. `id`: its raw `id` as a string, when it has
+   * one (a `poll` block of that id, or an id-less one, shows the
+   * placeholder in place). Null when there is no rejected poll.
+   */
+  pollUnsupported: { id: string | null } | null;
 };
 
 /** One E5 page: the posts and the opaque cursor of the next page. */

@@ -269,6 +269,9 @@ export function PostScreen({
               // Story 6.4: the AudioBlock plays through the PlayerEngine (the player capability).
               audio: playerEnabled,
               selfPost: { blogUrl: post.author.blogUrl, postId: post.id },
+              // Story 6.5: the poll (a PollWidget), or the «Опрос» placeholder when malformed.
+              poll: post.poll,
+              pollUnsupported: post.pollUnsupported,
             })
           : postBodyItems(post.teaser, { images: true }),
     [post, playerEnabled],

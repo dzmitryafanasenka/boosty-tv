@@ -5,6 +5,7 @@
  * so a stored session survives. The release guard is __tests__/demoModeOff.test.js.
  */
 import { act } from 'react';
+import { StyleSheet } from 'react-native';
 import App from '../src/app/App';
 import { resetQueryCache } from '../src/app/queryClient';
 import { session } from '../src/app/session';
@@ -197,11 +198,21 @@ test('Story 3.4: Пост answers E8 in demo mode (paragraphs and likes, mixed b
     'post/demo-post-1/block/video@16',
     // Story 6.4: the demo AudioBlock (its synthetic source never plays).
     'post/demo-post-1/block/audio_file:demo-audio-1',
+    // Story 6.5: the demo's top-level poll, after the body.
+    'post/demo-post-1/block/poll:2001',
   ]);
   expect(text()).toContain('Демо-аудио');
   expect(text()).toContain('0:00 / 3:12');
   expect(text()).toContain('лайк');
-  expect(text()).toContain(t('post.block.poll'));
+  // Story 6.5: the open demo poll's results (no «Опрос» placeholder any more).
+  expect(text()).toContain('Какой формат выпусков удобнее?');
+  expect(text()).toContain('Проголосовали: 128');
+  // The demo user's choice: the accent check on option 2 only.
+  const POLL_1 = 'post/demo-post-1/block/poll:2001';
+  const marks = (optionId: number) =>
+    root.container.queryAll(n => n.props.testID === `${POLL_1}/option/${optionId}/chosen`).length;
+  expect([marks(1), marks(2), marks(3)]).toEqual([0, 1, 0]);
+  expect(text()).not.toContain(t('poll.finished'));
   expect(text()).toContain('Файлы и видео');
   // Story 6.3: the demo file's QR opens from the demo E8, nothing goes to the network.
   await press(root, 'post/demo-post-1/block/file:demo-file-1');
@@ -217,6 +228,29 @@ test('Story 3.4: Пост answers E8 in demo mode (paragraphs and likes, mixed b
   expect(fetchMock).not.toHaveBeenCalled();
   await act(async () => {
     missing.unmount();
+  });
+});
+
+test('Story 6.5: a demo post with a finished poll: «Опрос завершен», 0 % bars, «Проголосовали: 0»; one stop', async () => {
+  fetchMock.mockClear();
+  const root = await renderApp();
+  const ids = () =>
+    root.container.queryAll(n => n.props.focusable === true).map(n => n.props.testID as string);
+  await press(root, 'home/feed/demo-post-3');
+  const pollId = 'post/demo-post-3/block/poll:2003';
+  expect(ids().filter(id => id.startsWith(pollId))).toEqual([pollId]);
+  const text = JSON.stringify(root.container.toJSON());
+  expect(text).toContain(t('poll.finished'));
+  expect(text).toContain('Проголосовали: 0');
+  expect(text).toContain('0\u00A0% · 0');
+  const bar = (optionId: number) =>
+    StyleSheet.flatten(
+      root.container.queryAll(n => n.props.testID === `${pollId}/option/${optionId}/bar`)[0].props.style,
+    ).width;
+  expect([bar(1), bar(2)]).toEqual(['0%', '0%']);
+  expect(fetchMock).not.toHaveBeenCalled();
+  await act(async () => {
+    root.unmount();
   });
 });
 

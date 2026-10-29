@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { youtubeThumbnail } from '../../shared/entities/externalUrls';
 import { AudioBlock, type ResolveAudioSource } from '../player';
+import { PollWidget } from '../polls';
 import type {
   FileTargetResult,
   MediaRef,
@@ -941,6 +942,17 @@ export function PostBody({
             );
           case 'heading':
             return <Heading key={item.key} id={id} text={item.text} />;
+          case 'poll':
+            // Story 6.5: results only, one focus stop.
+            return (
+              <PollWidget
+                key={item.key}
+                id={id}
+                poll={item.poll}
+                onView={onParagraphView}
+                onFocus={onParagraphFocus}
+              />
+            );
           case 'image':
             return item.stop ? (
               <ImageStop
