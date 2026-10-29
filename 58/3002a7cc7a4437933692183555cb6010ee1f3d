@@ -1,0 +1,105 @@
+__mocks__/react-native-svg-css.js
+  s_3889105f87e0de::t_b9ae498b24c02f 1-12
+__mocks__/react-native-svg.js
+  s_3889105f87e0de::t_0d7801acd7dc89 2,29-36
+__tests__/demoFlow.test.tsx
+  s_3889105f87e0de::t_a8e71bef5a591f 186-197,200-203
+__tests__/playerFlow.test.tsx
+  s_3889105f87e0de::t_ef47cdef1ea686 35-43,2858-2931
+__tests__/postFlow.test.tsx
+  s_3889105f87e0de::t_131874fb08dc43 18,103-116,363,403-404,408,413,432,444,465,488,1759-1760,1987-2372
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_3889105f87e0de::t_386f185d3b410d 317-324
+_bmad-output/implementation-artifacts/spec-6-3-links-files-and-external-videos-via-qr.md
+  s_3889105f87e0de::t_a05d901a9efc64 1-182
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_3889105f87e0de::t_5ed035dd42db19 32,92
+docs/adr/0014-qr-rendering.md
+  s_3889105f87e0de::t_081760ff3439a6 1-37
+docs/api-contract.md
+  s_3889105f87e0de::t_2113da4a6e6d2f 485-486,488,509-534,557
+docs/feature-parity.md
+  s_3889105f87e0de::t_93055804370893 81,83-84,86-87
+docs/focus-map.md
+  s_3889105f87e0de::t_79d44ff7652332 297,299,347-357,360
+docs/testing.md
+  s_3889105f87e0de::t_6f7cab9b594ea4 896-928
+jest.config.js
+  s_3889105f87e0de::t_0b58a1a5c4f367 11-15
+metro.config.js
+  s_3889105f87e0de::t_1ee9e8adc7b40a 3-14,21-30
+package-lock.json
+  s_3889105f87e0de::t_782da15cbbb6e1 20,5563-5568,10431-10439,10569-10703,10906-10921,12215-12221
+package.json
+  s_3889105f87e0de::t_8f10d7bc4787d0 23
+src/app/dev/demo.ts
+  s_3889105f87e0de::t_c3f5644c424178 26-29,349,351-359,370-371
+src/app/routes.ts
+  s_3889105f87e0de::t_378693a6f97a99 40-41,48
+src/app/stackRoutes.tsx
+  s_3889105f87e0de::t_a0ef2987616331 312-313,315,320,344-355,368
+src/features/player/PlayerScreen.tsx
+  s_3889105f87e0de::t_67888ca35916c7 89-94,127-130,1022,1026-1031
+src/features/post/PostBody.tsx
+  s_3889105f87e0de::t_f0ab8127b2c956 1,5,12,14,16,24,30,34-35,384-813,824-831,847-850,857,859-891,893-911,914-915,918,921-922,954-958,1261-1321
+src/features/post/PostScreen.tsx
+  s_3889105f87e0de::t_2b143a3c06f5f9 24,36,43-45,49,171-176,235,265-270,521-548,636-639
+src/features/post/__tests__/linkChip.test.tsx
+  s_3889105f87e0de::t_352e65b16fc1d2 1-104
+src/features/post/usePost.ts
+  s_3889105f87e0de::t_14ffb57a3b9bd7 2,11-16,85-101
+src/shared/api/dto/post.ts
+  s_3889105f87e0de::t_a9bbeb7349ad3f 20-21,125-156
+src/shared/entities/__tests__/externalUrls.test.ts
+  s_3889105f87e0de::t_7082ced6860da4 1-166
+src/shared/entities/externalUrls.ts
+  s_3889105f87e0de::t_1c3575ccf64aa9 1-201
+src/shared/entities/post/__tests__/postBody.test.ts
+  s_3889105f87e0de::t_426e6bcf991201 24-28,138,361,403,461,473,481,484,552,559,606-811
+src/shared/entities/post/__tests__/postRepository.test.ts
+  s_3889105f87e0de::t_579985052721ab 578-649
+src/shared/entities/post/index.ts
+  s_3889105f87e0de::t_d0f8de64cb9e29 23,31
+src/shared/entities/post/mapPost.ts
+  s_3889105f87e0de::t_241637ba7be451 5,15,17,209-216
+src/shared/entities/post/postBody.ts
+  s_3889105f87e0de::t_2e3839241e7a1d 1-8,52-65,69-70,171-190,199-203,205-213,257,286-292,294-306,370-371,374,462-465,471-474,488-498,505,518-522,524-528,535,538-568,608-632
+src/shared/entities/post/postRepository.ts
+  s_3889105f87e0de::t_08f675c3a2a98a 8-13,18,345,358,399-465,473
+src/shared/entities/post/types.ts
+  s_3889105f87e0de::t_3c87c410fa6d2c 61-66,68-78
+src/shared/i18n/__tests__/format.test.ts
+  s_3889105f87e0de::t_380b38f2a289fb 1,55-71
+src/shared/i18n/format.ts
+  s_3889105f87e0de::t_dc9174c85b3548 70-96
+src/shared/i18n/ru.ts
+  s_3889105f87e0de::t_ddb0d63c6400f4 252-265,285-306
+src/shared/platform/qrRenderer.tsx
+  s_3889105f87e0de::t_46954f4029a0f9 1-41
+src/shared/ui/QrDialog.tsx
+  s_3889105f87e0de::t_5901367c94351b 1-117
+src/shared/ui/__tests__/QrDialog.test.tsx
+  s_3889105f87e0de::t_9495386e51d63f 1-75
+src/shared/ui/index.ts
+  s_3889105f87e0de::t_9ae64b24df9de8 21
+src/test/fixtures/boosty/e8-post-accessible.json
+  s_3889105f87e0de::t_5d06a71c1ba505 773-790
+src/test/postFixtures.ts
+  s_3889105f87e0de::t_6068a2dad8b0e0 29-33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "583002a7cc7a4437933692183555cb6010ee1f3d",
+  "prompts": {},
+  "sessions": {
+    "s_3889105f87e0de": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6900e7f-f881-4858-9cce-006384a7dd3e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
