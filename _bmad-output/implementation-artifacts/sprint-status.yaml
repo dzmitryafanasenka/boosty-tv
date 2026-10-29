@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 10-25-2026 14:34
-last_updated: 10-29-2026 13:11
+last_updated: 10-29-2026 14:02
 project: Boosty TV
 project_key: NOKEY
 tracking_system: file-system
@@ -248,7 +248,7 @@ action_items:
     action: "Поиск: port the next-frame outcome settle from Автор and re-run the query
       on «Сбросить фильтры»; add the cached-empty-default reset test"
     owner: "dev"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-10-29.md"
   - id: "epic-5-retro-item-20-live-e6-access-check-доступные-мне-again"
     epic: 5
@@ -256,14 +256,14 @@ action_items:
       купленные» against the purchased post; record in api-contract; owner decision
       if E6 ignores them"
     owner: "dev+owner"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-10-29.md"
   - id: "epic-5-retro-item-21-обновить-also-refreshes-the-мой-блог-til"
     epic: 5
     action: "«Обновить» also refreshes the «Мой блог» tile queries; document (or split)
       what phaseFlags.search gates"
     owner: "dev"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-10-29.md"
   - id: "epic-5-retro-item-22-before-epic-7-extract-the-shared-outcome"
     epic: 5
