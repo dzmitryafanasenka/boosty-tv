@@ -10,6 +10,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { youtubeThumbnail } from '../../shared/entities/externalUrls';
+import { AudioBlock, type ResolveAudioSource } from '../player';
 import type {
   FileTargetResult,
   MediaRef,
@@ -829,6 +830,10 @@ export type PostBodyProps = {
   onOpenPost?: OpenPost;
   /** Story 6.3 (option b): OK on a timestamp link plays this post's video from that time. */
   onPlayAt?: PlayAt;
+  /** Story 6.4: an audio block's source when playback starts (a fresh E8). */
+  resolveAudio?: ResolveAudioSource;
+  /** Story 6.4: false while Пост is not the focused route (a playing track pauses). */
+  active?: boolean;
 };
 
 /**
@@ -848,6 +853,8 @@ export function PostBody({
   resolveFile,
   onOpenPost,
   onPlayAt,
+  resolveAudio,
+  active = true,
 }: PostBodyProps) {
   return (
     <>
@@ -904,6 +911,20 @@ export function PostBody({
                 onFocus={onParagraphFocus}
                 onOpenQr={onOpenQr}
                 resolveFile={resolveFile}
+              />
+            );
+          case 'audio':
+            return (
+              <AudioBlock
+                key={item.key}
+                id={id}
+                audioKey={item.key}
+                title={item.title}
+                durationSec={item.durationSec}
+                resolveSource={resolveAudio}
+                active={active}
+                onView={onParagraphView}
+                onFocus={onParagraphFocus}
               />
             );
           case 'externalVideo':

@@ -6,6 +6,7 @@ import {
   feedSearchPageDtoSchema,
 } from '../../api/dto/feed';
 import {
+  audioUrlDtoSchema,
   blockTypeDtoSchema,
   fileUrlDtoSchema,
   okVideoTimeCodeDtoSchema,
@@ -406,28 +407,73 @@ export type FileTargetResult =
   | { kind: 'locked' }
   | { kind: 'unavailable' };
 
+/** The block types whose URL needs `Post.signedQuery` (Stories 6.3, 6.4). */
+type SignedBlockType = 'file' | 'audio_file';
+
+const URL_SCHEMAS = { file: fileUrlDtoSchema, audio_file: audioUrlDtoSchema } as const;
+
 /**
- * The raw `file` block of `fileKey` (`file:<id>` → the block with that id;
- * else `file@<index>` → the file at that index of `data[]`, only when its
- * trimmed title is the one shown: an edited post must never hand out
- * another file's signed link under this title).
+ * The raw block of `key` (`<type>:<id>` → the block of that type with that
+ * id; else `<type>@<index>` → the block of that type at that index of
+ * `data[]`, only when its trimmed title is the one shown: an edited post
+ * must never hand out another block's signed link under this title).
  */
-function rawFileBlock(rawData: readonly unknown[], fileKey: string, title: string) {
-  const byId = /^file:(.+)$/.exec(fileKey);
-  if (byId) {
+function rawSignedBlock(
+  rawData: readonly unknown[],
+  type: SignedBlockType,
+  key: string,
+  title: string,
+): { url?: string | null } | null {
+  const schema = URL_SCHEMAS[type];
+  const prefix = `${type}:`;
+  if (key.startsWith(prefix) && key.length > prefix.length) {
+    const id = key.slice(prefix.length);
     for (const raw of rawData) {
-      const block = fileUrlDtoSchema.safeParse(raw);
-      if (block.success && block.data.id === byId[1]) {
+      const block = schema.safeParse(raw);
+      if (block.success && block.data.id === id) {
         return block.data;
       }
     }
   }
-  const byIndex = /^file@(\d+)$/.exec(fileKey);
+  const byIndex = new RegExp(`^${type}@(\\d+)$`).exec(key);
   if (byIndex) {
-    const block = fileUrlDtoSchema.safeParse(rawData[Number(byIndex[1])]);
+    const block = schema.safeParse(rawData[Number(byIndex[1])]);
     return block.success && (block.data.title ?? '').trim() === title ? block.data : null;
   }
   return null;
+}
+
+/**
+ * A fresh E8, then the raw block of `key` joined with the post's
+ * `signedQuery` (Stories 6.3, 6.4). `locked` when the post says
+ * `hasAccess=false`; `unavailable` for E8 404, a block no longer in the
+ * post, one without a usable `https:` URL (the signed query must never go
+ * over cleartext), or an empty `signedQuery` (the bare URL answers 403,
+ * live). Nothing here logs the URL or the query.
+ */
+async function signedBlockUrl(
+  http: HttpClient,
+  blogUrl: string,
+  postId: string,
+  type: SignedBlockType,
+  key: string,
+  title: string,
+  logger: Logger,
+): Promise<{ kind: 'ok'; url: string } | { kind: 'locked' } | { kind: 'unavailable' }> {
+  const fetched = await fetchPost(http, blogUrl, postId, logger);
+  if (fetched === null) {
+    return { kind: 'unavailable' };
+  }
+  if (!fetched.post.hasAccess) {
+    return { kind: 'locked' };
+  }
+  const block = rawSignedBlock(fetched.rawData, type, key, title.trim());
+  const parsed = signedQueryDtoSchema.safeParse(fetched.raw);
+  const query = parsed.success ? (parsed.data.signedQuery ?? '').trim().replace(/^[?&]+/, '') : '';
+  // Live: the bare URL answers 403, so no query is no URL.
+  const url = block === null || query.length === 0 ? null : joinFileTarget(block.url, query);
+  // The query carries the account's user id and a signature: never over cleartext http.
+  return url === null || !url.startsWith('https:') ? { kind: 'unavailable' } : { kind: 'ok', url };
 }
 
 /**
@@ -448,19 +494,40 @@ async function fileTarget(
   fileKey: string,
   { logger = appLogger, title = '' }: { logger?: Logger; title?: string } = {},
 ): Promise<FileTargetResult> {
-  const fetched = await fetchPost(http, blogUrl, postId, logger);
-  if (fetched === null) {
-    return { kind: 'unavailable' };
-  }
-  if (!fetched.post.hasAccess) {
-    return { kind: 'locked' };
-  }
-  const block = rawFileBlock(fetched.rawData, fileKey, title.trim());
-  const parsed = signedQueryDtoSchema.safeParse(fetched.raw);
-  const query = parsed.success ? (parsed.data.signedQuery ?? '').trim().replace(/^[?&]+/, '') : '';
-  // Live: the bare file URL answers 403, so no query is no target.
-  const target = block === null || query.length === 0 ? null : joinFileTarget(block.url, query);
-  return target === null ? { kind: 'unavailable' } : { kind: 'ok', target };
+  const result = await signedBlockUrl(http, blogUrl, postId, 'file', fileKey, title, logger);
+  return result.kind === 'ok' ? { kind: 'ok', target: result.url } : result;
+}
+
+/**
+ * An audio block's source (Story 6.4): `ok` with the playable URI, `locked`
+ * when the fresh E8 says `hasAccess=false`, `unavailable` for E8 404, an
+ * audio no longer in the post, one without a usable URL, or an empty
+ * `signedQuery` (never a bare URL: it answers 403, live).
+ */
+export type AudioSourceResult =
+  | { kind: 'ok'; uri: string }
+  | { kind: 'locked' }
+  | { kind: 'unavailable' };
+
+/**
+ * AudioBlock-only (Story 6.4, api-contract §4.1 «Audio blocks (LIVE)»): a
+ * fresh E8 (content profile, the same request and mapper as `post()`), then
+ * the audio's raw `url` + the post's `signedQuery` (live: 403 bare, 200
+ * `audio/mpeg` signed). Found by its block key: `audio_file:<id>`, else
+ * `audio_file@<n>` with the shown `title` (as `fileTarget`). The URI is a
+ * personal signed link: the caller keeps it in memory for the engine only;
+ * it never enters the Post entity, a query cache, storage or a log. Rejects
+ * with the E8 `AppError` (404 → `unavailable`).
+ */
+async function audioSource(
+  http: HttpClient,
+  blogUrl: string,
+  postId: string,
+  audioKey: string,
+  { logger = appLogger, title = '' }: { logger?: Logger; title?: string } = {},
+): Promise<AudioSourceResult> {
+  const result = await signedBlockUrl(http, blogUrl, postId, 'audio_file', audioKey, title, logger);
+  return result.kind === 'ok' ? { kind: 'ok', uri: result.url } : result;
 }
 
 export const PostRepository = {
@@ -471,4 +538,5 @@ export const PostRepository = {
   post: onePost,
   videoSources,
   fileTarget,
+  audioSource,
 } as const;

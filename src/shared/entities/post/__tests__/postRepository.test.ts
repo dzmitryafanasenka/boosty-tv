@@ -647,3 +647,107 @@ describe('PostRepository.fileTarget (Story 6.3)', () => {
     expect(JSON.stringify(logger.entries())).not.toMatch(/REDACTED|example\.invalid\/file/);
   });
 });
+
+describe('PostRepository.audioSource (Story 6.4)', () => {
+  const SQ = '?sig=REDACTED';
+  const withAudio = (data: unknown[], extra: Record<string, unknown> = {}) => ({
+    ...e8Accessible(),
+    data,
+    signedQuery: SQ,
+    ...extra,
+  });
+  const audio = (id: string | undefined, url: string, title = 'a') => ({
+    type: 'audio_file',
+    ...(id ? { id } : {}),
+    title,
+    duration: 180,
+    url,
+  });
+
+  it('a fresh E8 (content profile), then the audio by id: url + signedQuery', async () => {
+    const { http, transport } = client(() => ({
+      status: 200,
+      body: withAudio([audio('a0', 'https://example.invalid/zero'), audio('a1', 'https://example.invalid/audio')]),
+    }));
+    const result = await PostRepository.audioSource(http, 'synthetic-blog-1', 'synthetic-id-4', 'audio_file:a1');
+    expect(result).toEqual({ kind: 'ok', uri: 'https://example.invalid/audio?sig=REDACTED' });
+    expect(transport.calls).toHaveLength(1);
+    expect(transport.calls[0].url).toBe(
+      'https://api.boosty.to/v1/blog/synthetic-blog-1/post/synthetic-id-4?comments_limit=0&reply_limit=0',
+    );
+  });
+
+  it('the live fixture\'s synthetic audio block resolves by id', async () => {
+    const { http } = client(() => ({ status: 200, body: e8Accessible() }));
+    expect(await PostRepository.audioSource(http, 'b', 'p', 'audio_file:synthetic-id-14')).toEqual({
+      kind: 'ok',
+      uri: 'https://example.invalid/audio?sig=REDACTED',
+    });
+  });
+
+  it('an audio without an id is found by its index with the shown title; a wrong key, type, a missing or unsafe URL → unavailable', async () => {
+    const body = withAudio([
+      { type: 'file', id: 'f1', title: 'a', url: 'https://example.invalid/file' },
+      audio(undefined, 'https://example.invalid/audio'),
+      audio('bad', 'javascript:x'),
+      { type: 'audio_file', id: 'nourl', title: 'a' },
+    ]);
+    const { http } = client(() => ({ status: 200, body }));
+    expect(await PostRepository.audioSource(http, 'b', 'p', 'audio_file@1', { title: 'a' })).toEqual({
+      kind: 'ok',
+      uri: 'https://example.invalid/audio?sig=REDACTED',
+    });
+    // A file at that index or with that id is never an audio source.
+    expect(await PostRepository.audioSource(http, 'b', 'p', 'audio_file@0', { title: 'a' })).toEqual({ kind: 'unavailable' });
+    expect(await PostRepository.audioSource(http, 'b', 'p', 'audio_file:f1')).toEqual({ kind: 'unavailable' });
+    expect(await PostRepository.audioSource(http, 'b', 'p', 'file:f1')).toEqual({ kind: 'unavailable' });
+    expect(await PostRepository.audioSource(http, 'b', 'p', 'audio_file:gone')).toEqual({ kind: 'unavailable' });
+    expect(await PostRepository.audioSource(http, 'b', 'p', 'audio_file:bad')).toEqual({ kind: 'unavailable' });
+    expect(await PostRepository.audioSource(http, 'b', 'p', 'audio_file:nourl')).toEqual({ kind: 'unavailable' });
+  });
+
+  it('an id-less audio whose title changed at that index (an edited post) → unavailable', async () => {
+    const body = withAudio([{ type: 'text', content: '' }, audio(undefined, 'https://example.invalid/other', 'other')]);
+    const { http } = client(() => ({ status: 200, body }));
+    expect(await PostRepository.audioSource(http, 'b', 'p', 'audio_file@1', { title: 'mine' })).toEqual({ kind: 'unavailable' });
+    expect(await PostRepository.audioSource(http, 'b', 'p', 'audio_file@1', { title: ' other ' })).toEqual({
+      kind: 'ok',
+      uri: 'https://example.invalid/other?sig=REDACTED',
+    });
+  });
+
+  it('an empty or missing signedQuery → unavailable, never the bare URL (403, live)', async () => {
+    for (const extra of [{ signedQuery: '' }, { signedQuery: '?' }, { signedQuery: null }, { signedQuery: undefined }]) {
+      const { http } = client(() => ({ status: 200, body: withAudio([audio('a1', 'https://example.invalid/audio')], extra) }));
+      expect(await PostRepository.audioSource(http, 'b', 'p', 'audio_file:a1')).toEqual({ kind: 'unavailable' });
+    }
+  });
+
+  it('locked → locked; 404 → unavailable; other failures reject with their kind', async () => {
+    expect(
+      await PostRepository.audioSource(client(() => ({ status: 200, body: e8Locked() })).http, 'b', 'p', 'audio_file:a1'),
+    ).toEqual({ kind: 'locked' });
+    expect(await PostRepository.audioSource(client(() => e8MissingReply()).http, 'b', 'p', 'audio_file:a1')).toEqual({
+      kind: 'unavailable',
+    });
+    const failing = client(() => ({ status: 400, body: { error: 'bad_request' } }));
+    await expect(PostRepository.audioSource(failing.http, 'b', 'p', 'audio_file:a1')).rejects.toEqual(new AppError('Client'));
+  });
+
+  it('a signed target over cleartext http (audio or file) → unavailable: the signedQuery never goes over http', async () => {
+    const body = withAudio([
+      audio('a1', 'http://example.invalid/audio'),
+      { type: 'file', id: 'f1', title: 'f', url: 'http://example.invalid/file' },
+    ]);
+    const { http } = client(() => ({ status: 200, body }));
+    expect(await PostRepository.audioSource(http, 'b', 'p', 'audio_file:a1')).toEqual({ kind: 'unavailable' });
+    expect(await PostRepository.fileTarget(http, 'b', 'p', 'file:f1')).toEqual({ kind: 'unavailable' });
+  });
+
+  it('logs nothing of the source', async () => {
+    const logger = createLogger();
+    const { http } = client(() => ({ status: 200, body: withAudio([audio('a1', 'https://example.invalid/audio')]) }));
+    await PostRepository.audioSource(http, 'b', 'p', 'audio_file:a1', { logger });
+    expect(JSON.stringify(logger.entries())).not.toMatch(/REDACTED|example\.invalid\/audio/);
+  });
+});

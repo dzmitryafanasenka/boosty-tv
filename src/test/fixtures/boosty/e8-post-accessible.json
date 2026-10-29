@@ -788,6 +788,24 @@
       {
         "type": "video",
         "url": "https://example.invalid/video"
+      },
+      {
+        "album": "redacted",
+        "artist": "redacted",
+        "complete": true,
+        "duration": 180,
+        "fileType": "redacted",
+        "id": "synthetic-id-14",
+        "isInvalid": null,
+        "showViewsCounter": false,
+        "size": 3072000,
+        "timeCode": 0,
+        "title": "redacted",
+        "track": "redacted",
+        "type": "audio_file",
+        "uploadStatus": null,
+        "url": "https://example.invalid/audio",
+        "viewsCounter": 0
       }
     ],
     "contentCounters": [

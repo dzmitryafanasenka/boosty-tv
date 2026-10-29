@@ -22,10 +22,11 @@ const plain = (items: readonly PostBodyItem[]) =>
   items.map(i => (i.kind === 'paragraph' ? { kind: i.kind, key: i.key, text: i.text } : i));
 const body = (data: unknown[]) => plain(bodyItems(data));
 /**
- * The live accessible E8's blocks without the three synthetic blocks Story
- * 6.3 appended (`header`, `file`, `video`; tested in «Story 6.3» below).
+ * The live accessible E8's blocks without the synthetic blocks Stories
+ * 6.3–6.4 appended (`header`, `file`, `video`, `audio_file`; tested in
+ * «Story 6.3» below).
  */
-const liveBlocks = () => mapped(e8Accessible()).blocks.slice(0, -3);
+const liveBlocks = () => mapped(e8Accessible()).blocks.slice(0, -4);
 
 describe('postBodyItems (Story 3.4)', () => {
   it('merges text fragments until BLOCK_END into one paragraph; blank paragraphs are dropped', () => {
@@ -797,15 +798,74 @@ describe('postBodyItems: links, files, external videos and headings (Story 6.3)'
     ]);
   });
 
-  it('the live accessible E8 with its synthetic Story 6.3 blocks: links chipped (deduped per paragraph), heading, file and video', () => {
+  it('the live accessible E8 with its synthetic Story 6.3–6.4 blocks: links chipped (deduped per paragraph), heading, file, video and audio', () => {
     const items = postBodyItems(mapped(e8Accessible()).blocks, { videoRows: true, images: 'stops', qr: true });
     const chips = items.flatMap(i => (i.kind === 'paragraph' ? i.links : []));
     expect(chips.length).toBeGreaterThan(5);
     expect(new Set(chips.map(c => c.key)).size).toBe(chips.length);
-    expect(items.slice(-3)).toEqual([
+    expect(items.slice(-4)).toEqual([
       { kind: 'heading', key: 'header@113', text: 'Sample text' },
       { kind: 'file', key: 'file:synthetic-id-13', title: 'redacted', sizeBytes: 204800 },
       { kind: 'externalVideo', key: 'video@115', url: 'https://example.invalid/video', youtubeId: null },
+      { kind: 'audio', key: 'audio_file:synthetic-id-14', title: 'redacted', durationSec: 180 },
     ]);
+  });
+});
+
+describe('postBodyItems: audio (Story 6.4)', () => {
+  const qrItems = (data: unknown[], qr = true) =>
+    postBodyItems(mapped(postDetail('b', 'p', data as never)).blocks, { videoRows: true, images: 'stops', qr });
+
+  it('an accessible post\'s audio is an AudioBlock item (a focus stop) with its title and whole-second duration, between paragraphs', () => {
+    const items = qrItems([
+      ...paragraph('Before'),
+      { type: 'audio_file', id: 'a1', title: ' Track ', duration: 192.7, url: 'https://example.invalid/audio' },
+      ...paragraph('After'),
+    ]);
+    expect(plain(items)).toEqual([
+      { kind: 'paragraph', key: 'text@0', text: 'Before' },
+      { kind: 'audio', key: 'audio_file:a1', title: 'Track', durationSec: 192 },
+      { kind: 'paragraph', key: 'text@3', text: 'After' },
+    ]);
+    expect(items.map(isFocusStop)).toEqual([true, true, true]);
+  });
+
+  it('no id → keyed by index; no, zero, negative or malformed duration → null; no title → empty', () => {
+    expect(
+      qrItems([
+        { type: 'audio_file' },
+        { type: 'audio_file', id: 'z', duration: 0 },
+        { type: 'audio_file', id: 'n', duration: -5 },
+        { type: 'audio_file', id: 'm', duration: 'long', title: 5 },
+      ]),
+    ).toEqual([
+      { kind: 'audio', key: 'audio_file@0', title: '', durationSec: null },
+      { kind: 'audio', key: 'audio_file:z', title: '', durationSec: null },
+      { kind: 'audio', key: 'audio_file:n', title: '', durationSec: null },
+      { kind: 'audio', key: 'audio_file:m', title: '', durationSec: null },
+    ]);
+  });
+
+  it('a repeated id falls back to its index (keys stay unique)', () => {
+    expect(qrItems([{ type: 'audio_file', id: 'a' }, { type: 'audio_file', id: 'a' }]).map(i => i.key)).toEqual([
+      'audio_file:a',
+      'audio_file@1',
+    ]);
+  });
+
+  it('with `audio: false` (the player capability off) audio stays the neutral placeholder', () => {
+    expect(
+      postBodyItems(mapped(postDetail('b', 'p', [{ type: 'audio_file', id: 'a1' }] as never)).blocks, {
+        qr: true,
+        audio: false,
+      }),
+    ).toEqual([{ kind: 'placeholder', key: 'audio_file:a1', block: 'audio' }]);
+  });
+
+  it('without `qr` (a locked post\'s teaser) audio stays the neutral placeholder', () => {
+    expect(qrItems([{ type: 'audio_file', id: 'a1', title: 'T', duration: 60 }], false)).toEqual([
+      { kind: 'placeholder', key: 'audio_file:a1', block: 'audio' },
+    ]);
+    expect(isFocusStop({ kind: 'placeholder', key: 'audio_file:a1', block: 'audio' })).toBe(false);
   });
 });

@@ -30,6 +30,8 @@ import { progressStore } from '../src/shared/services/progress';
 import { colors, spacing } from '../src/shared/ui';
 import { requestHostFocus } from '../src/shared/ui/requestHostFocus';
 import backHandler from '../src/test/backHandlerMock';
+import { engine } from '../src/test/playerEngineMock';
+import { playbackArbiter } from '../src/shared/platform/playbackArbiter';
 import { e3Body, syntheticBlogPosts } from '../src/test/authorFixtures';
 import { E5_PATH, syntheticFeed } from '../src/test/feedFixtures';
 import e1Unauthorized from '../src/test/fixtures/boosty/e1-no-token.json';
@@ -81,6 +83,8 @@ jest.mock('react-native/Libraries/Utilities/BackHandler', () =>
 jest.mock('react-native/Libraries/Components/TV/TVFocusGuideView', () =>
   require('../src/test/flow').recordingFocusGuideModule(),
 );
+/** Story 6.4: the AudioBlock's (and the Player's) engine (`src/test/playerEngineMock`). */
+jest.mock('../src/shared/platform/PlayerEngineView', () => require('../src/test/playerEngineMock'));
 
 /** The real FlashList behind the recorder `lists` (`src/test/flow`; `onEndReached` held back). */
 jest.mock('@shopify/flash-list', () => require('../src/test/flow').recordingFlashListModule());
@@ -360,7 +364,7 @@ describe('open from Главная (matrix «Text post», «Likes»)', () => {
 });
 
 describe('blocks (matrix «Mixed blocks», «Malformed block»)', () => {
-  it('image, audio, poll, unknown: one non-focusable placeholder each, in order; text (and a standalone link\'s text, with its chip) and a file chip (Story 6.3) between them; the video is a MediaRow on top', async () => {
+  it('image, audio (the player off, Story 6.4), poll, unknown: one non-focusable placeholder each, in order; text (and a standalone link\'s text, with its chip) and a file chip (Story 6.3) between them; the video is a MediaRow on top', async () => {
     e8 = (_req, blogUrl, postId) => ({
       status: 200,
       body: postDetail(blogUrl, postId, [
@@ -410,7 +414,7 @@ describe('blocks (matrix «Mixed blocks», «Malformed block»)', () => {
     const order = byTestId(root, 'post/body')[0]
       .queryAll(n => typeof n.props.testID === 'string' && n.props.testID.startsWith(`post/${id}/block/`) && !n.props.testID.endsWith('/scale'))
       .map(n => n.props.testID as string);
-    expect([...new Set(order)].filter(o => !/\/(links|busy|guide)$|\/link\/0$/.test(o))).toEqual([
+    expect([...new Set(order)].filter(o => !/\/(links|busy|guide|play|time|bar)$|\/link\/0$/.test(o))).toEqual([
       BLOCK(id, 'text@1'),
       BLOCK(id, 'image:i1'),
       BLOCK(id, 'link@4'),
@@ -1756,8 +1760,8 @@ describe('locked posts (Story 3.6, focus-map §4 F)', () => {
     it('a placeholder-only post: scrolls when it overflows, not when it fits', async () => {
       e8 = (_req, blogUrl, postId) => ({
         status: 200,
-        // Placeholders only (a file is a chip stop since Story 6.3).
-        body: postDetail(blogUrl, postId, [{ type: 'audio_file', id: 'a1' }, { type: 'poll', id: 1 }]),
+        // Placeholders only (a file is a chip stop since Story 6.3, audio an AudioBlock since 6.4).
+        body: postDetail(blogUrl, postId, [{ type: 'brand_new_block' }, { type: 'poll', id: 1 }]),
       });
       const root = await openFromHome();
       await layoutColumn(root, VIEWPORT);
@@ -2367,6 +2371,170 @@ describe('Story 6.3: links, files and external videos via QR', () => {
     const id = FEED_ID(0);
     expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, 'text@0')]);
     expect(visible(root, BLOCK(id, 'text@0/link/0'))).toBe(false);
+    await unmount(root);
+  });
+});
+
+describe('Story 6.4: inline audio', () => {
+  const SECRET = 'SECRETSIGNATURE';
+  const SIGNED = `?user_id=1001&content_id=1002&expire_time=1700003600&sign=${SECRET}`;
+  const AUDIO_URL = 'https://example.invalid/audio/track';
+  const AUDIO = { type: 'audio_file', id: 'a1', title: 'Метроном', duration: 192, url: AUDIO_URL };
+  const allLogs = () =>
+    JSON.stringify([
+      logger.entries(),
+      (console.log as jest.Mock).mock.calls,
+      (console.warn as jest.Mock).mock.calls,
+      (console.error as jest.Mock).mock.calls,
+    ]);
+  const cacheText = () => JSON.stringify(queryClient.getQueryCache().getAll().map(q => q.state.data ?? null));
+  const withAudio = (data: unknown[] = [...paragraph('До'), AUDIO, ...paragraph('После')], extra = {}) => {
+    e8 = (_req, blogUrl, postId) => ({
+      status: 200,
+      body: postDetail(blogUrl, postId, data, { signedQuery: SIGNED, ...extra }),
+    });
+  };
+
+  beforeEach(() => {
+    engine.reset();
+    // The AudioBlock plays through the PlayerEngine: the player capability (AD-20).
+    mockPlayerFlag.on = true;
+  });
+  afterEach(() => {
+    mockPlayerFlag.on = false;
+  });
+
+  it('the player capability off: audio stays the neutral placeholder (no AudioBlock, no E8 on OK)', async () => {
+    mockPlayerFlag.on = false;
+    withAudio();
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    const [node] = byTestId(root, BLOCK(id, 'audio_file:a1'));
+    expect(node.props.focusable).toBe(false);
+    expect(node.props.accessibilityLabel).toBe('Аудио');
+    expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, 'text@0'), BLOCK(id, 'text@3')]);
+    await unmount(root);
+  });
+
+  it('route blur: audio plays → OK on a Boosty post link chip (Пост pushed) → the first post\'s engine pauses; Back → still paused', async () => {
+    const LINKED = 'linked-post';
+    e8 = (_req, blogUrl, postId) => ({
+      status: 200,
+      body: postDetail(
+        blogUrl,
+        postId,
+        postId === LINKED
+          ? paragraph('Связанный пост')
+          : [
+              textBlock('См. '),
+              { type: 'link', content: JSON.stringify(['другой пост', 'unstyled', []]), url: `https://boosty.to/${FEED_BLOG}/posts/${LINKED}` },
+              blockEnd(),
+              AUDIO,
+            ],
+        { signedQuery: SIGNED },
+      ),
+    });
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    const audio = BLOCK(id, 'audio_file:a1');
+    await press(root, audio);
+    expect(engine.props?.paused).toBe(false);
+    await press(root, BLOCK(id, 'text@0/link/0'));
+    expect(routeNames()).toEqual(['Shell', 'Post', 'Post']);
+    expect(engine.props?.paused).toBe(true);
+    expect(engine.unmounts).toBe(0);
+    await back();
+    expect(routeNames()).toEqual(['Shell', 'Post']);
+    expect(engine.props?.paused).toBe(true);
+    expect(visible(root, `${audio}/play`)).toBe(true);
+    await unmount(root);
+  });
+
+  it('matrix «Render», «Play», «Leave»: one focus stop between the paragraphs; OK → one fresh E8 → the hidden engine plays url + signedQuery (never in text, logs or the cache); Back → the engine stops, the slot is free, nothing persisted', async () => {
+    withAudio();
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    const audio = BLOCK(id, 'audio_file:a1');
+    expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, 'text@0'), audio, BLOCK(id, 'text@3')]);
+    expect(one(root, audio).props.accessibilityLabel).toBe('Аудио. Метроном. 0:00 / 3:12. Воспроизвести');
+    // Initial focus is unchanged: the first paragraph.
+    expect(lastFocusTarget()).toBe(BLOCK(id, 'text@0'));
+    expect(e8Calls()).toHaveLength(1);
+    expect(engine.mounts).toBe(0);
+    await press(root, audio);
+    expect(e8Calls()).toHaveLength(2);
+    expect(engine.props?.source).toEqual({ uri: `${AUDIO_URL}${SIGNED}`, format: 'progressive' });
+    expect(engine.props?.paused).toBe(false);
+    expect(visible(root, `${audio}/pause`)).toBe(true);
+    expect(text(root)).not.toContain(SECRET);
+    expect(allLogs()).not.toContain(SECRET);
+    expect(allLogs()).not.toContain(AUDIO_URL);
+    expect(cacheText()).not.toContain(SECRET);
+    expect(cacheText()).not.toContain(AUDIO_URL);
+    expect(playbackArbiter.current()).not.toBeNull();
+    // OK pauses (no new E8), OK plays again.
+    await press(root, audio);
+    expect(engine.props?.paused).toBe(true);
+    await press(root, audio);
+    expect(engine.props?.paused).toBe(false);
+    expect(e8Calls()).toHaveLength(2);
+    // Leave the post: the AudioBlock unmounts, the engine with it.
+    await back();
+    await settle(WITH_TIMERS);
+    expect(currentRoute()).not.toBe('Post');
+    expect(visible(root, 'post/page')).toBe(false);
+    expect(engine.unmounts).toBe(1);
+    expect(playbackArbiter.current()).toBeNull();
+    expect(cacheText()).not.toContain(SECRET);
+    await unmount(root);
+  });
+
+  it('matrix «Play» error: an empty signedQuery on the fresh E8 → «Не удалось воспроизвести», no bare URL played; OK retries', async () => {
+    withAudio(undefined, { signedQuery: '' });
+    const root = await openFromHome();
+    const audio = BLOCK(FEED_ID(0), 'audio_file:a1');
+    await press(root, audio);
+    expect(engine.mounts).toBe(0);
+    expect(text(byTestId(root, `${audio}/error`)[0])).toContain('Не удалось воспроизвести');
+    withAudio();
+    await press(root, audio);
+    expect(engine.props?.source.uri).toBe(`${AUDIO_URL}${SIGNED}`);
+    expect(visible(root, `${audio}/error`)).toBe(false);
+    await unmount(root);
+  });
+
+  it('«Смотреть» opens the Player: the playing audio pauses at once (route blur or the arbiter; this flow cannot tell them apart, the arbiter path is unit-tested in AudioBlock.test.tsx) and does not resume on return', async () => {
+    withAudio([{ type: 'ok_video', id: 'v1', title: 'Видео', playerUrls: [{ type: 'hd', url: '' }] }, AUDIO]);
+    mockPlayerFlag.on = true;
+    try {
+      const root = await openFromHome();
+      const id = FEED_ID(0);
+      const audio = BLOCK(id, 'audio_file:a1');
+      await press(root, audio);
+      expect(visible(root, `${audio}/pause`)).toBe(true);
+      await press(root, `post/${id}/primary`);
+      expect(currentRoute()).toBe('Player');
+      expect(visible(root, `${audio}/pause`)).toBe(false);
+      expect(visible(root, `${audio}/play`)).toBe(true);
+      await back();
+      expect(currentRoute()).toBe('Post');
+      expect(visible(root, `${audio}/play`)).toBe(true);
+      await unmount(root);
+    } finally {
+      mockPlayerFlag.on = false;
+    }
+  });
+
+  it('a locked post\'s teaser keeps audio as the neutral placeholder (no AudioBlock)', async () => {
+    e8 = (_req, blogUrl, postId) => ({
+      status: 200,
+      body: postDetail(blogUrl, postId, [], { hasAccess: false, signedQuery: '', teaser: [AUDIO] }),
+    });
+    const root = await openFromHome();
+    const audio = BLOCK(FEED_ID(0), 'audio_file:a1');
+    const [node] = byTestId(root, audio);
+    expect(node.props.focusable).toBe(false);
+    expect(node.props.accessibilityLabel).toBe('Аудио');
     await unmount(root);
   });
 });

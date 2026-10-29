@@ -19,6 +19,7 @@ export {
   feedSearchPath,
   mergePosts,
   postPath,
+  type AudioSourceResult,
   type E8Options,
   type FileTargetResult,
 } from './postRepository';
