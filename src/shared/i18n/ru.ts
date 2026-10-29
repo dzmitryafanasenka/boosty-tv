@@ -379,6 +379,22 @@ export const ru = {
     retry: 'Повторить',
     back: 'Назад',
   },
+  // DESIGN.md AudioBlock (Story 6.4): an inline track in a post. `{time}` is
+  // «position / duration» (`durationUnknown` until the duration is known);
+  // `{action}` is what OK does now (`play`, `pause`) or `loading`.
+  audio: {
+    untitled: 'Аудио',
+    durationUnknown: '–:––',
+    play: 'Воспроизвести',
+    pause: 'Пауза',
+    loading: 'Загружаем',
+    error: 'Не удалось воспроизвести',
+    // The fresh E8 said the post is locked now (as the 6.3 file chip).
+    locked: 'Нет доступа к аудио',
+    a11y: 'Аудио. {title}. {time}. {action}',
+    a11yFailed: 'Аудио. {title}. {time}. {error}. Повторить',
+    a11yLocked: 'Аудио. {title}. {time}. {error}',
+  },
   // DESIGN.md PostCard (Story 3.1). `{n}` is the video count. The card's
   // accessibility label reads «Видео. {title}. {author}, {date}.».
   postCard: {

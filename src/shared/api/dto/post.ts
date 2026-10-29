@@ -18,7 +18,8 @@ import { blogUrlSchema } from './subscriptions';
  * - Of `count`, only `likes` is read (Story 3.4, the read-only like count);
  *   a missing or invalid value is no like line.
  * - Never parsed into the post: `signedQuery` (Story 6.3 reads it beside
- *   the mapper for a file's QR only, `signedQueryDtoSchema`), `playerUrls`, `timeCode`,
+ *   the mapper for a file's QR, Story 6.4 for an audio source,
+ *   `signedQueryDtoSchema`), `playerUrls`, `timeCode`,
  *   `comments`, `count.comments`, reactions, prices. They are not part of
  *   the domain (AD-9; comments are excluded). `playerUrls` (Story 4.1) and
  *   `timeCode` (Story 4.2) have their own schemas below, read beside the
@@ -136,7 +137,21 @@ export const fileUrlDtoSchema = z.object({
   url: optionalString,
 });
 
-/** File-QR-only (Story 6.3): the post's `signedQuery`, read beside the mapper. */
+/**
+ * AudioBlock-only (Story 6.4): an `audio_file` block's `url` (api-contract
+ * §4.1 «Audio blocks (LIVE)»: a `boosty.to` URL that answers 403 bare and
+ * 200 `audio/mpeg` with `signedQuery`). Parsed only by
+ * `PostRepository.audioSource` from a fresh E8 when playback starts; never
+ * part of the Post entity, a query cache, a route, storage or a log.
+ */
+export const audioUrlDtoSchema = z.object({
+  type: z.literal('audio_file'),
+  id: optionalString,
+  title: optionalString,
+  url: optionalString,
+});
+
+/** File-QR and audio only (Stories 6.3, 6.4): the post's `signedQuery`, read beside the mapper. */
 export const signedQueryDtoSchema = z.object({ signedQuery: optionalString });
 
 /** `video` (`LIVE`, Story 6.3: keys `type`, `url`): an external video page. */

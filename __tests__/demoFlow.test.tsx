@@ -184,7 +184,8 @@ test('Story 3.4: Пост answers E8 in demo mode (paragraphs and likes, mixed b
   const text = () => JSON.stringify(root.container.toJSON());
   await press(root, 'home/feed/demo-post-1');
   // demo-post-1: 4 paragraphs, then the mixed placeholders, one more
-  // paragraph with its LinkChip, a file and an external video (Story 6.3).
+  // paragraph with its LinkChip, a file and an external video (Story 6.3),
+  // an AudioBlock (Story 6.4).
   expect(ids().filter(id => id.startsWith('post/demo-post-1/block/'))).toEqual([
     'post/demo-post-1/block/text@1',
     'post/demo-post-1/block/text@3',
@@ -194,7 +195,11 @@ test('Story 3.4: Пост answers E8 in demo mode (paragraphs and likes, mixed b
     'post/demo-post-1/block/text@10/link/0',
     'post/demo-post-1/block/file:demo-file-1',
     'post/demo-post-1/block/video@16',
+    // Story 6.4: the demo AudioBlock (its synthetic source never plays).
+    'post/demo-post-1/block/audio_file:demo-audio-1',
   ]);
+  expect(text()).toContain('Демо-аудио');
+  expect(text()).toContain('0:00 / 3:12');
   expect(text()).toContain('лайк');
   expect(text()).toContain(t('post.block.poll'));
   expect(text()).toContain('Файлы и видео');

@@ -10,6 +10,7 @@ import {
 } from '../../shared/api';
 import {
   PostRepository,
+  type AudioSourceResult,
   type FileTargetResult,
   type Post,
   type ServerProgressSink,
@@ -96,6 +97,23 @@ export function useFileTarget(
 ): (fileKey: string, title: string) => Promise<FileTargetResult> {
   return useCallback(
     (fileKey: string, title: string) => PostRepository.fileTarget(http, blogUrl, postId, fileKey, { title }),
+    [http, blogUrl, postId],
+  );
+}
+
+/**
+ * Story 6.4: resolves an audio block's source when playback starts (a fresh
+ * E8 through `PostRepository.audioSource`, by the block key). Not a query:
+ * the signed URI lives only in the AudioBlock's memory and the engine's
+ * props, never in a query cache. Rejects with the E8 `AppError`.
+ */
+export function useAudioSource(
+  http: HttpClient,
+  blogUrl: string,
+  postId: string,
+): (audioKey: string, title: string) => Promise<AudioSourceResult> {
+  return useCallback(
+    (audioKey: string, title: string) => PostRepository.audioSource(http, blogUrl, postId, audioKey, { title }),
     [http, blogUrl, postId],
   );
 }

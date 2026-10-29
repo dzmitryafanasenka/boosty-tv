@@ -26,7 +26,8 @@ import type { ReadResult, SecureStore } from '../../shared/platform/secureStore'
  * one also with image, audio, poll and unknown blocks, an inline link (a
  * LinkChip), a heading, a file and an external video (Story 6.3: QR chips;
  * their URLs are `example.invalid` placeholders, only drawn as a QR, and the
- * demo `signedQuery` is a fake);
+ * demo `signedQuery` is a fake; Story 6.4: an AudioBlock whose source is an
+ * `example.invalid` URL, so playback ends in its error state);
  * `demo-post-9` answers 404 `not_found`; locked posts (every seventh) have a
  * teaser image without a URL, and `demo-post-6`/`-20` a level name while
  * `demo-post-13`/`-27` have none, Story 3.6), E9 progress writes 200 (Story
@@ -357,7 +358,16 @@ function demoPostDetail(blogUrl: string, postId: string) {
             url: 'https://example.invalid/demo-file',
           },
           { type: 'video', url: 'https://example.invalid/demo-video' },
-          { type: 'audio_file', id: `demo-audio-${n}`, title: 'Аудио' },
+          {
+            type: 'audio_file',
+            id: `demo-audio-${n}`,
+            title: 'Демо-аудио',
+            duration: 192,
+            // Story 6.4: a synthetic host; the AudioBlock resolves it through
+            // the demo E8, the engine cannot load it (one re-resolve, then
+            // «Не удалось воспроизвести»).
+            url: 'https://example.invalid/demo-audio.mp3',
+          },
           { type: 'poll', id: 1000 + n },
           { type: 'demo_unknown_block' },
         ]
@@ -367,7 +377,8 @@ function demoPostDetail(blogUrl: string, postId: string) {
     data: base.hasAccess ? [...videos, ...DEMO_PARAGRAPHS.flatMap(textBlock), ...mixed] : [],
     teaser: base.hasAccess ? [] : [{ type: 'image', id: `demo-teaser-${n}`, width: 1280, height: 720 }],
     count: { likes: (n * 7) % 40, comments: 0 },
-    // Story 6.3: a fake signed query (the file QR's target), never a real one.
+    // Stories 6.3–6.4: a fake signed query (the file QR's target, the demo
+    // audio's source), never a real one.
     signedQuery: base.hasAccess ? '?demo=1' : '',
   };
 }

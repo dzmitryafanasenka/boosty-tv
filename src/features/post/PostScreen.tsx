@@ -46,7 +46,7 @@ import {
 } from './PostBody';
 import { LOCKED_NOTICE_GAP, LockedNotice } from './LockedNotice';
 import { PostHeader, PostHeaderSkeleton } from './PostHeader';
-import { useFileTarget, usePost } from './usePost';
+import { useAudioSource, useFileTarget, usePost } from './usePost';
 
 /** Focus ids (docs/focus-map.md §1.5). */
 export const POST_STATE_ACTION_ID = 'state/post/action';
@@ -266,10 +266,12 @@ export function PostScreen({
               videoRows: true,
               images: 'stops',
               qr: true,
+              // Story 6.4: the AudioBlock plays through the PlayerEngine (the player capability).
+              audio: playerEnabled,
               selfPost: { blogUrl: post.author.blogUrl, postId: post.id },
             })
           : postBodyItems(post.teaser, { images: true }),
-    [post],
+    [post, playerEnabled],
   );
   /** «Смотреть» (Story 4.1): an accessible post with a video, while the player is on. */
   const showPrimary = playerEnabled && rows.length > 0;
@@ -532,6 +534,17 @@ export function PostScreen({
     [modal],
   );
   const resolveFile = useFileTarget(http, blogUrl, postId);
+  // Story 6.4: an AudioBlock's source (a fresh E8 on play). A playing track
+  // pauses while Пост is not the focused route (the Player or another Пост
+  // on top) and never resumes by itself; leaving Пост unmounts it (stops).
+  const resolveAudio = useAudioSource(http, blogUrl, postId);
+  const [routeFocused, setRouteFocused] = useState(true);
+  useFocusEffect(
+    useCallback(() => {
+      setRouteFocused(true);
+      return () => setRouteFocused(false);
+    }, []),
+  );
   // Story 6.3 (owner decision 2026-10-29, option b): a timestamp chip plays
   // this post's video from that second; the Player returns focus to the chip.
   // Only while the player is on (else the chip keeps its QR).
@@ -637,6 +650,8 @@ export function PostScreen({
               resolveFile={resolveFile}
               onOpenPost={onOpenPost}
               onPlayAt={playerEnabled ? onPlayAt : undefined}
+              resolveAudio={playerEnabled ? resolveAudio : undefined}
+              active={routeFocused}
             />
           </ScrollView>
         ) : (

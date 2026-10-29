@@ -10,8 +10,8 @@ import type { Block, ListItem, TextSpan } from './types';
 
 /**
  * The Post screen's body (Story 3.4): the blocks as paragraphs and neutral
- * placeholders, in order. Images are Story 6.2; links as chips, files,
- * audio and polls are later Epic 6 stories.
+ * placeholders, in order. Images are Story 6.2; links as chips and files
+ * Story 6.3; audio Story 6.4; polls are later Epic 6 stories.
  *
  * - `text` fragments are merged until a `BLOCK_END` fragment ends the
  *   paragraph. A `link` block is a fragment too (owner decision 2026-10-27,
@@ -53,7 +53,8 @@ import type { Block, ListItem, TextSpan } from './types';
  *   URL and text become `links` (LinkChips under it; the text stays inline),
  *   deduped by URL within the paragraph (the first text wins); a `file`
  *   block is a `file` item, a `video` block with an http(s) URL an
- *   `externalVideo` item (with its YouTube id when the host is YouTube).
+ *   `externalVideo` item (with its YouTube id when the host is YouTube);
+ *   Story 6.4: an `audio_file` block is an `audio` item (an AudioBlock).
  *   A link to another Boosty post (`boosty.to/<blog>/posts/<id>`, not
  *   `selfPost`) carries `post`: its chip opens that post in the app (owner
  *   decision 2026-10-29); a timestamp link to a video of `selfPost`
@@ -204,6 +205,11 @@ export type PostBodyItem =
     }
   /** A file (Story 6.3, with `qr`): a FileChip focus stop. Its URL is resolved on OK. */
   | { kind: 'file'; key: string; title: string; sizeBytes: number | null }
+  /**
+   * An audio track (Story 6.4, with `qr`): an AudioBlock focus stop. Its
+   * source is resolved when playback starts. `durationSec` is positive or null.
+   */
+  | { kind: 'audio'; key: string; title: string; durationSec: number | null }
   /**
    * An external video page (Story 6.3, with `qr`): a chip focus stop; never
    * played. `youtubeId` when the host is YouTube (the thumbnail).
@@ -461,7 +467,7 @@ function listLines(items: readonly ListItem[], depth: number, out: Line[]): void
 /**
  * Whether a body item is a focus stop: a paragraph with plain text, an
  * accessible post's image (Story 6.2), a file or an external video (Story
- * 6.3). A paragraph's link chips are stops of their own inside it; a heading
+ * 6.3), an audio track (Story 6.4). A paragraph's link chips are stops of their own inside it; a heading
  * is never one. A paragraph (or split part) of emoji
  * only has no text to read or land on, so it is shown as non-focusable
  * content (Story 6.1); a teaser image is never a stop (Story 3.6).
@@ -471,6 +477,7 @@ export function isFocusStop(item: PostBodyItem): boolean {
     (item.kind === 'paragraph' && item.text.length > 0) ||
     (item.kind === 'image' && item.stop) ||
     item.kind === 'file' ||
+    item.kind === 'audio' ||
     item.kind === 'externalVideo'
   );
 }
@@ -487,10 +494,16 @@ export type PostBodyOptions = {
   images?: boolean | 'stops';
   /**
    * Story 6.3: link chips, file and external-video items (an accessible
-   * post). Default false: links stay inline text only, files and videos
-   * placeholders (a locked post's teaser keeps Story 3.6).
+   * post); Story 6.4: audio items. Default false: links stay inline text
+   * only, files, videos and audio placeholders (a locked post's teaser
+   * keeps Story 3.6).
    */
   qr?: boolean;
+  /**
+   * Story 6.4: with `qr`, `audio_file` blocks are AudioBlock items (default:
+   * `qr`). False (`phaseFlags.player` off): they stay placeholders.
+   */
+  audio?: boolean;
   /**
    * The post being shown (with `qr`): a link to it keeps the QR chip
    * instead of opening itself again.
@@ -502,7 +515,7 @@ const positive = (n: number | null): number | null => (n !== null && n > 0 ? n :
 
 export function postBodyItems(
   blocks: readonly Block[],
-  { videoRows = false, images = false, qr = false, selfPost }: PostBodyOptions = {},
+  { videoRows = false, images = false, qr = false, audio = qr, selfPost }: PostBodyOptions = {},
 ): PostBodyItem[] {
   const items: PostBodyItem[] = [];
   const used = new Set<string>();
@@ -618,6 +631,18 @@ export function postBodyItems(
           key: blockKey(block, index),
           title: block.title.trim(),
           sizeBytes: block.sizeBytes !== null && block.sizeBytes >= 0 ? block.sizeBytes : null,
+        },
+        index,
+      );
+      return;
+    }
+    if (qr && audio && block.type === 'audio_file') {
+      push(
+        {
+          kind: 'audio',
+          key: blockKey(block, index),
+          title: block.title.trim(),
+          durationSec: positive(block.durationSec !== null ? Math.floor(block.durationSec) : null),
         },
         index,
       );

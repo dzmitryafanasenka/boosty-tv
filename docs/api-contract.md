@@ -484,7 +484,7 @@ The type is selected by `type`. Fields come from `ContentResponse`.
 | `ok_stream` | as `ok_video`. `playerUrls` include `live_*` and `live_playback_*` | The reference keeps only live-edge URLs and drops `live_playback_*` (DVR) |
 | `video` | `url` | External player page (e.g. YouTube; `LIVE`, Story 6.3: keys `type`, `url`) |
 | `header` (`LIVE`, Story 6.3) | `content` (the `text` format), `modificator` (empty) | Not in the reference. A heading line (our addition) |
-| `audio_file` | `url`, `title?`, `duration` (seconds) | Playable URL = `url + Post.signedQuery` |
+| `audio_file` | `url`, `title?`, `duration` (seconds) | Playable URL = `url + Post.signedQuery` (`LIVE`, Story 6.4: 403 without the query, 200 `audio/mpeg` with it) |
 | `file` | `url`, `title?`, `size?` (bytes, inferred) | Download URL = `url + Post.signedQuery` (`LIVE`, Story 6.3: 403 without the query, 200 with it) |
 | `list` (`LIVE`, Story 1.5) | `items[]{data: ContentBlock[], items[]}` | Nested list of blocks. Not in the reference. Render the text of the nested blocks (our improvement) or fall back to the placeholder |
 | anything else | — | Must render as an "unsupported block" placeholder |
@@ -531,6 +531,19 @@ A temporary probe (`__DEV__`, `TEMP63C`, removed before the commit; it logged on
 | Time | `t` is whole seconds (digits only); it equals the `m:ss`/`h:mm:ss` time in the link text for 1 326 of 1 327 links (1 differs; `t` wins) | `LIVE` |
 
 Boosty TV (Story 6.3, owner decision 2026-10-29, option b): `shared/entities/externalUrls.timestampRef` accepts only this shape — the current post (blog compared case-insensitively), `t` as digits, `tmid` one of the post's `ok_video` ids — and the chip plays that video from `t` (the Player clamps it into the video). Any other link keeps its chip (QR, or «Открыть» for another post).
+
+#### Audio blocks (LIVE, Story 6.4, 2026-10-29)
+
+A temporary probe (`__DEV__`, `TEMP64`, mounted by the Shell, removed before the commit; it logged only counts, key names with value types, booleans, host classes, lengths and HTTP statuses, never a URL, title, text or query value) ran on the pinned device in a debug build with Metro, in the owner's session. It read E2, then E4 (content profile, default Filter, `is_only_allowed=true`, up to 8 pages of 20) for the 3 subscribed blogs, including blocks nested in `list` items. For the audio block found it sent one fresh E8 (content profile) and status-only requests to the audio host with the app's default headers (no Boosty `Authorization`; the range GET was aborted at the headers).
+
+| Item | Result | Level |
+|---|---|---|
+| Sample | 1 `audio_file` block in the scanned posts: the sample post (Илья MJTV Соколов, «Когда метроном - твой враг!», accessible, `signedQuery` 128 characters). The fresh E8 found the same block by `id` | `LIVE` (one block) |
+| `audio_file` keys | `album` (string), `artist` (string), `complete` (boolean), `duration` (number, **present, > 0**), `fileType` (string), `id` (string), `isInvalid` (null), `showViewsCounter` (boolean), `size` (number), `timeCode` (number), `title` (string), `track` (string), `type`, `uploadStatus` (null), `url` (string), `viewsCounter` (number). `url` is an `https` URL on a `boosty.to` host without a query. `timeCode` exists on audio too; Boosty TV never reads or writes it (audio progress is not persisted, parity) | `LIVE` |
+| Source | HEAD to `url` alone → **403** (`application/json`); HEAD to `url + signedQuery` (the fresh E8's, joined with `?`; keys `user_id`, `content_id`, `expire_time`, `sign`) → **200** `audio/mpeg`, `Content-Length` present, `Accept-Ranges: bytes`; a `Range: bytes=0-0` GET → 403 bare, **206** signed. The joined URL was 192 characters | `LIVE` |
+| Playback | The production AudioBlock played it on the pinned device (react-native-video 6.19.3 / Media3 1.8.0, `progressive`, no headers): first sound about 2 s after OK; ±10 s seeks; pause; Home paused it (the AudioTrack `paused`); Back released the player (`docs/testing.md` «Story 6.4») | `LIVE` |
+
+Boosty TV (Story 6.4): an `audio_file` of an accessible post is an AudioBlock; OK sends a fresh E8 (`PostRepository.audioSource`: the block by id, else by index with the shown title, as `fileTarget`) and plays `url` + `signedQuery` (`externalUrls.fileTarget` join). An empty `signedQuery` gives no source (the bare URL answers 403): the block shows «Не удалось воспроизвести» and never plays a bare URL. The URI is held only by the AudioBlock's state and the engine's props: never in the Post entity, a query cache, storage, a log or a fixture. An engine error re-resolves once (a fresh E8) and resumes at the last position; a source resolved ≥ 23 h ago is resolved again before a resume. Whether the host enforces `expire_time` stays unverified.
 
 #### Live evidence (Story 1.7, 2026-10-25): no sample in the scanned posts
 
@@ -651,7 +664,7 @@ What the production app sends and reads for progress (`src/shared/services/progr
 
 ### Audio and file URLs (`audio_file`, `file`)
 
-These are not `playerUrls`: the URL is the block `url` plus `Post.signedQuery` (§4.1, `REF`). `Post.signedQuery` is `?user_id=…&content_id=…&expire_time=…&sign=…` with `expire_time` 24 h ahead (`LIVE`, Story 1.7). Whether the media host enforces `expire_time`, whether the query depends on the request profile (no `srcAg`-like key was seen), and which host serves audio and files are **unverified**: Story 1.7 found no accessible sample (§4.1 «Live evidence (Story 1.7)»). Until verified, apply the `ok_video` rules: fetch the post with the reference profile before playing, send no Boosty `Authorization` to the media host, keep the URL in memory only, and re-resolve once via E8 (same block `id`, else the same `url`) after a player error.
+These are not `playerUrls`: the URL is the block `url` plus `Post.signedQuery` (§4.1; `LIVE` for files in Story 6.3 and for audio in Story 6.4: 403 bare, 200 signed, both on a `boosty.to` host). `Post.signedQuery` is `?user_id=…&content_id=…&expire_time=…&sign=…` with `expire_time` 24 h ahead (`LIVE`, Story 1.7). Whether the media host enforces `expire_time` and whether the query depends on the request profile (no `srcAg`-like key was seen; only the content profile was used live) are still **unverified**. The `ok_video` rules apply: fetch the post with the content (reference-like) profile before playing, send no Boosty `Authorization` to the media host, keep the URL in memory only, and re-resolve once via E8 (same block `id`, else the same index and title) after a player error (Story 6.4).
 
 ## 7. Entitlement and error semantics
 

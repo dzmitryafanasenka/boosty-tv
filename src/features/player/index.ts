@@ -1,4 +1,11 @@
 export {
+  AUDIO_ENTRY_GUARD_MS,
+  AUDIO_SEEK_STEP_SEC,
+  AudioBlock,
+  type AudioBlockProps,
+  type ResolveAudioSource,
+} from './AudioBlock';
+export {
   BUFFER_SPINNER_MS,
   ENTRY_GUARD_MS,
   OVERLAY_HIDE_MS,

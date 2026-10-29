@@ -31,6 +31,9 @@ export const e8Path = (blogUrl: string, postId: string) => `/v1/blog/${blogUrl}/
  * `header`, a `file` (`synthetic-id-13`, `https://example.invalid/file`,
  * 200 KiB) and a `video` (`https://example.invalid/video`; a real YouTube
  * URL cannot pass `check:fixtures`).
+ * Story 6.4 addition: one synthetic `audio_file` block after them, in the
+ * live key set (api-contract §4.1 «Audio blocks (LIVE)»): `synthetic-id-14`,
+ * `https://example.invalid/audio`, 3:00.
  */
 export function e8Accessible(): Json {
   return clone(e8Accessible_.body as unknown as Json);
