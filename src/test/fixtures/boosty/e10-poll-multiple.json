@@ -1,0 +1,44 @@
+{
+  "case": "e10-poll-multiple",
+  "status": 200,
+  "body": {
+    "data": {
+      "poll": {
+        "answer": [
+          1031,
+          1033
+        ],
+        "counter": 5,
+        "defaultLang": "redacted",
+        "hasOther": false,
+        "id": 1030,
+        "isFinished": false,
+        "isMultiple": true,
+        "options": [
+          {
+            "counter": 5,
+            "fraction": 100,
+            "id": 1031,
+            "text": "redacted"
+          },
+          {
+            "counter": 0,
+            "fraction": 0,
+            "id": 1032,
+            "text": "redacted"
+          },
+          {
+            "counter": 5,
+            "fraction": 100,
+            "id": 1033,
+            "text": "redacted"
+          }
+        ],
+        "title": [
+          "redacted"
+        ],
+        "other": "redacted"
+      }
+    }
+  }
+}

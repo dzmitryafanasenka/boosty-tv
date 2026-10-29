@@ -544,3 +544,421 @@ describe('Story 6.6: vote and retract (votable mode)', () => {
     expect(StyleSheet.flatten(outline.props.style).borderColor).toBe(colors.accent);
   });
 });
+
+/**
+ * Story 6.7: an open multiple-choice poll (focus-map §4 I «Poll, multiple
+ * choice»), every row of the spec's matrix. As «Story 6.6»: the poll is read
+ * from a seeded E8 query, so E10 through `applyPoll` shows on screen, and the
+ * HttpClient is a fake the test answers.
+ */
+describe('Story 6.7: multiple-choice poll', () => {
+  const BLOG = 'synthetic-blog';
+  const POST = 'p';
+  const PREFIX = `post/${POST}/poll/option/`;
+  const OPT = (optionId: string) => `${PREFIX}${optionId}`;
+  const SUBMIT = `post/${POST}/poll/submit`;
+  const RETRACT = `post/${POST}/poll/retract`;
+  const VOTE_PATH = '/v1/poll/9/vote';
+  const E10_PATH = `/v1/blog/${BLOG}/poll/9`;
+  const evt = { nativeEvent: {} };
+
+  type Pending = { request: HttpRequest<unknown>; d: ReturnType<typeof deferred<HttpResponse<unknown>>> };
+
+  let client: QueryClient;
+  let calls: Pending[];
+  let http: HttpClient;
+  /** The host views reported by focus id, and the focus ids reported (the screen's view). */
+  let onViewSpy: jest.Mock;
+  let onFocusSpy: jest.Mock;
+
+  beforeAll(() => {
+    jest.useFakeTimers();
+    notifyManager.setScheduler(callback => {
+      Promise.resolve().then(callback);
+    });
+  });
+  afterAll(() => {
+    jest.useRealTimers();
+    notifyManager.setScheduler(callback => setTimeout(callback, 0));
+  });
+
+  beforeEach(() => {
+    resetPollVotesForTests();
+    onViewSpy = jest.fn();
+    onFocusSpy = jest.fn();
+    client = new QueryClient({ defaultOptions: { queries: { gcTime: Infinity, retry: false } } });
+    calls = [];
+    const send = (request: HttpRequest<unknown>) => {
+      const d = deferred<HttpResponse<unknown>>();
+      calls.push({ request, d });
+      return d.promise;
+    };
+    http = {
+      request: (request: HttpRequest<unknown>) => send(request),
+      get: (path: string) => send({ method: 'GET', path }),
+    } as unknown as HttpClient;
+  });
+
+  afterEach(() => {
+    client.clear();
+    jest.restoreAllMocks();
+  });
+
+  const multi = (overrides: Partial<Poll> = {}) => poll({ isMultiple: true, ...overrides });
+
+  const e10 = (p: Poll): HttpResponse<unknown> => ({
+    status: 200,
+    body: {
+      data: {
+        poll: {
+          id: Number(p.id),
+          title: [p.title],
+          isMultiple: p.isMultiple,
+          isFinished: p.isFinished,
+          counter: p.counter,
+          answer: p.answer.map(Number),
+          options: p.options.map(o => ({ ...o, id: Number(o.id) })),
+        },
+      },
+    },
+  });
+
+  function Harness() {
+    const { data } = useQuery<PostResult>({
+      queryKey: queryKeys.post(BLOG, POST),
+      queryFn: () => new Promise<PostResult>(() => {}),
+      enabled: false,
+    });
+    const p = data?.kind === 'ok' ? data.post.poll : null;
+    return p ? (
+      <PollWidget
+        id={ID}
+        poll={p}
+        onView={onViewSpy}
+        onFocus={onFocusSpy}
+        http={http}
+        blogUrl={BLOG}
+        postId={POST}
+        optionIdPrefix={PREFIX}
+        submitId={SUBMIT}
+        retractId={RETRACT}
+      />
+    ) : null;
+  }
+
+  const seed = (p: Poll) =>
+    client.setQueryData(queryKeys.post(BLOG, POST), { kind: 'ok', post: { id: POST, poll: p } as unknown as Post });
+
+  async function renderMulti(p: Poll, twice = false) {
+    seed(p);
+    const root = createRoot();
+    roots.push(root);
+    await act(async () =>
+      root.render(
+        <QueryClientProvider client={client}>
+          <Harness />
+          {twice ? <Harness /> : null}
+        </QueryClientProvider>,
+      ),
+    );
+    return root;
+  }
+
+  /** The node with this testID (the focusable one when `focusable`). */
+  const node = (root: Root, testID: string, nth = 0) =>
+    root.container.queryAll(n => n.props.testID === testID && n.props.accessibilityRole !== undefined)[nth];
+  const ok = async (root: Root, testID: string, nth = 0) => {
+    await act(async () => {
+      node(root, testID, nth).props.onFocus(evt);
+      node(root, testID, nth).props.onClick?.(evt);
+    });
+  };
+  const answer = async (i: number, reply: HttpResponse<unknown> | Error) => {
+    await act(async () => {
+      if (reply instanceof Error) {
+        calls[i].d.reject(reply);
+      } else {
+        calls[i].d.resolve(reply);
+      }
+      await flush();
+    });
+  };
+  const sent = () => calls.map(c => [c.request.method ?? 'GET', c.request.path, c.request.form ?? null]);
+  const checked = (root: Root) =>
+    ['1', '2', '3'].filter(optionId => has(root, `${ID}/option/${optionId}/checked`));
+  const chosenMarks = (root: Root) =>
+    ['1', '2', '3'].filter(optionId => has(root, `${ID}/option/${optionId}/chosen`));
+  const voted13 = multi({
+    counter: 2522,
+    answer: ['1', '3'],
+    options: [
+      { id: '1', text: 'Длинные', counter: 1211, fraction: 48 },
+      { id: '2', text: 'Короткие', counter: 958, fraction: 38 },
+      { id: '3', text: 'Эфиры', counter: 354, fraction: 14 },
+    ],
+  });
+
+  it('not voted: each option a checkbox stop (ring, no scale); «Проголосовать» shown disabled and not focusable (matrix «Submit disabled»)', async () => {
+    const root = await renderMulti(multi());
+    expect(focusables(root)).toEqual([OPT('1'), OPT('2'), OPT('3')]);
+    expect(root.container.queryAll(n => n.props.testID === ID)[0].props.focusable).toBe(false);
+    const submit = node(root, SUBMIT);
+    expect(submit.props.focusable).toBe(false);
+    expect(submit.props.accessibilityState).toMatchObject({ disabled: true });
+    expect(text(root)).toContain(t('poll.submit'));
+    const first = node(root, OPT('1'));
+    expect(first.props.accessibilityRole).toBe('checkbox');
+    expect(first.props.accessibilityState).toMatchObject({ checked: false });
+    expect(first.props.accessibilityLabel).toBe(
+      'Опрос. Какой формат удобнее? Длинные, 48 %, 1 210 голосов. не отмечено',
+    );
+    expect(node(root, OPT('3')).props.accessibilityLabel).toBe(
+      'Эфиры, 14 %, 353 голоса. не отмечено. Затем выберите «Проголосовать» под вариантами. Проголосовали: 2 521',
+    );
+    // The submit hint is the last option's only (and only before the vote).
+    expect(node(root, OPT('2')).props.accessibilityLabel).not.toContain(t('poll.submitHint'));
+    // Results are visible before the vote; no answered check yet.
+    expect(text(root)).toContain('48 % · 1 210');
+    expect(chosenMarks(root)).toEqual([]);
+    await act(async () => first.props.onFocus(evt));
+    expect(has(root, `${OPT('1')}/ring`)).toBe(true);
+    const scale = StyleSheet.flatten(root.container.queryAll(n => n.props.testID === `${OPT('1')}/scale`)[0].props.style);
+    expect(scale.transform).toEqual([{ scale: 1 }]);
+  });
+
+  it('matrix «Toggle»: OK on 1, OK on 3, OK on 1 → only 3 checked (accent box, a11y «отмечено»); nothing sent, no pending step', async () => {
+    const root = await renderMulti(multi());
+    await ok(root, OPT('1'));
+    expect(checked(root)).toEqual(['1']);
+    expect(node(root, SUBMIT).props.focusable).toBe(true);
+    await ok(root, OPT('3'));
+    await ok(root, OPT('1'));
+    expect(checked(root)).toEqual(['3']);
+    expect(node(root, OPT('3')).props.accessibilityState).toMatchObject({ checked: true });
+    expect(node(root, OPT('3')).props.accessibilityLabel).toContain('353 голоса. отмечено');
+    expect(node(root, OPT('1')).props.accessibilityState).toMatchObject({ checked: false });
+    const box = root.container.queryAll(n => n.props.testID === `${ID}/option/3/box`)[0];
+    expect(StyleSheet.flatten(box.props.style).backgroundColor).toBe(colors.accent);
+    const empty = root.container.queryAll(n => n.props.testID === `${ID}/option/1/box`)[0];
+    expect(StyleSheet.flatten(empty.props.style).backgroundColor).toBeUndefined();
+    expect(has(root, `${ID}/option/1/pending`)).toBe(false);
+    expect(has(root, `${ID}/option/1/outline`)).toBe(false);
+    expect(calls).toHaveLength(0);
+    // Unchecking the last one disables «Проголосовать» again.
+    await ok(root, OPT('3'));
+    expect(checked(root)).toEqual([]);
+    expect(node(root, SUBMIT).props.focusable).toBe(false);
+  });
+
+  it('matrix «Vote»: 1 and 3 checked (in any order); OK on «Проголосовать» → sending, E11 `answer=1,3`, then E10; results with the checks, «Отозвать голос» the only stop', async () => {
+    const root = await renderMulti(multi());
+    await ok(root, OPT('3'));
+    await ok(root, OPT('1'));
+    await ok(root, SUBMIT);
+    // Comma-joined in option order, no extra confirmation.
+    expect(sent()).toEqual([['POST', VOTE_PATH, [['answer', '1,3']]]]);
+    expect(has(root, `${SUBMIT}/sending`)).toBe(true);
+    expect(node(root, SUBMIT).props.accessibilityState).toMatchObject({ busy: true });
+    expect(node(root, SUBMIT).props.accessibilityLabel).toBe('Проголосовать. Отправка');
+    await answer(0, { status: 200, body: { ignored: true } });
+    expect(sent()[1]).toEqual(['GET', E10_PATH, null]);
+    const submitView = onViewSpy.mock.calls.filter(([fid, view]) => fid === SUBMIT && view !== null).pop()?.[1];
+    expect(submitView).toBeDefined();
+    onViewSpy.mockClear();
+    onFocusSpy.mockClear();
+    await answer(1, e10(voted13));
+    expect(focusables(root)).toEqual([RETRACT]);
+    expect(has(root, SUBMIT)).toBe(false);
+    // Device fix: one action control, never unmounted. The focused host view
+    // is re-registered under the new id and the tracked focus id follows it.
+    expect(onViewSpy).toHaveBeenCalledWith(SUBMIT, null);
+    expect(onViewSpy).toHaveBeenCalledWith(RETRACT, submitView);
+    expect(onFocusSpy.mock.calls.map(([fid]) => fid)).toEqual([RETRACT]);
+    expect(chosenMarks(root)).toEqual(['1', '3']);
+    expect(checked(root)).toEqual([]);
+    expect(text(root)).toContain('Проголосовали: 2 522');
+    expect(text(root)).toContain(t('poll.retract'));
+    const retract = node(root, RETRACT);
+    expect(retract.props.accessibilityRole).toBe('button');
+    expect(retract.props.accessibilityLabel).toMatch(/^Опрос\. Какой формат удобнее\? Длинные, 48 %, 1 211 голосов, ваш выбор\. /);
+    expect(retract.props.accessibilityLabel).toMatch(/Проголосовали: 2 522\. Отозвать голос$/);
+    expect(has(root, `${ID}/error`)).toBe(false);
+    expect(calls).toHaveLength(2);
+  });
+
+  it('matrix «Vote fails»: inline error, the checks kept, 1 request; the next OK clears the error', async () => {
+    const root = await renderMulti(multi());
+    await ok(root, OPT('1'));
+    await ok(root, OPT('3'));
+    await ok(root, SUBMIT);
+    await answer(0, new AppError('Server', 503));
+    expect(calls).toHaveLength(1);
+    const errorNode = root.container.queryAll(n => n.props.testID === `${ID}/error`)[0];
+    expect(errorNode.props.children).toBe(t('poll.voteFailed'));
+    expect(errorNode.props.accessibilityLiveRegion).toBe('polite');
+    expect(checked(root)).toEqual(['1', '3']);
+    expect(chosenMarks(root)).toEqual([]);
+    expect(has(root, `${SUBMIT}/sending`)).toBe(false);
+    await jest.advanceTimersByTimeAsync(60_000);
+    expect(calls).toHaveLength(1);
+    // The next OK (here a toggle) clears the error.
+    await ok(root, OPT('2'));
+    expect(has(root, `${ID}/error`)).toBe(false);
+    expect(checked(root)).toEqual(['1', '2', '3']);
+    expect(calls).toHaveLength(1);
+  });
+
+  it('single flight: while the vote runs, toggles and more OKs on «Проголосовать» are ignored; a second widget of the poll too', async () => {
+    const root = await renderMulti(multi(), true);
+    await ok(root, OPT('1'));
+    await ok(root, SUBMIT);
+    expect(calls).toHaveLength(1);
+    await ok(root, SUBMIT);
+    await ok(root, OPT('2'));
+    expect(checked(root)).toEqual(['1']);
+    // The other instance shows the running request and ignores OK.
+    expect(root.container.queryAll(n => n.props.testID === `${SUBMIT}/sending`)).toHaveLength(2);
+    await ok(root, OPT('2'), 1);
+    expect(root.container.queryAll(n => n.props.testID === `${ID}/option/2/checked`)).toHaveLength(0);
+    expect(calls).toHaveLength(1);
+  });
+
+  it('matrix «Retract»: answer [1, 3]; OK → the pending outline and hint on the button; OK → E12, then E10; options without checks', async () => {
+    const root = await renderMulti(voted13);
+    expect(focusables(root)).toEqual([RETRACT]);
+    await ok(root, RETRACT);
+    expect(root.container.queryAll(n => n.props.testID === `${RETRACT}/pending`)[0].props.children).toBe(
+      t('poll.pendingRetract'),
+    );
+    const outline = root.container.queryAll(n => n.props.testID === `${RETRACT}/outline`)[0];
+    expect(StyleSheet.flatten(outline.props.style).borderColor).toBe(colors.accent);
+    expect(node(root, RETRACT).props.accessibilityLabel).toMatch(/Отозвать голос\. Нажмите OK ещё раз, чтобы отозвать$/);
+    expect(calls).toHaveLength(0);
+    await ok(root, RETRACT);
+    expect(sent()).toEqual([['DELETE', VOTE_PATH, null]]);
+    expect(has(root, `${RETRACT}/sending`)).toBe(true);
+    expect(has(root, `${RETRACT}/pending`)).toBe(false);
+    await answer(0, { status: 200, body: undefined });
+    expect(sent()[1]).toEqual(['GET', E10_PATH, null]);
+    const actionView = onViewSpy.mock.calls.filter(([fid, view]) => fid === RETRACT && view !== null).pop()?.[1];
+    await answer(1, e10(multi()));
+    // Device fix: the focused control becomes «Проголосовать» (nothing checked)
+    // but stays focusable (drawn disabled) while focus moves to the first option.
+    expect(focusables(root)).toEqual([OPT('1'), OPT('2'), OPT('3'), SUBMIT]);
+    expect(onViewSpy).toHaveBeenCalledWith(SUBMIT, actionView);
+    // Drawn disabled and inert (OK sends nothing).
+    const actionText = root.container
+      .queryAll(n => n.props.children === t('poll.submit') && n.props.style !== undefined)
+      .map(n => StyleSheet.flatten(n.props.style).color);
+    expect(actionText).toContain(colors['text-disabled']);
+    expect(actionText.every(color => color === colors['text-disabled'])).toBe(true);
+    const surface = root.container.queryAll(n => n.props.testID === `${SUBMIT}/scale`)[0];
+    expect(StyleSheet.flatten(surface.props.style).backgroundColor).toBe(colors['surface-raised']);
+    await act(async () => node(root, SUBMIT).props.onClick?.(evt));
+    expect(calls).toHaveLength(2);
+    // The first option reports focus → the control turns non-focusable.
+    await act(async () => {
+      node(root, SUBMIT).props.onBlur(evt);
+      node(root, OPT('1')).props.onFocus(evt);
+    });
+    expect(focusables(root)).toEqual([OPT('1'), OPT('2'), OPT('3')]);
+    expect(chosenMarks(root)).toEqual([]);
+    expect(checked(root)).toEqual([]);
+    expect(has(root, RETRACT)).toBe(false);
+  });
+
+  it('matrix «Retract» failure: inline error «Не удалось отозвать голос», the vote kept', async () => {
+    const root = await renderMulti(voted13);
+    await ok(root, RETRACT);
+    await ok(root, RETRACT);
+    await answer(0, new AppError('Network'));
+    expect(calls).toHaveLength(1);
+    expect(root.container.queryAll(n => n.props.testID === `${ID}/error`)[0].props.children).toBe(t('poll.retractFailed'));
+    expect(chosenMarks(root)).toEqual(['1', '3']);
+    expect(focusables(root)).toEqual([RETRACT]);
+    // The next OK clears it and starts pending again.
+    await ok(root, RETRACT);
+    expect(has(root, `${ID}/error`)).toBe(false);
+    expect(has(root, `${RETRACT}/pending`)).toBe(true);
+    expect(calls).toHaveLength(1);
+  });
+
+  it('matrix «Cancel retract»: OK on «Отозвать голос», then focus leaves (blur) → pending cleared; nothing sent', async () => {
+    const root = await renderMulti(voted13);
+    await ok(root, RETRACT);
+    expect(has(root, `${RETRACT}/pending`)).toBe(true);
+    await act(async () => node(root, RETRACT).props.onBlur(evt));
+    expect(has(root, `${RETRACT}/pending`)).toBe(false);
+    expect(has(root, `${RETRACT}/outline`)).toBe(false);
+    expect(text(root)).toContain(t('poll.retract'));
+    // The next OK is a first OK again.
+    await ok(root, RETRACT);
+    expect(has(root, `${RETRACT}/pending`)).toBe(true);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('retract hand-off: without the first option`s focus, the requests stop after a bounded number of frames but the focused control stays focusable until it blurs', async () => {
+    const root = await renderMulti(voted13);
+    await ok(root, RETRACT);
+    await ok(root, RETRACT);
+    await answer(0, { status: 200, body: undefined });
+    await answer(1, e10(multi()));
+    expect(focusables(root)).toContain(SUBMIT);
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(1000);
+    });
+    // Turning the focused control non-focusable would drop focus to the author (device).
+    expect(focusables(root)).toEqual([OPT('1'), OPT('2'), OPT('3'), SUBMIT]);
+    await act(async () => node(root, SUBMIT).props.onBlur(evt));
+    expect(focusables(root)).toEqual([OPT('1'), OPT('2'), OPT('3')]);
+  });
+
+  it('the spinner follows any running request of the poll, also when the mode flipped meanwhile', async () => {
+    const root = await renderMulti(multi());
+    await ok(root, OPT('1'));
+    await ok(root, SUBMIT);
+    expect(calls).toHaveLength(1);
+    // Another source (E8) shows the poll voted while the E11 still runs.
+    await act(async () => seed(voted13));
+    expect(has(root, `${RETRACT}/sending`)).toBe(true);
+    expect(node(root, RETRACT).props.accessibilityState).toMatchObject({ busy: true });
+  });
+
+  it('a retract while the control is not focused: «Проголосовать» is non-focusable at once (no hand-off)', async () => {
+    const root = await renderMulti(voted13);
+    await ok(root, RETRACT);
+    await ok(root, RETRACT);
+    await act(async () => node(root, RETRACT).props.onBlur(evt));
+    await answer(0, { status: 200, body: undefined });
+    await answer(1, e10(multi()));
+    expect(focusables(root)).toEqual([OPT('1'), OPT('2'), OPT('3')]);
+  });
+
+  it('a refetched poll without a checked option drops its check (it does not come back with the option)', async () => {
+    const root = await renderMulti(multi());
+    await ok(root, OPT('3'));
+    expect(node(root, SUBMIT).props.focusable).toBe(true);
+    const [one, two] = multi().options;
+    await act(async () => seed(multi({ options: [one, two] })));
+    expect(node(root, SUBMIT).props.focusable).toBe(false);
+    await act(async () => seed(multi()));
+    expect(checked(root)).toEqual([]);
+  });
+
+  it('matrix «Finished multi»: one inert stop (6.5), even with the vote props', async () => {
+    const root = await renderMulti(multi({ isFinished: true, answer: ['1'] }));
+    expect(focusables(root)).toEqual([ID]);
+    await act(async () => host(root).props.onClick?.(evt));
+    expect(calls).toHaveLength(0);
+  });
+
+  it('an open single-choice poll with the 6.7 ids keeps the 6.6 flow (option stops with the button role, no «Проголосовать»)', async () => {
+    const root = await renderMulti(poll());
+    expect(focusables(root)).toEqual([OPT('1'), OPT('2'), OPT('3')]);
+    expect(node(root, OPT('1')).props.accessibilityRole).toBe('button');
+    expect(has(root, SUBMIT)).toBe(false);
+    await ok(root, OPT('2'));
+    expect(has(root, `${ID}/option/2/pending`)).toBe(true);
+    expect(calls).toHaveLength(0);
+  });
+});

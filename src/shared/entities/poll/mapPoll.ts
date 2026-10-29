@@ -89,3 +89,12 @@ export function isChosen(poll: Poll, optionId: string): boolean {
 export function isVotablePoll(poll: Poll): boolean {
   return !poll.isFinished && !poll.isMultiple;
 }
+
+/**
+ * Story 6.7: an open multiple-choice poll. Before a vote its options are
+ * checkbox stops with «Проголосовать»; after one, the results with
+ * «Отозвать голос». A finished multiple-choice poll stays one inert stop.
+ */
+export function isMultipleVotable(poll: Poll): boolean {
+  return poll.isMultiple && !poll.isFinished;
+}

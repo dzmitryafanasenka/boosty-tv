@@ -840,8 +840,17 @@ export type PostBodyProps = {
    * Story 6.6: voting in an open single-choice poll: the active session's
    * client, the post's identity (E10, the E8 query key) and the option focus
    * id prefix (`post/<postId>/poll/option/`). Absent: the poll is display only.
+   * Story 6.7: also «Проголосовать» and «Отозвать голос» of an open
+   * multiple-choice poll (`post/<postId>/poll/submit|retract`).
    */
-  pollVote?: { http: HttpClient; blogUrl: string; postId: string; optionIdPrefix: string };
+  pollVote?: {
+    http: HttpClient;
+    blogUrl: string;
+    postId: string;
+    optionIdPrefix: string;
+    submitId: string;
+    retractId: string;
+  };
 };
 
 /**
@@ -952,7 +961,8 @@ export function PostBody({
             return <Heading key={item.key} id={id} text={item.text} />;
           case 'poll':
             // Story 6.5: results, one focus stop; Story 6.6: an open
-            // single-choice poll's options are stops that take a vote.
+            // single-choice poll's options are stops that take a vote; Story
+            // 6.7: an open multiple-choice poll's checkboxes and buttons.
             return (
               <PollWidget
                 key={item.key}
@@ -964,6 +974,8 @@ export function PostBody({
                 blogUrl={pollVote?.blogUrl}
                 postId={pollVote?.postId}
                 optionIdPrefix={pollVote?.optionIdPrefix}
+                submitId={pollVote?.submitId}
+                retractId={pollVote?.retractId}
               />
             );
           case 'image':

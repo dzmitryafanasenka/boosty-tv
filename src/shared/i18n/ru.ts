@@ -424,6 +424,14 @@ export const ru = {
     voteFailed: 'Не удалось отправить голос',
     retractFailed: 'Не удалось отозвать голос',
     sending: 'Отправка',
+    // Story 6.7: a multiple-choice poll: send the checked options, retract
+    // the vote (two OKs, `pendingRetract`), and the checkbox option's state.
+    submit: 'Проголосовать',
+    retract: 'Отозвать голос',
+    a11yChecked: 'отмечено',
+    a11yUnchecked: 'не отмечено',
+    // The last checkbox option's label (a screen reader): a submit step follows.
+    submitHint: 'Затем выберите «Проголосовать» под вариантами',
   },
   // DESIGN.md PostCard (Story 3.1). `{n}` is the video count. The card's
   // accessibility label reads «Видео. {title}. {author}, {date}.».

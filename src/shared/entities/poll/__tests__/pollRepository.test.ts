@@ -9,6 +9,8 @@ import { createHttpClient, fixedAccessToken, type AccessTokenSource } from '../.
 import { createLogger } from '../../../services/logger';
 // eslint-disable-next-line boundaries/dependencies -- test-only fixtures
 import e10Poll from '../../../../test/fixtures/boosty/e10-poll.json';
+// eslint-disable-next-line boundaries/dependencies -- test-only fixtures
+import e10PollMultiple from '../../../../test/fixtures/boosty/e10-poll-multiple.json';
 import { PollRepository, pollPath, pollVotePath } from '../pollRepository';
 
 function client(handler: FixtureHandler, tokens: AccessTokenSource = fixedAccessToken('t'.repeat(64))) {
@@ -115,6 +117,18 @@ describe('E12 retract', () => {
 });
 
 describe('E10 fetchPoll', () => {
+  it('Story 6.7: maps a multiple-choice `data.poll` with two ids in `answer` (synthetic fixture: no live multiple-choice sample)', async () => {
+    const { http } = client(() => ({ status: e10PollMultiple.status, body: e10PollMultiple.body }));
+    const poll = await PollRepository.fetchPoll(http, 'synthetic-blog', '1030');
+    expect(poll).toMatchObject({
+      id: '1030',
+      isMultiple: true,
+      isFinished: false,
+      answer: ['1031', '1033'],
+      options: [{ id: '1031' }, { id: '1032' }, { id: '1033' }],
+    });
+  });
+
   it('maps `data.poll` (the fixture: the user voted for 1022)', async () => {
     const { http, transport } = client(() => ({ status: e10Poll.status, body: e10Poll.body }));
     const poll = await PollRepository.fetchPoll(http, 'synthetic-blog', '1020');

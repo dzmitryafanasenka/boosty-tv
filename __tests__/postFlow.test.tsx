@@ -61,6 +61,7 @@ import {
   destinationIds,
   focusableIds,
   focusTargets,
+  guideDestinations,
   installFixtureTransport,
   installNativeModules,
   lastFocusTarget,
@@ -128,6 +129,38 @@ const { settle, render, one, focusOn, press, back } = createFlow({
   submitSettles: false,
 });
 const WITH_TIMERS = { timerRounds: 30 };
+/**
+ * A manual animation-frame queue for the poll focus deferrals (Stories
+ * 6.6, 6.7). The RN Jest preset's `requestAnimationFrame` is a 0 ms timeout,
+ * and a fake-timer advance runs a chain of them in one go, so the tests that
+ * count frames queue them here instead: `frames(n)` runs n frames, each only
+ * the callbacks queued before it.
+ */
+let frameQueue: Array<{ id: number; callback: (t: number) => void }> = [];
+function queueFrames() {
+  frameQueue = [];
+  let next = 1;
+  jest.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((callback: (t: number) => void) => {
+    const id = next++;
+    frameQueue.push({ id, callback });
+    return id;
+  });
+  jest.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation((id?: number | null) => {
+    frameQueue = frameQueue.filter(entry => entry.id !== id);
+  });
+}
+async function frames(n: number) {
+  for (let i = 0; i < n; i += 1) {
+    const due = frameQueue;
+    frameQueue = [];
+    await act(async () => {
+      for (const entry of due) {
+        entry.callback(Date.now());
+      }
+      await Promise.resolve();
+    });
+  }
+}
 
 const STORED = JSON.stringify({
   v: 1,
@@ -1022,6 +1055,36 @@ describe('focus (focus-map §4 F)', () => {
     });
     await settle();
     expect(focusTargets()).toEqual([]);
+    await unmount(root);
+  });
+
+  it.each([
+    ['focus still tracked on the vanished paragraph → a second request two frames later', false, 2],
+    ['the user focused another stop meanwhile → no second request', true, 1],
+  ] as const)('a refetch that drops the focused paragraph (`focusAfterUnmount`): %s', async (_name, movedAway, requests) => {
+    queueFrames();
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    await focusOn(root, BLOCK(id, 'text@2'));
+    focusMock.mockClear();
+    const key = queryKeys.post(FEED_BLOG, id);
+    await act(async () => {
+      queryClient.setQueryData(key, (data: any) => ({
+        ...data,
+        post: { ...data.post, blocks: data.post.blocks.slice(0, 2) },
+      }));
+    });
+    await settle();
+    // Sent at once (device: a request in the unmount's commit can be lost) …
+    expect(focusTargets()).toEqual([BLOCK(id, 'text@0')]);
+    if (movedAway) {
+      await focusOn(root, AUTHOR(id));
+    }
+    await frames(1);
+    expect(focusTargets()).toHaveLength(1);
+    // … and once more two frames later while the tracked id is still the vanished one.
+    await frames(1);
+    expect(focusTargets()).toEqual(Array(requests).fill(BLOCK(id, 'text@0')));
     await unmount(root);
   });
 
@@ -2901,7 +2964,12 @@ describe('Story 6.6: vote and retract in a single-choice poll', () => {
     await unmount(root);
   });
 
-  it('E10 returns the poll finished: the focused option is gone → focus goes to the poll`s block stop (not the top)', async () => {
+  it.each([
+    ['nothing else focused', null, true],
+    ['Android moved focus to the author', 'author', true],
+    ['the user moved to another stop', 'other', false],
+  ] as const)('E10 returns the poll finished: the focused option is gone → two frames later focus goes to the poll`s block stop (not the top) — %s', async (_name, moved, expected) => {
+    queueFrames();
     const root = await openFromHome();
     const id = FEED_ID(0);
     pollReply = req =>
@@ -2916,7 +2984,21 @@ describe('Story 6.6: vote and retract in a single-choice poll', () => {
       ['GET', E10, null],
     ]);
     expect(contentIds(root).filter(c => c.includes('poll'))).toEqual([POLL_ROOT(id)]);
-    expect(lastFocusTarget()).toBe(POLL_ROOT(id));
+    // Deferred (device: a request to a view mounted in the same commit scrolls the column to its top).
+    expect(focusTargets()).not.toContain(POLL_ROOT(id));
+    if (moved === 'author') {
+      await focusOn(root, AUTHOR(id));
+    } else if (moved === 'other') {
+      await focusOn(root, BLOCK(id, 'text@0'));
+    }
+    await frames(1);
+    expect(focusTargets()).not.toContain(POLL_ROOT(id));
+    await frames(1);
+    if (expected) {
+      expect(lastFocusTarget()).toBe(POLL_ROOT(id));
+    } else {
+      expect(focusTargets()).not.toContain(POLL_ROOT(id));
+    }
     await unmount(root);
   });
 
@@ -2935,7 +3017,8 @@ describe('Story 6.6: vote and retract in a single-choice poll', () => {
   });
 
   it('matrix «Finished / multiple»: one stop, OK inert, nothing sent', async () => {
-    for (const overrides of [{ isFinished: true }, { isMultiple: true }]) {
+    // Story 6.7: an open multiple-choice poll takes votes now; a finished one stays inert.
+    for (const overrides of [{ isFinished: true }, { isMultiple: true, isFinished: true }]) {
       e8Poll = { ...apiPoll(null), ...overrides };
       await resetQueryCache();
       const root = await openFromHome();
@@ -2945,5 +3028,261 @@ describe('Story 6.6: vote and retract in a single-choice poll', () => {
       expect(pollCalls()).toEqual([]);
       await unmount(root);
     }
+  });
+});
+
+describe('Story 6.7: multiple-choice poll', () => {
+  const option = (id: number, text_: string, counter: number, fraction: number) => ({
+    counter,
+    fraction,
+    id,
+    text: text_,
+    voters: { data: {}, extra: {} },
+  });
+  /** The live poll shape with `isMultiple` (no live multiple-choice sample: api-contract «Poll votes»). */
+  const apiPoll = (answer: number[] | null, counts: [number, number, number] = [10, 8, 3]) => ({
+    counter: 15,
+    defaultLang: 'ru',
+    hasOther: false,
+    id: 9,
+    isFinished: false,
+    isMultiple: true,
+    options: [
+      option(1, 'Длинные', counts[0], Math.round((counts[0] / 15) * 100)),
+      option(2, 'Короткие', counts[1], Math.round((counts[1] / 15) * 100)),
+      option(3, 'Эфиры', counts[2], Math.round((counts[2] / 15) * 100)),
+    ],
+    title: ['Какие форматы удобнее?'],
+    ...(answer === null ? {} : { answer }),
+  });
+  const VOTE = '/v1/poll/9/vote';
+  const E10 = `/v1/blog/${FEED_BLOG}/poll/9`;
+  const POLL_ROOT = (postId: string) => BLOCK(postId, 'poll:9');
+  const SUBMIT = (postId: string) => `post/${postId}/poll/submit`;
+  const RETRACT = (postId: string) => `post/${postId}/poll/retract`;
+
+  let e8Poll: unknown;
+  let pollReply: (req: FixtureRequest) => Reply;
+
+  beforeEach(() => {
+    e8Poll = apiPoll(null);
+    e8 = (_req, blogUrl, postId) => ({
+      status: 200,
+      body: postDetail(blogUrl, postId, [...paragraph('До'), ...paragraph('После')], { poll: e8Poll }),
+    });
+    pollReply = () => ({ status: 200, body: {} });
+    transport = installFixtureTransport(req =>
+      req.path === VOTE || req.path === E10 ? pollReply(req) : fullHandler(req),
+    );
+  });
+
+  const pollCalls = () =>
+    transport.calls
+      .filter(c => c.path === VOTE || c.path === E10)
+      .map(c => [c.method, c.path, c.method === 'POST' ? c.form : null]);
+  const pollIds = (root: Root, postId: string) =>
+    contentIds(root).filter(c => c.startsWith(`post/${postId}/poll/`) || c.startsWith(POLL_ROOT(postId)));
+  const checked = (root: Root, postId: string) =>
+    ['1', '2', '3'].filter(o => byTestId(root, `${POLL_ROOT(postId)}/option/${o}/checked`).length > 0);
+  const chosen = (root: Root, postId: string) =>
+    ['1', '2', '3'].filter(o => byTestId(root, `${POLL_ROOT(postId)}/option/${o}/chosen`).length > 0);
+  const errorShown = (root: Root, postId: string) => byTestId(root, `${POLL_ROOT(postId)}/error`).length > 0;
+  const retractPending = (root: Root, postId: string) => byTestId(root, `${RETRACT(postId)}/pending`).length > 0;
+  /**
+   * Device fix (Story 6.7): the vote keeps focus on the same action control.
+   * The column guide's destination (the last focused stop's host view) is the
+   * very view that was «Проголосовать», now carrying `…/poll/retract` (the
+   * tracked focus id followed it), and nothing asked to move focus (no
+   * refetch fallback, no jump to the author).
+   */
+  const expectFocusKeptOnAction = async (root: Root, postId: string) => {
+    // No deferred request either (the refetch fallback's frames have run).
+    await frames(3);
+    expect(guideDestinations.get('post/column')?.[0]).toBe(actionView);
+    expect(destinationIds('post/column')).toEqual([RETRACT(postId)]);
+    expect(focusMock).not.toHaveBeenCalled();
+  };
+  /** The column guide's destination right after OK on «Проголосовать» (that control's host view). */
+  let actionView: unknown;
+
+  it('not voted: the options are checkbox stops; «Проголосовать» is not focusable until an option is checked; matrix «Toggle» (1, 3, 1 → only 3; nothing sent)', async () => {
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    expect(pollIds(root, id)).toEqual([OPTION(id, '1'), OPTION(id, '2'), OPTION(id, '3')]);
+    const [submit] = byTestId(root, SUBMIT(id));
+    expect(submit.props.focusable).toBe(false);
+    expect(submit.props.accessibilityState).toMatchObject({ disabled: true });
+    expect(one(root, OPTION(id, '1')).props.accessibilityRole).toBe('checkbox');
+    expect(one(root, OPTION(id, '1')).props.accessibilityState).toMatchObject({ checked: false });
+    // Initial focus unchanged (the first paragraph).
+    expect(lastFocusTarget()).toBe(BLOCK(id, 'text@0'));
+    await press(root, OPTION(id, '1'));
+    await press(root, OPTION(id, '3'));
+    await press(root, OPTION(id, '1'));
+    expect(checked(root, id)).toEqual(['3']);
+    expect(one(root, OPTION(id, '3')).props.accessibilityState).toMatchObject({ checked: true });
+    expect(pollIds(root, id)).toEqual([OPTION(id, '1'), OPTION(id, '2'), OPTION(id, '3'), SUBMIT(id)]);
+    expect(pollCalls()).toEqual([]);
+    await unmount(root);
+  });
+
+  it('matrix «Vote»: 1 and 3 checked, OK on «Проголосовать» → E11 `answer=1,3`, then E10; results with the checks; focus stays on the same control, now «Отозвать голос»', async () => {
+    queueFrames();
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    pollReply = req =>
+      req.method === 'GET' ? { status: 200, body: { data: { poll: apiPoll([1, 3], [11, 8, 4]) } } } : { status: 200, body: {} };
+    await press(root, OPTION(id, '3'));
+    await press(root, OPTION(id, '1'));
+    await focusOn(root, SUBMIT(id));
+    actionView = guideDestinations.get('post/column')?.[0];
+    expect(destinationIds('post/column')).toEqual([SUBMIT(id)]);
+    focusMock.mockClear();
+    await press(root, SUBMIT(id));
+    expect(pollCalls()).toEqual([
+      ['POST', VOTE, { answer: '1,3' }],
+      ['GET', E10, null],
+    ]);
+    expect(pollIds(root, id)).toEqual([RETRACT(id)]);
+    expect(chosen(root, id)).toEqual(['1', '3']);
+    await expectFocusKeptOnAction(root, id);
+    expect(pageText(root)).toContain(t('poll.retract'));
+    const cached = queryClient.getQueryData<{ kind: string; post: Post }>(queryKeys.post(FEED_BLOG, id));
+    expect(cached?.post.poll?.answer).toEqual(['1', '3']);
+    await unmount(root);
+  });
+
+  it('matrix «Vote fails»: inline error, the checks kept, 1 request (no retry); the next OK clears the error', async () => {
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    pollReply = () => ({ status: 503 });
+    await press(root, OPTION(id, '1'));
+    await press(root, OPTION(id, '3'));
+    await press(root, SUBMIT(id), { settle: WITH_TIMERS });
+    expect(pollCalls()).toEqual([['POST', VOTE, { answer: '1,3' }]]);
+    expect(errorShown(root, id)).toBe(true);
+    expect(pageText(root)).toContain(t('poll.voteFailed'));
+    expect(checked(root, id)).toEqual(['1', '3']);
+    expect(chosen(root, id)).toEqual([]);
+    expect(pollIds(root, id)).toContain(SUBMIT(id));
+    await press(root, OPTION(id, '2'));
+    expect(errorShown(root, id)).toBe(false);
+    expect(pollCalls()).toHaveLength(1);
+    await unmount(root);
+  });
+
+  it('matrix «Retract»: answer [1, 3]; «Отозвать голос» is the only stop; OK → pending hint; OK → E12, then E10; no checks; focus on the first option', async () => {
+    e8Poll = apiPoll([1, 3], [11, 8, 4]);
+    queueFrames();
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    pollReply = req => (req.method === 'GET' ? { status: 200, body: { data: { poll: apiPoll(null) } } } : { status: 200 });
+    expect(pollIds(root, id)).toEqual([RETRACT(id)]);
+    expect(chosen(root, id)).toEqual(['1', '3']);
+    await press(root, RETRACT(id));
+    expect(retractPending(root, id)).toBe(true);
+    expect(text(byTestId(root, `${RETRACT(id)}/pending`)[0])).toContain(t('poll.pendingRetract'));
+    expect(pollCalls()).toEqual([]);
+    focusMock.mockClear();
+    await press(root, RETRACT(id));
+    expect(pollCalls()).toEqual([
+      ['DELETE', VOTE, null],
+      ['GET', E10, null],
+    ]);
+    expect(chosen(root, id)).toEqual([]);
+    expect(checked(root, id)).toEqual([]);
+    // Device fix: the focused control (now a disabled «Проголосовать») stays
+    // focusable while focus is handed to the first option. The request waits
+    // for the options' layout: none on frame 1, from frame 2 on.
+    expect(pollIds(root, id)).toEqual([OPTION(id, '1'), OPTION(id, '2'), OPTION(id, '3'), SUBMIT(id)]);
+    expect(focusTargets()).toEqual([]);
+    await frames(1);
+    expect(focusTargets()).toEqual([]);
+    await frames(1);
+    expect(lastFocusTarget()).toBe(OPTION(id, '1'));
+    expect(focusTargets()).not.toContain(AUTHOR(id));
+    // The first option reports focus → «Проголосовать» turns non-focusable.
+    await act(async () => {
+      one(root, SUBMIT(id)).props.onBlur({ nativeEvent: {} });
+    });
+    await focusOn(root, OPTION(id, '1'));
+    expect(pollIds(root, id)).toEqual([OPTION(id, '1'), OPTION(id, '2'), OPTION(id, '3')]);
+    await unmount(root);
+  });
+
+  it('matrix «Retract» failure: inline error, the vote kept, 1 request', async () => {
+    e8Poll = apiPoll([1, 3], [11, 8, 4]);
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    pollReply = () => ({ network: true as const });
+    await press(root, RETRACT(id));
+    await press(root, RETRACT(id), { settle: WITH_TIMERS });
+    expect(pollCalls()).toEqual([['DELETE', VOTE, null]]);
+    expect(pageText(root)).toContain(t('poll.retractFailed'));
+    expect(chosen(root, id)).toEqual(['1', '3']);
+    expect(pollIds(root, id)).toEqual([RETRACT(id)]);
+    await unmount(root);
+  });
+
+  it('matrix «Cancel retract»: OK on «Отозвать голос», then focus leaves → pending cleared; nothing sent', async () => {
+    e8Poll = apiPoll([1, 3], [11, 8, 4]);
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    await press(root, RETRACT(id));
+    expect(retractPending(root, id)).toBe(true);
+    await act(async () => {
+      one(root, RETRACT(id)).props.onBlur({ nativeEvent: {} });
+    });
+    await focusOn(root, BLOCK(id, 'text@2'));
+    expect(retractPending(root, id)).toBe(false);
+    expect(pollCalls()).toEqual([]);
+    await unmount(root);
+  });
+
+  it('E10 fails after the vote: the post`s E8 brings the voted poll; focus stays on the same control, now «Отозвать голос»; no error', async () => {
+    queueFrames();
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    pollReply = req => (req.method === 'GET' ? { status: 404, body: { error: 'not_found' } } : { status: 200 });
+    const before = e8Calls().length;
+    e8Poll = apiPoll([2], [10, 9, 3]);
+    await press(root, OPTION(id, '2'));
+    await focusOn(root, SUBMIT(id));
+    actionView = guideDestinations.get('post/column')?.[0];
+    focusMock.mockClear();
+    await press(root, SUBMIT(id));
+    expect(pollCalls()).toEqual([
+      ['POST', VOTE, { answer: '2' }],
+      ['GET', E10, null],
+    ]);
+    expect(e8Calls().length).toBe(before + 1);
+    expect(errorShown(root, id)).toBe(false);
+    expect(chosen(root, id)).toEqual(['2']);
+    await expectFocusKeptOnAction(root, id);
+    await unmount(root);
+  });
+
+  it('an open multiple-choice poll as the first stop: initial focus on its first option; once voted, on «Отозвать голос»', async () => {
+    const header = [{ type: 'header', content: JSON.stringify(['Опрос недели', 'unstyled', []]), modificator: '' }];
+    e8 = (_req, blogUrl, postId) => ({ status: 200, body: postDetail(blogUrl, postId, header, { poll: e8Poll }) });
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    expect(lastFocusTarget()).toBe(OPTION(id, '1'));
+    await unmount(root);
+    await resetQueryCache();
+    e8Poll = apiPoll([1]);
+    const voted = await openFromHome();
+    expect(lastFocusTarget()).toBe(RETRACT(id));
+    await unmount(voted);
+  });
+
+  it('matrix «Finished multi»: one inert stop', async () => {
+    e8Poll = { ...apiPoll([1]), isFinished: true };
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    expect(pollIds(root, id)).toEqual([POLL_ROOT(id)]);
+    await press(root, POLL_ROOT(id));
+    expect(pollCalls()).toEqual([]);
+    await unmount(root);
   });
 });

@@ -5,7 +5,8 @@ import { queryKeys, type HttpClient } from '../../shared/api';
 import { PollRepository, applyPoll } from '../../shared/entities/poll';
 
 /**
- * Story 6.6: the single-choice vote and retract (FR41, POLL-02/04).
+ * Story 6.6: the single-choice vote and retract (FR41, POLL-02/04); Story
+ * 6.7: the multiple-choice vote (every checked id) and retract (POLL-03).
  *
  * - One request per poll id, app-wide (module-level, AD-6): while one runs,
  *   `submit` for any option of that poll is ignored (returns false).
@@ -24,7 +25,7 @@ import { PollRepository, applyPoll } from '../../shared/entities/poll';
  *   the next account's vote on the same poll.
  */
 
-/** `<generation>:<pollId>` → the option whose request is running. */
+/** `<generation>:<pollId>` → the key of the control whose request is running. */
 const inFlight = new Map<string, string>();
 const flightKey = (pollId: string) => `${accountScope.generation()}:${pollId}`;
 const listeners = new Set<() => void>();
@@ -60,15 +61,21 @@ export type PollVoteTarget = {
 };
 
 export type PollVote = {
-  /** The option whose request is running (any instance of this poll); null when none. */
-  sendingOptionId: string | null;
+  /**
+   * The key of the control whose request is running (any instance of this
+   * poll): an option id (single choice), `submit` or `retract` (Story 6.7
+   * multiple choice); null when none.
+   */
+  sendingKey: string | null;
   /** The last failed mutation of this widget; null when none or cleared. */
   error: PollMutation | null;
   /**
-   * Starts `mutation` for `optionId` (`vote` sends that option, `retract`
-   * the poll's E12). False when a request for this poll is already running.
+   * Starts `mutation` (`vote` sends `optionIds`, comma-joined in the given
+   * order; `retract` the poll's E12 and ignores them). `sendingKey` names
+   * the control that sent (see `sendingKey`). False when a request for this
+   * poll is already running.
    */
-  submit: (mutation: PollMutation, optionId: string) => boolean;
+  submit: (mutation: PollMutation, optionIds: readonly string[], sendingKey: string) => boolean;
   /** A request of this poll runs now under the current account (read at call time). */
   isBusy: () => boolean;
   clearError: () => void;
@@ -85,16 +92,16 @@ export function usePollVote({ http, blogUrl, postId, pollId }: PollVoteTarget): 
     };
   }, []);
   const snapshot = () => inFlight.get(flightKey(pollId)) ?? null;
-  const sendingOptionId = useSyncExternalStore(subscribe, snapshot, snapshot);
+  const sendingKey = useSyncExternalStore(subscribe, snapshot, snapshot);
 
   const submit = useCallback(
-    (mutation: PollMutation, optionId: string) => {
+    (mutation: PollMutation, optionIds: readonly string[], controlKey: string) => {
       const generation = accountScope.generation();
       const key = `${generation}:${pollId}`;
       if (inFlight.has(key)) {
         return false;
       }
-      inFlight.set(key, optionId);
+      inFlight.set(key, controlKey);
       notify();
       setError(null);
       /** No sign-out or account switch since `submit`. */
@@ -102,7 +109,7 @@ export function usePollVote({ http, blogUrl, postId, pollId }: PollVoteTarget): 
       const run = async () => {
         try {
           if (mutation === 'vote') {
-            await PollRepository.vote(http, pollId, [optionId]);
+            await PollRepository.vote(http, pollId, optionIds);
           } else {
             await PollRepository.retract(http, pollId);
           }
@@ -127,7 +134,7 @@ export function usePollVote({ http, blogUrl, postId, pollId }: PollVoteTarget): 
         }
       };
       run().finally(() => {
-        if (inFlight.get(key) === optionId) {
+        if (inFlight.get(key) === controlKey) {
           inFlight.delete(key);
           notify();
         }
@@ -140,5 +147,5 @@ export function usePollVote({ http, blogUrl, postId, pollId }: PollVoteTarget): 
   const clearError = useCallback(() => setError(null), []);
   const isBusy = useCallback(() => inFlight.has(flightKey(pollId)), [pollId]);
 
-  return { sendingOptionId, error, submit, isBusy, clearError };
+  return { sendingKey, error, submit, isBusy, clearError };
 }

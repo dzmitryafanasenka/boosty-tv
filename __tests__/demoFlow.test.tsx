@@ -259,6 +259,49 @@ test('Story 6.5: a demo post with a finished poll: «Опрос завершен
   });
 });
 
+test('Story 6.7: the demo multiple-choice poll takes a multi-id vote and a retract in memory', async () => {
+  fetchMock.mockClear();
+  const root = await renderApp();
+  const ids = () =>
+    root.container.queryAll(n => n.props.focusable === true).map(n => n.props.testID as string);
+  const pollIds = () => ids().filter(id => id.startsWith('post/demo-post-5/poll/'));
+  const POLL_5 = 'post/demo-post-5/block/poll:2005';
+  const marks = (suffix: string) =>
+    [1, 2, 3, 4].filter(
+      optionId => root.container.queryAll(n => n.props.testID === `${POLL_5}/option/${optionId}/${suffix}`).length > 0,
+    );
+  await press(root, 'home/feed/demo-post-5');
+  // Not voted: four checkbox stops; «Проголосовать» is not focusable yet.
+  expect(pollIds()).toEqual([1, 2, 3, 4].map(o => `post/demo-post-5/poll/option/${o}`));
+  expect(JSON.stringify(root.container.toJSON())).toContain('Какие темы разобрать?');
+  await press(root, 'post/demo-post-5/poll/option/3');
+  await press(root, 'post/demo-post-5/poll/option/1');
+  expect(marks('checked')).toEqual([1, 3]);
+  await press(root, 'post/demo-post-5/poll/submit');
+  await settle();
+  // Voted: the results with the checks; «Отозвать голос» is the only stop.
+  expect(pollIds()).toEqual(['post/demo-post-5/poll/retract']);
+  expect(marks('chosen')).toEqual([1, 3]);
+  expect(JSON.stringify(root.container.toJSON())).toContain('Проголосовали: 41');
+  // Retract (two OKs): back to the open poll, no checks.
+  await press(root, 'post/demo-post-5/poll/retract');
+  await press(root, 'post/demo-post-5/poll/retract');
+  await settle();
+  // The focused control stays focusable (drawn disabled) until focus has left
+  // it for the first option (the hand-off; the native focus is mocked here).
+  await act(async () => {
+    one(root, 'post/demo-post-5/poll/submit').props.onBlur({ nativeEvent: {} });
+    one(root, 'post/demo-post-5/poll/option/1').props.onFocus({ nativeEvent: {} });
+  });
+  expect(pollIds()).toEqual([1, 2, 3, 4].map(o => `post/demo-post-5/poll/option/${o}`));
+  expect(marks('chosen')).toEqual([]);
+  expect(marks('checked')).toEqual([]);
+  expect(fetchMock).not.toHaveBeenCalled();
+  await act(async () => {
+    root.unmount();
+  });
+});
+
 test('Story 3.5: a demo post with two videos shows two MediaRows on top (the second without a title)', async () => {
   fetchMock.mockClear();
   const root = await renderApp();
