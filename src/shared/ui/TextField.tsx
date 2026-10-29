@@ -1,4 +1,4 @@
-import { useImperativeHandle, useRef, useState, type Ref } from 'react';
+import { useCallback, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import {
   StyleSheet,
   TextInput,
@@ -37,6 +37,10 @@ export type TextFieldProps = {
   maxLength?: number;
   testID?: string;
   style?: StyleProp<ViewStyle>;
+  /** The input received focus (e.g. a FocusZone item's `onFocus`, Story 5.6). */
+  onFocus?: () => void;
+  /** The host view as it mounts and unmounts (e.g. a FocusZone item's `ref`, Story 5.6). */
+  hostRef?: (view: HostView | null) => void;
   ref?: Ref<TextFieldHandle>;
 };
 
@@ -64,10 +68,18 @@ export function TextField({
   maxLength,
   testID,
   style,
+  onFocus,
+  hostRef: onHostRef,
   ref,
 }: TextFieldProps) {
   const [focused, setFocused] = useState(false);
   const hostRef = useRef<HostView>(null);
+  const onHostRefRef = useRef(onHostRef);
+  onHostRefRef.current = onHostRef;
+  const setHost = useCallback((view: HostView | null) => {
+    hostRef.current = view;
+    onHostRefRef.current?.(view);
+  }, []);
 
   useImperativeHandle(
     ref,
@@ -93,7 +105,7 @@ export function TextField({
       {/* Not collapsable: a real native view, so requestTVFocus() and focus
           guide destinations can find it; it hands focus to the input. */}
       <View
-        ref={hostRef}
+        ref={setHost}
         collapsable={false}
         testID={testID ? `${testID}/host` : undefined}
       >
@@ -102,7 +114,10 @@ export function TextField({
           value={value}
           onChangeText={onChangeText}
           onSubmitEditing={onSubmitEditing}
-          onFocus={() => setFocused(true)}
+          onFocus={() => {
+            setFocused(true);
+            onFocus?.();
+          }}
           onBlur={() => setFocused(false)}
           placeholder={placeholder}
           placeholderTextColor={colors['text-disabled']}

@@ -13,11 +13,14 @@
  * is off, Подписки sends no profile E1 and shows no «Мой блог» tile.
  *
  * `filters` (Story 5.3) is the «Фильтры» chip on Главная: while it is off,
- * there is no chip and the feed uses the default Filter.
+ * there is no chip and the feed uses the default Filter (and so does Поиск).
+ *
+ * `search` (Story 5.6) is the Поиск sidebar section («Поиск по подпискам»,
+ * E6): while it is off, the section is not rendered.
  */
 export const phaseFlags = {
   home: true,
-  search: false,
+  search: true,
   subs: true,
   events: false,
   settings: true,

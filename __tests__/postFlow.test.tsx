@@ -1078,6 +1078,7 @@ describe('the sidebar (ADR 0012)', () => {
     const root = await openFromHome();
     expect(focusableIds(root, byTestId(root, 'post/sidebar')[0])).toEqual([
       'post/nav/home',
+      'post/nav/search',
       'post/nav/subs',
       'post/nav/settings',
     ]);

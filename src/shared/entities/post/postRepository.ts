@@ -1,5 +1,10 @@
 import { AppError, isAppError } from '../../api/appError';
-import { blogPostsPageDtoSchema, feedPageDtoSchema } from '../../api/dto/feed';
+import {
+  blogPostsPageDtoSchema,
+  feedPageDtoSchema,
+  feedSearchItemDtoSchema,
+  feedSearchPageDtoSchema,
+} from '../../api/dto/feed';
 import { blockTypeDtoSchema, okVideoTimeCodeDtoSchema } from '../../api/dto/post';
 import { blogUrlSchema } from '../../api/dto/subscriptions';
 import type { HttpClient } from '../../api/httpClient';
@@ -62,6 +67,26 @@ export function feedPath(cursor: string | null, filter: Filter, nowMs: number = 
   return cursor === null ? base : `${base}&offset=${encodeURIComponent(cursor)}`;
 }
 
+/** E6 page size (the reference's `FeedRepository.searchData`, `limit = 10`). */
+export const FEED_SEARCH_PAGE_SIZE = 10;
+
+/**
+ * E6 path (Story 5.6, api-contract §3 «E6 (LIVE)»): E5's params (comments
+ * off, the `search` Filter's access, period and tag params) plus
+ * `search_query` = the query, URL-encoded (Cyrillic, `&`, `#`, spaces), then
+ * the opaque cursor, verbatim and URL-encoded. The caller passes the trimmed
+ * query. Never logged: it is user input.
+ */
+export function feedSearchPath(
+  query: string,
+  cursor: string | null,
+  filter: Filter,
+  nowMs: number = Date.now(),
+): string {
+  const base = `/v1/search/feed/post/?limit=${FEED_SEARCH_PAGE_SIZE}&comments_limit=0&reply_limit=0&${feedAccessParams(filter)}${feedPeriodParams(filter, nowMs)}${feedTagParams(filter)}&search_query=${encodeURIComponent(query)}`;
+  return cursor === null ? base : `${base}&offset=${encodeURIComponent(cursor)}`;
+}
+
 /** Append, then dedupe by `post.id`, keeping the first occurrence. */
 export function mergePosts(...lists: ReadonlyArray<readonly Post[]>): Post[] {
   const seen = new Set<string>();
@@ -121,6 +146,39 @@ async function feedPage(
 ): Promise<PostPage> {
   const { body } = await http.get(feedPath(cursor, filter, now), feedPageDtoSchema);
   return toPage(body.data.posts, body.extra, logger);
+}
+
+/**
+ * One E6 page of «Поиск по подпискам» (Story 5.6) for the trimmed `query`
+ * and the `search` Filter (`now` resolves the period at request time). An
+ * item without a `post` object is dropped and counted in the log (no value
+ * logged); a malformed post is dropped by the mapper; the page never fails
+ * for one item. Rejects with `AppError` (`Parse` when `data.searchPosts` is
+ * missing). Paging as E5 (`isLast`, a missing `extra`/`offset`).
+ */
+async function feedSearchPage(
+  http: HttpClient,
+  query: string,
+  cursor: string | null,
+  filter: Filter,
+  now: number = Date.now(),
+  logger: Logger = appLogger,
+): Promise<PostPage> {
+  const { body } = await http.get(feedSearchPath(query, cursor, filter, now), feedSearchPageDtoSchema);
+  const raw: unknown[] = [];
+  let dropped = 0;
+  for (const item of body.data.searchPosts) {
+    const parsed = feedSearchItemDtoSchema.safeParse(item);
+    if (parsed.success) {
+      raw.push(parsed.data.post);
+    } else {
+      dropped += 1;
+    }
+  }
+  if (dropped > 0) {
+    logger.warn('search', 'dropped', { count: dropped });
+  }
+  return toPage(raw, body.extra, logger);
 }
 
 /**
@@ -264,4 +322,10 @@ async function videoSources(
   return { kind: 'ok', post, videoTitle: block.title.trim(), sources };
 }
 
-export const PostRepository = { feedPage, blogPage, post: onePost, videoSources } as const;
+export const PostRepository = {
+  feedPage,
+  feedSearchPage,
+  blogPage,
+  post: onePost,
+  videoSources,
+} as const;

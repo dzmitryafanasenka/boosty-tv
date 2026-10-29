@@ -584,6 +584,7 @@ describe('focus (focus-map §4 D, §1.6)', () => {
     const root = await openAuthor();
     expect(focusableIds(root, byTestId(root, 'author/sidebar')[0])).toEqual([
       'author/nav/home',
+      'author/nav/search',
       'author/nav/subs',
       'author/nav/settings',
     ]);

@@ -187,6 +187,20 @@ export const ru = {
       chipMany: 'Теги: {n}',
     },
   },
+  // Поиск по подпискам (Story 5.6, E6; docs/focus-map.md §4 E): the search
+  // runs on «Готово» only; the hint shows before the first query.
+  search: {
+    fieldLabel: 'Поиск по подпискам',
+    placeholder: 'Название или текст публикации',
+    hint: 'Введите запрос и нажмите «Готово». Фильтры тоже сужают поиск.',
+    loading: 'Ищем…',
+    emptyTitle: 'Ничего не найдено',
+    emptyBody: 'Проверьте написание или сократите запрос.',
+    filteredEmptyBody: 'Проверьте написание или сократите запрос. Фильтры тоже влияют на поиск.',
+    resetFilters: 'Сбросить фильтры',
+    errorTitle: 'Не удалось выполнить поиск',
+    loadMoreError: 'Не удалось загрузить следующие результаты.',
+  },
   // Подписки (Story 3.2, E2; docs/focus-map.md §3 C1–C3). Empty: no CTA
   // (C3). `{n}` is the number of tiles shown.
   subs: {

@@ -247,7 +247,7 @@ All of these are under `https://api.boosty.to` and use a Bearer token.
 | E3 | `GET /v1/blog/{blogUrl}` | Blog header (Story 5.2: Подписки also sends it for the own blog, with the Author page's query key, to decide and draw «Мой блог»; `unavailable` or a failure → no tile) | — | `title`, `blogUrl`, `owner{name, avatarUrl}` |
 | E4 | `GET /v1/blog/{blogUrl}/post/` | Blog posts (Story 5.2: Подписки sends page 1 for the own blog, with the Author page's params and query key, to decide «Мой блог»; the reference's `limit=1` is not used. A failed own-blog E1/E3/E4 is not re-sent when Подписки mounts again. While Подписки is mounted, the resume head refresh also refreshes this page 1, because it observes `authorPosts(ownBlogUrl)`) | `limit` (20), `offset?` (opaque string), `comments_limit=0`, `reply_limit=0`, `is_only_allowed?`, `only_bought?`, `from_ts?`, `to_ts?` (epoch s), `tags_ids?` (comma-joined) | `data[]: Post`, `extra{offset, isLast}`. A pinned post (`isPinned: true`) comes first, out of date order (seen live on 2 of 3 blogs, 2026-10-27); the app keeps that order and marks the card with a pin badge on the Author page |
 | E5 | `GET /v1/feed/post/` | Feed (Story 5.3: Главная always sends the access params of the active `feed` Filter, see «E5 access params (LIVE)» below; Story 5.4: plus `from_ts`/`to_ts` for a period other than «За всё время», see «E5 period (LIVE)»; Story 5.5: plus `tags_ids` when tags are checked, see «E5 tags (LIVE)») | `limit` (10), `offset?`, `comments_limit=0`, `reply_limit=0`, `only_allowed?`, `only_bought?`, `tags_ids?`, `from_ts?`, `to_ts?` | `data.posts[]: Post`, `extra` |
-| E6 | `GET /v1/search/feed/post/` | Feed search | E5 params + `search_query` | `data.searchPosts[].post: Post`, `extra` |
+| E6 | `GET /v1/search/feed/post/` | Feed search (Story 5.6: Поиск по подпискам, content profile, see «E6 (LIVE)») | `limit` (10), `comments_limit=0`, `reply_limit=0`, the E5 access / period / tag params of the `search` Filter, `search_query`, `offset?` | `data.searchPosts[].post: Post`, `extra{offset, isLast}` |
 | E7 | `GET /v1/search/blog/post/` | Blog search | `blog_url`, `search_query`, E4 params (with `is_only_allowed`) | `data.searchPosts[].post: Post`, `extra` |
 | E8 | `GET /v1/blog/{blogUrl}/post/{postId}` | Single post (the reference uses it to refresh media URLs and `timeCode`) | `comments_limit`, `reply_limit` (the reference sends 20. **We must send 0**. 0 is accepted: `LIVE`, Story 1.5) | `Post` (top level, no `data` wrapper) |
 | E9 | `PUT /v1/viewstat/video/{videoId}/timecode/` | Save playback progress | form `time_code` = integer seconds | body ignored. **HTTP 200** on every write; the value comes back as `ok_video.timeCode` on the next E8 and on the website (`LIVE`, Story 1.6, §6, web profile). Sent by the app with the content profile since Story 4.2 (§6 «Production client: progress»; content profile `LIVE`, Story 4.2: the website showed the written position) |
@@ -363,6 +363,28 @@ Live check (same run; default access params, `limit` 20/50 for the probe request
 | `A,B` encoded as `A%2CB`, and `B,A` | the same posts as `A,B` |
 
 So E5 honours `tags_ids` and **intersects** the listed tags: a post must carry every listed tag (a union would have returned at least A's 50 posts). A literal and an encoded comma behave the same; the order does not matter. One account, two runs; E4 `tags_ids` (Story 5.7) was not checked.
+
+### E6 (`LIVE`, Story 5.6)
+
+The reference (`BoostyApi.feedSearch`, `FeedRepository.searchData`, `develop`) sends `limit=10`, `comments_limit=0`, `reply_limit=0`, the feed's access, tag and period params and `search_query`; it reads `data.searchPosts[].post` and `extra`. Boosty TV sends `GET /v1/search/feed/post/?limit=10&comments_limit=0&reply_limit=0&only_allowed=…&only_bought=…[&from_ts=…&to_ts=…][&tags_ids=…]&search_query=<URL-encoded>[&offset=<extra.offset>]` (the same builders as E5, from the `search` Filter; the query is trimmed by the app, never logged; `HttpClient` logs the path without the query string). `PostRepository.feedSearchPage` reads `data.searchPosts[].post` through the one post mapper; an item without a `post` object is dropped and counted in the log (no value), a malformed post is dropped by the mapper, never the page; a missing `data.searchPosts` is `Parse`. `headline`, `rank` and `data.blogs` are not read. Paging as E5 (`isLast`, a missing `extra`/`offset`, a used cursor).
+
+Live check (debug build with Metro and a temporary counts-only log, removed before the commit; Chromecast with Google TV 4K, the owner's session, 2026-10-29; HTTP 200 for every request; only keys, types, counts and booleans were logged, never ids, titles, the query or URLs). `Q` = the longest word (9 Cyrillic letters) of the newest default E5 post's title:
+
+| Request (default access params unless noted) | Result |
+|---|---|
+| `search_query=Q` | top level `{data, extra}`; `data` keys `blogs`, `searchPosts`; 10 items, each `{post, rank, headline}`, every `post` an object; 0 locked; `extra{offset: string, isLast: false}`; the newest feed post (whose title gave `Q`) is among them; 6 of 10 carry `Q` literally in the title or text blocks (the rest match otherwise: stemming or fields the app does not read) |
+| The same through `PostRepository.feedSearchPage` | 10 mapped posts, a next cursor |
+| Pages 2 and 3 (`offset` = the previous `extra.offset`) | 10 + 10 posts, **no overlap** with the earlier pages, a new cursor each time, `isLast: false` |
+| «Все посты» (`only_allowed=false&only_bought=false`) | 10 posts, 0 locked (this query) |
+| «Только купленные» | 0 posts, last page |
+| «Последние 7 / 30 дней», «Последние 3 месяца» | 1 / 4 / 8 posts, last page, **every one inside the bounds** |
+| A custom range in 2030 | 0 posts |
+| `tags_ids` = a tag carried by a result | 10 posts, **every one carries that tag**, more pages |
+| A one-letter query (`а`) | 0 posts, last page (no match on a single letter) |
+| A nonsense Latin query | 0 posts, last page (`searchPosts: []`, `extra` present) |
+| `Q & #` (spaces, `&`, `#` encoded) | HTTP 200, 10 posts (the encoding keeps it one param) |
+
+So E6 has the reference's shape, pages by the opaque cursor without overlap, and honours the period, tag and «Только купленные» params together with `search_query`. «Все посты» returned no locked post for this query, so the access split under search is not proven beyond «Только купленные»; one account, one run. Sanitized shape fixtures: `src/test/fixtures/boosty/e6-feed-search-1.json` (3 items, `isLast: false`) and `e6-feed-search-2.json` (2 items, `isLast: true`), built from the sanitized E5 posts (the live run logged counts only, no body was captured).
 
 ## 4. Post object (`REF`)
 

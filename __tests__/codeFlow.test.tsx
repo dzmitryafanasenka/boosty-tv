@@ -393,6 +393,7 @@ describe('confirm and session creation', () => {
         .map(node => node.props.testID),
     ).toEqual([
       'nav/home',
+      'nav/search',
       'nav/subs',
       'nav/settings',
       'home/filters',

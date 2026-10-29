@@ -1,0 +1,1584 @@
+{
+  "case": "e6-feed-search-1",
+  "status": 200,
+  "body": {
+    "data": {
+      "blogs": [],
+      "searchPosts": [
+        {
+          "post": {
+            "data": [
+              {
+                "type": "text",
+                "modificator": "",
+                "content": "[\"Sample text\",\"unstyled\",[]]"
+              },
+              {
+                "content": "",
+                "modificator": "BLOCK_END",
+                "type": "text"
+              },
+              {
+                "title": "redacted",
+                "rendition": "",
+                "size": 1536000,
+                "url": "https://example.invalid/image",
+                "isInvalid": null,
+                "type": "image",
+                "id": "synthetic-id-109",
+                "width": 3024,
+                "height": 4032
+              }
+            ],
+            "isShowcaseVisible": false,
+            "isDeleted": false,
+            "publishTime": 1700313200,
+            "forbiddenChangeHasAIContent": false,
+            "reactionsDisabled": false,
+            "donators": {
+              "extra": {
+                "isLast": true
+              },
+              "data": []
+            },
+            "reactionCounters": [
+              {
+                "count": 5,
+                "type": "like"
+              },
+              {
+                "type": "dislike",
+                "count": 0
+              },
+              {
+                "type": "fire",
+                "count": 5
+              },
+              {
+                "count": 0,
+                "type": "heart"
+              },
+              {
+                "type": "laugh",
+                "count": 0
+              },
+              {
+                "count": 0,
+                "type": "laught"
+              },
+              {
+                "count": 0,
+                "type": "wonder"
+              },
+              {
+                "count": 0,
+                "type": "sad"
+              },
+              {
+                "count": 0,
+                "type": "angry"
+              },
+              {
+                "type": "funny",
+                "count": 0
+              },
+              {
+                "count": 0,
+                "type": "check"
+              },
+              {
+                "count": 0,
+                "type": "thinking"
+              },
+              {
+                "type": "clown",
+                "count": 0
+              },
+              {
+                "count": 0,
+                "type": "swearing"
+              },
+              {
+                "count": 0,
+                "type": "applause"
+              },
+              {
+                "type": "call-me",
+                "count": 0
+              },
+              {
+                "type": "cold",
+                "count": 0
+              },
+              {
+                "type": "eggplant",
+                "count": 0
+              },
+              {
+                "count": 0,
+                "type": "blowing-up"
+              },
+              {
+                "type": "scream",
+                "count": 0
+              },
+              {
+                "count": 0,
+                "type": "crown"
+              },
+              {
+                "count": 0,
+                "type": "diamond"
+              },
+              {
+                "type": "melting",
+                "count": 0
+              },
+              {
+                "type": "money",
+                "count": 0
+              },
+              {
+                "count": 0,
+                "type": "nausea"
+              },
+              {
+                "type": "confetti",
+                "count": 0
+              },
+              {
+                "type": "banana",
+                "count": 0
+              },
+              {
+                "count": 0,
+                "type": "peach"
+              },
+              {
+                "count": 0,
+                "type": "pizza"
+              },
+              {
+                "count": 0,
+                "type": "love"
+              },
+              {
+                "count": 0,
+                "type": "rocket"
+              },
+              {
+                "count": 0,
+                "type": "splash"
+              },
+              {
+                "type": "lightning",
+                "count": 0
+              },
+              {
+                "type": "cry",
+                "count": 0
+              },
+              {
+                "count": 0,
+                "type": "folded-hands"
+              }
+            ],
+            "isCommentsDenied": false,
+            "intId": 1041,
+            "id": "synthetic-id-108",
+            "bundleIds": [],
+            "isBlocked": false,
+            "donations": 0,
+            "title": "redacted",
+            "comments": {
+              "extra": {
+                "isFirst": true,
+                "isLast": false
+              },
+              "data": []
+            },
+            "promo": null,
+            "sortOrder": 5,
+            "isMarketing": false,
+            "user": {
+              "id": 1006,
+              "blogUrl": "synthetic-blog-2",
+              "isOfficial": false,
+              "name": "redacted",
+              "flags": {
+                "showPostDonations": true
+              },
+              "currency": "redacted",
+              "hasAvatar": true,
+              "avatarUrl": "https://example.invalid/avatar"
+            },
+            "createdAt": 1700313200,
+            "isPublished": true,
+            "isRecord": false,
+            "price": 0,
+            "contentCounters": [
+              {
+                "size": 1536000,
+                "type": "image",
+                "count": 5
+              },
+              {
+                "size": 0,
+                "type": "text",
+                "count": 5
+              }
+            ],
+            "tags": [],
+            "hasAdultContent": false,
+            "showViewsCounter": false,
+            "isWaitingVideo": false,
+            "teaser": [],
+            "hasAccess": true,
+            "updatedAt": 1700313200,
+            "int_id": 1041,
+            "advertiserInfo": null,
+            "hasAIContent": false,
+            "signedQuery": "?sig=REDACTED",
+            "isPinned": false,
+            "currencyPrices": {
+              "USD": 0,
+              "RUB": 0,
+              "EUR": 0
+            },
+            "isLiked": false,
+            "count": {
+              "comments": 5,
+              "reactions": {
+                "dislike": 0,
+                "heart": 0,
+                "wonder": 0,
+                "fire": 5,
+                "sad": 0,
+                "laught": 0,
+                "angry": 0,
+                "like": 5
+              },
+              "likes": 0
+            },
+            "currencyDonations": {
+              "EUR": 0,
+              "RUB": 0,
+              "USD": 0
+            }
+          },
+          "rank": 5,
+          "headline": "redacted"
+        },
+        {
+          "post": {
+            "isMarketing": false,
+            "sortOrder": 5,
+            "isPublished": true,
+            "user": {
+              "name": "redacted",
+              "isOfficial": false,
+              "flags": {
+                "showPostDonations": false
+              },
+              "currency": "redacted",
+              "hasAvatar": true,
+              "avatarUrl": "https://example.invalid/avatar",
+              "id": 1002,
+              "blogUrl": "synthetic-blog-1"
+            },
+            "createdAt": 1700298800,
+            "promo": null,
+            "comments": {
+              "extra": {
+                "isFirst": true,
+                "isLast": false
+              },
+              "data": []
+            },
+            "title": "redacted",
+            "isBlocked": false,
+            "bundleIds": [],
+            "id": "synthetic-id-4",
+            "intId": 1010,
+            "donations": 0,
+            "reactionsDisabled": false,
+            "forbiddenChangeHasAIContent": false,
+            "publishTime": 1700298800,
+            "isDeleted": false,
+            "data": [
+              {
+                "type": "ok_video",
+                "viewsCounter": 5,
+                "complete": true,
+                "failoverHost": "redacted",
+                "previewId": "synthetic-id-6",
+                "duration": 3960,
+                "timeCode": 3900,
+                "uploadStatus": "redacted",
+                "title": "redacted",
+                "height": 1440,
+                "width": 2560,
+                "status": "ok",
+                "id": "synthetic-id-7",
+                "vid": "synthetic-id-5",
+                "defaultPreview": "https://example.invalid/preview",
+                "preview": "https://example.invalid/preview",
+                "showViewsCounter": true,
+                "isInvalid": null,
+                "playerUrls": [
+                  {
+                    "type": "ultra_hd",
+                    "url": ""
+                  },
+                  {
+                    "type": "live_playback_dash",
+                    "url": ""
+                  },
+                  {
+                    "url": "",
+                    "type": "live_cmaf"
+                  },
+                  {
+                    "type": "live_ondemand_hls",
+                    "url": ""
+                  },
+                  {
+                    "type": "low",
+                    "url": "https://example.invalid/player"
+                  },
+                  {
+                    "url": "https://example.invalid/player",
+                    "type": "lowest"
+                  },
+                  {
+                    "url": "",
+                    "type": "live_dash"
+                  },
+                  {
+                    "url": "https://example.invalid/player",
+                    "type": "quad_hd"
+                  },
+                  {
+                    "url": "https://example.invalid/player",
+                    "type": "hls"
+                  },
+                  {
+                    "url": "https://example.invalid/player",
+                    "type": "dash"
+                  },
+                  {
+                    "url": "https://example.invalid/player",
+                    "type": "full_hd"
+                  },
+                  {
+                    "url": "https://example.invalid/player",
+                    "type": "tiny"
+                  },
+                  {
+                    "url": "",
+                    "type": "dash_uni"
+                  },
+                  {
+                    "type": "live_hls",
+                    "url": ""
+                  },
+                  {
+                    "url": "https://example.invalid/player",
+                    "type": "medium"
+                  },
+                  {
+                    "url": "",
+                    "type": "live_playback_hls"
+                  },
+                  {
+                    "type": "ondemand_hls",
+                    "url": ""
+                  },
+                  {
+                    "type": "high",
+                    "url": "https://example.invalid/player"
+                  },
+                  {
+                    "type": "ondemand_dash",
+                    "url": ""
+                  }
+                ],
+                "url": ""
+              },
+              {
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "modificator": "",
+                "type": "text"
+              },
+              {
+                "type": "text",
+                "content": "",
+                "modificator": "BLOCK_END"
+              },
+              {
+                "type": "text",
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "modificator": ""
+              },
+              {
+                "type": "text",
+                "content": "",
+                "modificator": "BLOCK_END"
+              },
+              {
+                "type": "text",
+                "modificator": "",
+                "content": "[\"Sample text\",\"unstyled\",[]]"
+              },
+              {
+                "modificator": "BLOCK_END",
+                "content": "",
+                "type": "text"
+              },
+              {
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "modificator": "",
+                "type": "text"
+              },
+              {
+                "type": "text",
+                "modificator": "BLOCK_END",
+                "content": ""
+              },
+              {
+                "type": "text",
+                "modificator": "",
+                "content": "[\"Sample text\",\"unstyled\",[]]"
+              },
+              {
+                "modificator": "BLOCK_END",
+                "content": "",
+                "type": "text"
+              },
+              {
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "modificator": "",
+                "type": "text"
+              },
+              {
+                "modificator": "BLOCK_END",
+                "content": "",
+                "type": "text"
+              },
+              {
+                "type": "text",
+                "modificator": "",
+                "content": "[\"Sample text\",\"unstyled\",[]]"
+              },
+              {
+                "content": "",
+                "modificator": "BLOCK_END",
+                "type": "text"
+              },
+              {
+                "type": "text",
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "modificator": ""
+              },
+              {
+                "type": "text",
+                "modificator": "BLOCK_END",
+                "content": ""
+              },
+              {
+                "type": "text",
+                "modificator": "",
+                "content": "[\"Sample text\",\"unstyled\",[]]"
+              },
+              {
+                "modificator": "BLOCK_END",
+                "content": "",
+                "type": "text"
+              },
+              {
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "modificator": "",
+                "type": "text"
+              },
+              {
+                "type": "text",
+                "modificator": "BLOCK_END",
+                "content": ""
+              },
+              {
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "modificator": "",
+                "type": "text"
+              },
+              {
+                "content": "",
+                "modificator": "BLOCK_END",
+                "type": "text"
+              },
+              {
+                "type": "text",
+                "modificator": "",
+                "content": "[\"Sample text\",\"unstyled\",[]]"
+              },
+              {
+                "content": "",
+                "modificator": "BLOCK_END",
+                "type": "text"
+              },
+              {
+                "type": "text",
+                "content": "[\"Sample text\",\"unstyled\",[[0,0,6]]]",
+                "modificator": ""
+              },
+              {
+                "type": "text",
+                "content": "",
+                "modificator": "BLOCK_END"
+              },
+              {
+                "type": "text",
+                "modificator": "",
+                "content": "[\"Sample text\",\"unstyled\",[]]"
+              },
+              {
+                "explicit": false,
+                "content": "[\"Sample text\",\"unstyled\",[[4,0,6]]]",
+                "type": "link",
+                "url": "https://example.invalid/link"
+              },
+              {
+                "modificator": "BLOCK_END",
+                "content": "",
+                "type": "text"
+              },
+              {
+                "type": "text",
+                "modificator": "",
+                "content": "[\"Sample text\",\"unstyled\",[]]"
+              },
+              {
+                "url": "https://example.invalid/link",
+                "type": "link",
+                "content": "[\"Sample text\",\"unstyled\",[[4,0,6]]]",
+                "explicit": false
+              },
+              {
+                "modificator": "BLOCK_END",
+                "content": "",
+                "type": "text"
+              },
+              {
+                "type": "text",
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "modificator": ""
+              },
+              {
+                "content": "[\"Sample text\",\"unstyled\",[[4,0,6]]]",
+                "explicit": false,
+                "url": "https://example.invalid/link",
+                "type": "link"
+              },
+              {
+                "type": "text",
+                "modificator": "BLOCK_END",
+                "content": ""
+              },
+              {
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "modificator": "",
+                "type": "text"
+              },
+              {
+                "modificator": "BLOCK_END",
+                "content": "",
+                "type": "text"
+              },
+              {
+                "type": "text",
+                "modificator": "",
+                "content": "[\"Sample text\",\"unstyled\",[[0,0,6]]]"
+              },
+              {
+                "type": "text",
+                "content": "",
+                "modificator": "BLOCK_END"
+              },
+              {
+                "type": "link",
+                "url": "https://example.invalid/link",
+                "explicit": false,
+                "content": "[\"Sample text\",\"unstyled\",[]]"
+              },
+              {
+                "type": "text",
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "modificator": ""
+              },
+              {
+                "content": "",
+                "modificator": "BLOCK_END",
+                "type": "text"
+              },
+              {
+                "type": "text",
+                "content": "",
+                "modificator": "BLOCK_END"
+              },
+              {
+                "explicit": false,
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "type": "link",
+                "url": "https://example.invalid/link"
+              },
+              {
+                "modificator": "",
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "type": "text"
+              },
+              {
+                "type": "text",
+                "modificator": "BLOCK_END",
+                "content": ""
+              },
+              {
+                "type": "text",
+                "content": "",
+                "modificator": "BLOCK_END"
+              },
+              {
+                "url": "https://example.invalid/link",
+                "type": "link",
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "explicit": false
+              },
+              {
+                "type": "text",
+                "modificator": "",
+                "content": "[\"Sample text\",\"unstyled\",[]]"
+              },
+              {
+                "type": "text",
+                "modificator": "BLOCK_END",
+                "content": ""
+              },
+              {
+                "type": "text",
+                "modificator": "BLOCK_END",
+                "content": ""
+              },
+              {
+                "explicit": false,
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "type": "link",
+                "url": "https://example.invalid/link"
+              },
+              {
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "modificator": "",
+                "type": "text"
+              },
+              {
+                "type": "text",
+                "content": "",
+                "modificator": "BLOCK_END"
+              },
+              {
+                "modificator": "BLOCK_END",
+                "content": "",
+                "type": "text"
+              },
+              {
+                "url": "https://example.invalid/link",
+                "type": "link",
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "explicit": false
+              },
+              {
+                "type": "text",
+                "modificator": "",
+                "content": "[\"Sample text\",\"unstyled\",[]]"
+              },
+              {
+                "content": "",
+                "modificator": "BLOCK_END",
+                "type": "text"
+              },
+              {
+                "type": "text",
+                "modificator": "BLOCK_END",
+                "content": ""
+              },
+              {
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "explicit": false,
+                "url": "https://example.invalid/link",
+                "type": "link"
+              },
+              {
+                "type": "text",
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "modificator": ""
+              },
+              {
+                "type": "text",
+                "modificator": "BLOCK_END",
+                "content": ""
+              },
+              {
+                "type": "text",
+                "content": "",
+                "modificator": "BLOCK_END"
+              },
+              {
+                "url": "https://example.invalid/link",
+                "type": "link",
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "explicit": false
+              },
+              {
+                "type": "text",
+                "modificator": "",
+                "content": "[\"Sample text\",\"unstyled\",[]]"
+              },
+              {
+                "type": "text",
+                "content": "",
+                "modificator": "BLOCK_END"
+              },
+              {
+                "modificator": "BLOCK_END",
+                "content": "",
+                "type": "text"
+              },
+              {
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "explicit": false,
+                "url": "https://example.invalid/link",
+                "type": "link"
+              },
+              {
+                "type": "text",
+                "modificator": "",
+                "content": "[\"Sample text\",\"unstyled\",[]]"
+              },
+              {
+                "content": "",
+                "modificator": "BLOCK_END",
+                "type": "text"
+              },
+              {
+                "content": "",
+                "modificator": "BLOCK_END",
+                "type": "text"
+              },
+              {
+                "url": "https://example.invalid/link",
+                "type": "link",
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "explicit": false
+              },
+              {
+                "type": "text",
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "modificator": ""
+              },
+              {
+                "content": "",
+                "modificator": "BLOCK_END",
+                "type": "text"
+              },
+              {
+                "type": "text",
+                "content": "",
+                "modificator": "BLOCK_END"
+              },
+              {
+                "explicit": false,
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "type": "link",
+                "url": "https://example.invalid/link"
+              },
+              {
+                "type": "text",
+                "modificator": "",
+                "content": "[\"Sample text\",\"unstyled\",[]]"
+              },
+              {
+                "modificator": "BLOCK_END",
+                "content": "",
+                "type": "text"
+              },
+              {
+                "content": "",
+                "modificator": "BLOCK_END",
+                "type": "text"
+              },
+              {
+                "explicit": false,
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "type": "link",
+                "url": "https://example.invalid/link"
+              },
+              {
+                "type": "text",
+                "modificator": "",
+                "content": "[\"Sample text\",\"unstyled\",[]]"
+              },
+              {
+                "modificator": "BLOCK_END",
+                "content": "",
+                "type": "text"
+              },
+              {
+                "modificator": "BLOCK_END",
+                "content": "",
+                "type": "text"
+              },
+              {
+                "type": "link",
+                "url": "https://example.invalid/link",
+                "explicit": false,
+                "content": "[\"Sample text\",\"unstyled\",[]]"
+              },
+              {
+                "type": "text",
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "modificator": ""
+              },
+              {
+                "type": "text",
+                "content": "",
+                "modificator": "BLOCK_END"
+              },
+              {
+                "type": "text",
+                "modificator": "BLOCK_END",
+                "content": ""
+              },
+              {
+                "url": "https://example.invalid/link",
+                "type": "link",
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "explicit": false
+              },
+              {
+                "type": "text",
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "modificator": ""
+              },
+              {
+                "type": "text",
+                "modificator": "BLOCK_END",
+                "content": ""
+              },
+              {
+                "modificator": "BLOCK_END",
+                "content": "",
+                "type": "text"
+              },
+              {
+                "url": "https://example.invalid/link",
+                "type": "link",
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "explicit": false
+              },
+              {
+                "type": "text",
+                "modificator": "",
+                "content": "[\"Sample text\",\"unstyled\",[]]"
+              },
+              {
+                "type": "text",
+                "modificator": "BLOCK_END",
+                "content": ""
+              },
+              {
+                "content": "",
+                "modificator": "BLOCK_END",
+                "type": "text"
+              },
+              {
+                "type": "link",
+                "url": "https://example.invalid/link",
+                "explicit": false,
+                "content": "[\"Sample text\",\"unstyled\",[]]"
+              },
+              {
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "modificator": "",
+                "type": "text"
+              },
+              {
+                "content": "",
+                "modificator": "BLOCK_END",
+                "type": "text"
+              },
+              {
+                "type": "text",
+                "content": "",
+                "modificator": "BLOCK_END"
+              },
+              {
+                "url": "https://example.invalid/link",
+                "type": "link",
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "explicit": false
+              },
+              {
+                "type": "text",
+                "modificator": "",
+                "content": "[\"Sample text\",\"unstyled\",[]]"
+              },
+              {
+                "content": "",
+                "modificator": "BLOCK_END",
+                "type": "text"
+              },
+              {
+                "type": "text",
+                "content": "",
+                "modificator": "BLOCK_END"
+              },
+              {
+                "url": "https://example.invalid/link",
+                "type": "link",
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "explicit": false
+              },
+              {
+                "type": "text",
+                "modificator": "",
+                "content": "[\"Sample text\",\"unstyled\",[]]"
+              },
+              {
+                "content": "",
+                "modificator": "BLOCK_END",
+                "type": "text"
+              },
+              {
+                "type": "text",
+                "content": "",
+                "modificator": "BLOCK_END"
+              },
+              {
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "explicit": false,
+                "url": "https://example.invalid/link",
+                "type": "link"
+              },
+              {
+                "type": "text",
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "modificator": ""
+              },
+              {
+                "type": "text",
+                "modificator": "BLOCK_END",
+                "content": ""
+              },
+              {
+                "content": "",
+                "modificator": "BLOCK_END",
+                "type": "text"
+              }
+            ],
+            "isShowcaseVisible": false,
+            "isCommentsDenied": false,
+            "reactionCounters": [
+              {
+                "type": "like",
+                "count": 5
+              },
+              {
+                "type": "dislike",
+                "count": 0
+              },
+              {
+                "count": 5,
+                "type": "fire"
+              },
+              {
+                "type": "heart",
+                "count": 5
+              },
+              {
+                "count": 5,
+                "type": "laugh"
+              },
+              {
+                "type": "laught",
+                "count": 0
+              },
+              {
+                "type": "wonder",
+                "count": 5
+              },
+              {
+                "type": "sad",
+                "count": 0
+              },
+              {
+                "count": 0,
+                "type": "angry"
+              },
+              {
+                "type": "funny",
+                "count": 0
+              },
+              {
+                "count": 0,
+                "type": "check"
+              },
+              {
+                "type": "thinking",
+                "count": 0
+              },
+              {
+                "type": "clown",
+                "count": 0
+              },
+              {
+                "count": 0,
+                "type": "swearing"
+              },
+              {
+                "type": "applause",
+                "count": 0
+              },
+              {
+                "type": "call-me",
+                "count": 0
+              },
+              {
+                "type": "cold",
+                "count": 0
+              },
+              {
+                "type": "eggplant",
+                "count": 0
+              },
+              {
+                "type": "blowing-up",
+                "count": 0
+              },
+              {
+                "type": "scream",
+                "count": 0
+              },
+              {
+                "type": "crown",
+                "count": 0
+              },
+              {
+                "type": "diamond",
+                "count": 0
+              },
+              {
+                "count": 0,
+                "type": "melting"
+              },
+              {
+                "count": 0,
+                "type": "money"
+              },
+              {
+                "count": 0,
+                "type": "nausea"
+              },
+              {
+                "type": "confetti",
+                "count": 0
+              },
+              {
+                "count": 0,
+                "type": "banana"
+              },
+              {
+                "count": 0,
+                "type": "peach"
+              },
+              {
+                "count": 0,
+                "type": "pizza"
+              },
+              {
+                "count": 0,
+                "type": "love"
+              },
+              {
+                "type": "rocket",
+                "count": 0
+              },
+              {
+                "type": "splash",
+                "count": 0
+              },
+              {
+                "type": "lightning",
+                "count": 0
+              },
+              {
+                "count": 0,
+                "type": "cry"
+              },
+              {
+                "count": 0,
+                "type": "folded-hands"
+              }
+            ],
+            "donators": {
+              "extra": {
+                "isLast": true
+              },
+              "data": []
+            },
+            "count": {
+              "reactions": {
+                "laught": 5,
+                "angry": 0,
+                "like": 5,
+                "dislike": 0,
+                "heart": 5,
+                "wonder": 5,
+                "fire": 5,
+                "sad": 0
+              },
+              "comments": 5,
+              "likes": 5
+            },
+            "currencyDonations": {
+              "EUR": 0,
+              "RUB": 0,
+              "USD": 0
+            },
+            "subscriptionLevel": {
+              "flags": {
+                "isArchived": false,
+                "isLimited": false,
+                "isHidden": false
+              },
+              "data": [
+                {
+                  "id": "synthetic-id-8",
+                  "type": "image",
+                  "height": 150,
+                  "width": 240,
+                  "url": "https://example.invalid/image",
+                  "size": 102400,
+                  "rendition": "",
+                  "isInvalid": null
+                },
+                {
+                  "type": "text",
+                  "content": "[\"Sample text\",\"unstyled\",[]]",
+                  "modificator": ""
+                },
+                {
+                  "type": "text",
+                  "modificator": "BLOCK_END",
+                  "content": ""
+                },
+                {
+                  "type": "text",
+                  "modificator": "",
+                  "content": "[\"Sample text\",\"unstyled\",[]]"
+                },
+                {
+                  "modificator": "BLOCK_END",
+                  "content": "",
+                  "type": "text"
+                }
+              ],
+              "deleted": false,
+              "price": 5,
+              "id": 1011,
+              "isArchived": false,
+              "promos": [],
+              "currencyPrices": {
+                "EUR": 5,
+                "RUB": 5,
+                "USD": 5
+              },
+              "name": "redacted",
+              "ownerId": 1002,
+              "createdAt": 1700014400,
+              "isLimited": false,
+              "isHidden": false
+            },
+            "signedQuery": "?sig=REDACTED",
+            "hasAIContent": false,
+            "advertiserInfo": null,
+            "int_id": 1010,
+            "isLiked": false,
+            "currencyPrices": {
+              "USD": 0,
+              "EUR": 0,
+              "RUB": 0
+            },
+            "isPinned": false,
+            "hasAccess": true,
+            "teaser": [
+              {
+                "rendition": "",
+                "size": 102400,
+                "url": "https://example.invalid/image",
+                "isInvalid": null,
+                "type": "image",
+                "id": "synthetic-id-3",
+                "width": 575,
+                "height": 623
+              }
+            ],
+            "isWaitingVideo": false,
+            "updatedAt": 1700302400,
+            "tags": [],
+            "contentCounters": [
+              {
+                "size": 0,
+                "type": "ok_video",
+                "count": 5
+              },
+              {
+                "size": 0,
+                "type": "text",
+                "count": 5
+              }
+            ],
+            "price": 0,
+            "isRecord": false,
+            "showViewsCounter": false,
+            "hasAdultContent": false
+          },
+          "rank": 5,
+          "headline": "redacted"
+        },
+        {
+          "post": {
+            "count": {
+              "likes": 5,
+              "comments": 5,
+              "reactions": {
+                "like": 5,
+                "laught": 0,
+                "angry": 0,
+                "fire": 0,
+                "sad": 0,
+                "wonder": 0,
+                "heart": 5,
+                "dislike": 0
+              }
+            },
+            "subscriptionLevel": {
+              "ownerId": 1009,
+              "createdAt": 1700018000,
+              "isLimited": false,
+              "isHidden": true,
+              "currencyPrices": {
+                "USD": 5,
+                "RUB": 5,
+                "EUR": 5
+              },
+              "promos": [],
+              "isArchived": false,
+              "name": "redacted",
+              "id": 1008,
+              "flags": {
+                "isHidden": true,
+                "isArchived": false,
+                "isLimited": false
+              },
+              "price": 5,
+              "data": [
+                {
+                  "width": 240,
+                  "height": 150,
+                  "id": "synthetic-id-2",
+                  "type": "image",
+                  "isInvalid": null,
+                  "rendition": "",
+                  "url": "https://example.invalid/image",
+                  "size": 102400
+                },
+                {
+                  "type": "text",
+                  "content": "[\"Sample text\",\"unstyled\",[]]",
+                  "modificator": ""
+                },
+                {
+                  "content": "",
+                  "modificator": "BLOCK_END",
+                  "type": "text"
+                },
+                {
+                  "content": "[\"Sample text\",\"unstyled\",[]]",
+                  "modificator": "",
+                  "type": "text"
+                },
+                {
+                  "content": "",
+                  "modificator": "BLOCK_END",
+                  "type": "text"
+                }
+              ],
+              "deleted": false
+            },
+            "currencyDonations": {
+              "EUR": 0,
+              "RUB": 0,
+              "USD": 0
+            },
+            "int_id": 1061,
+            "advertiserInfo": null,
+            "hasAIContent": false,
+            "signedQuery": "?sig=REDACTED",
+            "currencyPrices": {
+              "USD": 0,
+              "EUR": 0,
+              "RUB": 0
+            },
+            "isPinned": false,
+            "isLiked": false,
+            "isWaitingVideo": false,
+            "hasAccess": true,
+            "teaser": [],
+            "updatedAt": 1700295200,
+            "price": 0,
+            "isRecord": false,
+            "contentCounters": [
+              {
+                "count": 5,
+                "size": 0,
+                "type": "text"
+              }
+            ],
+            "tags": [],
+            "hasAdultContent": false,
+            "showViewsCounter": false,
+            "sortOrder": 5,
+            "isMarketing": false,
+            "user": {
+              "avatarUrl": "https://example.invalid/avatar",
+              "currency": "redacted",
+              "hasAvatar": true,
+              "isOfficial": false,
+              "name": "redacted",
+              "flags": {
+                "showPostDonations": true
+              },
+              "id": 1009,
+              "blogUrl": "synthetic-blog-3"
+            },
+            "createdAt": 1700291600,
+            "isPublished": true,
+            "title": "",
+            "promo": null,
+            "comments": {
+              "data": [],
+              "extra": {
+                "isLast": false,
+                "isFirst": true
+              }
+            },
+            "intId": 1061,
+            "bundleIds": [],
+            "id": "synthetic-id-154",
+            "isBlocked": false,
+            "donations": 0,
+            "isShowcaseVisible": false,
+            "data": [
+              {
+                "type": "text",
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "modificator": ""
+              },
+              {
+                "type": "text",
+                "modificator": "BLOCK_END",
+                "content": ""
+              },
+              {
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "modificator": "",
+                "type": "text"
+              },
+              {
+                "type": "text",
+                "modificator": "BLOCK_END",
+                "content": ""
+              },
+              {
+                "modificator": "",
+                "content": "[\"Sample text\",\"unstyled\",[]]",
+                "type": "text"
+              },
+              {
+                "modificator": "BLOCK_END",
+                "content": "",
+                "type": "text"
+              }
+            ],
+            "publishTime": 1700291600,
+            "isDeleted": false,
+            "reactionsDisabled": false,
+            "forbiddenChangeHasAIContent": false,
+            "donators": {
+              "extra": {
+                "isLast": true
+              },
+              "data": []
+            },
+            "reactionCounters": [
+              {
+                "type": "like",
+                "count": 5
+              },
+              {
+                "type": "dislike",
+                "count": 0
+              },
+              {
+                "type": "fire",
+                "count": 0
+              },
+              {
+                "count": 5,
+                "type": "heart"
+              },
+              {
+                "type": "laugh",
+                "count": 0
+              },
+              {
+                "count": 0,
+                "type": "laught"
+              },
+              {
+                "count": 0,
+                "type": "wonder"
+              },
+              {
+                "count": 0,
+                "type": "sad"
+              },
+              {
+                "count": 0,
+                "type": "angry"
+              },
+              {
+                "count": 0,
+                "type": "funny"
+              },
+              {
+                "count": 0,
+                "type": "check"
+              },
+              {
+                "count": 0,
+                "type": "thinking"
+              },
+              {
+                "count": 0,
+                "type": "clown"
+              },
+              {
+                "type": "swearing",
+                "count": 0
+              },
+              {
+                "type": "applause",
+                "count": 0
+              },
+              {
+                "type": "call-me",
+                "count": 0
+              },
+              {
+                "type": "cold",
+                "count": 0
+              },
+              {
+                "type": "eggplant",
+                "count": 0
+              },
+              {
+                "type": "blowing-up",
+                "count": 0
+              },
+              {
+                "type": "scream",
+                "count": 0
+              },
+              {
+                "count": 0,
+                "type": "crown"
+              },
+              {
+                "count": 0,
+                "type": "diamond"
+              },
+              {
+                "count": 0,
+                "type": "melting"
+              },
+              {
+                "type": "money",
+                "count": 0
+              },
+              {
+                "type": "nausea",
+                "count": 0
+              },
+              {
+                "type": "confetti",
+                "count": 0
+              },
+              {
+                "type": "banana",
+                "count": 0
+              },
+              {
+                "count": 0,
+                "type": "peach"
+              },
+              {
+                "count": 0,
+                "type": "pizza"
+              },
+              {
+                "count": 0,
+                "type": "love"
+              },
+              {
+                "count": 0,
+                "type": "rocket"
+              },
+              {
+                "count": 0,
+                "type": "splash"
+              },
+              {
+                "count": 0,
+                "type": "lightning"
+              },
+              {
+                "count": 0,
+                "type": "cry"
+              },
+              {
+                "type": "folded-hands",
+                "count": 0
+              }
+            ],
+            "isCommentsDenied": false
+          },
+          "rank": 5,
+          "headline": "redacted"
+        }
+      ]
+    },
+    "extra": {
+      "offset": "redacted",
+      "isLast": false
+    }
+  }
+}

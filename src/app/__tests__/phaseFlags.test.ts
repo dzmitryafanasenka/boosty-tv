@@ -1,9 +1,9 @@
 import { SECTION_ORDER, enabledSections, phaseFlags } from '../phaseFlags';
 
-test('Story 3.2 enables Главная, Подписки and Настройки (Story 4.1: the player; Story 5.2: «Мой блог»; Story 5.3: filters)', () => {
+test('Story 3.2 enables Главная, Подписки and Настройки (Story 4.1: the player; Story 5.2: «Мой блог»; Story 5.3: filters; Story 5.6: Поиск)', () => {
   expect(phaseFlags).toEqual({
     home: true,
-    search: false,
+    search: true,
     subs: true,
     events: false,
     settings: true,
@@ -11,7 +11,7 @@ test('Story 3.2 enables Главная, Подписки and Настройки 
     myBlog: true,
     filters: true,
   });
-  expect(enabledSections()).toEqual(['home', 'subs', 'settings']);
+  expect(enabledSections()).toEqual(['home', 'search', 'subs', 'settings']);
 });
 
 test('Story 4.1: the player capability is on and is not a sidebar section', () => {

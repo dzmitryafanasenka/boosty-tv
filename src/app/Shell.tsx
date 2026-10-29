@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { BackHandler } from 'react-native';
 import { HomeScreen, type HomeFocusInfo, type HomeScreenProps } from '../features/home';
+import { SearchScreen, type SearchFocusInfo } from '../features/search';
 import { SETTINGS_VERSION_ID, SettingsScreen } from '../features/settings';
 import { SubscriptionsScreen, type SubscriptionsFocusInfo } from '../features/subscriptions';
 import type { HttpClient } from '../shared/api';
@@ -45,8 +46,11 @@ export type ShellProps = {
   homeOffline?: HomeScreenProps['offline'];
   /** Подписки: OK on a tile opens the Author page (Story 3.3). */
   onOpenAuthor?: (blogUrl: string) => void;
-  /** Главная: OK on a feed card opens Пост (Story 3.4). */
-  onOpenPost?: (blogUrl: string, postId: string) => void;
+  /**
+   * Главная: OK on a feed card opens Пост (Story 3.4); Поиск: OK on a result
+   * (Story 5.6, `section` 'search': Пост's sidebar current item).
+   */
+  onOpenPost?: (blogUrl: string, postId: string, section?: SectionId) => void;
   /** Главная: OK on a «Продолжить просмотр» card opens the Player (Story 4.7). */
   onOpenPlayer?: (ref: MediaRef, focusId: string) => void;
   /**
@@ -69,7 +73,7 @@ const HOME: SectionId = 'home';
  * virtualized grid, or after the first data arrives), so the content zone
  * does not focus its target on mount.
  */
-const SELF_FOCUS_SECTIONS: ReadonlySet<SectionId> = new Set<SectionId>(['home', 'subs']);
+const SELF_FOCUS_SECTIONS: ReadonlySet<SectionId> = new Set<SectionId>(['home', 'subs', 'search']);
 
 type View_ = { section: SectionId; focusContent: boolean };
 
@@ -279,6 +283,18 @@ export function Shell({
     [focusNav, setReturnFocus],
   );
 
+  // Поиск (Story 5.6): the field on open, the result card on return.
+  const searchFocus = useMemo<SearchFocusInfo>(
+    () => ({
+      isActive: () => routeFocused.current,
+      current: () => lastFocusId.current,
+      sectionItemId: NAV_ID.search,
+      onFocusChange,
+      setReturnFocus,
+    }),
+    [onFocusChange, setReturnFocus],
+  );
+
   return (
     <Screen testID="shell">
       <Sidebar
@@ -297,7 +313,7 @@ export function Shell({
         routeKey={routeKey}
         sectionId={view.section}
         initialFocusId={INITIAL_CONTENT_ID[view.section]}
-        // Главная and Подписки take their content focus themselves.
+        // Главная, Подписки and Поиск take their content focus themselves.
         focusOnMount={view.focusContent && !SELF_FOCUS_SECTIONS.has(view.section)}
         onItemFocus={onContentFocus}
         isActive={isShellActive}
@@ -310,6 +326,7 @@ export function Shell({
           focusContent={view.focusContent}
           homeFocus={homeFocus}
           subsFocus={subsFocus}
+          searchFocus={searchFocus}
           onOpenSignOut={onOpenSignOut}
           onOpenFocusCheck={onOpenFocusCheck}
           onCheckSession={onCheckSession}
@@ -332,6 +349,7 @@ function SectionContent({
   focusContent,
   homeFocus,
   subsFocus,
+  searchFocus,
   onOpenSignOut,
   onOpenFocusCheck,
   onCheckSession,
@@ -348,6 +366,7 @@ function SectionContent({
   focusContent: boolean;
   homeFocus: HomeFocusInfo;
   subsFocus: SubscriptionsFocusInfo;
+  searchFocus: SearchFocusInfo;
   onOpenSignOut: (initiator: RefObject<HostView | null>) => void;
   onOpenFocusCheck?: () => void;
   onCheckSession?: () => void;
@@ -355,9 +374,13 @@ function SectionContent({
   onBreakNextVideoUrl?: () => void;
   homeOffline?: HomeScreenProps['offline'];
   onOpenAuthor?: (blogUrl: string) => void;
-  onOpenPost?: (blogUrl: string, postId: string) => void;
+  onOpenPost?: (blogUrl: string, postId: string, section?: SectionId) => void;
   onOpenPlayer?: (ref: MediaRef, focusId: string) => void;
 }) {
+  const onOpenSearchResult = useCallback(
+    (blogUrl: string, postId: string) => onOpenPost?.(blogUrl, postId, 'search'),
+    [onOpenPost],
+  );
   switch (section) {
     case 'home':
       return (
@@ -393,8 +416,18 @@ function SectionContent({
           myBlogEnabled={phaseFlags.myBlog}
         />
       );
-    // Phase-gated off (phaseFlags): never rendered.
     case 'search':
+      return (
+        <SearchScreen
+          http={http}
+          routeKey={routeKey}
+          focusOnMount={focusContent}
+          focus={searchFocus}
+          onOpenPost={onOpenSearchResult}
+          filtersEnabled={phaseFlags.filters}
+        />
+      );
+    // Phase-gated off (phaseFlags): never rendered.
     case 'events':
       return null;
   }

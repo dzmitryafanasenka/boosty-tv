@@ -8,9 +8,11 @@ export {
 export {
   BLOG_POSTS_PAGE_SIZE,
   FEED_PAGE_SIZE,
+  FEED_SEARCH_PAGE_SIZE,
   PostRepository,
   blogPostsPath,
   feedPath,
+  feedSearchPath,
   mergePosts,
   postPath,
   type E8Options,

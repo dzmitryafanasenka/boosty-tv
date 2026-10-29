@@ -23,6 +23,7 @@ export {
   type TagRef,
 } from './filter';
 export { formatDay, formatPeriod, formatRange } from './periodLabel';
+export { chipLabels, chipTagsValue } from './chipLabels';
 export {
   filtersAccountStore,
   filtersStore,

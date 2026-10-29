@@ -9,7 +9,8 @@ import App from '../src/app/App';
 import { resetQueryCache } from '../src/app/queryClient';
 import { session } from '../src/app/session';
 import { focusRestoration } from '../src/shared/focus';
-import { filtersStore, formatDayKey, periodBounds } from '../src/shared/filters';
+import { DEFAULT_FILTER, filtersStore, formatDayKey, periodBounds } from '../src/shared/filters';
+import { PostRepository } from '../src/shared/entities/post';
 import { TagRepository } from '../src/shared/entities/tag';
 import { t } from '../src/shared/i18n';
 import { createAsyncStorage } from '@react-native-async-storage/async-storage';
@@ -92,8 +93,9 @@ test('fixture-backed Shell with the «ДЕМО» badge; SecureStore and the netw
     .queryAll(n => n.props.focusable === true)
     .map(n => n.props.testID as string);
   // Then «Фильтры» (Story 5.3) and «Обновить» (Story 5.1) in the feed's title row.
-  expect(focusable.slice(0, 5)).toEqual([
+  expect(focusable.slice(0, 6)).toEqual([
     'nav/home',
+    'nav/search',
     'nav/subs',
     'nav/settings',
     'home/filters',
@@ -102,10 +104,10 @@ test('fixture-backed Shell with the «ДЕМО» badge; SecureStore and the netw
   // Demo posts in order, under the default «Доступные мне» (Story 5.3: the
   // locked demo-post-6 is not in it). (FlashList's Jest measurements report
   // the list end at once, so further demo pages may already be loaded.)
-  expect(focusable.slice(5, 14)).toEqual(
+  expect(focusable.slice(6, 15)).toEqual(
     [0, 1, 2, 3, 4, 5, 7, 8, 9].map(i => `home/feed/demo-post-${i}`),
   );
-  expect(focusable.slice(5).every(id => id.startsWith('home/feed/demo-post-'))).toBe(true);
+  expect(focusable.slice(6).every(id => id.startsWith('home/feed/demo-post-'))).toBe(true);
   // The demo's E1 is answered by FixtureTransport: no real request, no keychain.
   expect(fetchMock).not.toHaveBeenCalled();
   expect(keychain.getGenericPassword).not.toHaveBeenCalled();
@@ -308,6 +310,42 @@ test('Story 5.5: the demo E13 answers two pages of 8; the demo feed intersects t
     ).toEqual([]);
   } finally {
     filtersStore.getState().clear();
+  }
+});
+
+test('Story 5.6: the demo E6 matches titles (case-insensitive) with the feed\'s Filter params, in pages of 10', async () => {
+  const root = await renderApp();
+  try {
+    const load = async (query: string, cursor: string | null, access: 'allowed' | 'all' = 'allowed') => {
+      const pending = PostRepository.feedSearchPage(session.http, query, cursor, {
+        ...DEFAULT_FILTER,
+        access,
+      });
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(1000);
+      });
+      return pending;
+    };
+    // «пост 1»: posts 1 and 10–19 (titles «Демо-пост N+1»: n = 0, 9–18), minus locked n = 13.
+    const page = await load('ПОСТ 1', null);
+    expect(page.posts.map(p => p.id)).toEqual(
+      [0, 9, 10, 11, 12, 14, 15, 16, 17, 18].map(n => `demo-post-${n}`),
+    );
+    expect(page.nextCursor).toBeNull();
+    // «Все посты»: the locked one too (11: a second page of one).
+    const all = await load('пост 1', null, 'all');
+    expect(all.posts).toHaveLength(10);
+    expect(all.posts.map(p => p.id)).toContain('demo-post-13');
+    expect((await load('пост 1', all.nextCursor, 'all')).posts).toHaveLength(1);
+    // Every post matches «демо»: three pages.
+    const first = await load('демо', null);
+    expect(first.posts).toHaveLength(10);
+    expect(first.nextCursor).not.toBeNull();
+    expect((await load('zzz', null)).posts).toEqual([]);
+  } finally {
+    await act(async () => {
+      root.unmount();
+    });
   }
 });
 

@@ -50,10 +50,11 @@ export type Filter = {
 };
 
 /**
- * Where a Filter applies. Story 5.3 uses `feed` only; Stories 5.6 and 5.7
- * add `search` and `author:<blogUrl>`.
+ * Where a Filter applies. Story 5.3 added `feed` (Главная), Story 5.6
+ * `search` (Поиск по подпискам, its own Filter, AD-18; the reference shares
+ * the feed's). Story 5.7 adds `author:<blogUrl>`.
  */
-export type FilterScope = 'feed';
+export type FilterScope = 'feed' | 'search';
 
 export const ALL_TIME: Period = Object.freeze({ kind: 'all' });
 
