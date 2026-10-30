@@ -68,6 +68,9 @@ export type AuthorAutoFocusOptions = {
   field: AuthorField;
   /** Story 7.1: the LiveCard, the nearest action above the grid while shown. */
   live: AuthorLiveView;
+  /** Story 7.4: «Нравится» and «Поделиться» (the restoration's gate treats them as the card). */
+  likeId: string;
+  shareId: string;
   /** The action row is shown (its field is the nearest action above the grid). */
   rowShown: boolean;
   cardPrefix: string;
@@ -111,6 +114,8 @@ export function useAuthorAutoFocus({
   modal,
   field,
   live,
+  likeId,
+  shareId,
   rowShown,
   cardPrefix,
   retryId,
@@ -215,7 +220,7 @@ export function useAuthorAutoFocus({
   // open and focus is still where the page may take it: none yet, the
   // sidebar's current item, a card, the StateView action, the load-more
   // «Повторить», the action row (Story 5.7: the row is content) or the
-  // LiveCard (Story 7.1).
+  // LiveCard (Story 7.1) with its «Нравится» / «Поделиться» (Story 7.4).
   const canFocus = useCallback(() => {
     const info = focusRef.current;
     if (!info.isActive() || modal.isOpen()) {
@@ -231,9 +236,11 @@ export function useAuthorAutoFocus({
       current === chipId ||
       current === resetId ||
       current === liveId ||
+      current === likeId ||
+      current === shareId ||
       current.startsWith(cardPrefix)
     );
-  }, [cardPrefix, retryId, fieldId, chipId, resetId, liveId, modal]);
+  }, [cardPrefix, retryId, fieldId, chipId, resetId, liveId, likeId, shareId, modal]);
   const mayTakeFocus = useCallback(() => {
     if (modal.isOpen()) {
       return false;

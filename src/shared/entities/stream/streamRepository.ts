@@ -99,4 +99,23 @@ async function heartbeat(http: HttpClient, blogUrl: string, { stop = false }: { 
   await http.request({ method: 'PUT', path: heartbeatPath(blogUrl, stop), retry: false });
 }
 
-export const StreamRepository = { fetchActive, liveSources, heartbeat } as const;
+/**
+ * E17 path (Story 7.4, api-contract E17): like / unlike the blog's stream.
+ * The blog is validated by `streamPath`.
+ */
+export function likePath(blogUrl: string): string {
+  return `${streamPath(blogUrl)}/like`;
+}
+
+/**
+ * E17: `POST` to like (`liked: true`), `DELETE` to unlike. A mutation: sent
+ * once, never retried (`retry: false`, and the HttpClient never replays a
+ * non-GET after a 401); the body is discarded. Rejects with the
+ * HttpClient's `AppError` (an invalid blog with `AppError('Client')`, before
+ * a request is sent).
+ */
+async function like(http: HttpClient, blogUrl: string, liked: boolean): Promise<void> {
+  await http.request({ method: liked ? 'POST' : 'DELETE', path: likePath(blogUrl), retry: false });
+}
+
+export const StreamRepository = { fetchActive, liveSources, heartbeat, like } as const;

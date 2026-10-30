@@ -1,7 +1,7 @@
 import { act } from 'react';
-import { AccessibilityInfo, Animated, StyleSheet } from 'react-native';
+import { AccessibilityInfo, Animated, StyleSheet, Text } from 'react-native';
 import { createRoot, type Root } from 'test-renderer';
-import { Button } from '../Button';
+import { Button, buttonInk } from '../Button';
 import { colors, focus, motion } from '../tokens';
 
 const ID = 'probe';
@@ -202,6 +202,29 @@ describe('Button', () => {
     });
     expect(byId(root, `${ID}/spinner`)).toHaveLength(0);
     expect(StyleSheet.flatten(labels[0].props.style).opacity).toBeUndefined();
+  });
+
+  it('Story 7.4: an icon before the label; selected (secondary) uses the accent ink and reports selected', async () => {
+    const icon = <Text testID="icon">♥</Text>;
+    const root = await render(<Button testID={ID} label="358" kind="secondary" icon={icon} selected />);
+    expect(byId(root, 'icon')).toHaveLength(1);
+    expect(host(root).props.accessibilityState).toMatchObject({ selected: true });
+    expect(JSON.stringify(root.container.toJSON())).toContain(colors['accent-text']);
+    expect(buttonInk({ kind: 'secondary', selected: true })).toBe(colors['accent-text']);
+    expect(buttonInk({ kind: 'secondary' })).toBe(colors.text);
+    expect(buttonInk({ kind: 'secondary', selected: true, disabled: true })).toBe(colors['text-disabled']);
+    await act(async () => {
+      root.render(<Button testID={ID} label="A" />);
+    });
+    // Without `selected` the state carries no `selected` key (unchanged buttons).
+    expect(host(root).props.accessibilityState?.selected).toBeUndefined();
+    // `accessibilityBusy`: busy for accessibility, no spinner (the label kept).
+    const onPress = jest.fn();
+    await act(async () => {
+      root.render(<Button testID={ID} label="A" accessibilityBusy onPress={onPress} />);
+    });
+    expect(host(root).props.accessibilityState).toMatchObject({ busy: true });
+    expect(byId(root, `${ID}/spinner`)).toHaveLength(0);
   });
 
   it('secondary kind uses the secondary surfaces', async () => {

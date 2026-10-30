@@ -1,4 +1,4 @@
-import type { Ref } from 'react';
+import type { ReactNode, Ref } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import {
   FocusableSurface,
@@ -8,7 +8,7 @@ import {
 } from './FocusableSurface';
 import { Spinner } from './Spinner';
 import { Text } from './Text';
-import { colors, components, focus, rounded, typography } from './tokens';
+import { colors, components, focus, rounded, spacing, typography } from './tokens';
 
 export type ButtonKind = 'primary' | 'secondary';
 export type ButtonSize = 'normal' | 'small';
@@ -31,6 +31,24 @@ export type ButtonProps = {
   accessibilityLabel?: string;
   /** Accessibility label while `busy` (default `busyLabel`, else as idle). */
   busyAccessibilityLabel?: string;
+  /**
+   * Story 7.4: an icon before the label (e.g. the like's heart), hidden
+   * while busy like the label. The caller draws it in the label's ink
+   * (`buttonInk`). Not with `busyLabel`.
+   */
+  icon?: ReactNode;
+  /**
+   * Story 7.4: an on/off button in its on state (e.g. «Вам нравится»): the
+   * label and icon use the accent ink, and the accessibility state says
+   * selected. Distinct from focus (the background still follows focus).
+   */
+  selected?: boolean;
+  /**
+   * Story 7.4: a request runs but the button keeps its label, icon and
+   * `onPress` (an optimistic toggle that ignores OK itself): only the
+   * accessibility state says busy. `busy` is the spinner variant.
+   */
+  accessibilityBusy?: boolean;
   /** See `FocusableSurface` `focusable` (default true). */
   focusable?: boolean;
   disabled?: boolean;
@@ -78,6 +96,18 @@ const SIZE = {
   },
 } as const;
 
+/** The label's ink for a button state (an icon passed in `icon` uses it too). */
+export function buttonInk({
+  kind = 'primary',
+  disabled = false,
+  selected = false,
+}: Pick<ButtonProps, 'kind' | 'disabled' | 'selected'>): string {
+  if (disabled) {
+    return colors['text-disabled'];
+  }
+  return selected && kind === 'secondary' ? colors['accent-text'] : KIND[kind].text;
+}
+
 /** DESIGN.md Button, primary and secondary kinds, normal and small sizes. */
 export function Button({
   label,
@@ -88,6 +118,9 @@ export function Button({
   busyLabel,
   accessibilityLabel,
   busyAccessibilityLabel,
+  icon,
+  selected,
+  accessibilityBusy = false,
   focusable,
   disabled = false,
   hasTVPreferredFocus,
@@ -111,7 +144,7 @@ export function Button({
           : k.bg,
     },
   ];
-  const textColor = disabled ? colors['text-disabled'] : k.text;
+  const textColor = buttonInk({ kind, disabled, selected });
 
   return (
     <FocusableSurface
@@ -129,7 +162,11 @@ export function Button({
           ? (busyAccessibilityLabel ?? busyLabel)
           : (accessibilityLabel ?? label)
       }
-      accessibilityState={{ busy, disabled }}
+      accessibilityState={
+        selected === undefined
+          ? { busy: busy || accessibilityBusy, disabled }
+          : { busy: busy || accessibilityBusy, disabled, selected }
+      }
       onPress={busy || disabled ? undefined : onPress}
       onFocus={onFocus}
       surfaceStyle={surfaceStyle}
@@ -157,7 +194,8 @@ export function Button({
           </Text>
         </View>
       ) : (
-        <View>
+        <View style={icon ? styles.iconRow : undefined}>
+          {icon ? <View style={[styles.icon, busy && styles.hidden]}>{icon}</View> : null}
           <Text
             variant={s.variant}
             numberOfLines={1}
@@ -185,6 +223,13 @@ const styles = StyleSheet.create({
   },
   hidden: {
     opacity: 0,
+  },
+  iconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  icon: {
+    marginRight: spacing['3'],
   },
   // Both labels stacked in one line's place: the wider one sets the width.
   labels: {

@@ -29,6 +29,9 @@ import { formatCount } from '../src/shared/i18n/format';
 import { logger } from '../src/shared/services/logger';
 import { colors } from '../src/shared/ui';
 import { requestHostFocus } from '../src/shared/ui/requestHostFocus';
+import { resetLiveLikesForTests } from '../src/features/author/useLiveLike';
+import type { Stream } from '../src/shared/entities/stream';
+import refreshOk from '../src/test/fixtures/boosty/refresh-ok.json';
 import backHandler from '../src/test/backHandlerMock';
 import { engine } from '../src/test/playerEngineMock';
 import {
@@ -162,6 +165,10 @@ let e7: (req: FixtureRequest) => Reply;
 let e14: (req: FixtureRequest) => Reply;
 /** Story 7.1: E15 (the live stream); default the live 204 (no stream). */
 let e15: (req: FixtureRequest) => Reply;
+/** Story 7.4: E17 (like / unlike); default 200. */
+let e17: (req: FixtureRequest) => Reply;
+/** Story 7.4: the refresh (`/oauth/token/`) reply, when a test sets one; else unhandled. */
+let tokenReply: FixtureReply | undefined;
 let transport: FixtureTransport;
 
 beforeAll(() => {
@@ -196,7 +203,16 @@ beforeEach(() => {
   e7 = () => undefined;
   e14 = () => undefined;
   e15 = () => e15None();
+  e17 = () => ({ status: 200 });
+  tokenReply = undefined;
   transport = installFixtureTransport(req => {
+    // Story 7.4: like (POST) / unlike (DELETE).
+    if (/^\/v1\/blog\/[^/]+\/video_stream\/like$/.test(req.path)) {
+      return e17(req);
+    }
+    if (req.path === '/oauth/token/') {
+      return tokenReply;
+    }
     if (/^\/v1\/blog\/[^/]+\/video_stream$/.test(req.path)) {
       return e15(req);
     }
@@ -2174,7 +2190,7 @@ describe('Story 7.1: the live stream card on the author page', () => {
     await unmount(withCard);
   });
 
-  it('Live: LIVE badge on colors.live, title, viewers and likes, cover; initial focus on the card; the label', async () => {
+  it('Live: LIVE badge on colors.live, title, viewers (likes on «Нравится», Story 7.4), cover; initial focus on the card; the label', async () => {
     e15 = () => e15Stream('live', { count: { viewers: 1643, likes: 21 } });
     const root = await openAuthor();
     expect(visible(root, LIVE)).toBe(true);
@@ -2183,7 +2199,10 @@ describe('Story 7.1: the live stream card on the author page', () => {
     expect(StyleSheet.flatten(badge.props.style).backgroundColor).toBe(colors.live);
     expect(cardText(root)).toContain('redacted');
     expect(cardText(root)).toContain(t('author.live.statusLive'));
-    expect(text(byTestId(root, `${LIVE}/details`)[0])).toContain(`${formatCount(1643)} зрителя · 21 лайк`);
+    // Story 7.4 (Q1 a): the likes moved to «Нравится» beside the card.
+    expect(text(byTestId(root, `${LIVE}/details`)[0])).toContain(`${formatCount(1643)} зрителя`);
+    expect(cardText(root)).not.toContain('лайк');
+    expect(text(byTestId(root, `${LIVE}/like`)[0])).toContain('21');
     expect(byTestId(root, `${LIVE}/cover`)[0].props.source).toEqual({ uri: 'https://example.invalid/cover' });
     expect(focusableIds(root)).toContain(LIVE);
     // Initial focus: the card (after the skeleton's sidebar item), never the first post after it.
@@ -2191,7 +2210,7 @@ describe('Story 7.1: the live stream card on the author page', () => {
     expect(targets[targets.length - 1]).toBe(LIVE);
     expect(targets).not.toContain(SYN(0));
     expect(byTestId(root, LIVE).find(n => n.props.focusable)?.props.accessibilityLabel).toBe(
-      `Эфир: redacted. Идёт эфир. ${formatCount(1643)} зрителя · 21 лайк`,
+      `Эфир: redacted. Идёт эфир. ${formatCount(1643)} зрителя`,
     );
     // No price anywhere on the card.
     expect(cardText(root)).not.toMatch(/₽|RUB|руб/);
@@ -2731,6 +2750,494 @@ describe('Story 7.2: OK on the live card (watch, or the QR)', () => {
     await back();
     expect(currentRoute()).toBe('Author');
     expect(dialogOpen(root)).toBe(false);
+    await unmount(root);
+  });
+});
+
+describe('Story 7.4: like and share a live stream', () => {
+  const LIVE = `author/${BLOG}/live`;
+  const LIKE = `${LIVE}/like`;
+  const SHARE = `${LIVE}/share`;
+  const ACTIONS_GUIDE = 'author/live/actions';
+  const GRID_GUIDE = 'author/posts/guide';
+  const STREAM_PAGE = `https://boosty.to/${BLOG}/streams/video_stream`;
+  const e17Calls = () => transport.calls.filter(c => /\/video_stream\/like$/.test(c.path));
+  const streamCalls = () => transport.callsTo(e15Path(BLOG));
+  const lastQr = () => mockQrValues[mockQrValues.length - 1];
+  const dialogOpen = (root: Root) => visible(root, 'dialog/qr');
+  const likeLabel = (root: Root) => one(root, LIKE).props.accessibilityLabel as string;
+  const filled = (root: Root) => visible(root, `${LIKE}/heart/filled`);
+  const errorLine = (root: Root) => text(byTestId(root, `${LIKE}/error`)[0]);
+  const LIVE_357 = { count: { viewers: 10, likes: 357 } };
+
+  beforeEach(() => {
+    mockQrValues.length = 0;
+    resetLiveLikesForTests();
+    e4 = syntheticBlogPosts({ blogUrl: BLOG, total: 12 });
+  });
+
+  async function advance(ms: number) {
+    await act(async () => {
+      jest.advanceTimersByTime(ms);
+    });
+    await settle();
+  }
+  /** An E15 refetch now (as the 30 s poll), then settle. */
+  async function pollNow() {
+    await act(async () => {
+      queryClient.refetchQueries({ queryKey: queryKeys.stream(BLOG), exact: true }).catch(() => {});
+    });
+    await settle();
+  }
+  const cachedLiked = () => (queryClient.getQueryData(queryKeys.stream(BLOG)) as { isLiked?: boolean } | null | undefined)?.isLiked;
+
+  it('Like: not liked, OK → liked and +1 at once (heart filled, accent); one POST …/video_stream/like with the content profile', async () => {
+    e15 = () => e15Stream('live', LIVE_357);
+    const root = await openAuthor();
+    expect(likeLabel(root)).toBe('Нравится, 357');
+    expect(filled(root)).toBe(false);
+    expect(visible(root, `${LIKE}/heart`)).toBe(true);
+    const held = deferred();
+    e17 = () => held.promise;
+    await press(root, LIKE);
+    // At once, before E17 answers.
+    expect(likeLabel(root)).toBe('Вам нравится, 358');
+    expect(text(byTestId(root, LIKE)[0])).toContain('358');
+    expect(filled(root)).toBe(true);
+    expect(one(root, LIKE).props.accessibilityState).toMatchObject({ selected: true });
+    expect(e17Calls().map(c => [c.method, c.url])).toEqual([
+      ['POST', `https://api.boosty.to/v1/blog/${BLOG}/video_stream/like`],
+    ]);
+    expect(e17Calls()[0].headers.Authorization).toBe(`Bearer ${'a'.repeat(64)}`);
+    await act(async () => {
+      held.resolve({ status: 200, body: { ignored: true } });
+    });
+    await settle();
+    // Kept after success; written into the query (the next poll reconciles).
+    expect(likeLabel(root)).toBe('Вам нравится, 358');
+    expect(queryClient.getQueryData(queryKeys.stream(BLOG))).toMatchObject({ isLiked: true, likes: 358 });
+    expect(e17Calls()).toHaveLength(1);
+    expect(errorLine(root)).not.toMatch(/Boosty|подключ/);
+    await unmount(root);
+  });
+
+  it('Unlike: liked, OK → not liked and −1 at once; one DELETE; the count never goes below 0', async () => {
+    e15 = () => e15Stream('live', { isLiked: true, count: { viewers: 1, likes: 358 } });
+    const root = await openAuthor();
+    expect(likeLabel(root)).toBe('Вам нравится, 358');
+    expect(filled(root)).toBe(true);
+    await press(root, LIKE);
+    expect(likeLabel(root)).toBe('Нравится, 357');
+    expect(filled(root)).toBe(false);
+    expect(e17Calls().map(c => c.method)).toEqual(['DELETE']);
+    await unmount(root);
+
+    // A liked stream that reports 0 likes: unlike stays at 0.
+    await resetQueryCache();
+    focusRestoration.clear();
+    e15 = () => e15Stream('live', { isLiked: true, count: { viewers: 1, likes: 0 } });
+    const zero = await openAuthor();
+    await press(zero, LIKE);
+    expect(likeLabel(zero)).toBe('Нравится, 0');
+    await unmount(zero);
+  });
+
+  it('In flight: OK again while E17 runs is ignored (no second request, no flip)', async () => {
+    e15 = () => e15Stream('live', LIVE_357);
+    const root = await openAuthor();
+    const held = deferred();
+    e17 = () => held.promise;
+    await press(root, LIKE);
+    await press(root, LIKE);
+    await press(root, LIKE);
+    expect(e17Calls()).toHaveLength(1);
+    expect(likeLabel(root)).toBe('Вам нравится, 358');
+    await act(async () => {
+      held.resolve({ status: 200 });
+    });
+    await settle();
+    // Settled: the next OK sends again (unlike).
+    await press(root, LIKE);
+    expect(e17Calls().map(c => c.method)).toEqual(['POST', 'DELETE']);
+    expect(likeLabel(root)).toBe('Нравится, 357');
+    await unmount(root);
+  });
+
+  it.each([
+    ['5xx', () => ({ status: 503 }), 'Server'],
+    ['network', () => ({ network: true as const }), 'Network'],
+    ['429', () => ({ status: 429 }), 'RateLimited'],
+  ] as const)('Failure (%s): the state and count roll back; the inline line reads error.<kind>; no retry; the next OK clears it', async (_name, reply, kind) => {
+    e15 = () => e15Stream('live', LIVE_357);
+    const root = await openAuthor();
+    e17 = reply;
+    await press(root, LIKE, { settle: WITH_TIMERS });
+    expect(likeLabel(root)).toBe('Нравится, 357');
+    expect(filled(root)).toBe(false);
+    expect(errorLine(root)).toContain(t(`error.${kind}`));
+    await advance(60_000);
+    expect(e17Calls()).toHaveLength(1);
+    // The next OK clears the line and tries once more (a user action, not a replay).
+    const held = deferred();
+    e17 = () => held.promise;
+    await press(root, LIKE);
+    expect(errorLine(root)).not.toContain(t(`error.${kind}`));
+    expect(likeLabel(root)).toBe('Вам нравится, 358');
+    expect(e17Calls()).toHaveLength(2);
+    await act(async () => {
+      held.resolve({ status: 200 });
+    });
+    await settle();
+    await unmount(root);
+  });
+
+  it('Failure (401): one refresh, the mutation is not replayed; rolled back with the kind\'s line', async () => {
+    installNativeModules({
+      AppInfo: { versionName: '1.0' },
+      InstallId: { getOrCreate: jest.fn().mockResolvedValue('0f8fad5b-d9cb-469f-a165-70867728950e') },
+    });
+    tokenReply = { status: refreshOk.status, body: refreshOk.body };
+    e15 = () => e15Stream('live', LIVE_357);
+    const root = await openAuthor();
+    e17 = () => ({ status: 401 });
+    await press(root, LIKE, { settle: WITH_TIMERS });
+    expect(e17Calls()).toHaveLength(1);
+    expect(transport.callsTo('/oauth/token/')).toHaveLength(1);
+    expect(likeLabel(root)).toBe('Нравится, 357');
+    // A 401 that survives the renewal reads as `Client` (the HttpClient's mutation rule), not a session problem.
+    expect(errorLine(root)).toContain(t('error.Client'));
+    expect(currentRoute()).toBe('Author');
+    await unmount(root);
+  });
+
+  it('Poll during the request: an E15 poll that lands mid-request keeps the optimistic state until E17 settles; a poll after success reconciles', async () => {
+    e15 = () => e15Stream('live', LIVE_357);
+    const root = await openAuthor();
+    const held = deferred();
+    e17 = () => held.promise;
+    await press(root, LIKE);
+    expect(likeLabel(root)).toBe('Вам нравится, 358');
+    // A poll lands with the pre-like value (a refetch; the 30 s timer would
+    // also hit the HttpClient's request timeout of the held E17).
+    const before = streamCalls().length;
+    await pollNow();
+    expect(streamCalls().length).toBe(before + 1);
+    expect(likeLabel(root)).toBe('Вам нравится, 358');
+    await act(async () => {
+      held.resolve({ status: 200 });
+    });
+    await settle();
+    expect(likeLabel(root)).toBe('Вам нравится, 358');
+    // The next poll is the truth (here the server counted one more like).
+    e15 = () => e15Stream('live', { isLiked: true, count: { viewers: 10, likes: 360 } });
+    await advance(30_000);
+    expect(likeLabel(root)).toBe('Вам нравится, 360');
+    await unmount(root);
+  });
+
+  it('Poll during a failing request: the optimistic state holds, then rolls back to the poll\'s value', async () => {
+    e15 = () => e15Stream('live', LIVE_357);
+    const root = await openAuthor();
+    const held = deferred();
+    e17 = () => held.promise;
+    await press(root, LIKE);
+    e15 = () => e15Stream('live', { count: { viewers: 10, likes: 359 } });
+    await pollNow();
+    expect(likeLabel(root)).toBe('Вам нравится, 358');
+    await act(async () => {
+      held.resolve({ status: 500 });
+    });
+    await settle();
+    expect(likeLabel(root)).toBe('Нравится, 359');
+    expect(errorLine(root)).toContain(t('error.Server'));
+    await unmount(root);
+  });
+
+  it('Account change mid-request: no rollback write, no error, nothing more sent', async () => {
+    e15 = () => e15Stream('live', LIVE_357);
+    const root = await openAuthor();
+    const held = deferred();
+    e17 = () => held.promise;
+    await press(root, LIKE);
+    const calls = transport.calls.length;
+    await act(async () => {
+      await accountScope.reset();
+    });
+    await settle();
+    await act(async () => {
+      held.resolve({ status: 500 });
+    });
+    await settle();
+    expect(cachedLiked()).not.toBe(true);
+    if (visible(root, LIKE)) {
+      expect(errorLine(root)).not.toContain(t('error.Server'));
+    }
+    expect(e17Calls()).toHaveLength(1);
+    expect(transport.calls.slice(calls).filter(c => c.method !== 'GET')).toHaveLength(0);
+    await unmount(root);
+  });
+
+  it('Account change mid-request, success: the old account\'s like is not written into the new account\'s stream', async () => {
+    e15 = () => e15Stream('live', LIVE_357);
+    const root = await openAuthor();
+    const before = queryClient.getQueryData<Stream>(queryKeys.stream(BLOG));
+    const held = deferred();
+    e17 = () => held.promise;
+    await press(root, LIKE);
+    await act(async () => {
+      await accountScope.reset();
+    });
+    await settle();
+    // The new account's stream is in the cache before the old E17 answers.
+    await act(async () => {
+      queryClient.setQueryData(queryKeys.stream(BLOG), { ...before, isLiked: false, likes: 357 });
+    });
+    await act(async () => {
+      held.resolve({ status: 200 });
+    });
+    await settle();
+    expect(queryClient.getQueryData<Stream>(queryKeys.stream(BLOG))).toMatchObject({ isLiked: false, likes: 357 });
+    expect(e17Calls()).toHaveLength(1);
+    await unmount(root);
+  });
+
+  it('Success: an E15 poll started mid-flight that answers after E17 200 with the pre-like body is cancelled; the label stays liked', async () => {
+    e15 = () => e15Stream('live', LIVE_357);
+    const root = await openAuthor();
+    const like = deferred();
+    e17 = () => like.promise;
+    await press(root, LIKE);
+    const poll = deferred();
+    e15 = () => poll.promise;
+    await pollNow();
+    await act(async () => {
+      like.resolve({ status: 200 });
+    });
+    await settle();
+    await act(async () => {
+      poll.resolve(e15Stream('live', LIVE_357));
+    });
+    await settle();
+    expect(likeLabel(root)).toBe('Вам нравится, 358');
+    expect(queryClient.getQueryData(queryKeys.stream(BLOG))).toMatchObject({ isLiked: true, likes: 358 });
+    await unmount(root);
+  });
+
+  it('Success: an E15 reply held from before the press (cancelled at OK) is not written when it answers after E17 200', async () => {
+    e15 = () => e15Stream('live', LIVE_357);
+    const root = await openAuthor();
+    const poll = deferred();
+    e15 = () => poll.promise;
+    await pollNow();
+    await press(root, LIKE);
+    await settle();
+    await act(async () => {
+      poll.resolve(e15Stream('live', LIVE_357));
+    });
+    await settle();
+    expect(likeLabel(root)).toBe('Вам нравится, 358');
+    expect(queryClient.getQueryData(queryKeys.stream(BLOG))).toMatchObject({ isLiked: true, likes: 358 });
+    await unmount(root);
+  });
+
+  it('Success: the write is relative to the cached value (a newer poll count is kept)', async () => {
+    e15 = () => e15Stream('live', LIVE_357);
+    const root = await openAuthor();
+    const like = deferred();
+    e17 = () => like.promise;
+    await press(root, LIKE);
+    // A poll lands mid-flight with a newer count (not yet liked).
+    e15 = () => e15Stream('live', { count: { viewers: 10, likes: 400 } });
+    await pollNow();
+    await act(async () => {
+      like.resolve({ status: 200 });
+    });
+    await settle();
+    expect(queryClient.getQueryData(queryKeys.stream(BLOG))).toMatchObject({ isLiked: true, likes: 401 });
+    expect(likeLabel(root)).toBe('Вам нравится, 401');
+    await unmount(root);
+  });
+
+  it('A new stream (another id) while E17 runs: the old optimistic state is neither shown nor written on it', async () => {
+    e15 = () => e15Stream('live', LIVE_357);
+    const root = await openAuthor();
+    const like = deferred();
+    e17 = () => like.promise;
+    await press(root, LIKE);
+    expect(likeLabel(root)).toBe('Вам нравится, 358');
+    e15 = () => e15Stream('live', { id: 'synthetic-id-99', count: { viewers: 1, likes: 10 } });
+    await pollNow();
+    expect(likeLabel(root)).toBe('Нравится, 10');
+    await act(async () => {
+      like.resolve({ status: 200 });
+    });
+    await settle();
+    expect(queryClient.getQueryData(queryKeys.stream(BLOG))).toMatchObject({ id: 'synthetic-id-99', isLiked: false, likes: 10 });
+    expect(likeLabel(root)).toBe('Нравится, 10');
+    await unmount(root);
+  });
+
+  it('The failure line goes with a hidden like: lost access, then the like reappears without the old line', async () => {
+    e15 = () => e15Stream('live', LIVE_357);
+    const root = await openAuthor();
+    e17 = () => ({ status: 503 });
+    await press(root, LIKE);
+    expect(errorLine(root)).toContain(t('error.Server'));
+    e15 = () => e15Stream('locked', LIVE_357);
+    await pollNow();
+    expect(visible(root, LIKE)).toBe(false);
+    e15 = () => e15Stream('live', LIVE_357);
+    await pollNow();
+    expect(visible(root, LIKE)).toBe(true);
+    expect(errorLine(root)).not.toContain(t('error.Server'));
+    await unmount(root);
+  });
+
+  it.each([
+    ['«Нравится»', () => LIKE],
+    ['«Поделиться»', () => SHARE],
+  ])('Return to Автор with %s remembered and still shown: focus back on it', async (_name, id) => {
+    e15 = () => e15Stream('live', LIVE_357);
+    const root = await openAuthor();
+    await focusOn(root, id());
+    await act(async () => {
+      navigationRef.navigate('DevFocus');
+    });
+    await settle();
+    focusMock.mockClear();
+    await act(async () => {
+      navigationRef.goBack();
+    });
+    await advance(50);
+    expect(currentRoute()).toBe('Author');
+    expect(focusTargets().filter(Boolean).pop()).toBe(id());
+    await unmount(root);
+  });
+
+  it('Return to Автор with «Нравится» remembered but gone while covered (lost access): focus on «Поделиться»', async () => {
+    e15 = () => e15Stream('live', LIVE_357);
+    const root = await openAuthor();
+    await focusOn(root, LIKE);
+    await act(async () => {
+      navigationRef.navigate('DevFocus');
+    });
+    await settle();
+    await act(async () => {
+      queryClient.setQueryData<Stream>(queryKeys.stream(BLOG), data => (data ? { ...data, hasAccess: false } : data));
+    });
+    await settle();
+    e15 = () => e15Stream('locked', LIVE_357);
+    focusMock.mockClear();
+    await act(async () => {
+      navigationRef.goBack();
+    });
+    await advance(50);
+    expect(currentRoute()).toBe('Author');
+    expect(visible(root, LIKE)).toBe(false);
+    expect(focusTargets().filter(Boolean).pop()).toBe(SHARE);
+    await unmount(root);
+  });
+
+  it('Share: OK → the QrDialog with the stream page; Back or «Закрыть» → focus back on «Поделиться»; no request', async () => {
+    e15 = () => e15Stream('live', LIVE_357);
+    const root = await openAuthor();
+    const calls = transport.calls.length;
+    await press(root, SHARE);
+    expect(dialogOpen(root)).toBe(true);
+    expect(lastQr()).toBe(STREAM_PAGE);
+    expect(text(byTestId(root, 'modal/content')[0])).toContain(t('player.live.qrTitle'));
+    expect(transport.calls).toHaveLength(calls);
+    focusMock.mockClear();
+    await back();
+    expect(dialogOpen(root)).toBe(false);
+    expect(currentRoute()).toBe('Author');
+    expect(lastFocusTarget()).toBe(SHARE);
+    // «Закрыть» does the same.
+    await press(root, SHARE);
+    expect(dialogOpen(root)).toBe(true);
+    focusMock.mockClear();
+    await press(root, 'dialog/qr/close');
+    expect(dialogOpen(root)).toBe(false);
+    expect(lastFocusTarget()).toBe(SHARE);
+    await unmount(root);
+  });
+
+  it('Focus: → from the card enters the action column on «Нравится»; ↓ from «Поделиться» (and the card) → the grid; the card keeps its own guide and initial focus', async () => {
+    e15 = () => e15Stream('live', LIVE_357);
+    const root = await openAuthor();
+    // Initial focus unchanged: the card.
+    const targets = focusTargets().filter(Boolean);
+    expect(targets[targets.length - 1]).toBe(LIVE);
+    expect(destinationIds('author/live/guide')).toEqual([LIVE]);
+    expect(destinationIds(ACTIONS_GUIDE)).toEqual([LIKE]);
+    expect(focusableIds(root)).toEqual(expect.arrayContaining([LIVE, LIKE, SHARE]));
+    // The column order: «Нравится» above «Поделиться».
+    const ids = focusableIds(root);
+    expect(ids.indexOf(LIKE)).toBeLessThan(ids.indexOf(SHARE));
+    await focusOn(root, SYN(4));
+    await focusOn(root, SHARE);
+    expect(destinationIds(GRID_GUIDE)).toEqual([SYN(4)]);
+    await focusOn(root, LIKE);
+    expect(destinationIds(GRID_GUIDE)).toEqual([SYN(4)]);
+    await focusOn(root, LIVE);
+    expect(destinationIds(GRID_GUIDE)).toEqual([SYN(4)]);
+    // The block's height is unchanged.
+    expect(StyleSheet.flatten(byTestId(root, 'author/live/guide')[0].props.style).height).toBe(
+      LIVE_CARD_BLOCK_HEIGHT - 8,
+    );
+    await unmount(root);
+  });
+
+  it.each([
+    ['scheduled', () => e15Stream('scheduled')],
+    ['needs a level', () => e15Stream('locked')],
+  ])('States (%s): «Поделиться» only; → from the card reaches it; ↓ from it → the grid', async (_name, reply) => {
+    e15 = reply;
+    const root = await openAuthor();
+    expect(visible(root, LIKE)).toBe(false);
+    expect(focusableIds(root)).toContain(SHARE);
+    expect(destinationIds(ACTIONS_GUIDE)).toEqual([SHARE]);
+    await focusOn(root, SHARE);
+    expect(destinationIds(GRID_GUIDE)).toEqual([SYN(0)]);
+    await press(root, SHARE);
+    expect(lastQr()).toBe(STREAM_PAGE);
+    await back();
+    await unmount(root);
+  });
+
+  it('States (live + access): the heart and «Поделиться»', async () => {
+    e15 = () => e15Stream('live');
+    const root = await openAuthor();
+    expect(focusableIds(root)).toEqual(expect.arrayContaining([LIKE, SHARE]));
+    expect(visible(root, `${LIKE}/heart`)).toBe(true);
+    await unmount(root);
+  });
+
+  it.each([
+    ['«Нравится»', LIKE],
+    ['«Поделиться»', SHARE],
+  ])('Card goes: the stream ends while %s has focus → the first post (the 7.1 card-loss rule)', async (_name, id) => {
+    e15 = () => e15Stream('live');
+    const root = await openAuthor();
+    await focusOn(root, id);
+    e15 = () => e15None();
+    focusMock.mockClear();
+    await advance(30_000);
+    expect(visible(root, LIVE)).toBe(false);
+    expect(visible(root, id)).toBe(false);
+    expect(focusTargets().filter(Boolean).pop()).toBe(SYN(0));
+    await unmount(root);
+  });
+
+  it('The like goes while it has focus and the card stays (the stream lost access): focus → «Поделиться»', async () => {
+    e15 = () => e15Stream('live');
+    const root = await openAuthor();
+    await focusOn(root, LIKE);
+    e15 = () => e15Stream('locked');
+    focusMock.mockClear();
+    await advance(30_000);
+    expect(visible(root, LIKE)).toBe(false);
+    expect(lastFocusTarget()).toBe(SHARE);
     await unmount(root);
   });
 });

@@ -1,15 +1,20 @@
 import { memo, useEffect, useState, type Ref } from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import { Image, StyleSheet, TVFocusGuideView, View } from 'react-native';
+import type { AppErrorKind } from '../../shared/api';
 import type { Stream } from '../../shared/entities/stream';
 import { t, tf, tp } from '../../shared/i18n';
 import { formatCount, formatStreamStart } from '../../shared/i18n/format';
 import {
+  Button,
+  buttonInk,
   FocusableSurface,
+  HeartIcon,
   Text,
   colors,
   components,
   rounded,
   spacing,
+  typography,
   type FocusableSurfaceProps,
   type HostView,
 } from '../../shared/ui';
@@ -19,15 +24,17 @@ import {
  * scheduled stream, between the action row and the posts. A 192×108 cover
  * with the badge (LIVE on `colors.live`, or «Запланирован»), then the
  * status line, the title and one detail line:
- * - live: «N зрителей · M лайков»;
+ * - live: «N зрителей» (Story 7.4, owner decision Q1 a: with access the
+ *   likes are on «Нравится» right of the card, so the line drops them;
+ *   without access the level line replaces the counts anyway);
  * - scheduled: «Начало сегодня в 19:00» as the status, the likes only (no
  *   viewer count);
  * - needs a level (`hasAccess: false`, either status): «Нужен уровень
  *   «X»» in place of the counts; never a price.
  * One fixed size in every state (no reflow when a refetch changes it).
  * Story 7.2: OK (`onPress`) opens the live player when the card is playable
- * (`liveCardPlayable`), else the stream page's QR; like and share are Story
- * 7.4.
+ * (`liveCardPlayable`), else the stream page's QR. Story 7.4: «Нравится» and
+ * «Поделиться» are `LiveCardActions`, beside the card in the same block.
  */
 
 const TOKENS = components['live-card'];
@@ -40,6 +47,16 @@ const FOCUS_ROOM = spacing['3'];
 const LIVE_CARD_TOP = spacing['4'];
 /** The whole block the card takes above the grid (for the grid's bounded height). */
 export const LIVE_CARD_BLOCK_HEIGHT = LIVE_CARD_TOP + TOKENS.height + 2 * FOCUS_ROOM;
+/** The block's width (the guide; see `liveCardBlockStyle`). */
+const BLOCK_WIDTH = spacing['content-width'] - 2 * spacing['focus-headroom'];
+/** Story 7.4: the gap between the card and the action column. */
+const ACTIONS_GAP = spacing['8'];
+/** Story 7.4: the like's failure slot: two `meta` lines. */
+export const LIKE_ERROR_HEIGHT = 2 * typography.meta.lineHeight;
+/** Story 7.4: one small button and the gap under it (the column's stops). */
+export const LIVE_ACTION_STOP_HEIGHT = components['button-small'].height + spacing['3'];
+/** Story 7.4: the action column's width: the rest of the block right of the card. */
+const ACTIONS_WIDTH = BLOCK_WIDTH - TOKENS.width - ACTIONS_GAP;
 
 export type LiveCardState = 'live' | 'scheduled' | 'needsLevel';
 
@@ -81,11 +98,9 @@ export function liveCardDetails(stream: Stream): string {
       ? tf('author.live.needsLevel', { level: stream.levelName })
       : t('author.live.noAccess');
   }
+  // Story 7.4 (Q1 a): a live card with access shows its likes on «Нравится».
   return stream.status === 'live'
-    ? tf('author.live.stats', {
-        viewers: count('author.live.viewers', stream.viewers),
-        likes: count('author.live.likes', stream.likes),
-      })
+    ? count('author.live.viewers', stream.viewers)
     : count('author.live.likes', stream.likes);
 }
 
@@ -231,6 +246,23 @@ const styles = StyleSheet.create({
   details: {
     marginTop: spacing['2'],
   },
+  // Story 7.4: within the card's own vertical extent (top-aligned with it),
+  // so ↓ from the card never finds «Поделиться» and the block never grows.
+  actions: {
+    width: ACTIONS_WIDTH,
+    height: TOKENS.height,
+    marginLeft: ACTIONS_GAP,
+    marginTop: FOCUS_ROOM,
+    alignItems: 'flex-start',
+  },
+  action: {
+    marginBottom: spacing['3'],
+  },
+  // A fixed slot of two meta lines (no reflow when a failure appears).
+  actionError: {
+    alignSelf: 'stretch',
+    height: LIKE_ERROR_HEIGHT,
+  },
 });
 
 /** The guide's styles: the block above the grid (see `LIVE_CARD_BLOCK_HEIGHT`). */
@@ -238,5 +270,113 @@ export const liveCardBlockStyle = {
   marginTop: LIVE_CARD_TOP,
   marginLeft: spacing['focus-headroom'],
   height: TOKENS.height + 2 * FOCUS_ROOM,
-  width: spacing['content-width'] - 2 * spacing['focus-headroom'],
+  width: BLOCK_WIDTH,
 } as const;
+
+/** Story 7.4: the card and its actions side by side inside the block (no height change). */
+export const liveCardRowStyle = {
+  flexDirection: 'row',
+  alignItems: 'flex-start',
+} as const;
+
+/** The like's a11y label: «Нравится, N» / «Вам нравится, N» (the visible label is the heart and N; owner decision Q1 a). */
+export function liveLikeA11yLabel(stream: Pick<Stream, 'isLiked' | 'likes'>): string {
+  return tf(stream.isLiked ? 'author.live.likedA11y' : 'author.live.likeA11y', { n: formatCount(stream.likes) });
+}
+
+export type LiveCardActionsProps = {
+  stream: Stream;
+  /** Owner decision Q2 a: «Нравится» only for a live stream with access; «Поделиться» always. */
+  likeShown: boolean;
+  likeId: string;
+  shareId: string;
+  /** The like's last failure (`error.<kind>` under the buttons); null: none. */
+  likeError: AppErrorKind | null;
+  /** A like request runs (OK on it is ignored by the toggle; announced as busy). */
+  likeSending: boolean;
+  likeHostRef: (view: HostView | null) => void;
+  shareHostRef: (view: HostView | null) => void;
+  onLikeFocus: () => void;
+  onShareFocus: () => void;
+  onLikePress: () => void;
+  onSharePress: () => void;
+  /** The column guide's destination (→ from the card): the like, else share. */
+  entry: HostView | null;
+};
+
+/**
+ * Story 7.4 (LIVE-04/05, docs/focus-map.md §4 D): «Нравится» (a heart and
+ * the count, in the accent when liked) above «Поделиться», in a column
+ * right of the card, inside the card's 120 dp: the block's height never
+ * changes. The column is a `TVFocusGuideView` whose destination is the like
+ * (else share), so → from the card always lands there; inside it ↑ ↓ move
+ * natively, ← reaches the card. The failure line sits under the buttons, in
+ * a slot that is always there (no reflow), as a polite live region.
+ */
+function LiveCardActionsView({
+  stream,
+  likeShown,
+  likeId,
+  shareId,
+  likeError,
+  likeSending,
+  likeHostRef,
+  shareHostRef,
+  onLikeFocus,
+  onShareFocus,
+  onLikePress,
+  onSharePress,
+  entry,
+}: LiveCardActionsProps) {
+  const destinations = entry ? [entry] : [];
+  return (
+    <TVFocusGuideView testID="author/live/actions" destinations={destinations} style={styles.actions}>
+      {likeShown ? (
+        <Button
+          ref={likeHostRef}
+          testID={likeId}
+          kind="secondary"
+          size="small"
+          label={formatCount(stream.likes)}
+          accessibilityLabel={liveLikeA11yLabel(stream)}
+          selected={stream.isLiked}
+          icon={
+            <HeartIcon
+              testID={`${likeId}/heart${stream.isLiked ? '/filled' : ''}`}
+              filled={stream.isLiked}
+              color={buttonInk({ kind: 'secondary', selected: stream.isLiked })}
+              size={16}
+            />
+          }
+          accessibilityBusy={likeSending}
+          onFocus={onLikeFocus}
+          onPress={onLikePress}
+          style={styles.action}
+        />
+      ) : null}
+      <Button
+        ref={shareHostRef}
+        testID={shareId}
+        kind="secondary"
+        size="small"
+        label={t('author.live.share')}
+        accessibilityLabel={t('author.live.shareA11y')}
+        onFocus={onShareFocus}
+        onPress={onSharePress}
+        style={styles.action}
+      />
+      <Text
+        testID={`${likeId}/error`}
+        variant="meta"
+        color="error-text"
+        numberOfLines={2}
+        accessibilityLiveRegion="polite"
+        style={styles.actionError}
+      >
+        {likeShown && likeError !== null ? t(`error.${likeError}`) : ''}
+      </Text>
+    </TVFocusGuideView>
+  );
+}
+
+export const LiveCardActions = memo(LiveCardActionsView);

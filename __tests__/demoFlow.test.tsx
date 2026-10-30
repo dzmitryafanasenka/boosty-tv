@@ -192,7 +192,7 @@ test('Story 7.1: the demo E15: a live card on demo-blog-1 (initial focus), no ca
   const card = root.container.queryAll(n => n.props.testID === 'author/demo-blog-1/live' && n.props.focusable === true);
   expect(card).toHaveLength(1);
   expect(card[0].props.accessibilityLabel).toBe(
-    'Эфир: Демо-эфир: разбор вопросов зрителей. Идёт эфир. 128 зрителей · 42 лайка',
+    'Эфир: Демо-эфир: разбор вопросов зрителей. Идёт эфир. 128 зрителей',
   );
   const targets = focusMock.mock.calls.map(call => (call[0] as { props?: { testID?: string } } | null)?.props?.testID);
   expect(targets[targets.length - 1]).toBe('author/demo-blog-1/live');
@@ -270,6 +270,46 @@ test('Story 7.3: the demo live Player answers E16 (heartbeats and the one stop) 
   expect(results.every(r => r.status === 'fulfilled')).toBe(true);
   expect(logger.entries().filter(e => e.scope === 'live' && e.message === 'heartbeat failed')).toHaveLength(0);
   expect(fetchMock).not.toHaveBeenCalled();
+});
+
+test('Story 7.4: the demo like toggles in memory and survives a poll; share opens the QR; nothing reaches Boosty', async () => {
+  fetchMock.mockClear();
+  const like = jest.spyOn(StreamRepository, 'like');
+  const root = await renderApp();
+  await press(root, 'nav/subs');
+  await press(root, 'subs/tile/demo-blog-1');
+  const LIKE = 'author/demo-blog-1/live/like';
+  const label = () =>
+    root.container.queryAll(n => n.props.testID === LIKE && n.props.focusable === true)[0]?.props.accessibilityLabel;
+  expect(label()).toBe('Нравится, 42');
+  await press(root, LIKE);
+  expect(label()).toBe('Вам нравится, 43');
+  // The 30 s poll: the demo E15 answers with the in-memory like.
+  await act(async () => {
+    jest.advanceTimersByTime(30_000);
+  });
+  await settle();
+  expect(label()).toBe('Вам нравится, 43');
+  await press(root, LIKE);
+  expect(label()).toBe('Нравится, 42');
+  await act(async () => {
+    jest.advanceTimersByTime(30_000);
+  });
+  await settle();
+  expect(label()).toBe('Нравится, 42');
+  expect(like.mock.calls.map(call => [call[1], call[2]])).toEqual([
+    ['demo-blog-1', true],
+    ['demo-blog-1', false],
+  ]);
+  const results = await Promise.allSettled(like.mock.results.map(r => r.value as Promise<void>));
+  expect(results.every(r => r.status === 'fulfilled')).toBe(true);
+  // «Поделиться» opens the stream page's QR (no request).
+  await press(root, 'author/demo-blog-1/live/share');
+  expect(root.container.queryAll(n => n.props.testID === 'dialog/qr').length).toBeGreaterThan(0);
+  expect(fetchMock).not.toHaveBeenCalled();
+  await act(async () => {
+    root.unmount();
+  });
 });
 
 test('Story 3.4: Пост answers E8 in demo mode (paragraphs and likes, mixed blocks, a missing post)', async () => {

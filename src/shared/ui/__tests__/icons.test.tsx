@@ -7,7 +7,7 @@
  */
 import { act } from 'react';
 import { createRoot, type Root } from 'test-renderer';
-import { GearIcon, SkipIcon } from '../icons';
+import { GearIcon, HeartIcon, SkipIcon } from '../icons';
 
 async function render(element: React.ReactElement): Promise<Root> {
   const root = createRoot();
@@ -41,6 +41,15 @@ describe('SVG icons', () => {
     const nodes = all(root);
     expect(nodes.filter(n => n.props.fill === '#abcdef' && n.props.transform !== undefined)).toHaveLength(8);
     expect(nodes.some(n => n.props.stroke === '#abcdef')).toBe(true);
+    await act(async () => root.unmount());
+  });
+
+  it.each([false, true])('HeartIcon (Story 7.4) filled=%p: the outline in the ink, filled only when liked', async filled => {
+    const root = await render(<HeartIcon testID="h" color="#e8914a" filled={filled} size={16} />);
+    const nodes = all(root);
+    expect(nodes.find(n => n.props.testID === 'h')?.props.width).toBe(16);
+    const heart = nodes.find(n => n.props.stroke === '#e8914a');
+    expect(heart?.props.fill).toBe(filled ? '#e8914a' : 'none');
     await act(async () => root.unmount());
   });
 });

@@ -22,6 +22,8 @@ export type Stream = {
   viewers: number;
   /** Non-negative integer; 0 when the API gives none. */
   likes: number;
+  /** Story 7.4: the account liked the stream (E15 `isLiked`; anything but `true` is false). */
+  isLiked: boolean;
   /** An http(s) cover image; null when none. */
   coverUrl: string | null;
   /** The required level's name (trimmed, never a price); null when none. */

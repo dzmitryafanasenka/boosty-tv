@@ -107,3 +107,33 @@ export function CheckIcon({ color, size = 24, testID }: IconProps) {
     </Svg>
   );
 }
+
+/** A heart on the 24-unit grid (two lobes meeting in a point at the bottom). */
+const HEART = 'M12 20.5 C11.6 20.2 3 14.6 3 8.7 C3 5.9 5.2 3.8 7.8 3.8 C9.6 3.8 11.1 4.8 12 6.3 C12.9 4.8 14.4 3.8 16.2 3.8 C18.8 3.8 21 5.9 21 8.7 C21 14.6 12.4 20.2 12 20.5 Z';
+
+type HeartIconProps = IconProps & {
+  /** Filled («♥», liked) or an outline («♡», not liked). */
+  filled: boolean;
+};
+
+/** Story 7.4 «Нравится» (owner decision Q1 a): an outline heart, filled when liked. */
+export function HeartIcon({ filled, color, size = 24, testID }: HeartIconProps) {
+  return (
+    <Svg
+      testID={testID}
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      <Path
+        d={HEART}
+        stroke={color}
+        strokeWidth={2}
+        strokeLinejoin="round"
+        fill={filled ? color : 'none'}
+      />
+    </Svg>
+  );
+}
