@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 10-25-2026 14:34
-last_updated: 10-29-2026 23:24
+last_updated: 10-30-2026 09:57
 project: Boosty TV
 project_key: NOKEY
 tracking_system: file-system
@@ -86,7 +86,7 @@ development_status:
   5-7-search-and-filters-inside-an-author: done
   epic-5-retrospective: done
 
-  epic-6: in-progress
+  epic-6: done
   6-1-rich-text-emoji-and-long-posts: done
   6-2-images-in-posts: done
   6-3-links-files-and-external-videos-via-qr: done
@@ -94,7 +94,7 @@ development_status:
   6-5-poll-display: done
   6-6-vote-and-retract-in-a-single-choice-poll: done
   6-7-multiple-choice-poll: done
-  epic-6-retrospective: optional
+  epic-6-retrospective: done
 
   epic-7: backlog
   7-1-live-stream-card-on-the-author-page: backlog
@@ -294,3 +294,55 @@ action_items:
     owner: "owner"
     status: open
     ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-10-29.md"
+  - id: "epic-6-retro-item-26-usepollvote-skip-e10-after-an-account-ge"
+    epic: 6
+    action: "usePollVote: skip E10 after an account generation change, cancel the
+      exact post query before applyPoll; test an E8 refetch landing after E10"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-6-retro-2026-10-30.md"
+  - id: "epic-6-retro-item-27-break-the-shared-platform-shared-ui-cycl"
+    epic: 6
+    action: "Break the shared/platform ↔ shared/ui cycle: QrRenderer takes its colours
+      as props"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-6-retro-2026-10-30.md"
+  - id: "epic-6-retro-item-28-before-the-next-post-content-work-split"
+    epic: 6
+    action: "Before the next post-content work: split PostBody.tsx and PollWidget.tsx,
+      extract usePendingConfirm and a guarded focusSoon into shared/focus, move poll
+      focus ids out of PostScreen, move test frame/key helpers into src/test"
+    owner: "architect"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-6-retro-2026-10-30.md"
+  - id: "epic-6-retro-item-29-boundary-tests-and-docs-audio-across-a-v"
+    epic: 6
+    action: "Boundary tests and docs: audio across a vote (E10 and E8 fallback), Back
+      after a vote restores feed focus, audio under the QR dialog in focus-map, applyPoll
+      list-page limit comment"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-6-retro-2026-10-30.md"
+  - id: "epic-6-retro-item-30-reconcile-epics-md-experience-md-design"
+    epic: 6
+    action: "Reconcile epics.md, EXPERIENCE.md, DESIGN.md, ARCHITECTURE-SPINE.md (pins,
+      AD-4 usePollVote exception, poll error collapse) and epic-6-context.md with
+      the Epic 6 as-built"
+    owner: "pm"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-6-retro-2026-10-30.md"
+  - id: "epic-6-retro-item-31-owner-physical-remote-pass-of-epic-6-pos"
+    epic: 6
+    action: "Owner physical-remote pass of Epic 6 post flows on a build with the 6.7
+      review patches"
+    owner: "owner"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-6-retro-2026-10-30.md"
+  - id: "epic-6-retro-item-32-device-checks-that-play-the-owner-conten"
+    epic: 6
+    action: "Device checks that play the owner content stay under the progress-write
+      threshold or ask the owner first; add to docs/testing.md"
+    owner: "agent"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-6-retro-2026-10-30.md"
