@@ -1,0 +1,97 @@
+__tests__/authorFlow.test.tsx
+  s_7477a2e6c69ec6::t_1eac90fbf96801 33,106-121,240,2547-2732
+__tests__/demoFlow.test.tsx
+  s_7477a2e6c69ec6::t_dbf64dfe8087f7 9-10,38-39,214-243
+__tests__/playerFlow.test.tsx
+  s_7477a2e6c69ec6::t_7ac8076afaadcf 15,17,22,34-35,119-121,171,189-192,2945-3264
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_7477a2e6c69ec6::t_aea51b4ffde094 338-340
+_bmad-output/implementation-artifacts/spec-7-2-watch-a-live-stream.md
+  s_7477a2e6c69ec6::t_794f259f134fad 1-159
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_7477a2e6c69ec6::t_fa361e0cb50627 32,101
+docs/api-contract.md
+  s_7477a2e6c69ec6::t_46312251228456 259,459,466-472
+docs/feature-parity.md
+  s_7477a2e6c69ec6::t_7066859676012b 128
+docs/focus-map.md
+  s_7477a2e6c69ec6::t_2b0878ac4faa25 278,281,286,393-403
+docs/testing.md
+  s_7477a2e6c69ec6::t_3d47ec8c393e51 896-916
+scripts/check-fixtures.mjs
+  s_7477a2e6c69ec6::t_2bc6fcd9ec360b 33-34
+src/app/dev/demo.ts
+  s_7477a2e6c69ec6::t_a6f39386d5f8c2 39-42,578-581,593-599
+src/app/routes.ts
+  s_7477a2e6c69ec6::t_200f1069fedbf4 2,45-47,50
+src/app/stackRoutes.tsx
+  s_7477a2e6c69ec6::t_7fe2d0f763ebe0 11,42-58,289-310,331-332,434-436,444,456-460,462,473-475,477,480,482,489,492-494,499-508,511-530
+src/features/author/AuthorScreen.tsx
+  s_7477a2e6c69ec6::t_e9bde79ea02a26 53-58,77-87,160-163,175-176,355-367,375,383-384,386-387,389-394,396-401,408-414,623
+src/features/author/LiveCard.tsx
+  s_7477a2e6c69ec6::t_b0bfd69c75d161 27-30,51-59,106-107,111,123-124,127
+src/features/author/__tests__/LiveCard.test.tsx
+  s_7477a2e6c69ec6::t_e9eddb20f7a6af 5-6,16,33,94,101-120
+src/features/author/useAuthorLive.tsx
+  s_7477a2e6c69ec6::t_abf0c33ae4d244 8-11,190-258
+src/features/player/PlayerOverlay.tsx
+  s_7477a2e6c69ec6::t_3f27c20199239d 1,45-89,321-330,341-344,362-363,366,396-419,422-430,437-445,447-458,534-551
+src/features/player/PlayerScreen.tsx
+  s_7477a2e6c69ec6::t_b6b2858103d698 12,32-39,95-96,118-122,144-149,203-215,225,227-233,258-259,262-267,309-313,488,576-586,594-596,614,623-625,633-634,650-651,653,705-718,755,761,800-813,837-839,852,872-873,878,890,895,955-956,972,1123,1125,1182-1189,1203,1216-1217,1236,1294,1296-1297,1299-1315,1320-1327,1342-1350,1355,1357-1359,1397,1399-1400
+src/features/player/__tests__/liveSource.test.tsx
+  s_7477a2e6c69ec6::t_2b1c6df4d0cd9e 1-151
+src/features/player/mediaResolver.ts
+  s_7477a2e6c69ec6::t_a00e74d37f760d 1,18-19,183-189,200-204,206-210,244-245,259-260,262-264,347,368-470,473
+src/shared/api/dto/stream.ts
+  s_7477a2e6c69ec6::t_e4b478a14486ac 7-10,51-61
+src/shared/api/queryKeys.ts
+  s_7477a2e6c69ec6::t_aaee43a44aaede 117-123
+src/shared/entities/__tests__/externalUrls.test.ts
+  s_7477a2e6c69ec6::t_55d413e8fcb8ed 2,167-178
+src/shared/entities/externalUrls.ts
+  s_7477a2e6c69ec6::t_818cc233901fbe 119-132
+src/shared/entities/stream/__tests__/liveSources.test.ts
+  s_7477a2e6c69ec6::t_225858414873d5 1-210
+src/shared/entities/stream/__tests__/streamRepository.test.ts
+  s_7477a2e6c69ec6::t_260cbf0d1d4784 99,101,214
+src/shared/entities/stream/index.ts
+  s_7477a2e6c69ec6::t_5713bed650157c 1,3-5
+src/shared/entities/stream/liveSources.ts
+  s_7477a2e6c69ec6::t_0cd339b2ed97aa 1-62
+src/shared/entities/stream/mapStream.ts
+  s_7477a2e6c69ec6::t_42236c210454ea 4,78
+src/shared/entities/stream/streamRepository.ts
+  s_7477a2e6c69ec6::t_78747ef2a24d53 5-6,49-82
+src/shared/entities/stream/types.ts
+  s_7477a2e6c69ec6::t_98d9f1a1761d85 29-34,36-51
+src/shared/i18n/ru.ts
+  s_7477a2e6c69ec6::t_7a1d385714b850 395-408
+src/test/fixtures/boosty/e15-video-stream-live.json
+  s_7477a2e6c69ec6::t_f422120757a900 19-41
+src/features/player/__tests__/PlayerOverlayLive.test.tsx
+  s_df5d8fc0bd8701::t_b3c3c68bef1353 1-127
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "1f6dcd96ce3ca871d40c8b27a717cb40f67ed877",
+  "prompts": {},
+  "sessions": {
+    "s_7477a2e6c69ec6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d998e7e2-636f-4943-a058-23b274887697",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_df5d8fc0bd8701": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ae79be11c58c74b92",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
