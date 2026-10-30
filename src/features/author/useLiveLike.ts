@@ -23,7 +23,10 @@ import { useLatestRef } from '../../shared/focus';
  *   written into the query relative to its current value (`isLiked` set;
  *   `likes` ± 1 only when the cached `isLiked` differs, clamped at ≥ 0) and
  *   kept; the next poll reconciles. The overlay is dropped once the page
- *   sees that write (no frame with the old value), or when the page unmounts.
+ *   sees that write (no frame with the old value), or when the page unmounts;
+ *   when the write changes nothing the page would see (a poll meanwhile
+ *   already carried the target, or the cached stream is another one or
+ *   gone), it is dropped at once.
  * - Failure: the overlay goes (the query's value shows again: the rollback)
  *   and `error` keeps the `AppErrorKind` (the line reads `error.<kind>`). No
  *   automatic retry; the HttpClient never replays a mutation after a 401.
@@ -40,7 +43,7 @@ type Overlay = {
   streamId: string;
   isLiked: boolean;
   likes: number;
-  /** E17 succeeded: held only until the page's stream value changes (it then carries the write). */
+  /** E17 succeeded and the write changed the cache: held until the page's stream value changes (it then carries the write). */
   settled: boolean;
 };
 
@@ -184,6 +187,11 @@ export function useLiveLike(http: HttpClient, blogUrl: string, stream: Stream | 
         if (ok && sameAccount()) {
           // Keep the state; the next poll reconciles. Relative to the cached
           // value (a newer poll count is kept), and only for the same stream.
+          const before = client.getQueryData<Stream | null>(queryKey);
+          // The page already shows the target from the cache when a poll
+          // meanwhile carried it (or the cached stream is another one, or
+          // gone): checked on values, not on the object identity.
+          const nothingToSee = !before || before.id !== streamId || before.isLiked === isLiked;
           client.setQueryData<Stream | null>(queryKey, data =>
             data && data.id === streamId
               ? {
@@ -193,7 +201,14 @@ export function useLiveLike(http: HttpClient, blogUrl: string, stream: Stream | 
                 }
               : data,
           );
-          overlays.set(key, { ...entry, settled: true });
+          if (nothingToSee) {
+            // The write changes nothing the page would see, so no later
+            // stream change would drop the overlay: it goes at once (Epic 7
+            // retro F1).
+            overlays.delete(key);
+          } else {
+            overlays.set(key, { ...entry, settled: true });
+          }
         } else {
           // The rollback (or an old account's entry, which nothing shows).
           overlays.delete(key);

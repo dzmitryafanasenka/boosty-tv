@@ -15,6 +15,16 @@ Apple TV (tvOS) is out of scope (owner decision 2026-10-27); every check here is
 | Reported window size (dp) | **960×540 dp** (1920 × 160 / 320 = 960; 1080 × 160 / 320 = 540). Matches the DESIGN.md assumption (design px ÷ 2). |
 | adb connection | Wireless debugging (Android 11+ pairing): `adb pair <ip>:<pair-port> <code>` once, then `adb connect <ip>:<port>` (the port changes after a reboot) |
 
+## Device rules (agent over adb)
+
+Rules for every device run that drives the app with injected keys, own or delegated. Epic 7 retro A6 collected them from earlier slips.
+
+- **The app is in the foreground before every key batch.** Check the resumed activity before each batch of key events: `adb shell dumpsys activity activities | grep -i resumed`, or `adb shell dumpsys window | grep mCurrentFocus`. It must name the package `io.github.dzmitryafanasenka.boostytv`. After an app restart, a wake-up or a screensaver, check again. A batch sent while the Google TV launcher was in front put two OKs on the launcher's account chooser and «Заставка» (Story 7.4; the owner checked the TV: nothing changed).
+- **Screenshot before every OK.** Read the focused element before pressing OK, from `adb exec-out screencap -p > shot.png` (kept in the scratchpad, never committed) or `adb shell uiautomator dump`. Stray OKs opened a player twice in Epic 5 (Stories 5.4, 5.7).
+- **The owner's content and their progress.** Ask the owner first, or keep a playback of the owner's content short. The progress rule writes a session once it has moved 10 s or more from its start, or the moment the user pauses (`WRITE_MOVEMENT_SEC`, `src/shared/services/progress/progressRepository.ts`). So stay under 10 s and never pause. A timestamp-chip check that played 10 s or more overwrote the owner's resume point on a video (Story 6.3); a sleep test played the new feed head (Story 4.6).
+- **Outward actions need the owner's approval.** That covers a poll vote, a like (E17) and a live heartbeat (E16). Never sign out, uninstall or clear app data; install with `adb install -r`.
+- **No secrets in device logs.** Temporary probes log counts, types and key sets only, never names, URLs, tokens or signed values. Remove every probe before the commit, and check that it is gone from the release bundle. Grep the built Hermes bundle for the probe's marker and expect a count of 0, as the story sections record (for example «`TEMP75` 0»).
+
 ## Build configuration
 
 Recorded for Story 1.1 (2026-10-25).
