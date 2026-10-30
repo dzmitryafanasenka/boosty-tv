@@ -1,0 +1,85 @@
+__tests__/playerFlow.test.tsx
+  s_7477a2e6c69ec6::t_6a5820cc9638ef 408-409,3030-3031
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_7477a2e6c69ec6::t_e3cce7957410c6 341-346
+_bmad-output/implementation-artifacts/spec-epic-7-retro-a2-live-and-focus-refactor.md
+  s_7477a2e6c69ec6::t_6f0e27ffe23820 1-208
+docs/focus-map.md
+  s_7477a2e6c69ec6::t_c6d3f4f27cd62a 87,291
+docs/testing.md
+  s_7477a2e6c69ec6::t_4bffb39195e635 906-932
+src/features/author/AuthorScreen.tsx
+  s_7477a2e6c69ec6::t_df49c9715e5c4b 52-53,201-205,360-364,369-372,374,384,392-399,404,407
+src/features/author/__tests__/liveReturnTarget.test.ts
+  s_7477a2e6c69ec6::t_d3334fd7d44332 1-65
+src/features/author/liveReturnTarget.ts
+  s_7477a2e6c69ec6::t_73d332c6d88201 1-51
+src/features/author/useAuthorAutoFocus.ts
+  s_7477a2e6c69ec6::t_74a285f28e905e 2,165,168,174-181,183-184,187-188,190
+src/features/author/useAuthorLive.tsx
+  s_7477a2e6c69ec6::t_f6c251f1d53595 12,184,186-187,189,194-195,197-198,208-216,218,230-234,236
+src/features/author/useAuthorLiveBlock.ts
+  s_7477a2e6c69ec6::t_aee184df431c39 1-219
+src/features/author/useLiveLike.ts
+  s_7477a2e6c69ec6::t_e00549fa30636d 2-3,51,55-56,62,94,128-132,164
+src/features/player/PlayerScreen.tsx
+  s_7477a2e6c69ec6::t_1e15cfbe12856e 12-13,52-59,210-211,224,257-262,605-606,618,702,799,845,1180,1196,1296,1300-1301,1303-1312,1320,1329
+src/features/player/PlayerSettingsSheet.tsx
+  s_7477a2e6c69ec6::t_2e847aba06a8ee 3,5,115
+src/features/player/__tests__/liveCopy.test.ts
+  s_7477a2e6c69ec6::t_9e6c20da1cd5a2 1-32
+src/features/player/useLiveHeartbeat.ts
+  s_7477a2e6c69ec6::t_0f31ad3cd7c440 2,64-65,74,87,141-142
+src/features/player/useLivePlayback.ts
+  s_7477a2e6c69ec6::t_8f5ed1f6fc936f 1-128
+src/features/polls/usePollVote.ts
+  s_7477a2e6c69ec6::t_fd3e91f7b3d9d3 2-3,32,36,81,85-88,133,141
+src/features/post/PostScreen.tsx
+  s_7477a2e6c69ec6::t_a677ab3f1100c9 22,532-533,535-537,554-560,562-570
+src/shared/account/__tests__/generationKeyed.test.tsx
+  s_7477a2e6c69ec6::t_2b24c02d620527 1-128
+src/shared/account/generationKeyed.ts
+  s_7477a2e6c69ec6::t_2d7b28e4907b74 1-96
+src/shared/account/index.ts
+  s_7477a2e6c69ec6::t_6edec21382b5c3 10-15
+src/shared/filters/FilterSheet.tsx
+  s_7477a2e6c69ec6::t_6de55b3ec4aaeb 21
+src/shared/filters/PeriodStepper.tsx
+  s_7477a2e6c69ec6::t_2544a2167d9e9a 19
+src/shared/focus/ModalHost.tsx
+  s_7477a2e6c69ec6::t_a5dfa20550bedb 16,134-135
+src/shared/focus/__tests__/ModalHost.test.tsx
+  s_7477a2e6c69ec6::t_671b015f3f270a 166-194
+src/shared/focus/__tests__/focusSoon.test.ts
+  s_7477a2e6c69ec6::t_b9ce7eb403a77b 1-177
+src/shared/focus/index.ts
+  s_7477a2e6c69ec6::t_4064876dbad872 24
+src/shared/focus/focusSoon.ts
+  s_12da818c759b95::t_98e28317537789 1-65
+src/features/author/__tests__/useAuthorLiveActions.test.tsx
+  s_7477a2e6c69ec6::t_252e53d39b335f 1-160
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "28228d6234d38647bec27bdeb5097f919706aa28",
+  "prompts": {},
+  "sessions": {
+    "s_12da818c759b95": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a8ef9358c948afcd5",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_7477a2e6c69ec6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d998e7e2-636f-4943-a058-23b274887697",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
