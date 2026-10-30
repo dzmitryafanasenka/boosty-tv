@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 10-25-2026 14:34
-last_updated: 10-30-2026 09:57
+last_updated: 10-30-2026 10:20
 project: Boosty TV
 project_key: NOKEY
 tracking_system: file-system
@@ -299,14 +299,14 @@ action_items:
     action: "usePollVote: skip E10 after an account generation change, cancel the
       exact post query before applyPoll; test an E8 refetch landing after E10"
     owner: "dev"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-6-retro-2026-10-30.md"
   - id: "epic-6-retro-item-27-break-the-shared-platform-shared-ui-cycl"
     epic: 6
     action: "Break the shared/platform ↔ shared/ui cycle: QrRenderer takes its colours
       as props"
     owner: "dev"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-6-retro-2026-10-30.md"
   - id: "epic-6-retro-item-28-before-the-next-post-content-work-split"
     epic: 6
