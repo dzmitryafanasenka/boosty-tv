@@ -1,0 +1,101 @@
+__tests__/accountScopeRegistry.test.js
+  s_7477a2e6c69ec6::t_83273eb3a324a4 53
+__tests__/authorFlow.test.tsx
+  s_7477a2e6c69ec6::t_32e3233c7f1cd8 676
+__tests__/codeFlow.test.tsx
+  s_7477a2e6c69ec6::t_cd9ac628186995 398
+__tests__/demoFlow.test.tsx
+  s_7477a2e6c69ec6::t_4a1d03a8606e20 102,106,114,117,316-338
+__tests__/eventsFlow.test.tsx
+  s_7477a2e6c69ec6::t_0646c6fb8fa9de 1-679
+__tests__/postFlow.test.tsx
+  s_7477a2e6c69ec6::t_9250cc3c13cdb1 1233
+__tests__/shellFlow.test.tsx
+  s_7477a2e6c69ec6::t_6b53bd01e8d6a0 145,148,151
+__tests__/subscriptionsFlow.test.tsx
+  s_7477a2e6c69ec6::t_7faf8c783e819f 199,205
+_bmad-output/implementation-artifacts/spec-7-5-events-list.md
+  s_7477a2e6c69ec6::t_20bf3af0318e27 1-153
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_7477a2e6c69ec6::t_ee92bb5778fb2c 32,104
+_bmad-output/planning-artifacts/ux-designs/ux-boosty-tv-2026-10-25/DESIGN.md
+  s_7477a2e6c69ec6::t_0b607603511c33 131,231,251
+docs/api-contract.md
+  s_7477a2e6c69ec6::t_0b1eafefaa3cc0 262,490-501,787
+docs/feature-parity.md
+  s_7477a2e6c69ec6::t_a411c776e09e21 138
+docs/focus-map.md
+  s_7477a2e6c69ec6::t_b972b8259cb9ab 458,474-480
+docs/testing.md
+  s_7477a2e6c69ec6::t_5d1c49d28b3011 896-926
+src/app/App.tsx
+  s_7477a2e6c69ec6::t_2cbaf977066bba 206-210,212-214,216-217,392-394
+src/app/Shell.tsx
+  s_7477a2e6c69ec6::t_99556d654dbe98 11,48-54,82,292-303,334,348,372,390,397,405-412,444,459,461-469
+src/app/__tests__/phaseFlags.test.ts
+  s_7477a2e6c69ec6::t_3217b97aeafc82 3,8,15,44-51
+src/app/bootstrap.ts
+  s_7477a2e6c69ec6::t_0cee97a8f05c81 2,45
+src/app/dev/demo.ts
+  s_7477a2e6c69ec6::t_ef6dbae8b2d958 42-45,510-511,617-653,767-768
+src/app/phaseFlags.ts
+  s_7477a2e6c69ec6::t_6d2f3f7e5c865d 25-29,35
+src/app/routes.ts
+  s_7477a2e6c69ec6::t_6710a3cc1fae4a 26-27
+src/app/stackRoutes.tsx
+  s_7477a2e6c69ec6::t_6a5a9670786b64 59-62
+src/features/events/EventRow.tsx
+  s_7477a2e6c69ec6::t_fc4861a7921b18 1-188
+src/features/events/EventsScreen.tsx
+  s_7477a2e6c69ec6::t_ac5ad734060848 1-444
+src/features/events/useEvents.ts
+  s_7477a2e6c69ec6::t_f162c67d70ebb6 1-62
+src/shared/entities/event/__tests__/eventRepository.test.ts
+  s_7477a2e6c69ec6::t_42d48f8e8ff998 1-263
+src/shared/entities/event/mapEvents.ts
+  s_7477a2e6c69ec6::t_508ce36e4bf4fa 1-128
+src/shared/i18n/ru.ts
+  s_7477a2e6c69ec6::t_176fb5ef312fb2 216-245
+src/shared/ui/tokens.ts
+  s_7477a2e6c69ec6::t_474140d872825c 250-265
+src/test/fixtures/boosty/e18-events-synthetic.json
+  s_7477a2e6c69ec6::t_1dc0fe70c1c9aa 1-116
+src/features/events/eventReadMarks.ts
+  s_a60d8d580ef56e::t_857481b243584e 1-34
+src/features/events/index.ts
+  s_a60d8d580ef56e::t_20f90190ee618e 1-11
+src/shared/api/dto/events.ts
+  s_a60d8d580ef56e::t_1af5030fa71f93 1-56
+src/shared/api/queryKeys.ts
+  s_a60d8d580ef56e::t_7d422690468a22 124-129
+src/shared/entities/event/eventRepository.ts
+  s_a60d8d580ef56e::t_a73ec779183559 1-31
+src/shared/entities/event/index.ts
+  s_a60d8d580ef56e::t_913d40911a9ce3 1-3
+src/shared/entities/event/types.ts
+  s_a60d8d580ef56e::t_1e099622e931cf 1-25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "bcc569aa31959ac7fc5bf1228e6cf4d29f4f412f",
+  "prompts": {},
+  "sessions": {
+    "s_7477a2e6c69ec6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d998e7e2-636f-4943-a058-23b274887697",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_a60d8d580ef56e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a84531556262ab92d",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
