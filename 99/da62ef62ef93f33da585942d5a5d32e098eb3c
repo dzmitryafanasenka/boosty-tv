@@ -1,0 +1,31 @@
+_bmad-output/implementation-artifacts/spec-post-card-no-preview-placeholder.md
+  s_7477a2e6c69ec6::t_a12fef19def9db 1-56
+_bmad-output/planning-artifacts/ux-designs/ux-boosty-tv-2026-10-25/DESIGN.md
+  s_7477a2e6c69ec6::t_742b07f1e0a65a 235
+docs/testing.md
+  s_7477a2e6c69ec6::t_2b1dc18afa648b 906-922
+src/shared/ui/PostCard.tsx
+  s_7477a2e6c69ec6::t_661f80dd43d605 1,7-15,27-35,51-57,163-201,204-224,260-261,280-297,410-416
+src/shared/ui/__tests__/PostCard.test.tsx
+  s_7477a2e6c69ec6::t_a296052e4e9324 17-26,172,177-390,426,428-430,456-462
+src/shared/ui/__tests__/icons.test.tsx
+  s_7477a2e6c69ec6::t_8804358cc8dfb9 10-20,65-82
+src/shared/ui/icons/index.tsx
+  s_7477a2e6c69ec6::t_2093f26d3f5465 1,141-231
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "99da62ef62ef93f33da585942d5a5d32e098eb3c",
+  "prompts": {},
+  "sessions": {
+    "s_7477a2e6c69ec6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d998e7e2-636f-4943-a058-23b274887697",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
