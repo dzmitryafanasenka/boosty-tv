@@ -30,6 +30,11 @@ export {
   type ScreenFocusGate,
 } from './screenFocus';
 export {
+  useOutcomeFocus,
+  type OutcomeFocus,
+  type OutcomeFocusOptions,
+} from './useOutcomeFocus';
+export {
   useFocusRestoration,
   type FocusRestorationOptions,
   type ListRestoration,

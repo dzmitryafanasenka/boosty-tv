@@ -39,9 +39,11 @@ import {
   destinationIds,
   focusableIds,
   focusTargets,
+  gridRowItems,
   installFixtureTransport,
   installNativeModules,
   lastFocusTarget,
+  listProps,
   lists,
   resetKeychain,
   resetRecorders,
@@ -166,18 +168,10 @@ const subsCalls = () => transport.callsTo(E2_PATH);
 const tileIds = (root: Root) =>
   focusableIds(root).filter(id => id.startsWith('subs/tile/') || id === 'subs/mine');
 /** The Подписки grid's FlashList props (last render). */
-function grid(): Record<string, any> {
-  const props = lists.props.get('subs/list');
-  if (!props) {
-    throw new Error('no Подписки grid rendered');
-  }
-  return props;
-}
+const grid = () => listProps('subs/list');
 /** The blogUrls in the grid (its items are rows of up to 3). */
 const gridBlogs = () =>
-  (grid().data as Array<{ authors: Array<{ blogUrl: string }> }>).flatMap(r =>
-    r.authors.map(a => a.blogUrl),
-  );
+  gridRowItems<{ blogUrl: string }>('subs/list', 'authors').map(a => a.blogUrl);
 
 type CachedList = { authors: Array<{ blogUrl: string }>; received: number; total: number | null };
 

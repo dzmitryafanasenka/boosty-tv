@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback } from 'react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { queryKeys, type HttpClient } from '../../shared/api';
 import {
   PostRepository,
-  trimPostsToFirstPage,
   usePagedPosts,
+  useTrimOnKeyChange,
   type PagedPosts,
 } from '../../shared/entities/post';
 import type { Filter } from '../../shared/filters';
@@ -28,17 +28,7 @@ export function useFeedSearch(http: HttpClient, query: string | null, filter: Fi
   );
   const key = queryKeys.feedSearch(query ?? '', filter);
   const results = usePagedPosts({ queryKey: key, fetchPage, enabled: query !== null });
-  const client = useQueryClient();
-  const shownKey = useRef(JSON.stringify(key));
-  const shownRaw = useRef(key);
-  useEffect(() => {
-    const next = JSON.stringify(key);
-    if (next !== shownKey.current) {
-      trimPostsToFirstPage(client, shownRaw.current).catch(() => {});
-      shownKey.current = next;
-      shownRaw.current = key;
-    }
-  });
+  useTrimOnKeyChange(useQueryClient(), key);
   return results;
 }
 

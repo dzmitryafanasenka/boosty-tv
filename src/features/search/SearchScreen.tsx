@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FlashListRef } from '@shopify/flash-list';
-import { hashKey, useQueryClient, type QueryKey } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { StyleSheet, TVFocusGuideView, View, useWindowDimensions } from 'react-native';
 import { queryKeys, type HttpClient } from '../../shared/api';
 import {
@@ -17,6 +17,7 @@ import {
   useFocusRestoration,
   useLatestRef,
   useModal,
+  useOutcomeFocus,
   usePhaseChange,
   useZoneItem,
 } from '../../shared/focus';
@@ -61,8 +62,9 @@ export const SEARCH_RESET_FILTERS_ID = 'search/reset-filters';
 export const SEARCH_LOAD_MORE_RETRY_ID = 'search/results/retry';
 
 const SKELETON_ROWS = 2;
-/** Frames the no-fetch outcome settle waits for the render and the cache. */
-const OUTCOME_FRAME_TRIES = 30;
+/** The outcome waits through the skeleton and the hint; the hint drops it. */
+const OUTCOME_WAIT_PHASES: readonly Phase[] = ['loading', 'hint'];
+const OUTCOME_DROP_PHASES: readonly Phase[] = ['hint'];
 const FIELD = components['text-field'];
 /** The field row: the label above the 50 dp field, and a little room under it. */
 const FIELD_ROW_HEIGHT = typography['body-s'].lineHeight + spacing['4'] + FIELD.height + spacing['2'];
@@ -239,11 +241,11 @@ export function SearchScreen({
   }, []);
 
   /**
-   * «Готово», «Повторить» or «Сбросить фильтры» is waiting for its outcome:
-   * the first result, else the field / «Сбросить фильтры», else «Повторить».
+   * «Готово», «Повторить» or «Сбросить фильтры» is waiting for its outcome
+   * (`useOutcomeFocus`): the first result, else the field / «Сбросить
+   * фильтры», else «Повторить». The hint drops a pending outcome. It lands
+   * only while the user has not moved off the element that started the wait.
    */
-  const pendingOutcome = useRef(false);
-  /** The user has not moved off the element that started the wait. */
   const mayTakeOutcomeFocus = useCallback(() => {
     const info = focusRef.current;
     if (!info.isActive() || modal.isOpen()) {
@@ -257,97 +259,32 @@ export function SearchScreen({
       current === SEARCH_RESET_FILTERS_ID
     );
   }, [focusRef, modal]);
-
-  /** The awaited fetch has started (so its end can settle the outcome). */
-  const outcomeFetchSeen = useRef(false);
-  const listFetchingRef = useLatestRef(results.isFetching);
-  /** The shown list's key (hashed), as last rendered. */
-  const shownKeyRef = useLatestRef(hashKey(queryKeys.feedSearch(query ?? '', effectiveFilter)));
-  /** The latest `resolveOutcome` (set below; read by the next-frame check). */
-  const resolveLater = useRef<() => void>(() => {});
-  const outcomeFrame = useRef<number | null>(null);
-  useEffect(
-    () => () => {
-      if (outcomeFrame.current !== null) {
-        cancelAnimationFrame(outcomeFrame.current);
+  const {
+    awaitOutcome,
+    cancel: cancelOutcome,
+    resolve: resolveOutcome,
+  } = useOutcomeFocus<Phase>({
+    client,
+    phase,
+    isFetching: results.isFetching,
+    shownKey: queryKeys.feedSearch(query ?? '', effectiveFilter),
+    mayTakeFocus: mayTakeOutcomeFocus,
+    waitPhases: OUTCOME_WAIT_PHASES,
+    dropPhases: OUTCOME_DROP_PHASES,
+    onOutcome: settled => {
+      if (settled === 'results') {
+        listRef.current?.scrollToOffset({ offset: 0, animated: false });
+        restoration.focusInitial();
+      } else if (settled === 'error' || (settled === 'empty' && filtered)) {
+        requestHostFocus(stateActionView.current);
+      } else {
+        focusField();
       }
     },
-    [],
-  );
-  const awaitOutcome = useCallback(
-    (awaited: QueryKey) => {
-      pendingOutcome.current = true;
-      outcomeFetchSeen.current = false;
-      // No fetch followed (e.g. an action onto a cached list with no phase
-      // change and no fetching cycle): settle on a next frame with the same
-      // rules, so the flag never outlives its action. Not while the awaited
-      // list is fetching per the cache, or the render has not reached it
-      // yet (a slow device: TanStack's batched notify can come after the
-      // frame); then look again on the next frame, at most
-      // OUTCOME_FRAME_TRIES times (a longer fetch settles through the
-      // fetching cycle or the phase change).
-      if (outcomeFrame.current !== null) {
-        cancelAnimationFrame(outcomeFrame.current);
-      }
-      const awaitedHash = hashKey(awaited);
-      let tries = 0;
-      const check = () => {
-        outcomeFrame.current = null;
-        if (!pendingOutcome.current || outcomeFetchSeen.current) {
-          return;
-        }
-        const busy =
-          listFetchingRef.current ||
-          shownKeyRef.current !== awaitedHash ||
-          client.isFetching({ queryKey: awaited, exact: true }) > 0;
-        if (!busy) {
-          resolveLater.current();
-        } else if (++tries < OUTCOME_FRAME_TRIES) {
-          outcomeFrame.current = requestAnimationFrame(check);
-        }
-      };
-      outcomeFrame.current = requestAnimationFrame(check);
-    },
-    [listFetchingRef, shownKeyRef, client],
-  );
-  /** Settle the pending outcome on the current phase (focus rules above). */
-  const resolveOutcome = () => {
-    if (!pendingOutcome.current || phase === 'loading' || phase === 'hint') {
-      if (phase === 'hint') {
-        pendingOutcome.current = false;
-      }
-      return;
-    }
-    pendingOutcome.current = false;
-    if (!mayTakeOutcomeFocus()) {
-      return;
-    }
-    if (phase === 'results') {
-      listRef.current?.scrollToOffset({ offset: 0, animated: false });
-      restoration.focusInitial();
-    } else if (phase === 'error' || (phase === 'empty' && filtered)) {
-      requestHostFocus(stateActionView.current);
-    } else {
-      focusField();
-    }
-  };
-  resolveLater.current = resolveOutcome;
-  usePhaseChange(phase, resolveOutcome);
-  // The awaited fetch settled with the phase unchanged (the held error
-  // through a failed «Повторить», or «Готово» from the error view failing
-  // again): settle the outcome too, so the flag never outlives its fetch.
-  const resolveRef = useLatestRef(resolveOutcome);
-  useEffect(() => {
-    if (!pendingOutcome.current) {
-      return;
-    }
-    if (results.isFetching) {
-      outcomeFetchSeen.current = true;
-    } else if (outcomeFetchSeen.current) {
-      outcomeFetchSeen.current = false;
-      resolveRef.current();
-    }
-  }, [results.isFetching, resolveRef]);
+  });
+  usePhaseChange(phase, () => {
+    resolveOutcome();
+  });
 
   const queryRef = useLatestRef(query);
   const filterRef = useLatestRef(effectiveFilter);
@@ -356,7 +293,7 @@ export function SearchScreen({
     focusField();
     const next = draft.trim();
     if (next === '') {
-      pendingOutcome.current = false;
+      cancelOutcome();
       searchQueryStore.getState().clear();
       return;
     }
@@ -369,7 +306,17 @@ export function SearchScreen({
     if (queryRef.current !== next) {
       searchQueryStore.getState().submit(next);
     }
-  }, [draft, focusField, routeKey, restoration, client, filterRef, queryRef, awaitOutcome]);
+  }, [
+    draft,
+    focusField,
+    cancelOutcome,
+    routeKey,
+    restoration,
+    client,
+    filterRef,
+    queryRef,
+    awaitOutcome,
+  ]);
 
   const onRetry = useCallback(() => {
     awaitOutcome(queryKeys.feedSearch(queryRef.current ?? '', filterRef.current));

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   SESSION_CHECK_KEYS,
@@ -10,8 +10,8 @@ import {
   MAX_AUTO_FETCHES,
   PostRepository,
   nextPageCursor,
-  trimPostsToFirstPage,
   usePagedPosts,
+  useTrimOnKeyChange,
   type PagedPosts,
 } from '../../shared/entities/post';
 import type { Filter } from '../../shared/filters';
@@ -67,16 +67,7 @@ export function useSubscriptionFeed(
   // The Filter changed (Story 5.3): the feed left behind keeps its first
   // page only, so switching back to it while stale sends one E5 request,
   // not one per page it had loaded.
-  const client = useQueryClient();
-  const shownFilter = useRef(filter);
-  useEffect(() => {
-    const previous = shownFilter.current;
-    shownFilter.current = filter;
-    const previousKey = queryKeys.subscriptionFeed(previous);
-    if (JSON.stringify(previousKey) !== JSON.stringify(queryKeys.subscriptionFeed(filter))) {
-      trimPostsToFirstPage(client, previousKey).catch(() => {});
-    }
-  }, [client, filter]);
+  useTrimOnKeyChange(useQueryClient(), queryKeys.subscriptionFeed(filter));
   refetchRef.current = feed.refetch;
   return feed;
 }
