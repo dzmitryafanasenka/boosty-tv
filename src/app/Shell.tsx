@@ -8,6 +8,7 @@ import {
   type RefObject,
 } from 'react';
 import { BackHandler } from 'react-native';
+import { EventsScreen, type EventsFocusInfo } from '../features/events';
 import { HomeScreen, type HomeFocusInfo, type HomeScreenProps } from '../features/home';
 import { SearchScreen, type SearchFocusInfo } from '../features/search';
 import { SETTINGS_VERSION_ID, SettingsScreen } from '../features/settings';
@@ -44,8 +45,13 @@ export type ShellProps = {
   onBreakNextVideoUrl?: () => void;
   /** Главная's offline StateView (Story 2.5); absent: the feed. */
   homeOffline?: HomeScreenProps['offline'];
-  /** Подписки: OK on a tile opens the Author page (Story 3.3). */
-  onOpenAuthor?: (blogUrl: string) => void;
+  /**
+   * Подписки: OK on a tile opens the Author page (Story 3.3); События: OK
+   * on a row (Story 7.5, `section` 'events': Автор's sidebar current item;
+   * absent: the Author route's default, Подписки). Returns whether it
+   * navigated (false: dropped, e.g. during a transition).
+   */
+  onOpenAuthor?: (blogUrl: string, section?: SectionId) => boolean;
   /**
    * Главная: OK on a feed card opens Пост (Story 3.4); Поиск: OK on a result
    * (Story 5.6, `section` 'search': Пост's sidebar current item).
@@ -73,7 +79,7 @@ const HOME: SectionId = 'home';
  * virtualized grid, or after the first data arrives), so the content zone
  * does not focus its target on mount.
  */
-const SELF_FOCUS_SECTIONS: ReadonlySet<SectionId> = new Set<SectionId>(['home', 'subs', 'search']);
+const SELF_FOCUS_SECTIONS: ReadonlySet<SectionId> = new Set<SectionId>(['home', 'subs', 'search', 'events']);
 
 type View_ = { section: SectionId; focusContent: boolean };
 
@@ -283,6 +289,18 @@ export function Shell({
     [focusNav, setReturnFocus],
   );
 
+  // События (Story 7.5) follows Подписки's rules (docs/focus-map.md §5 J).
+  const eventsFocus = useMemo<EventsFocusInfo>(
+    () => ({
+      isActive: () => routeFocused.current,
+      current: () => lastFocusId.current,
+      sectionItemId: NAV_ID.events,
+      focusSidebar: () => focusNav('events'),
+      setReturnFocus,
+    }),
+    [focusNav, setReturnFocus],
+  );
+
   // Поиск (Story 5.6): the field on open, the result card on return.
   const searchFocus = useMemo<SearchFocusInfo>(
     () => ({
@@ -313,7 +331,7 @@ export function Shell({
         routeKey={routeKey}
         sectionId={view.section}
         initialFocusId={INITIAL_CONTENT_ID[view.section]}
-        // Главная, Подписки and Поиск take their content focus themselves.
+        // Главная, Подписки, Поиск and События take their content focus themselves.
         focusOnMount={view.focusContent && !SELF_FOCUS_SECTIONS.has(view.section)}
         onItemFocus={onContentFocus}
         isActive={isShellActive}
@@ -327,6 +345,7 @@ export function Shell({
           homeFocus={homeFocus}
           subsFocus={subsFocus}
           searchFocus={searchFocus}
+          eventsFocus={eventsFocus}
           onOpenSignOut={onOpenSignOut}
           onOpenFocusCheck={onOpenFocusCheck}
           onCheckSession={onCheckSession}
@@ -350,6 +369,7 @@ function SectionContent({
   homeFocus,
   subsFocus,
   searchFocus,
+  eventsFocus,
   onOpenSignOut,
   onOpenFocusCheck,
   onCheckSession,
@@ -367,19 +387,28 @@ function SectionContent({
   homeFocus: HomeFocusInfo;
   subsFocus: SubscriptionsFocusInfo;
   searchFocus: SearchFocusInfo;
+  eventsFocus: EventsFocusInfo;
   onOpenSignOut: (initiator: RefObject<HostView | null>) => void;
   onOpenFocusCheck?: () => void;
   onCheckSession?: () => void;
   onExpireSession?: () => void;
   onBreakNextVideoUrl?: () => void;
   homeOffline?: HomeScreenProps['offline'];
-  onOpenAuthor?: (blogUrl: string) => void;
+  onOpenAuthor?: (blogUrl: string, section?: SectionId) => boolean;
   onOpenPost?: (blogUrl: string, postId: string, section?: SectionId) => void;
   onOpenPlayer?: (ref: MediaRef, focusId: string) => void;
 }) {
   const onOpenSearchResult = useCallback(
     (blogUrl: string, postId: string) => onOpenPost?.(blogUrl, postId, 'search'),
     [onOpenPost],
+  );
+  // Подписки opens Автор with the route's default section; События with its own.
+  const onOpenSubsAuthor = useCallback((blogUrl: string) => {
+    onOpenAuthor?.(blogUrl);
+  }, [onOpenAuthor]);
+  const onOpenEventAuthor = useCallback(
+    (blogUrl: string) => onOpenAuthor?.(blogUrl, 'events') ?? false,
+    [onOpenAuthor],
   );
   switch (section) {
     case 'home':
@@ -412,7 +441,7 @@ function SectionContent({
           routeKey={routeKey}
           focusOnMount={focusContent}
           focus={subsFocus}
-          onOpenAuthor={onOpenAuthor}
+          onOpenAuthor={onOpenSubsAuthor}
           myBlogEnabled={phaseFlags.myBlog}
         />
       );
@@ -427,8 +456,16 @@ function SectionContent({
           filtersEnabled={phaseFlags.filters}
         />
       );
-    // Phase-gated off (phaseFlags): never rendered.
+    // Story 7.5: rendered only while `phaseFlags.events` lists the section.
     case 'events':
-      return null;
+      return (
+        <EventsScreen
+          http={http}
+          routeKey={routeKey}
+          focusOnMount={focusContent}
+          focus={eventsFocus}
+          onOpenAuthor={onOpenEventAuthor}
+        />
+      );
   }
 }

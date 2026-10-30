@@ -56,7 +56,10 @@ export function takePendingLiveQr(routeKey: string): boolean {
   return true;
 }
 
-/** Автор opened from Подписки: its sidebar's current item (decision A). */
+/**
+ * Автор's default sidebar current item (decision A): Подписки. Other callers
+ * pass their own `section` (Главная/Пост, События in Story 7.5).
+ */
 const AUTHOR_ORIGIN: SectionId = 'subs';
 
 /**

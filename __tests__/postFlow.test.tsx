@@ -1230,6 +1230,7 @@ describe('the sidebar (ADR 0012)', () => {
       'post/nav/home',
       'post/nav/search',
       'post/nav/subs',
+      'post/nav/events',
       'post/nav/settings',
     ]);
     expect(visible(root, 'post/nav/home/current')).toBe(true);

@@ -455,7 +455,7 @@ Implementation notes (Story 4.4, recovery; host-tested only, the device rows are
 
 | Screen | Initial focus | Arrows | OK | Back | Restoration |
 |---|---|---|---|---|---|
-| J События (flag-gated; E18 shape verified in Story 1.5, paging not) | The first event | ↑ ↓; ← → sidebar | → D Автор; for a live event the author page opens with focus on the live card (OK there opens the live player; it does not start from J directly) | → sidebar | After Автор: the same row by event id |
+| J События (flag-gated, on since Story 7.5; E18 shape verified in Stories 1.5 and 7.5, paging not) | The first event (as built: once the rows arrive, if the section was opened with OK and the user has not moved; the skeleton keeps focus on `nav/events`) | ↑ ↓ between rows (one column; the content zone traps ↑ ↓, no wrap); ← → sidebar | → D Автор with section `events` (the row is marked read locally); for a live event the author page opens with focus on the live card (7.1's rule: OK there opens the live player; it does not start from J directly). A row without a valid blog: nothing | → sidebar | After Автор: the same row by event id, else the first row (no neighbour fallback). Reopening the section from the sidebar: the same rule, from the cache |
 | K Настройки (K1–K3) | The first row | ↑ ↓; ← → sidebar | Row by kind: nav → submenu or sheet; toggle → flips at once; radio → selects and closes the submenu; check → toggles; info → nothing. 7 OKs on «Версия» reveal diagnostics | → sidebar. In diagnostics or a submenu → back to Настройки, focus on the row that opened it | — |
 | K Settings submenu or sheet | The selected value (radio), otherwise the first row | ↑ ↓ | Per SettingRow kind; radio selects and closes the submenu | Close, focus on the row that opened it | — |
 | K Diagnostics (SET-05, revealed) | The log-capture toggle | ↑ ↓; ← → sidebar | Toggle; the info rows (how to fetch logs via adb) are not activatable | → Настройки, focus on «Версия» | — |
@@ -470,6 +470,13 @@ Implementation notes (Story 2.7; the dialog rows device-verified by adb, the sig
 - Настройки: `settings/row/version` (info, the initial content focus), then `settings/row/signout` «Выйти из аккаунта» (nav row, no subtitle); the `__DEV__` rows follow. ↑ ↓ between rows, no wrap.
 - OK on the row opens the dialog in the modal host with the row as the initiator. Ids `dialog/signout/cancel` (preferred focus) and `dialog/signout/confirm`, in one row: ← → move natively; ↑ ↓ and the edges are trapped. «Отмена» or Back closes it and focus returns to the row.
 - «Выйти» is busy while `AccountScope.reset()` runs; a repeated OK, «Отмена» and Back are ignored meanwhile. Success: the modal closes **without** a focus return, the stack is reset to `[Welcome]` and A1's «Войти в Boosty» takes the initial focus («Войдите снова» is not shown). Failure (a SecureStore clear rejects): the dialog stays with the polite error line «Не удалось выйти из аккаунта. Попробуйте ещё раз.», focus stays on «Выйти» (nothing moves it), and OK retries.
+
+Implementation notes (Story 7.5, host-tested; device rows in `docs/testing.md`):
+- Ids: `events/row/<eventId>` (the E18 id), the StateView action `state/events/action` («Повторить» on an error, «Обновить» on «Событий нет», owner decision Q2 a). The rows are a FlashList (ADR 0011) of fixed-height EventRows (56 dp + a 10 dp gap), keyed by the event id.
+- Empty and error: the action takes focus under the skeleton rule (opened with OK, focus still on `nav/events`, nothing, or the action itself); pressing it refetches and keeps focus on the busy button; rows arriving then take focus on the first row. A refetch that empties the list while a row has focus moves focus to «Обновить».
+- A background refetch that reorders the rows keeps the focused row by id (scrolled to its new index); a focused row that disappears gives focus to the first row. The trigger is the id change, never frame timing.
+- Автор opened from События shows «События» as its sidebar's current item; Back from Автор returns to J.
+- Refresh (review fix): every open of J fetches E18 again (`staleTime` 0) and a resume refetches the shown list; the focused row is kept by id as above. A second OK during the transition to Автор is dropped and marks nothing.
 
 **Session expired mid-session:** A11 replaces the stack from any screen (Shell, Post, Player). FocusRestoration entries survive the sign-in flow only for the same account id; after re-login the app lands on Главная with its remembered focus, not on the screen where the session expired.
 

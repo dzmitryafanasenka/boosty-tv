@@ -247,6 +247,22 @@ export const components = {
     progress: colors.accent,
     scaleFocus: focus['scale-row'],
   },
+  /**
+   * Story 7.5 (События): the row spans the 720 dp content minus the focus
+   * headroom on both sides (720 − 2 × 12), so the 1.02 scale and the ring
+   * stay inside the content.
+   */
+  'event-row': {
+    width: 696,
+    height: 56,
+    avatar: 32,
+    dot: 6,
+    radius: rounded.lg,
+    bg: colors.surface,
+    bgFocus: colors['surface-focus-row'],
+    chip: colors.live,
+    scaleFocus: focus['scale-row'],
+  },
   'link-chip': {
     height: 32,
     radius: rounded.full,

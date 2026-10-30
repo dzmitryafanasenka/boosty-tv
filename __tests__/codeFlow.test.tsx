@@ -395,6 +395,7 @@ describe('confirm and session creation', () => {
       'nav/home',
       'nav/search',
       'nav/subs',
+      'nav/events',
       'nav/settings',
       'home/filters',
       'home/refresh',

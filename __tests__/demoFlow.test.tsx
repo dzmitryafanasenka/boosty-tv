@@ -99,10 +99,11 @@ test('fixture-backed Shell with the «ДЕМО» badge; SecureStore and the netw
     .queryAll(n => n.props.focusable === true)
     .map(n => n.props.testID as string);
   // Then «Фильтры» (Story 5.3) and «Обновить» (Story 5.1) in the feed's title row.
-  expect(focusable.slice(0, 6)).toEqual([
+  expect(focusable.slice(0, 7)).toEqual([
     'nav/home',
     'nav/search',
     'nav/subs',
+    'nav/events',
     'nav/settings',
     'home/filters',
     'home/refresh',
@@ -110,10 +111,10 @@ test('fixture-backed Shell with the «ДЕМО» badge; SecureStore and the netw
   // Demo posts in order, under the default «Доступные мне» (Story 5.3: the
   // locked demo-post-6 is not in it). (FlashList's Jest measurements report
   // the list end at once, so further demo pages may already be loaded.)
-  expect(focusable.slice(6, 15)).toEqual(
+  expect(focusable.slice(7, 16)).toEqual(
     [0, 1, 2, 3, 4, 5, 7, 8, 9].map(i => `home/feed/demo-post-${i}`),
   );
-  expect(focusable.slice(6).every(id => id.startsWith('home/feed/demo-post-'))).toBe(true);
+  expect(focusable.slice(7).every(id => id.startsWith('home/feed/demo-post-'))).toBe(true);
   // The demo's E1 is answered by FixtureTransport: no real request, no keychain.
   expect(fetchMock).not.toHaveBeenCalled();
   expect(keychain.getGenericPassword).not.toHaveBeenCalled();
@@ -306,6 +307,29 @@ test('Story 7.4: the demo like toggles in memory and survives a poll; share open
   // «Поделиться» opens the stream page's QR (no request).
   await press(root, 'author/demo-blog-1/live/share');
   expect(root.container.queryAll(n => n.props.testID === 'dialog/qr').length).toBeGreaterThan(0);
+  expect(fetchMock).not.toHaveBeenCalled();
+  await act(async () => {
+    root.unmount();
+  });
+});
+
+test('Story 7.5: the demo E18: События lists the shown demo events (stream first); OK on the stream row → Автор on the live card; no network', async () => {
+  fetchMock.mockClear();
+  const focusMock = requestHostFocus as jest.Mock;
+  const root = await renderApp();
+  focusMock.mockClear();
+  await press(root, 'nav/events');
+  const rows = root.container
+    .queryAll(n => n.props.focusable === true && String(n.props.testID).startsWith('events/row/'))
+    .map(n => n.props.testID as string);
+  // The comment (9002) and the owner-side donation (9003) are hidden.
+  expect(rows).toEqual(['events/row/9001', 'events/row/9004', 'events/row/9005', 'events/row/9006', 'events/row/9007']);
+  const testIdOf = (call: unknown[]) => (call[0] as { props?: { testID?: string } } | null)?.props?.testID;
+  expect(focusMock.mock.calls.map(testIdOf).pop()).toBe('events/row/9001');
+  expect(one(root, 'events/row/9001').props.accessibilityLabel).toMatch(/^Новое\. Демо-автор 1: Начался эфир\. Эфир\./);
+  focusMock.mockClear();
+  await press(root, 'events/row/9001');
+  expect(focusMock.mock.calls.map(testIdOf).filter(Boolean).pop()).toBe('author/demo-blog-1/live');
   expect(fetchMock).not.toHaveBeenCalled();
   await act(async () => {
     root.unmount();
