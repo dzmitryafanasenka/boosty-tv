@@ -1,0 +1,33 @@
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_7477a2e6c69ec6::t_0f4696dc99fca8 335-337
+_bmad-output/implementation-artifacts/spec-epic-6-retro-a1-a2.md
+  s_7477a2e6c69ec6::t_888c799f3a83ab 1-60
+docs/adr/0014-qr-rendering.md
+  s_7477a2e6c69ec6::t_257c0eb32a331d 14
+docs/testing.md
+  s_7477a2e6c69ec6::t_e7155e6acd43fc 896-899
+src/features/polls/__tests__/PollWidget.test.tsx
+  s_7477a2e6c69ec6::t_5f5db4b188f79f 514-567
+src/features/polls/usePollVote.ts
+  s_7477a2e6c69ec6::t_d3f5d97ee0b485 16-19,26-28,125-129,140-146
+src/shared/platform/qrRenderer.tsx
+  s_7477a2e6c69ec6::t_bcc3866585f6a5 11-13,25-26,32,40
+src/shared/ui/QrDialog.tsx
+  s_7477a2e6c69ec6::t_c71c3a41384750 66-72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "15ae5cf4cf1844d34a74b8d5c44370edc853f786",
+  "prompts": {},
+  "sessions": {
+    "s_7477a2e6c69ec6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d998e7e2-636f-4943-a058-23b274887697",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
