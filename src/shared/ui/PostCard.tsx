@@ -1,9 +1,18 @@
-import { memo, type Ref } from 'react';
+import { memo, type JSX, type ReactNode, type Ref } from 'react';
 import { Image, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { firstText, type Post, type PostKind } from '../entities/post';
 import { t, tf } from '../i18n';
 import { formatCardDate, formatDuration } from '../i18n/format';
 import { FocusableSurface, type FocusableSurfaceProps, type HostView } from './FocusableSurface';
+import {
+  AudioIcon,
+  FileIcon,
+  PollIcon,
+  TextPhotoIcon,
+  VideoIcon,
+  VideosIcon,
+  type IconProps,
+} from './icons';
 import { Text } from './Text';
 import { useItemState } from './useItemState';
 import { colors, components, rounded, spacing } from './tokens';
@@ -14,6 +23,15 @@ import { colors, components, rounded, spacing } from './tokens';
  * it), then a 2-line title and avatar · author · date. Locked: dimmed
  * preview, lock glyph and the «Нет доступа» badge; never a price or a
  * subscribe action. No comment count anywhere.
+ *
+ * No preview (`previewUrl` null, or the preview failed to load; owner
+ * decision 2026-10-30): a `surface-raised` plate with the author's round
+ * avatar centred on it. «No picture» must never look like «still loading»,
+ * so the plate never uses the skeleton colour (PostCardSkeleton keeps it).
+ * Without an avatar, or when it fails, the plate shows the post-type icon
+ * instead (`text-secondary`). Locked without a preview: the plate, the
+ * avatar dimmed, the lock glyph on top and no type icon (without an avatar:
+ * the plate and the lock only).
  *
  * The width is the grid's: the token width (168) leaves no horizontal focus
  * headroom in the 720 dp content (4 × 168 + 3 × 16 = 720), so the feed
@@ -30,6 +48,13 @@ const META_HEIGHT = AVATAR;
 /** DESIGN.md «dimmed preview» for a locked card. */
 const LOCKED_PREVIEW_OPACITY = 0.4;
 const LOCK = { body: 14, shackle: 10 } as const;
+/**
+ * The no-preview placeholder (owner decision 2026-10-30, DESIGN.md PostCard
+ * «… without a preview show the author avatar on a plate»): the avatar and,
+ * without one, the type icon are sized from the thumb height, not a token.
+ */
+const PLATE_AVATAR_RATIO = 0.5;
+const PLATE_ICON_RATIO = 0.3;
 
 /**
  * The text block under the thumb (title, then the meta row). Shared with
@@ -135,24 +160,68 @@ function LockGlyph({
   );
 }
 
-function Avatar({ url }: { url: string | null }) {
+const TYPE_ICONS: Record<Exclude<PostKind['kind'], 'locked'>, (props: IconProps) => JSX.Element> = {
+  video: VideoIcon,
+  videos: VideosIcon,
+  audio: AudioIcon,
+  text: TextPhotoIcon,
+  poll: PollIcon,
+  file: FileIcon,
+};
+
+/**
+ * The post-type glyph on the placeholder plate; none for a locked post,
+ * whose lock glyph sits on the plate instead.
+ */
+function TypeIcon({ kind, size, testID }: { kind: PostKind; size: number; testID?: string }) {
+  if (kind.kind === 'locked') {
+    return null;
+  }
+  const Icon = TYPE_ICONS[kind.kind];
+  return <Icon color={colors['text-secondary']} size={size} testID={testID} />;
+}
+
+/**
+ * The author's round avatar: the meta row's (default size, a neutral circle
+ * when there is none or it failed) or the placeholder plate's (`size`, and
+ * `fallback` instead of the circle).
+ */
+function Avatar({
+  url,
+  size,
+  dimmed = false,
+  fallback,
+  testID,
+}: {
+  url: string | null;
+  size?: number;
+  dimmed?: boolean;
+  fallback?: ReactNode;
+  testID?: string;
+}) {
   // Recycled cells (ADR 0011): a failure belongs to one URL only.
   const [failed, setFailed] = useItemState(false, url ?? undefined);
-  return url && !failed ? (
-    <Image
-      // Keyed by the URL: a recycled cell never shows the previous author's
-      // avatar while the new one loads (only this view remounts, not the cell).
-      key={url}
-      source={{ uri: url }}
-      resizeMethod="resize"
-      fadeDuration={0}
-      style={styles.avatar}
-      onError={() => setFailed(true)}
-      accessibilityIgnoresInvertColors
-    />
-  ) : (
-    <View style={[styles.avatar, styles.avatarPlaceholder]} />
-  );
+  const sized = size === undefined ? null : { width: size, height: size };
+  if (url && !failed) {
+    return (
+      <Image
+        // Keyed by the URL: a recycled cell never shows the previous author's
+        // avatar while the new one loads (only this view remounts, not the cell).
+        key={url}
+        testID={testID}
+        source={{ uri: url }}
+        resizeMethod="resize"
+        fadeDuration={0}
+        style={[styles.avatar, sized, dimmed && styles.dimmed]}
+        onError={() => setFailed(true)}
+        accessibilityIgnoresInvertColors
+      />
+    );
+  }
+  if (fallback !== undefined) {
+    return <>{fallback}</>;
+  }
+  return <View style={[styles.avatar, styles.avatarPlaceholder, sized]} />;
 }
 
 export function PostCardView({
@@ -188,7 +257,8 @@ export function PostCardView({
       {/*
         Flat on purpose (Story 3.1 device profiling: mounting ≈ 37 ms of
         native work per card): the thumb is the Image itself (or the
-        placeholder View), the badges are single Texts with their own
+        placeholder plate with one centered child: the author avatar or the
+        type icon), the badges are single Texts with their own
         background, and the lock and badges are placed absolutely on the
         surface, whose top-left is the thumb's.
       */}
@@ -207,7 +277,24 @@ export function PostCardView({
           accessibilityIgnoresInvertColors
         />
       ) : (
-        <View style={[styles.thumb, { width, height: thumbHeight }]} />
+        <View
+          testID={testID ? `${testID}/placeholder` : undefined}
+          style={[styles.thumb, styles.plate, { width, height: thumbHeight }]}
+        >
+          <Avatar
+            url={post.author.avatarUrl}
+            size={Math.round(thumbHeight * PLATE_AVATAR_RATIO)}
+            dimmed={locked}
+            testID={testID ? `${testID}/placeholder-avatar` : undefined}
+            fallback={
+              <TypeIcon
+                kind={post.kind}
+                size={Math.round(thumbHeight * PLATE_ICON_RATIO)}
+                testID={testID ? `${testID}/type-icon` : undefined}
+              />
+            }
+          />
+        </View>
       )}
       {locked ? (
         <LockGlyph
@@ -319,6 +406,13 @@ const styles = StyleSheet.create({
   },
   dimmed: {
     opacity: LOCKED_PREVIEW_OPACITY,
+  },
+  // Not the skeleton colour: «no picture» must read differently from
+  // «still loading» (owner report 2026-10-30).
+  plate: {
+    backgroundColor: colors['surface-raised'],
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   // One Text per badge: its own background, radius and padding; the text
   // is centered in the 20 dp box.

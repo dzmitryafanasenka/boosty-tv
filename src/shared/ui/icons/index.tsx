@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import Svg, { Circle, G, Path, Rect, Text as SvgText } from 'react-native-svg';
 import { t } from '../../i18n';
 
@@ -135,5 +136,96 @@ export function HeartIcon({ filled, color, size = 24, testID }: HeartIconProps) 
         fill={filled ? color : 'none'}
       />
     </Svg>
+  );
+}
+
+/*
+ * Post-type glyphs for the PostCard placeholder (owner decision 2026-10-30:
+ * a card without a preview and without an author avatar shows its type).
+ * One per PostCard badge kind; drawn in the ink as outlines on the 24-unit
+ * grid, decorative like the rest (the card carries the label).
+ */
+
+function Glyph({ size = 24, testID, children }: Omit<IconProps, 'color'> & { children: ReactNode }) {
+  return (
+    <Svg
+      testID={testID}
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      {children}
+    </Svg>
+  );
+}
+
+/** «Видео»: a play triangle in a rounded frame. */
+export function VideoIcon({ color, size, testID }: IconProps) {
+  return (
+    <Glyph size={size} testID={testID}>
+      <Rect x={2.5} y={5} width={19} height={14} rx={3} stroke={color} strokeWidth={2} fill="none" />
+      <Path d="M10 9 L15.5 12 L10 15 Z" fill={color} />
+    </Glyph>
+  );
+}
+
+/** «N видео»: the video frame with a second frame behind it. */
+export function VideosIcon({ color, size, testID }: IconProps) {
+  return (
+    <Glyph size={size} testID={testID}>
+      <Path d="M6 4 H19 A3 3 0 0 1 22 7 V15" stroke={color} strokeWidth={2} strokeLinecap="round" fill="none" />
+      <Rect x={2} y={8} width={16} height={12} rx={3} stroke={color} strokeWidth={2} fill="none" />
+      <Path d="M8.5 11.2 L13 14 L8.5 16.8 Z" fill={color} />
+    </Glyph>
+  );
+}
+
+/** «Аудио»: a music note (a stem with a flag and a filled head). */
+export function AudioIcon({ color, size, testID }: IconProps) {
+  return (
+    <Glyph size={size} testID={testID}>
+      <Path d="M10 17 V4.5 L19 3 V7 L10 8.5" stroke={color} strokeWidth={2} strokeLinejoin="round" fill="none" />
+      <Circle cx={7} cy={17.5} r={3} fill={color} />
+    </Glyph>
+  );
+}
+
+/** «Текст и фото»: a picture (frame, sun, hill) over two text lines. */
+export function TextPhotoIcon({ color, size, testID }: IconProps) {
+  return (
+    <Glyph size={size} testID={testID}>
+      <Rect x={3} y={3} width={18} height={12} rx={2.5} stroke={color} strokeWidth={2} fill="none" />
+      <Circle cx={8.5} cy={7.5} r={1.6} fill={color} />
+      <Path d="M5 13.5 L10 9.5 L13.5 12 L16 10 L19.5 13.5" stroke={color} strokeWidth={1.6} strokeLinejoin="round" fill="none" />
+      <Path d="M3 18.5 H21 M3 21.5 H14" stroke={color} strokeWidth={2} strokeLinecap="round" />
+    </Glyph>
+  );
+}
+
+/** «Опрос»: three result bars of different lengths. */
+export function PollIcon({ color, size, testID }: IconProps) {
+  return (
+    <Glyph size={size} testID={testID}>
+      <Rect x={3} y={4} width={18} height={4} rx={2} fill={color} />
+      <Rect x={3} y={10} width={11} height={4} rx={2} fill={color} />
+      <Rect x={3} y={16} width={15} height={4} rx={2} fill={color} />
+    </Glyph>
+  );
+}
+
+/** «Файл»: a sheet with a folded corner. */
+export function FileIcon({ color, size, testID }: IconProps) {
+  return (
+    <Glyph size={size} testID={testID}>
+      <Path
+        d="M6 2.5 H14 L19.5 8 V20 A1.5 1.5 0 0 1 18 21.5 H6 A1.5 1.5 0 0 1 4.5 20 V4 A1.5 1.5 0 0 1 6 2.5 Z M14 2.5 V8 H19.5"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </Glyph>
   );
 }
