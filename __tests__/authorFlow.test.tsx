@@ -3059,6 +3059,47 @@ describe('Story 7.4: like and share a live stream', () => {
     await unmount(root);
   });
 
+  it('Success: a poll mid-flight that already says liked (a newer count) shows that count after E17 200 (Epic 7 retro F1)', async () => {
+    e15 = () => e15Stream('live', LIVE_357);
+    const root = await openAuthor();
+    const like = deferred();
+    e17 = () => like.promise;
+    await press(root, LIKE);
+    expect(likeLabel(root)).toBe('Вам нравится, 358');
+    // The poll already carries the like (and others' likes): the success
+    // write produces equal data, so the query keeps its object.
+    e15 = () => e15Stream('live', { isLiked: true, count: { viewers: 10, likes: 400 } });
+    await pollNow();
+    await act(async () => {
+      like.resolve({ status: 200 });
+    });
+    await settle();
+    expect(queryClient.getQueryData(queryKeys.stream(BLOG))).toMatchObject({ isLiked: true, likes: 400 });
+    expect(likeLabel(root)).toBe('Вам нравится, 400');
+    // No overlay left behind: a later poll with another count shows at once.
+    e15 = () => e15Stream('live', { isLiked: true, count: { viewers: 10, likes: 410 } });
+    await pollNow();
+    expect(likeLabel(root)).toBe('Вам нравится, 410');
+    await unmount(root);
+  });
+
+  it('Unlike: a poll mid-flight that already says not liked (a lower count) shows that count after E17 200 (Epic 7 retro F1)', async () => {
+    e15 = () => e15Stream('live', { isLiked: true, count: { viewers: 10, likes: 358 } });
+    const root = await openAuthor();
+    const unlike = deferred();
+    e17 = () => unlike.promise;
+    await press(root, LIKE);
+    expect(likeLabel(root)).toBe('Нравится, 357');
+    e15 = () => e15Stream('live', { isLiked: false, count: { viewers: 10, likes: 300 } });
+    await pollNow();
+    await act(async () => {
+      unlike.resolve({ status: 200 });
+    });
+    await settle();
+    expect(likeLabel(root)).toBe('Нравится, 300');
+    await unmount(root);
+  });
+
   it('A new stream (another id) while E17 runs: the old optimistic state is neither shown nor written on it', async () => {
     e15 = () => e15Stream('live', LIVE_357);
     const root = await openAuthor();

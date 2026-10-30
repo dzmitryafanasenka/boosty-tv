@@ -78,7 +78,7 @@ export function useLiveHeartbeat(http: HttpClient, blogUrl: string | null, watch
     logger.warn('live', 'heartbeat failed', {
       stop,
       failures: failures.current,
-      kind: isAppError(error) ? error.kind : 'Unknown',
+      kind: isAppError(error) ? error.kind : 'Client',
     });
   };
 
