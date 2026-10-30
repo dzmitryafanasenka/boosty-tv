@@ -63,7 +63,13 @@ export function QrDialog({ title, value, onClose, testID = 'dialog/qr' }: QrDial
             {t('qr.error')}
           </Text>
         ) : (
-          <QrCode testID={`${testID}/svg`} value={value} size={TOKENS.qrSize} onError={onQrError} />
+          <QrCode
+            testID={`${testID}/svg`}
+            value={value}
+            size={TOKENS.qrSize}
+            background={TOKENS.qrBg}
+            onError={onQrError}
+          />
         )}
       </View>
       <Text variant="body-s" color="text-secondary" style={styles.hint}>

@@ -511,6 +511,60 @@ describe('Story 6.6: vote and retract (votable mode)', () => {
     expect(has(root, `${ID}/error`)).toBe(false);
   });
 
+  it('a sign-out / account switch while E11 runs: its late 200 sends no E10 (Epic 6 retro A1)', async () => {
+    let generation = 1;
+    jest.spyOn(accountScope, 'generation').mockImplementation(() => generation);
+    const invalidate = jest.spyOn(client, 'invalidateQueries');
+    const root = await renderVotable(poll());
+    await ok(root, '2');
+    await ok(root, '2');
+    generation = 2;
+    await answer(0, { status: 200, body: undefined });
+    expect(sent()).toEqual([['POST', VOTE_PATH, [['answer', '2']]]]);
+    expect(invalidate).not.toHaveBeenCalled();
+    // The old request is over: the new account's vote is sent at once.
+    await ok(root, '1');
+    await ok(root, '1');
+    expect(sent()[1]).toEqual(['POST', VOTE_PATH, [['answer', '1']]]);
+  });
+
+  it('a sign-out / account switch while E10 runs: the post query of the new account is not cancelled (Epic 6 retro A1)', async () => {
+    let generation = 1;
+    jest.spyOn(accountScope, 'generation').mockImplementation(() => generation);
+    const cancel = jest.spyOn(client, 'cancelQueries');
+    const root = await renderVotable(poll());
+    await ok(root, '2');
+    await ok(root, '2');
+    await answer(0, { status: 200, body: undefined });
+    generation = 2;
+    await answer(1, e10(poll({ answer: ['2'] })));
+    expect(cancel).not.toHaveBeenCalled();
+  });
+
+  it('an E8 of the post started before the vote and landing after E10 does not undo the vote (Epic 6 retro A1)', async () => {
+    const root = await renderVotable(poll());
+    const e8 = deferred<PostResult>();
+    // A fetch of the post's query (as the screen's refetch): the hook cancels
+    // the query's running fetch, whoever started it (TanStack reverts it).
+    const cancel = jest.spyOn(client, 'cancelQueries');
+    const stale = client
+      .fetchQuery({ queryKey: queryKeys.post(BLOG, POST), queryFn: () => e8.promise })
+      .catch(() => undefined);
+    await ok(root, '2');
+    await ok(root, '2');
+    await answer(0, { status: 200, body: undefined });
+    await answer(1, e10(poll({ answer: ['2'] })));
+    await act(async () => {
+      e8.resolve({ kind: 'ok', post: { id: POST, poll: poll() } as unknown as Post });
+      await stale;
+      await flush();
+    });
+    const cached = client.getQueryData<PostResult>(queryKeys.post(BLOG, POST));
+    expect(cancel).toHaveBeenCalledWith({ queryKey: queryKeys.post(BLOG, POST), exact: true });
+    expect(cached?.kind === 'ok' && cached.post.poll?.answer).toEqual(['2']);
+    expect(has(root, `${ID}/option/2/chosen`)).toBe(true);
+  });
+
   it('matrix «E10 fails»: E11 200, E10 error → the post`s E8 query is invalidated; no error shown', async () => {
     const invalidate = jest.spyOn(client, 'invalidateQueries');
     const root = await renderVotable(poll());
