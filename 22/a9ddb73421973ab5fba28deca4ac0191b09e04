@@ -1,0 +1,27 @@
+_bmad-output/implementation-artifacts/spec-epic-7-retro-a1-a6.md
+  s_7477a2e6c69ec6::t_a2e03b78e09f02 1-53
+docs/testing.md
+  s_7477a2e6c69ec6::t_88edc89fbc2f70 18-27
+src/features/author/useLiveLike.ts
+  s_7477a2e6c69ec6::t_af48fb329bc372 26-29,46,190-194,204-211
+src/features/player/useLiveHeartbeat.ts
+  s_7477a2e6c69ec6::t_ea615a6ee9b9fb 81
+__tests__/authorFlow.test.tsx
+  s_7477a2e6c69ec6::t_d938c17bcf37ff 3062-3102
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "22a9ddb73421973ab5fba28deca4ac0191b09e04",
+  "prompts": {},
+  "sessions": {
+    "s_7477a2e6c69ec6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d998e7e2-636f-4943-a058-23b274887697",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
