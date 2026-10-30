@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 10-25-2026 14:34
-last_updated: 10-30-2026 17:11
+last_updated: 10-30-2026 17:19
 project: Boosty TV
 project_key: NOKEY
 tracking_system: file-system
@@ -96,13 +96,13 @@ development_status:
   6-7-multiple-choice-poll: done
   epic-6-retrospective: done
 
-  epic-7: in-progress
+  epic-7: done
   7-1-live-stream-card-on-the-author-page: done
   7-2-watch-a-live-stream: done
   7-3-live-viewer-heartbeat: done
   7-4-like-and-share-a-live-stream: done
   7-5-events-list: done
-  epic-7-retrospective: optional
+  epic-7-retrospective: done
 
   epic-8: backlog
   8-1-playback-speed: backlog
@@ -278,7 +278,7 @@ action_items:
       with the Epic 5 as-built (per-route Author scope, no «Только купленные» on Автор,
       Author default access, client-side drop, search on «Готово»)"
     owner: "pm"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-10-29.md"
   - id: "epic-5-retro-item-24-when-a-review-patches-a-pattern-another"
     epic: 5
@@ -330,7 +330,7 @@ action_items:
       AD-4 usePollVote exception, poll error collapse) and epic-6-context.md with
       the Epic 6 as-built"
     owner: "pm"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-6-retro-2026-10-30.md"
   - id: "epic-6-retro-item-31-owner-physical-remote-pass-of-epic-6-pos"
     epic: 6
@@ -346,3 +346,50 @@ action_items:
     owner: "agent"
     status: open
     ref: "_bmad-output/implementation-artifacts/epic-6-retro-2026-10-30.md"
+  - id: "epic-7-retro-item-33-uselivelike-drop-the-settled-overlay-rig"
+    epic: 7
+    action: "useLiveLike: drop the settled overlay right after the success write (or
+      when the cache equals the target), test a mid-flight poll already saying liked;
+      useLiveHeartbeat logs a real AppErrorKind"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-7-retro-2026-10-30.md"
+  - id: "epic-7-retro-item-34-before-epic-8-extract-useliveplayback-fr"
+    epic: 7
+    action: "Before Epic 8: extract useLivePlayback from PlayerScreen and one live-block
+      hook from AuthorScreen; one generation-keyed single-flight helper for useLiveLike
+      and usePollVote; one guarded focusSoon in shared/focus"
+    owner: "architect"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-7-retro-2026-10-30.md"
+  - id: "epic-7-retro-item-35-one-reconcile-pass-for-epics-5-7-epics-m"
+    epic: 7
+    action: "One reconcile pass for Epics 5–7: epics.md, EXPERIENCE.md, DESIGN.md,
+      ARCHITECTURE-SPINE.md (AD-4 generation-keyed state, AD-7 staleTime 0, polling,
+      resume invalidation, entity→entity edge)"
+    owner: "pm"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-7-retro-2026-10-30.md"
+  - id: "epic-7-retro-item-36-boundary-tests-events-автор-with-a-sched"
+    epic: 7
+    action: "Boundary tests: Events → Автор with a scheduled or just-ended stream,
+      resume request count, like cancels only a running poll (or document F3)"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-7-retro-2026-10-30.md"
+  - id: "epic-7-retro-item-37-device-pass-when-a-subscribed-blog-is-li"
+    epic: 7
+    action: "Device pass when a subscribed blog is live: playback, E16 heartbeats,
+      one approved like/unlike, a live «Начался эфир» row; owner physical-remote pass
+      of Epic 7 flows"
+    owner: "owner+agent"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-7-retro-2026-10-30.md"
+  - id: "epic-7-retro-item-38-add-device-rules-to-docs-testing-md-app"
+    epic: 7
+    action: "Add device rules to docs/testing.md: app-in-foreground check before every
+      adb key batch; owner-content playback stays under the progress threshold or
+      asks first"
+    owner: "agent"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-7-retro-2026-10-30.md"
