@@ -1,4 +1,4 @@
-import { formatCardDate, formatCount, formatDuration, formatFileSize } from '../format';
+import { formatCardDate, formatCount, formatDuration, formatFileSize, formatStreamStart } from '../format';
 
 /** Epoch seconds of a local date-time (the device's zone, like the app). */
 const local = (y: number, mo: number, d: number, h = 12, mi = 0) =>
@@ -35,6 +35,21 @@ describe('formatCardDate (owner decision 2026-10-26)', () => {
 
   it('a future time today is still «сегодня»', () => {
     expect(formatCardDate(local(2026, 10, 26, 20, 0), NOW)).toBe('сегодня, 20:00');
+  });
+});
+
+describe('formatStreamStart (Story 7.1, a scheduled stream)', () => {
+  it('today, tomorrow, this year, another year; minutes padded, hours not', () => {
+    expect(formatStreamStart(local(2026, 10, 26, 19, 0), NOW)).toBe('сегодня в 19:00');
+    expect(formatStreamStart(local(2026, 10, 27, 9, 5), NOW)).toBe('завтра в 9:05');
+    expect(formatStreamStart(local(2026, 11, 3, 20, 30), NOW)).toBe('3 ноя в 20:30');
+    expect(formatStreamStart(local(2027, 1, 2, 20, 30), NOW)).toBe('2 янв 2027 в 20:30');
+  });
+
+  it('a start already past today is still «сегодня»; tomorrow across a year boundary', () => {
+    expect(formatStreamStart(local(2026, 10, 26, 8, 0), NOW)).toBe('сегодня в 8:00');
+    const lastDay = new Date(2026, 11, 31, 22, 0).getTime();
+    expect(formatStreamStart(local(2027, 1, 1, 0, 30), lastDay)).toBe('завтра в 0:30');
   });
 });
 

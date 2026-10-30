@@ -534,9 +534,11 @@ describe('focus (focus-map §3 C, §1.6)', () => {
     // Подписки stays mounted below (the JS stack keeps covered screens).
     expect(visible(root, 'subs')).toBe(true);
     const blogCalls = transport.calls.filter(c => c.path.startsWith('/v1/blog/'));
+    // Story 7.1: Автор also asks E15 (the live card); Подписки itself never does.
     expect(blogCalls.map(c => c.path).sort()).toEqual([
       `/v1/blog/${blogUrlOf(2)}`,
       `/v1/blog/${blogUrlOf(2)}/post/`,
+      `/v1/blog/${blogUrlOf(2)}/video_stream`,
     ]);
     await unmount(root);
   });

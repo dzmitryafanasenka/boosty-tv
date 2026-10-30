@@ -244,6 +244,24 @@ export const ru = {
       errorTitle: 'Не удалось выполнить поиск',
       loadMoreError: 'Не удалось загрузить следующие результаты.',
     },
+    // Story 7.1 (LIVE-01, UX-DR8, docs/focus-map.md §4 D): the LiveCard
+    // between the action row and the posts. Three states: live, scheduled
+    // (`{when}` from `formatStreamStart`), needs a level (`{level}`: the
+    // level name only, never a price). Counts carry `{n}` (`formatCount`).
+    live: {
+      badgeLive: 'LIVE',
+      badgeScheduled: 'Запланирован',
+      statusLive: 'Идёт эфир',
+      statusScheduled: 'Начало {when}',
+      statusScheduledNoTime: 'Время начала не указано',
+      untitled: 'Эфир без названия',
+      viewers: ['{n} зритель', '{n} зрителя', '{n} зрителей'] as RuPluralForms,
+      likes: ['{n} лайк', '{n} лайка', '{n} лайков'] as RuPluralForms,
+      stats: '{viewers} · {likes}',
+      needsLevel: 'Нужен уровень «{level}»',
+      noAccess: 'Нет доступа',
+      a11y: 'Эфир: {title}. {status}. {details}',
+    },
   },
   // Пост (Story 3.4, E8; docs/focus-map.md §4 F). Missing post (E8 404,
   // `not_found` verified): «Назад» only, no retry. Videos are MediaRows
@@ -470,6 +488,11 @@ export const ru = {
     yesterday: 'вчера',
     dayMonth: '{day} {month}',
     dayMonthYear: '{day} {month} {year}',
+    // Story 7.1: a scheduled stream's start («сегодня в 19:00»).
+    todayAt: 'сегодня в {time}',
+    tomorrowAt: 'завтра в {time}',
+    dayMonthAt: '{day} {month} в {time}',
+    dayMonthYearAt: '{day} {month} {year} в {time}',
     month: {
       jan: 'янв',
       feb: 'фев',

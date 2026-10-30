@@ -1,0 +1,36 @@
+{
+  "case": "e15-video-stream-live",
+  "synthetic": true,
+  "status": 200,
+  "body": {
+    "id": "synthetic-id-71",
+    "int_id": 1071,
+    "title": "redacted",
+    "isOnline": true,
+    "isTemplate": false,
+    "hasAccess": true,
+    "startTime": 1700018000,
+    "signedQuery": "?sig=REDACTED",
+    "isLiked": false,
+    "data": [
+      {
+        "type": "ok_stream",
+        "id": "synthetic-id-72",
+        "preview": "https://example.invalid/preview"
+      }
+    ],
+    "teaser": [
+      {
+        "type": "image",
+        "id": "synthetic-id-73",
+        "url": "https://example.invalid/cover",
+        "width": 1280,
+        "height": 720
+      }
+    ],
+    "count": {
+      "viewers": 5,
+      "likes": 5
+    }
+  }
+}

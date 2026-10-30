@@ -8,6 +8,15 @@ import { AppState } from 'react-native';
  * which owns the audio focus request.
  */
 
+/**
+ * Whether the app is in the foreground now (Story 7.1: the live card's poll).
+ * An unknown state counts as active.
+ */
+export function isAppActive(): boolean {
+  const state = AppState.currentState;
+  return state !== 'background' && state !== 'inactive';
+}
+
 /** Calls `listener` every time the app leaves the foreground. Returns the unsubscribe function. */
 export function subscribeAppBackground(listener: () => void): () => void {
   let last: string | null | undefined = AppState.currentState;

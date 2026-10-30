@@ -1,5 +1,5 @@
 import { AppState } from 'react-native';
-import { subscribeAppBackground, subscribeAppForeground } from '../appLifecycle';
+import { isAppActive, subscribeAppBackground, subscribeAppForeground } from '../appLifecycle';
 
 /** Story 4.6: the AppLifecycle port reports transitions only. */
 
@@ -43,4 +43,17 @@ it('foreground: only after leaving the foreground; unsubscribe stops it', () => 
   emit('background');
   emit('active');
   expect(listener).toHaveBeenCalledTimes(1);
+});
+
+it('Story 7.1: isAppActive is false only in the background or inactive; an unknown state counts as active', () => {
+  const app = AppState as unknown as { currentState: unknown };
+  const original = app.currentState;
+  try {
+    for (const [state, active] of [['active', true], ['background', false], ['inactive', false], [null, true]] as const) {
+      app.currentState = state;
+      expect(isAppActive()).toBe(active);
+    }
+  } finally {
+    app.currentState = original;
+  }
 });

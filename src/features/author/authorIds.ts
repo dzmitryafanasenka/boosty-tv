@@ -8,3 +8,5 @@ export const authorRetryId = (blogUrl: string) => `author/${blogUrl}/retry`;
 export const authorSearchId = (blogUrl: string) => `author/${blogUrl}/action/search`;
 export const authorFiltersId = (blogUrl: string) => `author/${blogUrl}/action/filters`;
 export const authorResetId = (blogUrl: string) => `author/${blogUrl}/action/reset`;
+/** Story 7.1: the LiveCard (docs/focus-map.md §1.5; Story 7.4 adds `/like` and `/share`). */
+export const authorLiveId = (blogUrl: string) => `author/${blogUrl}/live`;

@@ -19,6 +19,7 @@ import { accountScope } from '../src/shared/account';
 import { logger } from '../src/shared/services/logger';
 import { progressStore } from '../src/shared/services/progress';
 import { components, spacing } from '../src/shared/ui';
+import { requestHostFocus } from '../src/shared/ui/requestHostFocus';
 import {
   clearNativeModules,
   createFlow,
@@ -174,6 +175,36 @@ test('Story 3.3: Автор answers E3/E4 in demo mode (2 pages, an empty blog, 
   expect(fetchMock).not.toHaveBeenCalled();
   await act(async () => {
     missing.unmount();
+  });
+});
+
+test('Story 7.1: the demo E15: a live card on demo-blog-1 (initial focus), no card on demo-blog-3; no network', async () => {
+  fetchMock.mockClear();
+  const focusMock = requestHostFocus as jest.Mock;
+  const root = await renderApp();
+  await press(root, 'nav/subs');
+  focusMock.mockClear();
+  await press(root, 'subs/tile/demo-blog-1');
+  const card = root.container.queryAll(n => n.props.testID === 'author/demo-blog-1/live' && n.props.focusable === true);
+  expect(card).toHaveLength(1);
+  expect(card[0].props.accessibilityLabel).toBe(
+    'Эфир: Демо-эфир: разбор вопросов зрителей. Идёт эфир. 128 зрителей · 42 лайка',
+  );
+  const targets = focusMock.mock.calls.map(call => (call[0] as { props?: { testID?: string } } | null)?.props?.testID);
+  expect(targets[targets.length - 1]).toBe('author/demo-blog-1/live');
+  expect(fetchMock).not.toHaveBeenCalled();
+  await act(async () => {
+    root.unmount();
+  });
+
+  await resetQueryCache();
+  const none = await renderApp();
+  await press(none, 'nav/subs');
+  await press(none, 'subs/tile/demo-blog-3');
+  expect(none.container.queryAll(n => n.props.testID === 'author/demo-blog-3/live')).toHaveLength(0);
+  expect(fetchMock).not.toHaveBeenCalled();
+  await act(async () => {
+    none.unmount();
   });
 });
 

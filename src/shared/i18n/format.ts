@@ -59,6 +59,33 @@ export function formatCardDate(epochSec: number, nowMs: number = Date.now()): st
     : tf('date.dayMonthYear', values);
 }
 
+/**
+ * A scheduled stream's start (Story 7.1): «сегодня в 19:00», «завтра в
+ * 9:05», «12 окт в 19:00» (current year), «12 окт 2027 в 19:00».
+ * `epochSec` in epoch seconds; `nowMs` in epoch milliseconds; local time.
+ */
+export function formatStreamStart(epochSec: number, nowMs: number = Date.now()): string {
+  const date = new Date(epochSec * 1000);
+  const now = new Date(nowMs);
+  const time = `${date.getHours()}:${pad2(date.getMinutes())}`;
+  if (sameDay(date, now)) {
+    return tf('date.todayAt', { time });
+  }
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  if (sameDay(date, tomorrow)) {
+    return tf('date.tomorrowAt', { time });
+  }
+  const values = {
+    day: String(date.getDate()),
+    month: t(`date.month.${MONTH_KEYS[date.getMonth()]}`),
+    year: String(date.getFullYear()),
+    time,
+  };
+  return date.getFullYear() === now.getFullYear()
+    ? tf('date.dayMonthAt', values)
+    : tf('date.dayMonthYearAt', values);
+}
+
 /** `48:00`, `1:06:00`: m:ss below an hour, else h:mm:ss. */
 export function formatDuration(totalSec: number): string {
   const sec = Math.max(0, Math.floor(totalSec));

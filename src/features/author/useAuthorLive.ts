@@ -1,0 +1,186 @@
+import { useIsFocused } from '@react-navigation/native';
+import { useQuery } from '@tanstack/react-query';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { queryKeys, type HttpClient } from '../../shared/api';
+import { StreamRepository, type Stream } from '../../shared/entities/stream';
+import { useLatestRef, useZoneItem, type ListRestoration, type ModalApi } from '../../shared/focus';
+import { isAppActive, subscribeAppBackground, subscribeAppForeground } from '../../shared/platform/appLifecycle';
+import type { HostView, NotMovedLatch } from '../../shared/ui';
+import type { AuthorFocusInfo } from './useAuthorAutoFocus';
+
+/**
+ * Story 7.1 (LIVE-01, docs/focus-map.md §4 D): the Author page's LiveCard
+ * data and focus glue, kept out of AuthorScreen.
+ */
+
+/**
+ * Owner decision 2026-10-30 (Q1 a): E15 is fetched again every 30 s while
+ * the page is focused and a card is shown (live or scheduled), so an ended
+ * stream's card goes within 30 s.
+ */
+export const LIVE_POLL_INTERVAL_MS = 30_000;
+
+/**
+ * E15 through the `['stream', blogUrl]` query (`entities/stream`): the
+ * blog's stream, or null for none, while loading, after a failed first
+ * load (no retry, no error UI) or while `enabled` (`phaseFlags.live`) is
+ * off (then no request at all). A failed poll keeps the last stream
+ * (TanStack keeps the data on a refetch error). Polling runs only while
+ * the Author route is focused (a covered route or one leaving stops it),
+ * the app is in the foreground (TanStack's focus manager is not wired to
+ * AppState in RN; the resume invalidation fetches again) and a stream is
+ * shown. `staleTime: 0`: every Author open sends one E15 (a cached card of
+ * an ended stream, or a cached «none», is never trusted for the initial
+ * focus; `answered` waits for this page's own answer).
+ */
+export type AuthorLiveStream = {
+  stream: Stream | null;
+  /** This page's own first E15 answered (a stream, none, or a failure); a cached value does not count. */
+  answered: boolean;
+};
+
+export function useAuthorLiveStream(http: HttpClient, blogUrl: string, enabled: boolean): AuthorLiveStream {
+  const routeFocused = useIsFocused();
+  const [appActive, setAppActive] = useState(isAppActive);
+  useEffect(() => {
+    const offBackground = subscribeAppBackground(() => setAppActive(false));
+    const offForeground = subscribeAppForeground(() => setAppActive(true));
+    return () => {
+      offBackground();
+      offForeground();
+    };
+  }, []);
+  const { data, isFetchedAfterMount } = useQuery({
+    queryKey: queryKeys.stream(blogUrl),
+    queryFn: () => StreamRepository.fetchActive(http, blogUrl),
+    enabled,
+    retry: false,
+    staleTime: 0,
+    refetchInterval: query =>
+      routeFocused && appActive && isAppActive() && query.state.data !== null && query.state.data !== undefined
+        ? LIVE_POLL_INTERVAL_MS
+        : false,
+  });
+  return {
+    stream: enabled ? data ?? null : null,
+    answered: enabled && isFetchedAfterMount,
+  };
+}
+
+export type AuthorLiveCard = {
+  liveId: string;
+  /** The card's host view as state (the live guide's destination). */
+  liveView: HostView | null;
+  /** The mounted card's host view; null while no card is shown. */
+  liveViewRef: RefObject<HostView | null>;
+  liveHostRef: (view: HostView | null) => void;
+  /** The card is a content FocusZone item (Back, ← → zones, the route's tracking). */
+  onLiveFocus: () => void;
+};
+
+/** The LiveCard's view and zone item (declared before the page's auto focus, which reads it). */
+export function useAuthorLiveCard(liveId: string): AuthorLiveCard {
+  const zone = useZoneItem(liveId);
+  const [liveView, setLiveView] = useState<HostView | null>(null);
+  const liveViewRef = useRef<HostView | null>(null);
+  const liveHostRef = useCallback(
+    (view: HostView | null) => {
+      liveViewRef.current = view;
+      setLiveView(view);
+      zone.ref?.(view);
+    },
+    [zone],
+  );
+  return { liveId, liveView, liveViewRef, liveHostRef, onLiveFocus: zone.onFocus };
+}
+
+export type AuthorLiveFocusOptions = {
+  stream: Stream | null;
+  /** `AuthorLiveStream.answered`. */
+  answered: boolean;
+  card: AuthorLiveCard;
+  focusRef: RefObject<AuthorFocusInfo>;
+  modal: ModalApi;
+  latch: NotMovedLatch;
+  restoration: Pick<ListRestoration, 'focusInitial'>;
+  /** The shown cards' focus ids. */
+  idsRef: RefObject<string[]>;
+  /** The user has not moved focus away from where the page may take it. */
+  mayTakeFocus: () => boolean;
+  /** The page's own LiveCard focus (recorded as automatic). */
+  autoFocusLive: () => void;
+};
+
+/**
+ * The LiveCard's own focus rules (docs/focus-map.md §4 D):
+ * - Initial focus: this page's own first E15 answer with a live stream sends focus to the card while the user has
+ *   not moved (focus still on the sidebar item, the StateView action or
+ *   none yet, or on the first post the page focused by itself). A later
+ *   refetch never moves focus, also not a scheduled stream going live.
+ * - Card loss: when the card goes (a refetch found no stream) while it had
+ *   focus, the first post takes it (`restoration.focusInitial`, else the
+ *   nearest action above). A covered route is handled on return.
+ */
+export function useAuthorLiveFocus({
+  stream,
+  answered,
+  card,
+  focusRef,
+  modal,
+  latch,
+  restoration,
+  idsRef,
+  mayTakeFocus,
+  autoFocusLive,
+}: AuthorLiveFocusOptions): void {
+  const shown = stream !== null;
+  const live = stream?.status === 'live';
+  /** The initial-focus decision was made (the first answer). */
+  const settled = useRef(false);
+  const mayTakeRef = useLatestRef(mayTakeFocus);
+  const autoFocusLiveRef = useLatestRef(autoFocusLive);
+  useEffect(() => {
+    if (settled.current || !answered) {
+      return;
+    }
+    // The first answer decides once: no stream then, no initial focus later.
+    settled.current = true;
+    if (!live) {
+      return;
+    }
+    const info = focusRef.current;
+    if (!info.isActive() || modal.isOpen()) {
+      return;
+    }
+    const current = info.current();
+    if (mayTakeRef.current() || (current !== null && latch.followHead(current))) {
+      autoFocusLiveRef.current();
+    }
+  }, [answered, live, focusRef, modal, latch, mayTakeRef, autoFocusLiveRef]);
+
+  // Whether the card had focus is read during the render where the stream
+  // turns null, before the commit removes the card: on Android, removing
+  // the focused view moves native focus at once (the Story 6.7 device
+  // lesson), so its focus event can reach JS before this effect runs.
+  const renderedShown = useRef(shown);
+  const lostWhileFocused = useRef(false);
+  if (renderedShown.current !== shown) {
+    lostWhileFocused.current = !shown && focusRef.current.current() === card.liveId;
+    renderedShown.current = shown;
+  }
+  const wasShown = useRef(shown);
+  useEffect(() => {
+    const before = wasShown.current;
+    wasShown.current = shown;
+    if (!before || shown) {
+      return;
+    }
+    const hadFocus = lostWhileFocused.current;
+    lostWhileFocused.current = false;
+    const info = focusRef.current;
+    if (hadFocus && info.isActive() && !modal.isOpen()) {
+      latch.auto(idsRef.current[0]);
+      restoration.focusInitial();
+    }
+  }, [shown, focusRef, modal, card.liveId, latch, idsRef, restoration]);
+}

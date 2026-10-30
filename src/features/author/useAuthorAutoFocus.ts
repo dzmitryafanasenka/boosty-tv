@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { mayTakeScreenFocus, useLatestRef, useZoneItem, type ModalApi } from '../../shared/focus';
 import { requestHostFocus, useNotMovedLatch, type HostView, type NotMovedLatch } from '../../shared/ui';
 import { AUTHOR_STATE_ACTION_ID } from './authorIds';
@@ -55,10 +55,19 @@ export function useAuthorField(fieldId: string): AuthorField {
   return { fieldView, fieldViewRef, fieldHostRef, onFieldFocus: fieldZone.onFocus, focusField, fieldAuto };
 }
 
+/** The LiveCard's view (Story 7.1; `useAuthorLiveCard`). */
+export type AuthorLiveView = {
+  liveId: string;
+  /** The mounted card's host view; null while no card is shown. */
+  liveViewRef: RefObject<HostView | null>;
+};
+
 export type AuthorAutoFocusOptions = {
   focus: AuthorFocusInfo;
   modal: ModalApi;
   field: AuthorField;
+  /** Story 7.1: the LiveCard, the nearest action above the grid while shown. */
+  live: AuthorLiveView;
   /** The action row is shown (its field is the nearest action above the grid). */
   rowShown: boolean;
   cardPrefix: string;
@@ -80,9 +89,11 @@ export type AuthorAutoFocus = {
   autoFocusSidebar: () => void;
   /** The page's own StateView action focus (recorded as automatic). */
   autoFocusAction: () => void;
+  /** Story 7.1: the page's own LiveCard focus (recorded as automatic). */
+  autoFocusLive: () => void;
   /** The nearest action above the grid (the restoration's last fallback). */
   focusAbove: () => void;
-  /** Content focus is gone (nothing focusable left there): the field, else the sidebar. */
+  /** Content focus is gone (nothing focusable left there): the LiveCard, else the field, else the sidebar. */
   focusAfterLoss: () => void;
   /** A pending card focus may land (the restoration's gate). */
   canFocus: () => boolean;
@@ -99,6 +110,7 @@ export function useAuthorAutoFocus({
   focus,
   modal,
   field,
+  live,
   rowShown,
   cardPrefix,
   retryId,
@@ -107,6 +119,7 @@ export function useAuthorAutoFocus({
   resetId,
 }: AuthorAutoFocusOptions): AuthorAutoFocus {
   const { fieldViewRef, focusField, fieldAuto } = field;
+  const { liveId, liveViewRef } = live;
   const focusRef = useRef(focus);
   focusRef.current = focus;
   const stateAction = useZoneItem(AUTHOR_STATE_ACTION_ID);
@@ -138,30 +151,71 @@ export function useAuthorAutoFocus({
     fieldAuto.current = true;
     focusField();
   }, [latch, fieldId, fieldAuto, focusField]);
-  // The nearest action above the grid: the field (Story 5.7) when the action
-  // row is shown, else the StateView action when shown, else the sidebar's
-  // current item.
+  // Story 7.1 device lesson (demo debug build): the card often mounts in the
+  // same commit as this request (E15 and E4 answer together), and Android
+  // drops a focus request to a view with no layout yet. So the request is
+  // repeated two frames later, while focus is still where the page may take
+  // it (nothing yet, or an element the page focused by itself, the card
+  // included) and no modal is open; a user move cancels it.
+  const liveFrame = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (liveFrame.current !== null) {
+        cancelAnimationFrame(liveFrame.current);
+      }
+    },
+    [],
+  );
+  const autoFocusLive = useCallback(() => {
+    latch.auto(liveId);
+    requestHostFocus(liveViewRef.current);
+    if (liveFrame.current !== null) {
+      cancelAnimationFrame(liveFrame.current);
+    }
+    liveFrame.current = requestAnimationFrame(() => {
+      liveFrame.current = requestAnimationFrame(() => {
+        liveFrame.current = null;
+        const info = focusRef.current;
+        const view = liveViewRef.current;
+        if (view === null || !info.isActive() || modal.isOpen()) {
+          return;
+        }
+        const current = info.current();
+        if (current === liveId || current === null || latch.followHead(current)) {
+          requestHostFocus(view);
+        }
+      });
+    });
+  }, [latch, liveId, liveViewRef, modal]);
+  // The nearest action above the grid: the LiveCard (Story 7.1) while it is
+  // shown, else the field (Story 5.7) when the action row is shown, else the
+  // StateView action when shown, else the sidebar's current item.
   const rowShownRef = useLatestRef(rowShown);
   const focusAbove = useCallback(() => {
-    if (rowShownRef.current && fieldViewRef.current) {
+    if (liveViewRef.current) {
+      autoFocusLive();
+    } else if (rowShownRef.current && fieldViewRef.current) {
       autoFocusField();
     } else if (stateActionView.current) {
       autoFocusAction();
     } else {
       autoFocusSidebar();
     }
-  }, [autoFocusAction, autoFocusSidebar, autoFocusField, rowShownRef, fieldViewRef]);
+  }, [autoFocusAction, autoFocusSidebar, autoFocusField, autoFocusLive, rowShownRef, fieldViewRef, liveViewRef]);
   const focusAfterLoss = useCallback(() => {
-    if (rowShownRef.current && fieldViewRef.current) {
+    if (liveViewRef.current) {
+      autoFocusLive();
+    } else if (rowShownRef.current && fieldViewRef.current) {
       autoFocusField();
     } else {
       autoFocusSidebar();
     }
-  }, [autoFocusField, autoFocusSidebar, rowShownRef, fieldViewRef]);
+  }, [autoFocusField, autoFocusSidebar, autoFocusLive, rowShownRef, fieldViewRef, liveViewRef]);
   // A pending card focus lands only while the route is active, no modal is
   // open and focus is still where the page may take it: none yet, the
   // sidebar's current item, a card, the StateView action, the load-more
-  // «Повторить» or the action row (Story 5.7: the row is content).
+  // «Повторить», the action row (Story 5.7: the row is content) or the
+  // LiveCard (Story 7.1).
   const canFocus = useCallback(() => {
     const info = focusRef.current;
     if (!info.isActive() || modal.isOpen()) {
@@ -176,9 +230,10 @@ export function useAuthorAutoFocus({
       current === fieldId ||
       current === chipId ||
       current === resetId ||
+      current === liveId ||
       current.startsWith(cardPrefix)
     );
-  }, [cardPrefix, retryId, fieldId, chipId, resetId, modal]);
+  }, [cardPrefix, retryId, fieldId, chipId, resetId, liveId, modal]);
   const mayTakeFocus = useCallback(() => {
     if (modal.isOpen()) {
       return false;
@@ -198,6 +253,7 @@ export function useAuthorAutoFocus({
     stateActionRef,
     autoFocusSidebar,
     autoFocusAction,
+    autoFocusLive,
     focusAbove,
     focusAfterLoss,
     canFocus,
