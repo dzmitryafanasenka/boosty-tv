@@ -1,0 +1,103 @@
+__tests__/authorFlow.test.tsx
+  s_7477a2e6c69ec6::t_0efbfed2460e9e 13,15-16,28,30,40-42,85-104,146-147,181,183-185,1463-1489,2105-2538
+__tests__/demoFlow.test.tsx
+  s_7477a2e6c69ec6::t_1728f71089fd6c 22,181-210
+__tests__/searchFlow.test.tsx
+  s_7477a2e6c69ec6::t_6613647f1f2010 259-260
+__tests__/subscriptionsFlow.test.tsx
+  s_7477a2e6c69ec6::t_a4425478762dfb 537,541
+_bmad-output/implementation-artifacts/epic-7-context.md
+  s_7477a2e6c69ec6::t_319a6ef5f3147c 1-105
+_bmad-output/implementation-artifacts/spec-7-1-live-stream-card-on-the-author-page.md
+  s_7477a2e6c69ec6::t_551ed787365d5d 1-164
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_7477a2e6c69ec6::t_814404128ed59d 32,99-100
+docs/api-contract.md
+  s_7477a2e6c69ec6::t_2ddf19081878fc 259,453-465,729
+docs/feature-parity.md
+  s_7477a2e6c69ec6::t_aa68a1ebeed2bb 127
+docs/focus-map.md
+  s_7477a2e6c69ec6::t_73b52db7141fa9 91,260,278-286
+docs/testing.md
+  s_7477a2e6c69ec6::t_8a5e2a16ea78a3 896-916
+src/app/App.tsx
+  s_7477a2e6c69ec6::t_d259105d272f95 38,384-387
+src/app/__tests__/phaseFlags.test.ts
+  s_7477a2e6c69ec6::t_f321fd9f9713a9 13,39-43
+src/app/dev/demo.ts
+  s_7477a2e6c69ec6::t_cc87f800037732 38-40,496-499,573-593,651-657
+src/app/phaseFlags.ts
+  s_7477a2e6c69ec6::t_a14c3b6603b4d5 21-24,35
+src/app/stackRoutes.tsx
+  s_7477a2e6c69ec6::t_5f8ab1e722c519 293
+src/features/author/AuthorScreen.tsx
+  s_7477a2e6c69ec6::t_e1d1ba7f2958ea 35,40,53,76-77,136-143,157,167,178-181,228,234,260,269,322-331,347-353,360,418,431-439,452,456-469,497-498,508-511,556-571
+src/features/author/LiveCard.tsx
+  s_7477a2e6c69ec6::t_410eabf1d0dbc7 1-229
+src/features/author/__tests__/LiveCard.test.tsx
+  s_7477a2e6c69ec6::t_216779383508e9 1-98
+src/features/author/authorIds.ts
+  s_7477a2e6c69ec6::t_1d0cda01acd8a4 11-12
+src/features/author/useAuthorActionRowFocus.ts
+  s_7477a2e6c69ec6::t_2b7eacf5be557e 12-15,28-33,42-44,52-53,62,73,75,78,80,101
+src/features/author/useAuthorAutoFocus.ts
+  s_7477a2e6c69ec6::t_c89733be35b50c 1,58-64,69-70,92-93,96,113,122,154-192,195-197,204,206-208,213,217-218,233,236,256
+src/features/author/useAuthorLive.ts
+  s_7477a2e6c69ec6::t_8f74308801408a 1-186
+src/shared/api/queryKeys.ts
+  s_7477a2e6c69ec6::t_0cbe057f891f66 108-116
+src/shared/entities/stream/__tests__/streamRepository.test.ts
+  s_7477a2e6c69ec6::t_a7e9a233be29a3 1-228
+src/shared/entities/stream/mapStream.ts
+  s_7477a2e6c69ec6::t_2aca9ab71b2ba2 1-78
+src/shared/i18n/__tests__/format.test.ts
+  s_7477a2e6c69ec6::t_c91d71c8ae9654 1,41-55
+src/shared/i18n/format.ts
+  s_7477a2e6c69ec6::t_f0ca2f8085350a 62-88
+src/shared/i18n/ru.ts
+  s_7477a2e6c69ec6::t_3cc337ec65c40f 247-264,491-495
+src/shared/platform/__tests__/appLifecycle.test.ts
+  s_7477a2e6c69ec6::t_4796e914015698 2,47-59
+src/shared/platform/appLifecycle.ts
+  s_7477a2e6c69ec6::t_68855364780244 11-19
+src/test/authorFixtures.ts
+  s_7477a2e6c69ec6::t_986ab3b04057c3 10-12,20-23,90-105
+src/test/fixtures/boosty/e15-video-stream-live.json
+  s_7477a2e6c69ec6::t_b019541bc694f4 1-36
+src/test/fixtures/boosty/e15-video-stream-locked.json
+  s_7477a2e6c69ec6::t_d872f85ebb2ba3 1-38
+src/test/fixtures/boosty/e15-video-stream-scheduled.json
+  s_7477a2e6c69ec6::t_c506b250688204 1-36
+src/shared/api/dto/stream.ts
+  s_56e8c0bf510ef0::t_42e6e13471f7b4 1-49
+src/shared/entities/stream/index.ts
+  s_56e8c0bf510ef0::t_f5ad0149b1f195 1-3
+src/shared/entities/stream/streamRepository.ts
+  s_56e8c0bf510ef0::t_a52f899460879a 1-47
+src/shared/entities/stream/types.ts
+  s_56e8c0bf510ef0::t_4c71263298c475 1-29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "a97b5e49723badf36f0b50ccc245c562afa25f1d",
+  "prompts": {},
+  "sessions": {
+    "s_56e8c0bf510ef0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-aefa065e978eb1803",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_7477a2e6c69ec6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d998e7e2-636f-4943-a058-23b274887697",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
