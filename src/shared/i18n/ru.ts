@@ -257,10 +257,16 @@ export const ru = {
       untitled: 'Эфир без названия',
       viewers: ['{n} зритель', '{n} зрителя', '{n} зрителей'] as RuPluralForms,
       likes: ['{n} лайк', '{n} лайка', '{n} лайков'] as RuPluralForms,
-      stats: '{viewers} · {likes}',
       needsLevel: 'Нужен уровень «{level}»',
       noAccess: 'Нет доступа',
       a11y: 'Эфир: {title}. {status}. {details}',
+      // Story 7.4 (LIVE-04/05, owner decision Q1 a): «Нравится» shows a
+      // heart and the count only; its label names the state. «Поделиться»
+      // opens the stream page's QR (`player.live.qrTitle`).
+      likeA11y: 'Нравится, {n}',
+      likedA11y: 'Вам нравится, {n}',
+      share: 'Поделиться',
+      shareA11y: 'Поделиться эфиром: QR-код со ссылкой',
     },
   },
   // Пост (Story 3.4, E8; docs/focus-map.md §4 F). Missing post (E8 404,

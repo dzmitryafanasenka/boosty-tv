@@ -4,8 +4,9 @@ import { z } from 'zod';
  * Lenient Zod schema for the E15 live stream body (Story 7.1,
  * docs/api-contract.md «E15 (LIVE)»). The 200 shape comes from the
  * reference only (no live 200 was ever observed): only the fields the
- * LiveCard reads are parsed; `signedQuery`, `isLiked` and `currencyPrices`
- * are not read here (prices are never shown). The `ok_stream` player URLs
+ * LiveCard reads are parsed; `signedQuery` and `currencyPrices` are not
+ * read here (prices are never shown). Story 7.4: `isLiked` is read
+ * leniently (`unknown`; the mapper keeps only a literal `true`). The `ok_stream` player URLs
  * are parsed only by the player-only `liveSourcesOf` (Story 7.2,
  * `okStreamSourcesDtoSchema`).
  *
@@ -28,6 +29,8 @@ export const streamDtoSchema = z.object({
   hasAccess: z.boolean(),
   /** Epoch seconds. */
   startTime: optionalNumber,
+  /** Story 7.4: the account liked the stream; anything but `true` reads as not liked. */
+  isLiked: z.unknown().optional(),
   /** Content blocks; only an image `url` or a video `preview` is read, for the cover. */
   data: z.array(z.unknown()).nullish().catch(undefined),
   teaser: z.array(z.unknown()).nullish().catch(undefined),

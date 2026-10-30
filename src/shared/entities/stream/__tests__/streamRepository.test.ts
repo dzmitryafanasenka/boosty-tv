@@ -20,7 +20,7 @@ import e15Scheduled from '../../../../test/fixtures/boosty/e15-video-stream-sche
 // eslint-disable-next-line boundaries/dependencies -- test-only fixtures
 import e15Locked from '../../../../test/fixtures/boosty/e15-video-stream-locked.json';
 import { mapStream } from '../mapStream';
-import { StreamRepository, heartbeatPath, streamPath } from '../streamRepository';
+import { StreamRepository, heartbeatPath, likePath, streamPath } from '../streamRepository';
 
 function client(handler: FixtureHandler) {
   const transport = createFixtureTransport(handler);
@@ -94,6 +94,7 @@ describe('E15 fetchActive', () => {
       startTime: 1_700_018_000,
       viewers: 5,
       likes: 5,
+      isLiked: false,
       coverUrl: 'https://example.invalid/cover',
       levelName: null,
       hasLiveSources: true,
@@ -209,11 +210,17 @@ describe('mapStream', () => {
       startTime: null,
       viewers: 0,
       likes: 0,
+      isLiked: false,
       coverUrl: null,
       levelName: null,
       hasLiveSources: false,
     });
     expect(map({ ...live, startTime: 0 })?.startTime).toBeNull();
+    // Story 7.4: `isLiked` is lenient: only a literal `true` is liked.
+    expect(map({ ...live, isLiked: true })?.isLiked).toBe(true);
+    for (const isLiked of ['true', 1, null, undefined, {}]) {
+      expect(map({ ...live, isLiked })?.isLiked).toBe(false);
+    }
     expect(map({ ...live, title: '  Эфир  ' })?.title).toBe('Эфир');
   });
 
@@ -275,6 +282,57 @@ describe('E16 heartbeat (Story 7.3)', () => {
   it('an unsafe blog rejects with `Client` before any request', async () => {
     const { http, transport } = client(() => ({ status: 200 }));
     expect(await kindOf(StreamRepository.heartbeat(http, 'a/b', { stop: true }))).toBe('Client');
+    expect(transport.calls).toHaveLength(0);
+  });
+});
+
+describe('E17 like (Story 7.4)', () => {
+  const BLOG = 'synthetic-blog-1';
+  const URL = `https://api.boosty.to/v1/blog/${BLOG}/video_stream/like`;
+
+  it('path: under the E15 path; an unsafe blog throws `Client`', () => {
+    expect(likePath(BLOG)).toBe(`/v1/blog/${BLOG}/video_stream/like`);
+    expect(() => likePath('../user')).toThrow(AppError);
+  });
+
+  it('like → one POST, unlike → one DELETE; no body, the token; the response body is discarded', async () => {
+    const { http, transport } = client(() => ({ status: 200, body: { anything: true } }));
+    await expect(StreamRepository.like(http, BLOG, true)).resolves.toBeUndefined();
+    await expect(StreamRepository.like(http, BLOG, false)).resolves.toBeUndefined();
+    expect(transport.calls.map(c => [c.method, c.url, c.body])).toEqual([
+      ['POST', URL, undefined],
+      ['DELETE', URL, undefined],
+    ]);
+    expect(transport.calls[0].headers.Authorization).toMatch(/^Bearer /);
+  });
+
+  it.each([
+    ['500', { status: 500 }, 'Server'],
+    ['503', { status: 503 }, 'Server'],
+    ['429', { status: 429 }, 'RateLimited'],
+    ['network', { network: true as const }, 'Network'],
+  ])('a failure (%s) rejects with its kind and is sent once (no retry)', async (_name, reply, kind) => {
+    const { http, transport } = client(() => reply);
+    expect(await kindOf(StreamRepository.like(http, BLOG, true))).toBe(kind);
+    expect(transport.calls).toHaveLength(1);
+  });
+
+  it('a 401 is not replayed with a renewed token (a mutation)', async () => {
+    const transport = createFixtureTransport(() => ({ status: 401 }));
+    const renew = jest.fn(() => Promise.resolve('n'.repeat(64)));
+    const http = createHttpClient({
+      transport,
+      tokens: { getAccessToken: () => Promise.resolve({ token: 't'.repeat(64), refreshed: false }), renewAfterUnauthorized: renew },
+      sleep: () => Promise.resolve(),
+      logger: createLogger(),
+    });
+    await expect(StreamRepository.like(http, BLOG, false)).rejects.toBeInstanceOf(AppError);
+    expect(transport.calls).toHaveLength(1);
+  });
+
+  it('an unsafe blog rejects with `Client` before any request', async () => {
+    const { http, transport } = client(() => ({ status: 200 }));
+    expect(await kindOf(StreamRepository.like(http, 'a/b', true))).toBe('Client');
     expect(transport.calls).toHaveLength(0);
   });
 });

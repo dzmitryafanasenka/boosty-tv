@@ -32,12 +32,14 @@ import {
 import { AUTHOR_ACTION_ROW_HEIGHT, AUTHOR_ACTION_ROW_TOP, AuthorActionRow } from './AuthorActionRow';
 import { AUTHOR_HEADER_HEIGHT, AuthorHeader, AuthorHeaderSkeleton } from './AuthorHeader';
 import { AuthorListState, AuthorPageState } from './AuthorStates';
-import { LIVE_CARD_BLOCK_HEIGHT, LiveCard, liveCardBlockStyle } from './LiveCard';
+import { LIVE_CARD_BLOCK_HEIGHT, LiveCard, LiveCardActions, liveCardBlockStyle, liveCardRowStyle } from './LiveCard';
 import {
   AUTHOR_STATE_ACTION_ID,
   authorCardPrefix,
   authorFiltersId,
   authorLiveId,
+  authorLiveLikeId,
+  authorLiveShareId,
   authorResetId,
   authorRetryId,
   authorSearchId,
@@ -57,6 +59,7 @@ import {
   useAuthorLiveStream,
 } from './useAuthorLive';
 import { useAuthorPosts } from './useAuthorPosts';
+import { liveLikeShown, useLiveLike } from './useLiveLike';
 import { useAuthorSearch, type AuthorSearch } from './useAuthorSearch';
 import { useBlogSearch } from './useBlogSearch';
 
@@ -161,6 +164,13 @@ const OUTCOME_WAIT_PHASES: readonly Phase[] = ['loading'];
  * playable, else the stream page's QR (`useAuthorLivePress`). Back from the
  * player returns to the card while it is shown, else to the first post.
  *
+ * Story 7.4 (LIVE-04/05): «Нравится» (live with access only; an optimistic
+ * E17 toggle, `useLiveLike`) above «Поделиться» (the stream page's QR, focus
+ * back on «Поделиться»), right of the card in the same block. → from the
+ * card reaches the like (else share), ↓ from the like share, ↓ from share
+ * the grid, ← the card. Card loss, return focus, the restoration's gate and
+ * the head-follow treat their focus as the card's.
+ *
  * This component composes those pieces with the outcome focus
  * (`useOutcomeFocus`), and keeps the phase fallback, the route focus and
  * the head refocus.
@@ -187,6 +197,9 @@ export function AuthorScreen({
   const chipId = authorFiltersId(blogUrl);
   const resetId = authorResetId(blogUrl);
   const liveId = authorLiveId(blogUrl);
+  const likeId = authorLiveLikeId(blogUrl);
+  const shareId = authorLiveShareId(blogUrl);
+  const liveActionIds = useMemo(() => [likeId, shareId], [likeId, shareId]);
   // The search and filter actions call the outcome focus and the grid's
   // restoration, composed further down (they need the list the search
   // selects); the filter resets call the search. Read in handlers only,
@@ -198,7 +211,14 @@ export function AuthorScreen({
   const field = useAuthorField(fieldId);
   const { focusField, fieldAuto } = field;
   const liveCard = useAuthorLiveCard(liveId);
-  const { stream, answered: liveAnswered } = useAuthorLiveStream(http, blogUrl, liveEnabled);
+  // Story 7.4: «Нравится» and «Поделиться» have the card's shape (zone item + host view).
+  const likeButton = useAuthorLiveCard(likeId);
+  const shareButton = useAuthorLiveCard(shareId);
+  const { stream: queriedStream, answered: liveAnswered } = useAuthorLiveStream(http, blogUrl, liveEnabled);
+  // Story 7.4: the shown stream carries the optimistic like over the query.
+  const like = useLiveLike(http, blogUrl, queriedStream);
+  const stream = like.stream;
+  const likeShown = stream !== null && liveLikeShown(stream);
   const liveShown = stream !== null;
   const liveShownRef = useLatestRef(liveShown);
 
@@ -289,6 +309,8 @@ export function AuthorScreen({
     modal,
     field,
     live: liveCard,
+    likeId,
+    shareId,
     rowShown,
     cardPrefix,
     retryId,
@@ -353,10 +375,11 @@ export function AuthorScreen({
   }, [liveRef, liveCard.liveViewRef, autoFocusLive, restoreOrFirst]);
 
   // Story 7.2: OK on the LiveCard (the live player, else the stream page's QR).
-  const { onLivePress, openLiveQr } = useAuthorLivePress({
+  const { onLivePress, onSharePress, openLiveQr } = useAuthorLivePress({
     blogUrl,
     stream,
     card: liveCard,
+    share: shareButton,
     focusRef,
     modal,
     latch,
@@ -392,7 +415,22 @@ export function AuthorScreen({
             // modal host's, so Back closes the QR first (focus-map §1.4).
             qrFrame = requestAnimationFrame(() => openLiveQrRef.current());
           }
-        } else if (current === liveId && phaseRef.current === 'grid') {
+        } else if (
+          (current === likeId && likeButton.liveViewRef.current) ||
+          (current === shareId && shareButton.liveViewRef.current)
+        ) {
+          // Story 7.4: back to «Нравится» / «Поделиться» while still shown.
+          const view = current === likeId ? likeButton.liveViewRef.current : shareButton.liveViewRef.current;
+          latch.auto(current);
+          requestHostFocus(view);
+        } else if (current === likeId && shareButton.liveViewRef.current) {
+          // Story 7.4: the like went while covered (it needs live + access)
+          // and the card stays: «Поделиться», as when uncovered.
+          latch.auto(shareId);
+          requestHostFocus(shareButton.liveViewRef.current);
+        } else if ((current === likeId || current === shareId) && liveCard.liveViewRef.current) {
+          autoFocusLive();
+        } else if ((current === liveId || current === likeId || current === shareId) && phaseRef.current === 'grid') {
           // The stream ended while covered (Story 7.2: e.g. the live player's
           // «Стрим завершён»): the first post, where the card was
           // (focus-map §4 D). Not `restoreOrFirst`: it would restore the
@@ -411,7 +449,7 @@ export function AuthorScreen({
         }
         restoration.cancel();
       };
-    }, [focusRef, cardPrefix, restoreOrFirst, restoration, autoFocusSidebar, phaseRef, liveId, liveCard.liveViewRef, autoFocusLive, latch, takeLiveQrRequestRef, openLiveQrRef]),
+    }, [focusRef, cardPrefix, restoreOrFirst, restoration, autoFocusSidebar, phaseRef, liveId, likeId, shareId, liveCard.liveViewRef, likeButton.liveViewRef, shareButton.liveViewRef, autoFocusLive, latch, takeLiveQrRequestRef, openLiveQrRef]),
   );
 
   /**
@@ -485,10 +523,12 @@ export function AuthorScreen({
   // Story 7.1: while the live card holds the page's own focus, a head
   // refresh never moves it to the new first post (a first post that took
   // the initial focus beside a scheduled card still follows the head).
+  // Story 7.4: «Нравится» / «Поделиться» count as the card.
   const followHeadUnlessLive = useCallback(
     (focused: string | null) =>
-      !(liveShownRef.current && focused === liveId) && latch.followHead(focused),
-    [liveShownRef, liveId, latch],
+      !(liveShownRef.current && (focused === liveId || focused === likeId || focused === shareId)) &&
+      latch.followHead(focused),
+    [liveShownRef, liveId, likeId, shareId, latch],
   );
 
   // A head refresh (reopen or resume, spec-author-posts-refresh) changed the
@@ -512,6 +552,9 @@ export function AuthorScreen({
     stream,
     answered: liveAnswered,
     card: liveCard,
+    like: likeButton,
+    share: shareButton,
+    likeShown,
     focusRef,
     modal,
     latch,
@@ -549,6 +592,7 @@ export function AuthorScreen({
     chipId,
     resetId,
     liveId,
+    liveActionIds,
     liveShown,
     fieldAuto,
     ids,
@@ -563,6 +607,17 @@ export function AuthorScreen({
     () => (liveCard.liveView ? [liveCard.liveView] : []),
     [liveCard.liveView],
   );
+  // Story 7.4: OK on «Нравится» clears the last failure and toggles.
+  const likeToggle = like.toggle;
+  const onLikePress = useCallback(() => {
+    const info = focusRef.current;
+    if (!info.isActive() || modal.isOpen()) {
+      return;
+    }
+    if (likeToggle()) {
+      latch.move();
+    }
+  }, [focusRef, modal, likeToggle, latch]);
 
   if (phase === 'unavailable' || phase === 'error') {
     return (
@@ -615,13 +670,30 @@ export function AuthorScreen({
           destinations={liveDestinations}
           style={liveCardBlockStyle}
         >
-          <LiveCard
-            ref={liveCard.liveHostRef}
-            testID={liveId}
-            stream={stream}
-            onFocus={liveCard.onLiveFocus}
-            onPress={onLivePress}
-          />
+          <View style={liveCardRowStyle}>
+            <LiveCard
+              ref={liveCard.liveHostRef}
+              testID={liveId}
+              stream={stream}
+              onFocus={liveCard.onLiveFocus}
+              onPress={onLivePress}
+            />
+            <LiveCardActions
+              stream={stream}
+              likeShown={likeShown}
+              likeId={likeId}
+              shareId={shareId}
+              likeError={like.error}
+              likeSending={like.sending}
+              likeHostRef={likeButton.liveHostRef}
+              shareHostRef={shareButton.liveHostRef}
+              onLikeFocus={likeButton.onLiveFocus}
+              onShareFocus={shareButton.onLiveFocus}
+              onLikePress={onLikePress}
+              onSharePress={onSharePress}
+              entry={likeShown ? likeButton.liveView : shareButton.liveView}
+            />
+          </View>
         </TVFocusGuideView>
       ) : null}
       <AuthorListState

@@ -11,6 +11,8 @@ export type AuthorActionRowFocusOptions = {
   resetId: string;
   /** Story 7.1: the LiveCard's focus id. */
   liveId: string;
+  /** Story 7.4: «Нравится» and «Поделиться» (↓ from them reaches the grid, as from the card). */
+  liveActionIds: readonly string[];
   /** Story 7.1: the LiveCard is shown (between the row and the grid). */
   liveShown: boolean;
   /** The field holds the page's own focus; any other focus clears it. */
@@ -41,7 +43,9 @@ export type AuthorActionRowFocus = {
  * redirects to the field). ↓ from the row: the last focused card, else its
  * neighbour by index, else the first (the guide around the grid). Story
  * 7.1: with the LiveCard shown, the same grid target applies to ↓ from the
- * card instead, and ↓ from the row lands on the card.
+ * card instead, and ↓ from the row lands on the card. Story 7.4: also while
+ * «Нравится» or «Поделиться» has focus (↓ from «Поделиться» → the grid; ↓
+ * from «Нравится» finds «Поделиться» first, right below it).
  */
 export function useAuthorActionRowFocus({
   focus,
@@ -50,6 +54,7 @@ export function useAuthorActionRowFocus({
   chipId,
   resetId,
   liveId,
+  liveActionIds,
   liveShown,
   fieldAuto,
   ids,
@@ -70,9 +75,9 @@ export function useAuthorActionRowFocus({
           fieldAuto.current = false;
         }
         setRowFocus(focusId === fieldId || focusId === chipId || focusId === resetId);
-        setLiveFocus(focusId === liveId);
+        setLiveFocus(focusId === liveId || liveActionIds.includes(focusId));
       }),
-    [focus, cardPrefix, fieldId, chipId, resetId, liveId, idsRef, fieldAuto],
+    [focus, cardPrefix, fieldId, chipId, resetId, liveId, liveActionIds, idsRef, fieldAuto],
   );
   const [downTarget, setDownTarget] = useState<HostView | null>(null);
   const aboveGrid = liveShown ? liveFocus : rowFocus;

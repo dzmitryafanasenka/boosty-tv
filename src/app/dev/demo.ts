@@ -500,6 +500,10 @@ const DEMO_VOTE_PATH = /^\/v1\/poll\/([^/]+)\/vote$/;
 const DEMO_STREAM_PATH = /^\/v1\/blog\/(demo-blog-\d+)\/video_stream$/;
 /** E16 (Story 7.3): the viewer heartbeat, also with `?stop=true` (the path has no query). */
 const DEMO_HEARTBEAT_PATH = /^\/v1\/blog\/demo-blog-\d+\/video_stream\/heartbeat\/viewer$/;
+/** E17 (Story 7.4): like (`POST`) / unlike (`DELETE`) the demo stream. */
+const DEMO_LIKE_PATH = /^\/v1\/blog\/(demo-blog-\d+)\/video_stream\/like$/;
+/** The demo stream's likes before the demo account's own like. */
+const DEMO_STREAM_LIKES = 42;
 /** The demo blog with a live stream (Story 7.1); the other demo blogs have none (204). */
 const DEMO_LIVE_BLOG = 'demo-blog-1';
 /** E9: `PUT /v1/viewstat/video/{mediaId}/timecode/` (Story 4.2). */
@@ -580,9 +584,10 @@ function demoPostDetail(blogUrl: string, postId: string) {
  * `src/test/fixtures/boosty/e15-video-stream-live.json`; no signed query,
  * no price): started an hour before the app run. Story 7.2: one synthetic,
  * unplayable `live_hls` URL (`example.invalid` never resolves), so the live
- * Player opens and ends in its error state.
+ * Player opens and ends in its error state. Story 7.4: `liked` is the demo
+ * account's in-memory like (E17), kept across polls.
  */
-function demoStream() {
+function demoStream(liked: boolean) {
   return {
     id: 'demo-stream-1',
     int_id: 1,
@@ -591,7 +596,7 @@ function demoStream() {
     isTemplate: false,
     hasAccess: true,
     startTime: Math.floor(Date.now() / 1000) - 3600,
-    isLiked: false,
+    isLiked: liked,
     data: [
       {
         type: 'ok_stream',
@@ -600,7 +605,7 @@ function demoStream() {
       },
     ],
     teaser: [],
-    count: { viewers: 128, likes: 42 },
+    count: { viewers: 128, likes: DEMO_STREAM_LIKES + (liked ? 1 : 0) },
   };
 }
 
@@ -648,7 +653,18 @@ export function createDemoKeyValueStore(): KeyValueStore {
 }
 
 export function createDemoSessionManager(): SessionManager {
+  /** Story 7.4: the demo account's like of the demo stream (memory only). */
+  let streamLiked = false;
   const transport = createFixtureTransport(request => {
+    // E17 (Story 7.4): like / unlike the demo stream in memory; nothing reaches Boosty.
+    const like = DEMO_LIKE_PATH.exec(request.path);
+    if (like && (request.method === 'POST' || request.method === 'DELETE')) {
+      if (like[1] !== DEMO_LIVE_BLOG) {
+        return { status: 404, body: { error: 'not_found' }, delayMs: 300 };
+      }
+      streamLiked = request.method === 'POST';
+      return { status: 200, delayMs: 300 };
+    }
     // E9 (Story 4.2): progress writes answer 200 with no body, as live.
     if (request.method === 'PUT' && DEMO_TIMECODE_PATH.test(request.path)) {
       return { status: 200, delayMs: 300 };
@@ -669,7 +685,7 @@ export function createDemoSessionManager(): SessionManager {
     const stream = DEMO_STREAM_PATH.exec(request.path);
     if (stream) {
       return stream[1] === DEMO_LIVE_BLOG
-        ? { status: 200, body: demoStream(), delayMs: 300 }
+        ? { status: 200, body: demoStream(streamLiked), delayMs: 300 }
         : { status: 204, delayMs: 300 };
     }
     const blogTags = DEMO_BLOG_TAGS_PATH.exec(request.path);

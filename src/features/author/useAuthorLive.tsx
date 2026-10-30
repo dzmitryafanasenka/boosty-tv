@@ -7,7 +7,7 @@ import { useLatestRef, useZoneItem, type ListRestoration, type ModalApi } from '
 import { isAppActive, subscribeAppBackground, subscribeAppForeground } from '../../shared/platform/appLifecycle';
 import { boostyStreamUrl } from '../../shared/entities/externalUrls';
 import { t } from '../../shared/i18n';
-import { QrDialog, type HostView, type NotMovedLatch } from '../../shared/ui';
+import { QrDialog, requestHostFocus, type HostView, type NotMovedLatch } from '../../shared/ui';
 import { liveCardPlayable } from './LiveCard';
 import type { AuthorFocusInfo } from './useAuthorAutoFocus';
 
@@ -81,7 +81,11 @@ export type AuthorLiveCard = {
   onLiveFocus: () => void;
 };
 
-/** The LiveCard's view and zone item (declared before the page's auto focus, which reads it). */
+/**
+ * The LiveCard's view and zone item (declared before the page's auto focus,
+ * which reads it). Story 7.4: «Нравится» and «Поделиться» use the same
+ * shape, each with its own id (`liveId` is then the button's id).
+ */
 export function useAuthorLiveCard(liveId: string): AuthorLiveCard {
   const zone = useZoneItem(liveId);
   const [liveView, setLiveView] = useState<HostView | null>(null);
@@ -102,6 +106,11 @@ export type AuthorLiveFocusOptions = {
   /** `AuthorLiveStream.answered`. */
   answered: boolean;
   card: AuthorLiveCard;
+  /** Story 7.4: «Нравится» and «Поделиться» (card loss counts their focus as the card's). */
+  like: AuthorLiveCard;
+  share: AuthorLiveCard;
+  /** Story 7.4: «Нравится» is shown (a live stream with access). */
+  likeShown: boolean;
   focusRef: RefObject<AuthorFocusInfo>;
   modal: ModalApi;
   latch: NotMovedLatch;
@@ -122,12 +131,18 @@ export type AuthorLiveFocusOptions = {
  *   refetch never moves focus, also not a scheduled stream going live.
  * - Card loss: when the card goes (a refetch found no stream) while it had
  *   focus, the first post takes it (`restoration.focusInitial`, else the
- *   nearest action above). A covered route is handled on return.
+ *   nearest action above). A covered route is handled on return. Story
+ *   7.4: focus on «Нравится» or «Поделиться» counts as the card's.
+ * - Story 7.4: «Нравится» goes while it has focus and the card stays (the
+ *   stream lost access or stopped being live): «Поделиться» takes it.
  */
 export function useAuthorLiveFocus({
   stream,
   answered,
   card,
+  like,
+  share,
+  likeShown,
   focusRef,
   modal,
   latch,
@@ -168,9 +183,33 @@ export function useAuthorLiveFocus({
   const renderedShown = useRef(shown);
   const lostWhileFocused = useRef(false);
   if (renderedShown.current !== shown) {
-    lostWhileFocused.current = !shown && focusRef.current.current() === card.liveId;
+    const current = focusRef.current.current();
+    lostWhileFocused.current =
+      !shown && (current === card.liveId || current === like.liveId || current === share.liveId);
     renderedShown.current = shown;
   }
+  const likeVisible = shown && likeShown;
+  const renderedLike = useRef(likeVisible);
+  const likeLostWhileFocused = useRef(false);
+  if (renderedLike.current !== likeVisible) {
+    likeLostWhileFocused.current = shown && !likeVisible && focusRef.current.current() === like.liveId;
+    renderedLike.current = likeVisible;
+  }
+  const wasLike = useRef(likeVisible);
+  useEffect(() => {
+    const before = wasLike.current;
+    wasLike.current = likeVisible;
+    if (!before || likeVisible) {
+      return;
+    }
+    const hadFocus = likeLostWhileFocused.current;
+    likeLostWhileFocused.current = false;
+    const info = focusRef.current;
+    if (hadFocus && shown && info.isActive() && !modal.isOpen()) {
+      latch.auto(share.liveId);
+      requestHostFocus(share.liveViewRef.current);
+    }
+  }, [likeVisible, shown, focusRef, modal, latch, share]);
   const wasShown = useRef(shown);
   useEffect(() => {
     const before = wasShown.current;
@@ -192,6 +231,8 @@ export type AuthorLivePressOptions = {
   blogUrl: string;
   stream: Stream | null;
   card: AuthorLiveCard;
+  /** Story 7.4: «Поделиться» (the share QR's initiator). */
+  share: AuthorLiveCard;
   focusRef: RefObject<AuthorFocusInfo>;
   modal: ModalApi;
   latch: NotMovedLatch;
@@ -202,8 +243,13 @@ export type AuthorLivePressOptions = {
 export type AuthorLivePress = {
   /** OK on the LiveCard. */
   onLivePress: () => void;
-  /** The stream page's QR, focus back to the card on close (also the player's not-playable return); false when it did not open. */
-  openLiveQr: () => boolean;
+  /** Story 7.4: OK on «Поделиться»: the stream page's QR, focus back on «Поделиться» on close. */
+  onSharePress: () => void;
+  /**
+   * The stream page's QR, focus back to `initiator` on close (default the
+   * card: also the player's not-playable return); false when it did not open.
+   */
+  openLiveQr: (initiator?: RefObject<HostView | null>) => boolean;
 };
 
 /**
@@ -219,6 +265,7 @@ export function useAuthorLivePress({
   blogUrl,
   stream,
   card,
+  share,
   focusRef,
   modal,
   latch,
@@ -227,17 +274,25 @@ export function useAuthorLivePress({
   const streamRef = useLatestRef(stream);
   const onOpenLiveRef = useLatestRef(onOpenLive);
   /** Opens the stream page's QR; false when it cannot (no URL, no card, not active, a modal open). */
-  const openLiveQr = useCallback((): boolean => {
-    const url = boostyStreamUrl(blogUrl);
-    if (url === null || !focusRef.current.isActive() || modal.isOpen() || card.liveViewRef.current === null) {
-      return false;
+  const openLiveQr = useCallback(
+    (initiator: RefObject<HostView | null> = card.liveViewRef): boolean => {
+      const url = boostyStreamUrl(blogUrl);
+      if (url === null || !focusRef.current.isActive() || modal.isOpen() || initiator.current === null) {
+        return false;
+      }
+      modal.open(
+        <QrDialog title={t('player.live.qrTitle')} value={url} onClose={() => modal.close()} />,
+        initiator,
+      );
+      return true;
+    },
+    [blogUrl, focusRef, modal, card.liveViewRef],
+  );
+  const onSharePress = useCallback(() => {
+    if (streamRef.current !== null && openLiveQr(share.liveViewRef)) {
+      latch.move();
     }
-    modal.open(
-      <QrDialog title={t('player.live.qrTitle')} value={url} onClose={() => modal.close()} />,
-      card.liveViewRef,
-    );
-    return true;
-  }, [blogUrl, focusRef, modal, card.liveViewRef]);
+  }, [streamRef, openLiveQr, share.liveViewRef, latch]);
   const onLivePress = useCallback(() => {
     const current = streamRef.current;
     if (current === null || !focusRef.current.isActive() || modal.isOpen()) {
@@ -254,5 +309,5 @@ export function useAuthorLivePress({
       latch.move();
     }
   }, [streamRef, focusRef, modal, latch, onOpenLiveRef, blogUrl, card.liveId, openLiveQr]);
-  return { onLivePress, openLiveQr };
+  return { onLivePress, onSharePress, openLiveQr };
 }

@@ -73,6 +73,7 @@ export function mapStream(raw: unknown, logger: Logger = appLogger): Stream | nu
     startTime,
     viewers: dto.count?.viewers ?? 0,
     likes: dto.count?.likes ?? 0,
+    isLiked: dto.isLiked === true,
     coverUrl: coverOf(dto.teaser ?? [], dto.data ?? []),
     levelName: nonEmpty(dto.subscriptionLevel?.name),
     hasLiveSources: liveSourcesOf(dto.data).length > 0,
