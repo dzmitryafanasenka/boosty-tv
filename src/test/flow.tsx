@@ -178,6 +178,29 @@ export const lists: {
   scrollToIndex: jest.Mock;
 } = { props: new Map(), scrollToOffset: jest.fn(), scrollToIndex: jest.fn() };
 
+/** The last props of the recorded list `testID`; throws when it has not rendered. */
+export function listProps(testID: string): Record<string, any> {
+  const props = lists.props.get(testID);
+  if (!props) {
+    throw new Error(`no list rendered: ${testID}`);
+  }
+  return props;
+}
+
+/**
+ * The items of a recorded grid list `testID` whose rows hold them under
+ * `field` (e.g. PostGrid's `posts`, Подписки's `authors`), flattened in order.
+ */
+export function gridRowItems<T = any>(testID: string, field: string): T[] {
+  return (listProps(testID).data as Array<Record<string, unknown>>).flatMap(row => {
+    const items = row[field];
+    if (!Array.isArray(items)) {
+      throw new Error(`grid ${testID}: row field "${field}" is not an array`);
+    }
+    return items as T[];
+  });
+}
+
 /** Empties every recorder (list props, both scroll mocks, guide destinations); call in `beforeEach`. */
 export function resetRecorders(): void {
   lists.props.clear();

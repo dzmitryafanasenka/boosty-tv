@@ -50,9 +50,11 @@ import {
   destinationIds,
   focusableIds,
   focusTargets,
+  gridRowItems,
   installFixtureTransport,
   installNativeModules,
   lastFocusTarget,
+  listProps,
   lists,
   resetKeychain,
   resetRecorders,
@@ -188,18 +190,11 @@ const currentRoute = () => navigationRef.getCurrentRoute()?.name;
 const e3Calls = (blogUrl: string = BLOG) => transport.callsTo(e3Path(blogUrl));
 const e4Calls = (blogUrl: string = BLOG) => transport.callsTo(e4Path(blogUrl));
 const authorCards = (root: Root) =>
-  focusableIds(root).filter(id => id.startsWith(`author/${BLOG}/post/`));
+  focusableIds(root).filter(id => id?.startsWith(`author/${BLOG}/post/`));
 /** The Author grid's FlashList props (last render). */
-function grid(): Record<string, any> {
-  const props = lists.props.get('author/posts/list');
-  if (!props) {
-    throw new Error('no Author grid rendered');
-  }
-  return props;
-}
+const grid = () => listProps('author/posts/list');
 /** The post ids in the Author grid (its items are rows of up to 3). */
-const gridPosts = () =>
-  (grid().data as Array<{ posts: Array<{ id: string }> }>).flatMap(r => r.posts.map(p => p.id));
+const gridPosts = () => gridRowItems<{ id: string }>('author/posts/list', 'posts').map(p => p.id);
 
 /** The App on Подписки (9 tiles, focus on the first). */
 async function openSubs() {
@@ -1714,6 +1709,38 @@ describe('Story 5.7: search and filters inside an author', () => {
     expect(lastFocusTarget()).toBe(SYN(0));
     await unmount(root);
   });
+
+  it.each([
+    ['Back', async (_root: Root) => f.back()],
+    ['a blank «Готово»', async (root: Root) => runSearch(root, '  ')],
+  ])(
+    'leaving a search while its E7 is pending (%s): the cached posts return, focus stays on the field, no card takes it',
+    async (_label, leave) => {
+      const root = await openAuthor();
+      const reply = deferred();
+      let pending: FixtureRequest | null = null;
+      e7 = req => {
+        pending = req;
+        return reply.promise;
+      };
+      await runSearch(root, 'пирог');
+      expect(visible(root, 'author/skeleton')).toBe(true);
+      expect(pending).not.toBeNull();
+      focusMock.mockClear();
+      await leave(root);
+      await f.settle();
+      expect(currentRoute()).toBe('Author');
+      expect(gridPosts()).toHaveLength(18);
+      expect(lastFocusTarget()).toBe(FIELD_HOST);
+      expect(focusTargets().filter(id => id?.startsWith(`author/${BLOG}/post/`))).toEqual([]);
+      // The late E7 reply moves nothing either.
+      reply.resolve(syntheticBlogSearch(5)(pending as unknown as FixtureRequest));
+      await f.settle();
+      expect(lastFocusTarget()).toBe(FIELD_HOST);
+      expect(focusTargets().filter(id => id?.startsWith(`author/${BLOG}/post/`))).toEqual([]);
+      await unmount(root);
+    },
+  );
 
   it('Search access (owner decision B a): «Доступные мне» drops locked results; «Все посты» shows them', async () => {
     e7 = syntheticBlogSearch(6, n => n % 2 === 1);

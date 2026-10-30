@@ -52,6 +52,7 @@ export {
   type PostsHeadRefreshLog,
   type PostsHeadRefreshResult,
 } from './postsHeadRefresh';
+export { useTrimOnKeyChange } from './useTrimOnKeyChange';
 export {
   MAX_AUTO_FETCHES,
   nextPageCursor,

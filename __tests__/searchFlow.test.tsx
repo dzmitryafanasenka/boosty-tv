@@ -36,10 +36,11 @@ import {
   deferred,
   destinationIds,
   focusTargets,
+  gridRowItems,
   installFixtureTransport,
   installNativeModules,
   lastFocusTarget,
-  lists,
+  listProps,
   resetKeychain,
   resetRecorders,
   text,
@@ -178,14 +179,8 @@ const resultIds = (root: Root) =>
     .map(n => n.props.testID as string)
     .filter(id => id.startsWith('search/result/'));
 /** The results grid's FlashList props (last render). */
-function grid(): Record<string, any> {
-  const props = lists.props.get('search/results/list');
-  if (!props) {
-    throw new Error('no results grid rendered');
-  }
-  return props;
-}
-const gridPosts = () => (grid().data as Array<{ posts: Array<{ id: string }> }>).flatMap(r => r.posts);
+const grid = () => listProps('search/results/list');
+const gridPosts = () => gridRowItems<{ id: string }>('search/results/list', 'posts');
 
 /** The App on Главная, then OK on «Поиск». */
 async function openSearch() {

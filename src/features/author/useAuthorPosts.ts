@@ -3,8 +3,8 @@ import { useCallback, useEffect, useRef } from 'react';
 import { queryKeys, type HttpClient } from '../../shared/api';
 import {
   PostRepository,
-  trimPostsToFirstPage,
   usePagedPosts,
+  useTrimOnKeyChange,
   type PagedPosts,
 } from '../../shared/entities/post';
 import type { Filter } from '../../shared/filters';
@@ -40,14 +40,8 @@ export function useAuthorPosts(http: HttpClient, blogUrl: string, filter: Filter
   useEffect(() => {
     refreshAuthorPostsHead(client, http, blogUrl, filterRef.current, Date.now()).catch(() => {});
   }, [client, http, blogUrl, keyString]);
-  // The Filter changed: the list left behind keeps its first page only.
-  const shownKey = useRef(key);
-  useEffect(() => {
-    const previous = shownKey.current;
-    if (JSON.stringify(previous) !== keyString) {
-      trimPostsToFirstPage(client, previous).catch(() => {});
-    }
-    shownKey.current = JSON.parse(keyString);
-  }, [client, keyString]);
+  // The Filter changed: the list left behind keeps its first page only
+  // (after the head refresh above, as before).
+  useTrimOnKeyChange(client, key);
   return posts;
 }
