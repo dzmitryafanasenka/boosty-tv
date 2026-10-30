@@ -7,7 +7,17 @@
  */
 import { act } from 'react';
 import { createRoot, type Root } from 'test-renderer';
-import { GearIcon, HeartIcon, SkipIcon } from '../icons';
+import {
+  AudioIcon,
+  FileIcon,
+  GearIcon,
+  HeartIcon,
+  PollIcon,
+  SkipIcon,
+  TextPhotoIcon,
+  VideoIcon,
+  VideosIcon,
+} from '../icons';
 
 async function render(element: React.ReactElement): Promise<Root> {
   const root = createRoot();
@@ -50,6 +60,24 @@ describe('SVG icons', () => {
     expect(nodes.find(n => n.props.testID === 'h')?.props.width).toBe(16);
     const heart = nodes.find(n => n.props.stroke === '#e8914a');
     expect(heart?.props.fill).toBe(filled ? '#e8914a' : 'none');
+    await act(async () => root.unmount());
+  });
+
+  it.each([
+    ['VideoIcon', VideoIcon],
+    ['VideosIcon', VideosIcon],
+    ['AudioIcon', AudioIcon],
+    ['TextPhotoIcon', TextPhotoIcon],
+    ['PollIcon', PollIcon],
+    ['FileIcon', FileIcon],
+  ])('%s (PostCard placeholder, 2026-10-30): drawn in the ink, sized, hidden from a11y', async (_name, Icon) => {
+    const root = await render(<Icon testID="p" color="#b7b0a6" size={37} />);
+    const nodes = all(root);
+    const svg = nodes.find(n => n.props.testID === 'p');
+    expect(svg?.props.width).toBe(37);
+    expect(svg?.props.importantForAccessibility).toBe('no-hide-descendants');
+    expect(svg?.props.accessibilityElementsHidden).toBe(true);
+    expect(nodes.some(n => n.props.stroke === '#b7b0a6' || n.props.fill === '#b7b0a6')).toBe(true);
     await act(async () => root.unmount());
   });
 });
