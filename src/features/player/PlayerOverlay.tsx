@@ -1,4 +1,4 @@
-import type { Ref } from 'react';
+import { useEffect, useState, type Ref } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { isGenericVideoTitle } from '../../shared/entities/post';
 import { tf, t } from '../../shared/i18n';
@@ -41,6 +41,51 @@ const BAND_DARK = colors.scrim;
 
 /** Whole seconds → `m:ss` / `h:mm:ss`. */
 const time = (sec: number) => formatDuration(sec);
+
+/** Story 7.2: the live elapsed time ticks this often. */
+export const LIVE_ELAPSED_TICK_MS = 1_000;
+
+/** Story 7.2: whole seconds since the stream's start (epoch seconds), never negative. */
+export function liveElapsedSec(startTime: number, nowMs: number): number {
+  return Math.max(0, Math.floor(nowMs / 1000 - startTime));
+}
+
+/**
+ * Story 7.2 (focus-map G9–G10): the live row: the LIVE badge (`colors.live`)
+ * and the time since the stream started, ticking every second; no elapsed
+ * when `startTime` is unknown. Not focusable.
+ */
+function LiveStatus({ startTime }: { startTime: number | null }) {
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    if (startTime === null) {
+      return;
+    }
+    setNowMs(Date.now());
+    const timer = setInterval(() => setNowMs(Date.now()), LIVE_ELAPSED_TICK_MS);
+    return () => clearInterval(timer);
+  }, [startTime]);
+  const elapsed = startTime === null ? null : time(liveElapsedSec(startTime, nowMs));
+  return (
+    <View
+      testID="player/live"
+      style={styles.liveRow}
+      accessible
+      accessibilityLabel={
+        elapsed === null ? t('player.live.a11yBadge') : tf('player.live.a11yElapsed', { elapsed })
+      }
+    >
+      <Text testID="player/live/badge" variant="badge" numberOfLines={1} style={styles.liveBadge}>
+        {t('author.live.badgeLive')}
+      </Text>
+      {elapsed !== null ? (
+        <Text testID="player/live/elapsed" variant="meta" color="text-secondary" style={[styles.tabular, styles.liveElapsed]}>
+          {elapsed}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
 
 
 /**
@@ -273,6 +318,16 @@ export type PlayerOverlayProps = {
   playPauseRef?: Ref<HostView>;
   /** «Настройки», the sheet's initiator (focus returns here when it closes). */
   settingsRef?: Ref<HostView>;
+  /**
+   * Story 7.2: a live stream: the LIVE badge and the elapsed time since
+   * `startTime` replace the timeline and the times; no ±10 s.
+   */
+  live?: { startTime: number | null } | null;
+  /**
+   * The ⚙ «Настройки» control (default shown). Story 7.2 (owner decision
+   * 2026-10-30): for live, only when the quality list has a real choice.
+   */
+  showSettings?: boolean;
 };
 
 /**
@@ -283,6 +338,10 @@ export type PlayerOverlayProps = {
  * end (Story 4.3 owner decision 2026-10-28). Both bands sit on a darkening
  * gradient. Focus: the timeline; ↓ → play/pause; ← → across −10 · play/pause
  * · +10 · ⚙; ↑ → the timeline (all native).
+ *
+ * Live (Story 7.2, focus-map G9–G10): the LIVE badge and the elapsed time
+ * instead of the timeline and the times; play/pause only (no ±10 s, no
+ * speed), plus ⚙ only when `showSettings`. Focus: play/pause.
  */
 export function PlayerOverlay({
   meta,
@@ -300,8 +359,11 @@ export function PlayerOverlay({
   timelineRef,
   playPauseRef,
   settingsRef,
+  live = null,
+  showSettings = true,
 }: PlayerOverlayProps) {
   const showVideoTitle = isDistinctVideoTitle(meta.videoTitle, meta.postTitle);
+  const isLive = live !== null;
   return (
     <View testID="player/overlay" style={styles.overlay} pointerEvents="box-none">
       <View testID="player/top" style={[styles.band, styles.top]}>
@@ -331,57 +393,69 @@ export function PlayerOverlay({
         ) : null}
       </View>
       <View testID="player/bottom" style={[styles.band, styles.bottom]}>
-        <Timeline
-          ref={timelineRef}
-          positionSec={positionSec}
-          durationSec={durationSec}
-          seekTargetSec={seekTargetSec}
-          onPress={onTogglePause}
-          onFocus={onTimelineFocus}
-        />
-        <View style={styles.times}>
-          <Text testID="player/elapsed" variant="meta" color="text-secondary" style={styles.tabular}>
-            {time(positionSec)}
-          </Text>
-          {durationSec > 0 ? (
-            <Text testID="player/remaining" variant="meta" color="text-secondary" style={styles.tabular}>
-              {tf('player.remaining', { remaining: time(Math.max(0, durationSec - positionSec)) })}
-            </Text>
-          ) : null}
-        </View>
+        {isLive ? (
+          <LiveStatus startTime={live.startTime} />
+        ) : (
+          <>
+            <Timeline
+              ref={timelineRef}
+              positionSec={positionSec}
+              durationSec={durationSec}
+              seekTargetSec={seekTargetSec}
+              onPress={onTogglePause}
+              onFocus={onTimelineFocus}
+            />
+            <View style={styles.times}>
+              <Text testID="player/elapsed" variant="meta" color="text-secondary" style={styles.tabular}>
+                {time(positionSec)}
+              </Text>
+              {durationSec > 0 ? (
+                <Text testID="player/remaining" variant="meta" color="text-secondary" style={styles.tabular}>
+                  {tf('player.remaining', { remaining: time(Math.max(0, durationSec - positionSec)) })}
+                </Text>
+              ) : null}
+            </View>
+          </>
+        )}
         <View testID="player/controls" style={styles.controls}>
           <View testID="player/controls/center" style={styles.controlsCenter}>
-            <IconControl
-              testID={PLAYER_BACK10_ID}
-              label={t('player.back10')}
-              icon="back10"
-              onPress={() => onSkip(-1)}
-              onFocus={() => onControlFocus(PLAYER_BACK10_ID)}
-            />
+            {isLive ? null : (
+              <IconControl
+                testID={PLAYER_BACK10_ID}
+                label={t('player.back10')}
+                icon="back10"
+                onPress={() => onSkip(-1)}
+                onFocus={() => onControlFocus(PLAYER_BACK10_ID)}
+              />
+            )}
             <PlayPauseControl
               ref={playPauseRef}
               paused={paused}
               onPress={onTogglePause}
               onFocus={onPlayPauseFocus}
             />
-            <IconControl
-              testID={PLAYER_FORWARD10_ID}
-              label={t('player.forward10')}
-              icon="forward10"
-              onPress={() => onSkip(1)}
-              onFocus={() => onControlFocus(PLAYER_FORWARD10_ID)}
-            />
+            {isLive ? null : (
+              <IconControl
+                testID={PLAYER_FORWARD10_ID}
+                label={t('player.forward10')}
+                icon="forward10"
+                onPress={() => onSkip(1)}
+                onFocus={() => onControlFocus(PLAYER_FORWARD10_ID)}
+              />
+            )}
           </View>
-          <View testID="player/controls/end" style={styles.controlsEnd}>
-            <IconControl
-              ref={settingsRef}
-              testID={PLAYER_SETTINGS_ID}
-              label={t('player.settings')}
-              icon="settings"
-              onPress={onOpenSettings}
-              onFocus={onSettingsFocus}
-            />
-          </View>
+          {showSettings ? (
+            <View testID="player/controls/end" style={styles.controlsEnd}>
+              <IconControl
+                ref={settingsRef}
+                testID={PLAYER_SETTINGS_ID}
+                label={t('player.settings')}
+                icon="settings"
+                onPress={onOpenSettings}
+                onFocus={onSettingsFocus}
+              />
+            </View>
+          ) : null}
         </View>
       </View>
     </View>
@@ -456,6 +530,24 @@ const styles = StyleSheet.create({
   },
   tabular: {
     fontVariant: ['tabular-nums'],
+  },
+  liveRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  liveBadge: {
+    ...components.badge.text,
+    height: components.badge.height,
+    lineHeight: components.badge.height,
+    textAlignVertical: 'center',
+    borderRadius: components.badge.radius,
+    paddingHorizontal: spacing['3'],
+    color: colors.text,
+    backgroundColor: colors.live,
+    overflow: 'hidden',
+  },
+  liveElapsed: {
+    marginLeft: spacing['4'],
   },
   times: {
     flexDirection: 'row',

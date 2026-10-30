@@ -16,7 +16,29 @@
       {
         "type": "ok_stream",
         "id": "synthetic-id-72",
-        "preview": "https://example.invalid/preview"
+        "preview": "https://example.invalid/preview",
+        "playerUrls": [
+          {
+            "type": "live_playback_hls",
+            "url": "https://example.invalid/live-playback"
+          },
+          {
+            "type": "live_hls",
+            "url": "https://example.invalid/live-hls?sig=REDACTED"
+          },
+          {
+            "type": "live_dash",
+            "url": "https://example.invalid/live-dash"
+          },
+          {
+            "type": "live_cmaf",
+            "url": "https://example.invalid/live-cmaf"
+          },
+          {
+            "type": "hls",
+            "url": ""
+          }
+        ]
       }
     ],
     "teaser": [

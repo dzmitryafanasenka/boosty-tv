@@ -5,7 +5,10 @@ import { queryKeys, type HttpClient } from '../../shared/api';
 import { StreamRepository, type Stream } from '../../shared/entities/stream';
 import { useLatestRef, useZoneItem, type ListRestoration, type ModalApi } from '../../shared/focus';
 import { isAppActive, subscribeAppBackground, subscribeAppForeground } from '../../shared/platform/appLifecycle';
-import type { HostView, NotMovedLatch } from '../../shared/ui';
+import { boostyStreamUrl } from '../../shared/entities/externalUrls';
+import { t } from '../../shared/i18n';
+import { QrDialog, type HostView, type NotMovedLatch } from '../../shared/ui';
+import { liveCardPlayable } from './LiveCard';
 import type { AuthorFocusInfo } from './useAuthorAutoFocus';
 
 /**
@@ -183,4 +186,73 @@ export function useAuthorLiveFocus({
       restoration.focusInitial();
     }
   }, [shown, focusRef, modal, card.liveId, latch, idsRef, restoration]);
+}
+
+export type AuthorLivePressOptions = {
+  blogUrl: string;
+  stream: Stream | null;
+  card: AuthorLiveCard;
+  focusRef: RefObject<AuthorFocusInfo>;
+  modal: ModalApi;
+  latch: NotMovedLatch;
+  /** `AuthorScreenProps.onOpenLive`: the live Player for this blog, return focus on the card. */
+  onOpenLive?: (blogUrl: string, focusId: string) => void;
+};
+
+export type AuthorLivePress = {
+  /** OK on the LiveCard. */
+  onLivePress: () => void;
+  /** The stream page's QR, focus back to the card on close (also the player's not-playable return); false when it did not open. */
+  openLiveQr: () => boolean;
+};
+
+/**
+ * Story 7.2 (LIVE-02, docs/focus-map.md §4 D): OK on the LiveCard. A
+ * playable card (`liveCardPlayable`: live, `hasAccess`, a live-edge URL)
+ * opens the live player through `onOpenLive` (the route's callback; no
+ * feature edge). Every other card (scheduled, needs a level, no URL) shows
+ * the QrDialog with the stream page (`boostyStreamUrl`); «Закрыть» or Back
+ * returns focus to the card. Only while Автор is the focused route and no
+ * modal is open. OK is a move (the reopen rule).
+ */
+export function useAuthorLivePress({
+  blogUrl,
+  stream,
+  card,
+  focusRef,
+  modal,
+  latch,
+  onOpenLive,
+}: AuthorLivePressOptions): AuthorLivePress {
+  const streamRef = useLatestRef(stream);
+  const onOpenLiveRef = useLatestRef(onOpenLive);
+  /** Opens the stream page's QR; false when it cannot (no URL, no card, not active, a modal open). */
+  const openLiveQr = useCallback((): boolean => {
+    const url = boostyStreamUrl(blogUrl);
+    if (url === null || !focusRef.current.isActive() || modal.isOpen() || card.liveViewRef.current === null) {
+      return false;
+    }
+    modal.open(
+      <QrDialog title={t('player.live.qrTitle')} value={url} onClose={() => modal.close()} />,
+      card.liveViewRef,
+    );
+    return true;
+  }, [blogUrl, focusRef, modal, card.liveViewRef]);
+  const onLivePress = useCallback(() => {
+    const current = streamRef.current;
+    if (current === null || !focusRef.current.isActive() || modal.isOpen()) {
+      return;
+    }
+    // OK is a move only when the Player or the QR actually opens.
+    const open = onOpenLiveRef.current;
+    if (liveCardPlayable(current) && open) {
+      latch.move();
+      open(blogUrl, card.liveId);
+      return;
+    }
+    if (openLiveQr()) {
+      latch.move();
+    }
+  }, [streamRef, focusRef, modal, latch, onOpenLiveRef, blogUrl, card.liveId, openLiveQr]);
+  return { onLivePress, openLiveQr };
 }

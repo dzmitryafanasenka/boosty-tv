@@ -1,6 +1,7 @@
 import { streamCoverBlockDtoSchema, streamDtoSchema } from '../../api/dto/stream';
 import { logger as appLogger, type Logger } from '../../services/logger';
 import { safeHttpUrl } from '../externalUrls';
+import { liveSourcesOf } from './liveSources';
 import type { Stream } from './types';
 
 /**
@@ -74,5 +75,6 @@ export function mapStream(raw: unknown, logger: Logger = appLogger): Stream | nu
     likes: dto.count?.likes ?? 0,
     coverUrl: coverOf(dto.teaser ?? [], dto.data ?? []),
     levelName: nonEmpty(dto.subscriptionLevel?.name),
+    hasLiveSources: liveSourcesOf(dto.data).length > 0,
   };
 }

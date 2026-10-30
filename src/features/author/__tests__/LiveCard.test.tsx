@@ -2,7 +2,8 @@
  * Story 7.1: the LiveCard's copy helpers and the branches the flow tests do
  * not reach: the untitled fallback, a scheduled stream without a start
  * time, no access without a level name, needs-level on a scheduled stream,
- * the cover placeholder after a load error, and the non-button role.
+ * the cover placeholder after a load error, and the role (Story 7.2: a
+ * button with an OK action, else a summary); `liveCardPlayable`.
  */
 import { act } from 'react';
 import { createRoot, type Root } from 'test-renderer';
@@ -12,6 +13,7 @@ import {
   LiveCard,
   liveCardA11yLabel,
   liveCardDetails,
+  liveCardPlayable,
   liveCardState,
   liveCardStatus,
   liveCardTitle,
@@ -28,6 +30,7 @@ const base: Stream = {
   likes: 0,
   coverUrl: 'https://example.invalid/cover',
   levelName: null,
+  hasLiveSources: true,
 };
 const stream = (overrides: Partial<Stream>): Stream => ({ ...base, ...overrides });
 
@@ -88,11 +91,31 @@ describe('component', () => {
     await act(async () => root.unmount());
   });
 
-  it('the focusable surface is not announced as a button (OK does nothing in 7.1) and keeps the label', async () => {
+  it('without an OK action the surface is not announced as a button and keeps the label', async () => {
     const root = await render(base);
     const host = root.container.queryAll(n => n.props.testID === ID && n.props.focusable === true)[0];
     expect(host.props.accessibilityRole).not.toBe('button');
     expect(host.props.accessibilityLabel).toBe(liveCardA11yLabel(base));
     await act(async () => root.unmount());
+  });
+
+  it('Story 7.2: with an OK action it is a button (OK itself: authorFlow «Story 7.2»)', async () => {
+    const onPress = jest.fn();
+    const root = createRoot();
+    await act(async () => {
+      root.render(<LiveCard testID={ID} stream={base} onPress={onPress} />);
+    });
+    const host = root.container.queryAll(n => n.props.testID === ID && n.props.focusable === true)[0];
+    expect(host.props.accessibilityRole).toBe('button');
+    await act(async () => root.unmount());
+  });
+});
+
+describe('liveCardPlayable (Story 7.2)', () => {
+  it('live, with access and a live-edge URL only', () => {
+    expect(liveCardPlayable(base)).toBe(true);
+    expect(liveCardPlayable(stream({ status: 'scheduled' }))).toBe(false);
+    expect(liveCardPlayable(stream({ hasAccess: false }))).toBe(false);
+    expect(liveCardPlayable(stream({ hasLiveSources: false }))).toBe(false);
   });
 });

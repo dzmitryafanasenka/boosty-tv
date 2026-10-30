@@ -335,3 +335,6 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-epic-6-retro-a1-a2.md`
   summary: Add an ESLint `no-restricted-imports` rule (or a boundaries.test.js case) that forbids `src/shared/platform/**` from importing `src/shared/ui/**`.
   evidence: A2 removed the only platform → ui import, but no rule keeps the cycle from returning (Blind Hunter review of the A1–A2 fix).
+- source_spec: `_bmad-output/implementation-artifacts/spec-7-2-watch-a-live-stream.md`
+  summary: Live play after a long pause or a background/sleep return remounts the same signed live URL; consider a quiet E15 re-fetch on a stale play so an expired URL does not spend the single automatic recovery.
+  evidence: maybe-false, medium if true — the live URL lifetime was never observed (no live sample); a live stream played across a sleep, or a pause longer than the URL lifetime, would settle it (Story 7.2 review).

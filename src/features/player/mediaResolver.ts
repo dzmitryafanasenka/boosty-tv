@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useRef, useState } from 'react';
 import {
   SESSION_CHECK_KEYS,
@@ -15,6 +15,8 @@ import {
   type ServerProgressSink,
   type VideoSource,
 } from '../../shared/entities/post';
+import type { BlogResult } from '../../shared/entities/author';
+import { StreamRepository, pickLiveSource, type LiveRef } from '../../shared/entities/stream';
 import type { ProgressMeta } from '../../shared/services/progress';
 import { postCardTitle } from '../../shared/ui';
 import type * as DebugBreakModule from './debugBreakSource';
@@ -178,7 +180,13 @@ export type MediaSourceState =
       /** Every usable source of this video (the settings sheet's list, Story 4.3). */
       sources: readonly VideoSource[];
       meta: PlayerMeta;
-      progress: ProgressMeta;
+      /** Null for a live stream (Story 7.2: no progress is ever written for live). */
+      progress: ProgressMeta | null;
+      /**
+       * Story 7.2: set for a live stream (the overlay's elapsed time since
+       * `startTime`, epoch seconds, null when unknown); null for a video.
+       */
+      live: { startTime: number | null } | null;
       resolution: number;
     }
   /**
@@ -189,9 +197,17 @@ export type MediaSourceState =
    * said the session is fine (not offline), so the post is really locked.
    */
   | { kind: 'locked'; confirmed: boolean; verified: boolean }
-  /** E8 404 or the video is gone from the post: «Видео недоступно», no retry. */
+  /**
+   * E8 404 or the video is gone from the post: «Видео недоступно», no retry.
+   * Live (Story 7.2): E15 has no live stream (204, or not online): «Стрим
+   * завершён».
+   */
   | { kind: 'unavailable' }
-  /** No usable URL (all empty or unknown): «Не удалось воспроизвести видео» + «Повторить». */
+  /**
+   * No usable URL (all empty or unknown): «Не удалось воспроизвести видео» +
+   * «Повторить». Live (Story 7.2): the stream is live but has no live-edge
+   * URL or `hasAccess: false`: the not-playable QR path.
+   */
   | { kind: 'noSource' }
   /** E8 failed: the error state + «Повторить» (kept, busy, while the retry runs). */
   | { kind: 'error'; error: AppErrorKind };
@@ -225,7 +241,8 @@ export type MediaSourceOptions = {
  */
 export function useMediaSource(
   http: HttpClient,
-  ref: MediaRef,
+  /** Null: disabled (the live player, Story 7.2): no request, always `loading`. */
+  ref: MediaRef | null,
   onServerProgress?: ServerProgressSink,
   preference: QualityKey | null = null,
   { keep = null }: MediaSourceOptions = {},
@@ -239,8 +256,12 @@ export function useMediaSource(
   /** The locked E8 result E1 verified (session fine, Story 4.7). */
   const [verifiedLocked, setVerifiedLocked] = useState<unknown>(null);
   const query = useQuery({
-    queryKey: queryKeys.mediaSource(ref.blogUrl, ref.postId, ref.mediaId),
+    queryKey: queryKeys.mediaSource(ref?.blogUrl ?? '', ref?.postId ?? '', ref?.mediaId ?? ''),
+    enabled: ref !== null,
     queryFn: async () => {
+      if (ref === null) {
+        throw new Error('disabled');
+      }
       // The fresh E8's `timeCode` goes to the ProgressRepository (Story 4.2).
       const result = await PostRepository.videoSources(http, ref, {
         onServerProgress: (mediaId, sec) => sinkRef.current?.(mediaId, sec),
@@ -323,7 +344,7 @@ export function useMediaSource(
       debugBreak !== null && debugBreak.isBroken(debugOwner.current, resolution)
         ? { ...picked, url: debugBreak.breakUrl(picked.url) }
         : picked;
-    const block = data.post.blocks.find(b => b.type === 'ok_video' && b.id === ref.mediaId);
+    const block = data.post.blocks.find(b => b.type === 'ok_video' && b.id === ref?.mediaId);
     const video = block?.type === 'ok_video' ? block : null;
     const postTitle = postCardTitle(data.post);
     return {
@@ -344,9 +365,112 @@ export function useMediaSource(
         previewUrl: video?.previewUrl ?? null,
         durationSec: video?.durationSec !== null && video?.durationSec !== undefined && video.durationSec > 0 ? Math.floor(video.durationSec) : null,
       },
+      live: null,
       resolution,
     };
-  }, [data, heldError, dataError, resolution, ref.mediaId, preference, keep, confirmedLocked, verifiedLocked, status, isFetching]);
+  }, [data, heldError, dataError, resolution, ref?.mediaId, preference, keep, confirmedLocked, verifiedLocked, status, isFetching]);
+
+  return {
+    state,
+    isFetching,
+    retry: () => {
+      refetch().catch(() => {});
+    },
+  };
+}
+
+/**
+ * The live player's source for `ref` (Story 7.2, LIVE-02): a fresh E15
+ * through `StreamRepository.liveSources` on every player mount (its own key
+ * `queryKeys.liveSource`, the same freshness rules as `useMediaSource`:
+ * never refetched by itself, a short `gcTime`, data from before this mount
+ * never played), then the same state union:
+ * - no live stream (204, malformed, scheduled or no longer online) →
+ *   `unavailable` («Стрим завершён»);
+ * - live but `hasAccess: false` or no live-edge URL → `noSource` (the
+ *   not-playable QR path);
+ * - else `ready` with the kept quality row's source (`keep`), else
+ *   `pickLiveSource` (HLS before DASH), no progress meta, and the stream's
+ *   `startTime` for the overlay.
+ * `hasAccess: false` is never a session check here (it is a result, as on
+ * the LiveCard). The overlay's author comes from the cached E3 of the
+ * Author page the player was opened from (E15 carries no author).
+ * Null `ref`: disabled (a video), always `loading`.
+ */
+export function useLiveSource(
+  http: HttpClient,
+  ref: LiveRef | null,
+  { keep = null }: MediaSourceOptions = {},
+): MediaSource {
+  const client = useQueryClient();
+  const query = useQuery({
+    queryKey: queryKeys.liveSource(ref?.blogUrl ?? ''),
+    enabled: ref !== null,
+    queryFn: () => {
+      if (ref === null) {
+        throw new Error('disabled');
+      }
+      return StreamRepository.liveSources(http, ref.blogUrl);
+    },
+    staleTime: Infinity,
+    gcTime: MEDIA_SOURCE_GC_TIME_MS,
+    retry: false,
+    refetchOnMount: 'always',
+    structuralSharing: false,
+  });
+  const { error, isFetching, refetch, status, isFetchedAfterMount } = query;
+  const data = isFetchedAfterMount ? query.data : undefined;
+  const resolutions = useRef<{ data: unknown; count: number }>({ data: undefined, count: 0 });
+  if (data !== undefined && data !== resolutions.current.data) {
+    resolutions.current = { data, count: resolutions.current.count + 1 };
+  }
+  const resolution = resolutions.current.count;
+  const heldError = useHeldError({ empty: data === undefined, status, error, isFetching });
+  const dataError: AppErrorKind | null =
+    isFetchedAfterMount && status === 'error' && data !== undefined
+      ? isAppError(error)
+        ? error.kind
+        : 'Client'
+      : null;
+  const blogUrl = ref?.blogUrl ?? '';
+
+  const state = useMemo<MediaSourceState>(() => {
+    if (heldError !== null) {
+      return { kind: 'error', error: heldError };
+    }
+    if (dataError !== null) {
+      return { kind: 'error', error: dataError };
+    }
+    if (data === undefined) {
+      return { kind: 'loading' };
+    }
+    if (data.kind === 'none') {
+      return { kind: 'unavailable' };
+    }
+    // A kept quality row (a recovery, or a pick from the sheet), else the default.
+    const kept = keep === null ? undefined : data.sources.find(candidate => qualityOf(candidate) === keep);
+    const source = data.stream.hasAccess ? (kept ?? pickLiveSource(data.sources)) : null;
+    if (source === null) {
+      return { kind: 'noSource' };
+    }
+    const blog = client.getQueryData<BlogResult>(queryKeys.author(blogUrl));
+    const author = blog?.kind === 'ok' ? blog.author : null;
+    return {
+      kind: 'ready',
+      source,
+      byQuality: false,
+      sources: data.sources,
+      meta: {
+        authorName: author?.ownerName || author?.title || '',
+        authorAvatarUrl: author?.avatarUrl ?? null,
+        postTitle: data.stream.title,
+        videoTitle: '',
+      },
+      progress: null,
+      live: { startTime: data.stream.startTime },
+      resolution,
+    };
+  }, [data, heldError, dataError, resolution, client, blogUrl, keep]);
 
   return {
     state,

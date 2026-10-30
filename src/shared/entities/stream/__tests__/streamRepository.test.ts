@@ -96,8 +96,9 @@ describe('E15 fetchActive', () => {
       likes: 5,
       coverUrl: 'https://example.invalid/cover',
       levelName: null,
+      hasLiveSources: true,
     });
-    expect(JSON.stringify(stream)).not.toMatch(/sig=|currency|RUB|preview/);
+    expect(JSON.stringify(stream)).not.toMatch(/sig=|currency|RUB|preview|live-hls|live-dash|example\.invalid\/live/);
   });
 
   it('scheduled (synthetic fixture): `isTemplate` and not online', async () => {
@@ -210,6 +211,7 @@ describe('mapStream', () => {
       likes: 0,
       coverUrl: null,
       levelName: null,
+      hasLiveSources: false,
     });
     expect(map({ ...live, startTime: 0 })?.startTime).toBeNull();
     expect(map({ ...live, title: '  Эфир  ' })?.title).toBe('Эфир');

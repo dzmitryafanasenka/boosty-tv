@@ -1,5 +1,5 @@
 /* eslint-disable no-script-url -- Story 6.3: unsafe URLs are inputs the code must reject */
-import { boostyPostRef, fileTarget, timestampRef, safeHttpUrl, youtubeId, youtubeThumbnail } from '../externalUrls';
+import { boostyPostRef, boostyStreamUrl, fileTarget, timestampRef, safeHttpUrl, youtubeId, youtubeThumbnail } from '../externalUrls';
 
 describe('safeHttpUrl (Story 6.3)', () => {
   it('keeps absolute http(s) URLs with a host (trimmed)', () => {
@@ -162,5 +162,17 @@ describe('timestampRef (Story 6.3, owner decision 2026-10-29, option b; live for
     null,
   ])('%s → null', url => {
     expect(timestampRef(url, POST)).toBeNull();
+  });
+});
+
+describe('boostyStreamUrl (Story 7.2)', () => {
+  it('the stream page of a valid blog, the blog encoded as one segment', () => {
+    expect(boostyStreamUrl('synthetic-blog')).toBe('https://boosty.to/synthetic-blog/streams/video_stream');
+  });
+
+  it('an invalid blog is null', () => {
+    expect(boostyStreamUrl('')).toBeNull();
+    expect(boostyStreamUrl('a/b')).toBeNull();
+    expect(boostyStreamUrl('..')).toBeNull();
   });
 });

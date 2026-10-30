@@ -116,6 +116,20 @@ export function fileTarget(url: string | null | undefined, signedQuery: string |
   return /[?&]$/.test(base) ? `${base}${query}` : `${base}&${query}`;
 }
 
+/**
+ * Story 7.2 (LIVE-02, epic-7-context «Watching»): the blog's stream page,
+ * `https://boosty.to/{blog}/streams/video_stream`, the QR target of a live
+ * card that cannot play here (scheduled, needs a level, no live-edge URL).
+ * The blog is encoded as one path segment; null when it fails
+ * `blogUrlSchema`. Reused by «Поделиться» (Story 7.4).
+ */
+export function boostyStreamUrl(blogUrl: string): string | null {
+  if (!blogUrlSchema.safeParse(blogUrl).success) {
+    return null;
+  }
+  return `https://boosty.to/${encodeURIComponent(blogUrl)}/streams/video_stream`;
+}
+
 /** A Boosty post a link points to (Story 6.3, owner decision 2026-10-29). */
 export type BoostyPostRef = { blogUrl: string; postId: string };
 

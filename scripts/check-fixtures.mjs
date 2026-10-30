@@ -30,7 +30,8 @@ const root = resolve(process.argv[2] ?? 'src/test/fixtures');
 const PLACEHOLDER = 'redacted';
 const SIGNED_QUERY = '?sig=REDACTED';
 const SYNTHETIC = /^synthetic-(id|blog|key)-\d{1,4}$/;
-const URL_PLACEHOLDER = /^https:\/\/example\.invalid\/[a-z-]{1,20}$/;
+// Story 7.2: a placeholder URL may carry the redacted signature (`?sig=REDACTED`), so leak checks have a signed value to find.
+const URL_PLACEHOLDER = /^https:\/\/example\.invalid\/[a-z-]{1,20}(\?sig=REDACTED)?$/;
 const SYNTHETIC_TEXT = 'Sample text';
 const ENUM_KEYS = new Set(['type', 'modificator', 'error', 'status']);
 const ENUM_VALUE = /^[A-Za-z][A-Za-z0-9_.-]{0,39}$/;

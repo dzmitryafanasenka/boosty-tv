@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import type { HttpClient } from '../../shared/api';
 import type { MediaRef } from '../../shared/entities/post';
+import { isLiveRef, type LiveRef } from '../../shared/entities/stream';
 import { useLatestRef, useModal } from '../../shared/focus';
 import { t } from '../../shared/i18n';
 import { subscribeAppBackground, subscribeAppForeground } from '../../shared/platform/appLifecycle';
@@ -28,7 +29,14 @@ import {
   spacing,
   type HostView,
 } from '../../shared/ui';
-import { pickSource, qualityOf, qualityOptions, useMediaSource, type QualityKey } from './mediaResolver';
+import {
+  pickSource,
+  qualityOf,
+  qualityOptions,
+  useLiveSource,
+  useMediaSource,
+  type QualityKey,
+} from './mediaResolver';
 import {
   PLAYER_CONTROL_IDS,
   PLAYER_PLAYPAUSE_ID,
@@ -84,7 +92,8 @@ type HWEvent = Parameters<Parameters<typeof useTVEventHandler>[0]>[0];
 /** Android KeyEvent.ACTION_UP: raw keys act on key up only (device: Story 1.6). */
 const KEY_UP = 1;
 
-type Phase = 'loading' | 'playing' | 'recovering' | 'error' | 'locked' | 'unavailable';
+/** `ended` (Story 7.2): live only, the stream ended or is gone («Стрим завершён»). */
+type Phase = 'loading' | 'playing' | 'recovering' | 'error' | 'locked' | 'unavailable' | 'ended';
 
 /**
  * Where playback starts (Story 4.2): the resume point, or 0 («С начала»);
@@ -106,8 +115,11 @@ type Failure = { target: number | undefined; key: QualityKey; byQuality: boolean
 export type PlayerScreenProps = {
   /** The active session's content client (from the route; never a singleton). */
   http: HttpClient;
-  /** The video to play (route params: ids only, AD-9). */
-  mediaRef: MediaRef;
+  /**
+   * The video to play (route params: ids only, AD-9), or a live stream
+   * (Story 7.2, `LiveRef {blogUrl}`): the live mode (no progress, no seek).
+   */
+  mediaRef: MediaRef | LiveRef;
   /** The Player route is the focused route (a closing one ignores the remote). */
   isActive: () => boolean;
   /** Leave the player: the route pops and focus returns to the origin element. */
@@ -129,6 +141,12 @@ export type PlayerScreenProps = {
    * 0; Story 6.3: `{atSec}` at that second (a timestamp link).
    */
   start?: PlayerStart;
+  /**
+   * Story 7.2 (live only): the fresh E15 says the stream is live but not
+   * playable here (`hasAccess: false` or no live-edge URL): leave, so the
+   * origin shows the stream page's QR. Default: `onExit`.
+   */
+  onLiveUnplayable?: () => void;
 };
 
 /**
@@ -182,6 +200,19 @@ export type PlayerScreenProps = {
  *   sheet closes with focus on «Настройки». The stored preference feeds
  *   `pickSource` on every open.
  * - No autoplay of the next video (Story 4.5).
+ * - Live (Story 7.2, `LiveRef`, focus-map G9–G11): the source is a fresh E15
+ *   (`useLiveSource`, live-edge URLs only). No ProgressRepository at all
+ *   (no begin, tick, pause, exit or forget), no seek (← → and the media
+ *   seek keys only show the overlay), no ±10 s, no timeline; the overlay
+ *   shows the LIVE badge and the elapsed time, focus on play/pause. Play
+ *   after a pause remounts the source (the engine starts at the live edge).
+ *   The gear only when the live quality list has a real choice (owner
+ *   decision 2026-10-30); a pick replays at the edge. The engine's end, or
+ *   no live stream at the open or after a recovery, shows «Стрим завершён»
+ *   with focus on «Назад» (no auto-exit, no restart). The first engine error
+ *   re-fetches E15 once and replays at the edge; a second error shows the
+ *   error state with «Назад» only. A stream that is live but not playable
+ *   here leaves through `onLiveUnplayable` (the origin's QR).
  */
 export function PlayerScreen({
   http,
@@ -191,8 +222,15 @@ export function PlayerScreen({
   onNoAccess,
   onEnded,
   start = 'resume',
+  onLiveUnplayable,
 }: PlayerScreenProps) {
-  const progress = useProgressRepository();
+  // Story 7.2: the ref kind is fixed for a mounted player (route params).
+  const liveRef = isLiveRef(mediaRef) ? mediaRef : null;
+  const vodRef = isLiveRef(mediaRef) ? null : mediaRef;
+  const isLive = liveRef !== null;
+  const progressRepository = useProgressRepository();
+  // No progress is ever written for a live stream: every call site guards null.
+  const progress = isLive ? null : progressRepository;
   // The device's quality preference (Story 4.3): read once per app run;
   // the engine waits for it, so the first source is the preferred one.
   const [preference, setPreference] = useState<QualityKey | null | undefined>(() => qualityPreference.peek());
@@ -217,9 +255,16 @@ export function PlayerScreen({
    * a quality pick.
    */
   const [keepQuality, setKeepQuality] = useState<QualityKey | null>(null);
-  const media = useMediaSource(http, mediaRef, progress?.onServerProgress, preference ?? null, {
+  // Both hooks run (hooks are unconditional); the one for the other kind is disabled.
+  const vodMedia = useMediaSource(http, vodRef, progress?.onServerProgress, preference ?? null, {
     keep: keepQuality,
   });
+  const liveMedia = useLiveSource(http, liveRef, { keep: keepQuality });
+  const media = isLive ? liveMedia : vodMedia;
+  /** Story 7.2: the engine reported the end of the live stream. */
+  const [liveEnded, setLiveEnded] = useState(false);
+  /** Story 7.2: bumped by a play after a pause: the engine remounts at the live edge. */
+  const [liveEpoch, setLiveEpoch] = useState(0);
   // The local store is loaded before the engine starts, so the resume point
   // is known at `onLoad` (a cold start reads the persisted entry).
   const [progressReady, setProgressReady] = useState(() => progress === null || progress.store.isReady());
@@ -261,8 +306,11 @@ export function PlayerScreen({
     ((ready !== null && (ready.resolution === recovery.from || !failed)) ||
       (state.kind === 'locked' && everReady.current));
   const phase: Phase =
-    state.kind === 'loading'
-      ? 'loading'
+    isLive && (liveEnded || state.kind === 'unavailable')
+      ? 'ended'
+      : state.kind === 'loading' || (isLive && state.kind === 'noSource')
+      ? // Live and not playable here: the player leaves at once (the origin's QR).
+        'loading'
       : recovering
         ? 'recovering'
         : state.kind === 'locked'
@@ -437,6 +485,7 @@ export function PlayerScreen({
 
   const surfaceView = useRef<HostView | null>(null);
   const timelineView = useRef<HostView | null>(null);
+  const playPauseView = useRef<HostView | null>(null);
   const retryView = useRef<HostView | null>(null);
   const backView = useRef<HostView | null>(null);
   /** The focused player element (raw ← → seek only off play/pause). */
@@ -524,7 +573,17 @@ export function PlayerScreen({
   // within those frames: Epic 3 retro A6).
   // «Восстанавливаем воспроизведение…» has no action: focus on the surface (Story 4.4).
   const surfaceFocusable = phase === 'loading' || phase === 'recovering' || (playing && !overlay);
-  const errorTarget = phase === 'error' ? 'retry' : phase === 'locked' || phase === 'unavailable' ? 'back' : null;
+  // Live (Story 7.2): only a failed E15 request offers «Повторить»; a broken
+  // live source after its one recovery shows «Назад» only.
+  const retryable = phase === 'error' && (!isLive || state.kind === 'error');
+  const errorTarget =
+    phase === 'error'
+      ? retryable
+        ? 'retry'
+        : 'back'
+      : phase === 'locked' || phase === 'unavailable' || phase === 'ended'
+        ? 'back'
+        : null;
   useEffect(() => {
     const [view, id] =
       errorTarget === 'retry'
@@ -532,7 +591,9 @@ export function PlayerScreen({
         : errorTarget === 'back'
           ? [backView, PLAYER_BACK_ID]
           : playing && overlay
-            ? [timelineView, PLAYER_TIMELINE_ID]
+            ? isLive
+              ? [playPauseView, PLAYER_PLAYPAUSE_ID]
+              : [timelineView, PLAYER_TIMELINE_ID]
             : surfaceFocusable
               ? [surfaceView, PLAYER_SURFACE_ID]
               : [null, null];
@@ -550,7 +611,7 @@ export function PlayerScreen({
       });
     });
     return () => cancelAnimationFrame(frame);
-  }, [errorTarget, playing, overlay, surfaceFocusable, isActive]);
+  }, [errorTarget, playing, overlay, surfaceFocusable, isActive, isLive]);
 
   // -------------------------------------------------------------- actions
 
@@ -559,7 +620,9 @@ export function PlayerScreen({
     setInteraction(n => n + 1);
   }, []);
 
-  const live = useLatestRef({ phase, overlay, paused, positionSec, durationSec, isActive, onExit, mediaRef, ready });
+  /** Story 7.2 (owner decision 2026-10-30): live shows the gear only with a real quality choice. */
+  const settingsShown = ready !== null && (!isLive || qualityOptions(ready.sources).length > 1);
+  const live = useLatestRef({ phase, overlay, paused, positionSec, durationSec, isActive, onExit, vodRef, ready, settingsShown });
 
   /**
    * One progress report (Story 4.2), only once the start position was
@@ -567,10 +630,10 @@ export function PlayerScreen({
    */
   const reportProgress = useCallback(
     (event: ProgressEvent, positionOverride?: number) => {
-      if (progress === null || gate.current.kind !== 'started') {
+      const { positionSec: position, durationSec: duration, vodRef: ref } = live.current;
+      if (progress === null || ref === null || gate.current.kind !== 'started') {
         return;
       }
-      const { positionSec: position, durationSec: duration, mediaRef: ref } = live.current;
       progress.report(ref, positionOverride ?? position, event, duration > 0 ? duration : null);
     },
     [progress, live],
@@ -584,9 +647,10 @@ export function PlayerScreen({
   const begun = useRef(false);
   useEffect(() => {
     const meta = readyProgressRef.current;
-    if (progress !== null && readyResolution !== null && meta !== null && !begun.current) {
+    const ref = live.current.vodRef;
+    if (progress !== null && ref !== null && readyResolution !== null && meta !== null && !begun.current) {
       begun.current = true;
-      progress.begin(live.current.mediaRef, meta);
+      progress.begin(ref, meta);
     }
   }, [progress, readyResolution, readyProgressRef, live]);
 
@@ -638,6 +702,20 @@ export function PlayerScreen({
   const pickQuality = useCallback(
     (key: QualityKey) => {
       const current = live.current.ready;
+      if (isLive) {
+        // Story 7.2 (owner decision 2026-10-30): the chosen live source plays
+        // from the live edge (no position, no stored preference).
+        const next = current === null ? null : (current.sources.find(source => qualityOf(source) === key) ?? null);
+        if (current !== null && next !== null && next !== current.source) {
+          setKeepQuality(key);
+          gate.current = { kind: 'load' };
+          setBuffering(true);
+          setAutoHeight(null);
+        }
+        closeSheet(true);
+        showOverlay();
+        return;
+      }
       setPreference(key);
       // A pick replaces the quality a recovery kept (Story 4.4).
       setKeepQuality(null);
@@ -674,13 +752,13 @@ export function PlayerScreen({
       closeSheet(true);
       showOverlay();
     },
-    [live, seek, closeSheet, showOverlay],
+    [live, seek, closeSheet, showOverlay, isLive],
   );
   const pickQualityRef = useLatestRef(pickQuality);
 
   /** «Настройки», Menu or Info: the settings sheet (the overlay shows and stays). */
   const openSettings = useCallback(() => {
-    if (live.current.phase !== 'playing' || sheetOpenRef.current) {
+    if (live.current.phase !== 'playing' || sheetOpenRef.current || !live.current.settingsShown) {
       return;
     }
     sheetOpenRef.current = true;
@@ -719,7 +797,20 @@ export function PlayerScreen({
   const setPlaying = useCallback(
     (play: boolean) => {
       const current = live.current.ready;
-      if (play && current !== null && Date.now() - resolvedAt.current >= SOURCE_REFRESH_AGE_MS) {
+      if (isLive && play && live.current.paused) {
+        // Story 7.2: play after a pause returns to the live edge: the engine
+        // remounts with the same source (it starts at the edge), never a
+        // seek to a position.
+        heldByLifecycle.current = false;
+        gate.current = { kind: 'load' };
+        setLiveEpoch(n => n + 1);
+        setBuffering(true);
+        setAutoHeight(null);
+        setPaused(false);
+        showOverlay();
+        return;
+      }
+      if (play && !isLive && current !== null && Date.now() - resolvedAt.current >= SOURCE_REFRESH_AGE_MS) {
         // Story 4.6: the signed URL is (nearly) expired: one fresh E8 first
         // (the Story 4.4 path, «Восстанавливаем…», same quality, same
         // second), then play. Not an error: the recovery budget is untouched.
@@ -743,8 +834,9 @@ export function PlayerScreen({
         // visit writes nothing, owner decision 2026-10-28); reports wait for
         // the seek to 0, as for a new source.
         const meta = readyProgressRef.current;
-        if (progress !== null && meta !== null) {
-          progress.begin(live.current.mediaRef, meta);
+        const ref = live.current.vodRef;
+        if (progress !== null && ref !== null && meta !== null) {
+          progress.begin(ref, meta);
           gate.current = { kind: 'seek', target: 0 };
         }
         engine.current?.seek(0);
@@ -757,7 +849,7 @@ export function PlayerScreen({
       setPaused(!play);
       showOverlay();
     },
-    [showOverlay, reportProgress, live, progress, readyProgressRef, seek, media],
+    [showOverlay, reportProgress, live, progress, readyProgressRef, seek, media, isLive],
   );
   const togglePause = useCallback(() => setPlaying(live.current.paused), [live, setPlaying]);
   /**
@@ -777,12 +869,13 @@ export function PlayerScreen({
   const seekBy = useCallback(
     (direction: SeekDirection) => {
       const { positionSec: position, durationSec: duration } = live.current;
-      if (duration > 0) {
+      // Story 7.2: a live stream never seeks (overlay only).
+      if (duration > 0 && !isLive) {
         seek.press(direction, position, duration);
       }
       showOverlay();
     },
-    [live, seek, showOverlay],
+    [live, seek, showOverlay, isLive],
   );
 
   /**
@@ -794,12 +887,12 @@ export function PlayerScreen({
   const onSkip = useCallback(
     (direction: SeekDirection) => {
       const { positionSec: position, durationSec: duration } = live.current;
-      if (duration > 0) {
+      if (duration > 0 && !isLive) {
         seek.press(direction, position, duration, SKIP_STEP_SEC);
       }
       showOverlay();
     },
-    [live, seek, showOverlay],
+    [live, seek, showOverlay, isLive],
   );
 
   /** OK on the surface (overlay hidden): pause and show the overlay (a pending seek: commit it). */
@@ -859,7 +952,8 @@ export function PlayerScreen({
           }
           return;
         }
-        if (hold.current.ignored || onControls) {
+        // Story 7.2: a held key on a live stream never seeks (no pending target).
+        if (hold.current.ignored || onControls || isLive) {
           return;
         }
         hold.current.repeats += 1;
@@ -875,7 +969,7 @@ export function PlayerScreen({
       // a tap keeps the 600 ms window.
       hold.current = { key: null, repeats: 0, lastAt: 0, ignored: false };
     },
-    [live, seek, seekBy, showOverlay, entryGuarded],
+    [live, seek, seekBy, showOverlay, entryGuarded, isLive],
   );
   useFocusEffect(useCallback(() => subscribeSeekKeys(onSeekKey), [onSeekKey]));
 
@@ -1026,9 +1120,9 @@ export function PlayerScreen({
           : typeof mode === 'object'
             ? // A timestamp link (Story 6.3): that second, kept inside the video.
               Math.max(0, d > 0 ? Math.min(mode.atSec, Math.max(0, d - 1)) : mode.atSec)
-            : progress === null || mode === 'beginning'
+            : progress === null || live.current.vodRef === null || mode === 'beginning'
               ? 0
-              : progress.resumePoint(live.current.mediaRef, d > 0 ? d : null);
+              : progress.resumePoint(live.current.vodRef, d > 0 ? d : null);
       if (explicit === undefined) {
         startMode.current = 'resume';
       }
@@ -1085,6 +1179,14 @@ export function PlayerScreen({
   );
   const onEndedRef = useLatestRef(onEnded);
   const onEnd = useCallback(() => {
+    if (isLive) {
+      // Story 7.2: «Стрим завершён» (focus on «Назад»): no write, no
+      // auto-exit, no restart; the engine unmounts.
+      ended.current = true;
+      setPaused(true);
+      setLiveEnded(true);
+      return;
+    }
     // The final position is written (finished). Story 4.5: then leave for
     // the origin (no autoplay); without `onEnded`, stay paused at the end
     // and a later play starts over from 0.
@@ -1098,7 +1200,7 @@ export function PlayerScreen({
       return;
     }
     showOverlay();
-  }, [showOverlay, live, reportRef, onEndedRef]);
+  }, [showOverlay, live, reportRef, onEndedRef, isLive]);
   /**
    * An engine error (Story 4.4: an expired signed URL, a CDN or decoder
    * failure, also before the first `onLoad`). With the budget left: the
@@ -1111,7 +1213,8 @@ export function PlayerScreen({
     // A switched source that failed before `onLoad` is never stored.
     pendingPreferenceWrite.current = null;
     const current = live.current.ready;
-    const target = recoveryTarget(gate.current, seek.target(), live.current.positionSec);
+    // Story 7.2: a live source always continues at the live edge (no position).
+    const target = isLive ? undefined : recoveryTarget(gate.current, seek.target(), live.current.positionSec);
     // Paused by the user at the error (a hold-scrub pause of a playing video is not).
     const pausedAtError = live.current.paused && !(seek.isHeld() && scrubWasPlaying.current);
     seek.reset();
@@ -1130,7 +1233,7 @@ export function PlayerScreen({
     setKeepQuality(failure.key);
     setRecovery({ from: resolution });
     media.retry();
-  }, [resolution, seek, live, media]);
+  }, [resolution, seek, live, media, isLive]);
 
   /**
    * «Повторить» (one fresh E8). After a broken source it continues from
@@ -1188,17 +1291,40 @@ export function PlayerScreen({
   // exit report) or an unavailable video (E8 404 / the video gone) drops the
   // video's local progress, so it leaves the Continue row. No request.
   const goneForGood = state.kind === 'unavailable' || (state.kind === 'locked' && state.verified);
+  const vodMediaId = vodRef?.mediaId ?? null;
   useEffect(() => {
-    if (goneForGood) {
-      progress?.forget(mediaRef.mediaId);
+    if (goneForGood && vodMediaId !== null) {
+      progress?.forget(vodMediaId);
     }
-  }, [goneForGood, progress, mediaRef.mediaId]);
+  }, [goneForGood, progress, vodMediaId]);
+
+  // Story 7.2: live but not playable here (no access, no live-edge URL):
+  // leave at once, so the origin shows the stream page's QR.
+  const liveUnplayable = isLive && state.kind === 'noSource' && !liveEnded;
+  const onLiveUnplayableRef = useLatestRef(onLiveUnplayable ?? onExit);
+  // A focus effect: an answer that lands while the route is not focused
+  // (the push transition, a covering screen) leaves once it is focused.
+  useFocusEffect(
+    useCallback(() => {
+      if (!liveUnplayable) {
+        return;
+      }
+      logger.info('player', 'live stream not playable here; leaving');
+      onLiveUnplayableRef.current();
+    }, [liveUnplayable, onLiveUnplayableRef]),
+  );
 
   // --------------------------------------------------------------- render
 
-  const retryable = phase === 'error';
   const errorCopy =
-    phase === 'locked'
+    phase === 'ended'
+      ? { title: t('player.live.endedTitle'), body: t('player.live.endedBody') }
+      : isLive
+        ? {
+            title: t('player.live.errorTitle'),
+            body: state.kind === 'error' ? t(`error.${state.error}`) : t('player.live.errorBody'),
+          }
+        : phase === 'locked'
       ? { title: t('player.noAccessTitle'), body: t('player.noAccessBody') }
       : phase === 'unavailable'
         ? { title: t('player.unavailableTitle'), body: t('player.unavailableBody') }
@@ -1213,15 +1339,24 @@ export function PlayerScreen({
         ref={surfaceView}
         testID={PLAYER_SURFACE_ID}
         focusable={surfaceFocusable}
-        accessibilityLabel={phase === 'loading' ? t('player.loading') : t('player.surface')}
+        accessibilityLabel={
+          phase === 'loading'
+            ? isLive
+              ? t('player.live.loading')
+              : t('player.loading')
+            : isLive
+              ? t('player.live.surface')
+              : t('player.surface')
+        }
         onFocus={onSurfaceFocus}
         onPress={onSurfacePress}
         style={styles.surface}
       >
-        {ready !== null && !failed && progressReady && preferenceReady ? (
+        {ready !== null && !failed && phase !== 'ended' && progressReady && preferenceReady ? (
           <PlayerEngineView
-            // A new E8 or a quality switch (Story 4.3) remounts the engine.
-            key={`${ready.resolution}:${ready.source.type}`}
+            // A new E8 or a quality switch (Story 4.3) remounts the engine;
+            // so does a live play after a pause (Story 7.2: the live edge).
+            key={`${ready.resolution}:${ready.source.type}:${liveEpoch}`}
             ref={engine}
             testID="player/engine"
             source={{ uri: ready.source.url, format: ready.source.format }}
@@ -1259,7 +1394,10 @@ export function PlayerScreen({
           onOpenSettings={openSettings}
           onSettingsFocus={onSettingsFocus}
           timelineRef={timelineView}
+          playPauseRef={playPauseView}
           settingsRef={settingsView}
+          live={ready.live}
+          showSettings={settingsShown}
         />
       ) : null}
       {phase === 'recovering' ? (
