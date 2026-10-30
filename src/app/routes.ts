@@ -23,7 +23,8 @@ export type RootStackParamList = {
    * D Автор (Story 3.3): one blog's header and posts. `blogUrl` already
    * passed `blogUrlSchema` (it came from an Author or Post entity).
    * `section`: the origin Shell section, the sidebar's current item
-   * (default Подписки; Главная when opened from a post of the feed).
+   * (default Подписки; Главная when opened from a post of the feed;
+   * События when opened from an event row, Story 7.5).
    */
   Author: { blogUrl: string; section?: SectionId };
   /**

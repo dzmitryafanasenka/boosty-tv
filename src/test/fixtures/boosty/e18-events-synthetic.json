@@ -1,0 +1,116 @@
+{
+  "case": "e18-events-synthetic",
+  "synthetic": true,
+  "status": 200,
+  "body": {
+    "data": {
+      "notificationStandalone": {
+        "updateTime": 1700036000,
+        "events": [
+          {
+            "id": 1181,
+            "type": "post_comment_new",
+            "eventTime": 1700032400,
+            "isRead": false,
+            "author": {
+              "id": 1182,
+              "name": "redacted",
+              "avatarUrl": "https://example.invalid/avatar",
+              "hasAvatar": true,
+              "isOfficial": false
+            },
+            "blog": {
+              "blogUrl": "synthetic-blog-2"
+            },
+            "aggregation": {
+              "id": 1183,
+              "type": "redacted"
+            }
+          },
+          {
+            "id": 1184,
+            "type": "video_stream_start",
+            "eventTime": 1700028800,
+            "isRead": false,
+            "author": {
+              "id": 1185,
+              "name": "redacted",
+              "avatarUrl": "https://example.invalid/avatar",
+              "hasAvatar": true,
+              "isOfficial": false
+            },
+            "blog": {
+              "blogUrl": "synthetic-blog-1"
+            },
+            "aggregation": {
+              "id": 1186,
+              "type": "redacted"
+            }
+          },
+          {
+            "type": "post_new",
+            "eventTime": 1700025200,
+            "isRead": true,
+            "author": {
+              "id": 1187,
+              "name": "redacted",
+              "avatarUrl": "https://example.invalid/avatar",
+              "hasAvatar": true,
+              "isOfficial": false
+            },
+            "blog": {
+              "blogUrl": "synthetic-blog-3"
+            }
+          },
+          {
+            "id": 1188,
+            "type": "post_new",
+            "eventTime": 0,
+            "isRead": true,
+            "blog": {
+              "blogUrl": "synthetic-blog-3"
+            }
+          },
+          {
+            "id": 1189,
+            "type": "promo_new",
+            "eventTime": 1700021600,
+            "isRead": true,
+            "author": {
+              "id": 1190,
+              "name": "redacted",
+              "avatarUrl": "https://example.invalid/avatar",
+              "hasAvatar": true,
+              "isOfficial": false
+            },
+            "target": {
+              "bloggerUrl": "synthetic-blog-4",
+              "type": "redacted"
+            }
+          },
+          {
+            "id": 1191,
+            "type": "synthetic_unknown_type",
+            "eventTime": 1700018000,
+            "isRead": true,
+            "author": {
+              "id": 1192,
+              "name": "redacted",
+              "avatarUrl": "https://example.invalid/avatar",
+              "hasAvatar": true,
+              "isOfficial": false
+            },
+            "target": {
+              "bloggerUrl": "synthetic-blog-5"
+            }
+          }
+        ],
+        "count": {
+          "unread": 5,
+          "total": 5,
+          "byEventType": []
+        }
+      }
+    }
+  }
+}

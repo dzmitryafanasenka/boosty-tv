@@ -673,6 +673,7 @@ describe('focus (focus-map §4 D, §1.6)', () => {
       'author/nav/home',
       'author/nav/search',
       'author/nav/subs',
+      'author/nav/events',
       'author/nav/settings',
     ]);
     expect(visible(root, 'author/nav/subs/current')).toBe(true);

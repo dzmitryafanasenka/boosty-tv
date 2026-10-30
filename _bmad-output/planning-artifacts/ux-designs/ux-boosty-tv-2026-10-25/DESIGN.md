@@ -128,6 +128,7 @@ components:
   setting-row: { minHeight: 44, compactHeight: 38, radius: '{rounded.md}', bgFocus: '{colors.surface-focus-row}', scaleFocus: '{focus.scale-row}' }
   poll-option: { height: 42, radius: '{rounded.md}', resultBar: '{colors.accent-tint}', chosenMark: '{colors.accent}', scaleFocus: '{focus.scale-row}' }
   media-row: { height: 64, thumb: '96x54', radius: '{rounded.md}', progress: '{colors.accent}', scaleFocus: '{focus.scale-row}' }
+  event-row: { width: 696, height: 56, avatar: 32, dot: 6, radius: '{rounded.lg}', bg: '{colors.surface}', bgFocus: '{colors.surface-focus-row}', chip: '{colors.live}', scaleFocus: '{focus.scale-row}' }
   link-chip: { height: 32, radius: '{rounded.full}', bg: '{colors.surface-raised}', suffix: 'QR' }
   player-control: { size: 40, radius: '{rounded.full}', bg: '{colors.overlay-badge}', bgFocus: '{colors.text}', iconFocus: '{colors.bg}' }
   timeline: { trackHeight: 3, trackHeightFocus: 5, progress: '{colors.accent}', thumb: '{colors.text}', bubble: '{colors.overlay-badge}' }
@@ -227,7 +228,7 @@ Every focusable component is built on **FocusableSurface**. In focus it gets the
 
 | Component | Anatomy and visual states |
 |---|---|
-| **Sidebar / NavItem** | Wordmark «Boosty TV» and 5 labeled items: Главная, Поиск, Подписки, События, Настройки. Always expanded. **Current:** `{colors.surface-current}` plus an accent bar. **Focused:** ring plus `{colors.surface-focus-row}`. «События» is hidden until E18 (EVT-01) is verified. |
+| **Sidebar / NavItem** | Wordmark «Boosty TV» and 5 labeled items: Главная, Поиск, Подписки, События, Настройки. Always expanded. **Current:** `{colors.surface-current}` plus an accent bar. **Focused:** ring plus `{colors.surface-focus-row}`. «События» is hidden until E18 (EVT-01) is verified (shown since Story 7.5, `events` flag on). |
 | **Button** | Kinds: primary, secondary, ghost, icon-only. Sizes: normal, small. Primary uses `{colors.accent}`; secondary uses `{colors.surface-raised}`. Optional sub-label (for example «видео 2») and count. The refresh button «Обновить» is a secondary small Button. |
 | **FilterChip** | Pill with label and current value («Фильтры · Доступные мне») or an active-filter count. Implemented (Story 5.3, `src/shared/ui/FilterChip.tsx`): 32 dp on `{colors.surface-raised}`, label and value, plus a count badge on `{colors.accent-tint}` (`{colors.accent-text}` digits) when filters are active; focused: ring, `{colors.surface-focus-button}` and the button scale. |
 | **TextField** | Kinds: phone, code, search. **Focused:** `{colors.focus-ring}` border, no scale. **Error:** `{colors.error}` border plus `{colors.error-text}` message. **Phone:** an editable country code (default `+7`) followed by the number field. **Code:** a single field, because the code length is unknown. |
@@ -247,7 +248,7 @@ Every focusable component is built on **FocusableSurface**. In focus it gets the
 | **PlayerControl** | Round control on `{colors.overlay-badge}`. **Focused:** inverted (`{colors.text}` fill, `{colors.bg}` icon) plus ring. |
 | **Timeline** | Track with accent progress and a thumb. Thicker when focused. While seeking, a bubble shows the target time. Below: elapsed and remaining, tabular. **Live:** no track; LIVE badge plus elapsed time since start. |
 | **AudioBlock** | An inline row: play/pause glyph, title, position / duration, thin progress. A single focus target. |
-| **EventRow** *(conditional)* | Author avatar, text («Начался эфир»), author name, time. Unread events show an accent dot. |
+| **EventRow** *(conditional)* | Author avatar, text («Начался эфир»), author name, time. Unread events show an accent dot. Implemented (Story 7.5, `src/features/events/EventRow.tsx`, `event-row` tokens): a 696 × 56 dp row (the 720 dp content minus the focus headroom on both sides) on `{colors.surface}`; a 6 dp `{colors.accent}` dot (unread only; the slot stays when read), a 32 dp avatar, the author name (semibold) and the text on one ellipsized line, a «Эфир» chip on `{colors.live}` for a stream start, and the time (`meta`). Focused: ring, `{colors.surface-focus-row}` and the row scale. |
 | **SideSheet** | Right panel (filters `widthFilters`, player settings `widthPlayer`), `{colors.bg-sidebar}`, enters with `{motion.panel}`. |
 | **Dialog** | Centered, `{rounded.xl}`, above the scrim. Title, body, 2 actions. |
 | **QrDialog** | Dialog with a QR on `{colors.qr-bg}`, a title, the target description («Откроется на телефоне») and «Закрыть». The URL is never printed in full. |

@@ -39,7 +39,10 @@ import type { ReadResult, SecureStore } from '../../shared/platform/secureStore'
  * no cover URL; Story 7.2: its `ok_stream` has one `live_hls` URL on
  * `example.invalid`, so OK on the card reaches the live Player and its
  * engine error path, and no real CDN is called; every other demo blog
- * answers 204), every other request a
+ * answers 204), E18 (Story 7.5: «События»: a `video_stream_start` of
+ * `demo-blog-1` (live, unread), a `post_new` of `demo-blog-2`, a
+ * `promo_new`, an unknown type, a row without a blog, and a comment and an
+ * owner-side event that the app hides), every other request a
  * 404. The
  * keychain is never touched, so the owner's stored session survives a demo
  * run.
@@ -504,6 +507,8 @@ const DEMO_HEARTBEAT_PATH = /^\/v1\/blog\/demo-blog-\d+\/video_stream\/heartbeat
 const DEMO_LIKE_PATH = /^\/v1\/blog\/(demo-blog-\d+)\/video_stream\/like$/;
 /** The demo stream's likes before the demo account's own like. */
 const DEMO_STREAM_LIKES = 42;
+/** E18 (Story 7.5). */
+const DEMO_EVENTS_PATH = '/v1/notification/standalone/event/';
 /** The demo blog with a live stream (Story 7.1); the other demo blogs have none (204). */
 const DEMO_LIVE_BLOG = 'demo-blog-1';
 /** E9: `PUT /v1/viewstat/video/{mediaId}/timecode/` (Story 4.2). */
@@ -606,6 +611,43 @@ function demoStream(liked: boolean) {
     ],
     teaser: [],
     count: { viewers: 128, likes: DEMO_STREAM_LIKES + (liked ? 1 : 0) },
+  };
+}
+
+/**
+ * E18 for the demo account (the live shape, as
+ * `src/test/fixtures/boosty/e18-events.json`; no money field): times
+ * relative to the app run, so the stream start reads «сегодня».
+ */
+function demoEvents() {
+  const now = Math.floor(Date.now() / 1000);
+  const author = (n: number) => ({ id: 1000 + n, name: `Демо-автор ${n}`, hasAvatar: false, isOfficial: false });
+  const event = (id: number, type: string, minutesAgo: number, extra: Record<string, unknown>) => ({
+    id,
+    type,
+    eventTime: now - minutesAgo * 60,
+    isRead: true,
+    aggregation: { id, type },
+    ...extra,
+  });
+  return {
+    data: {
+      notificationStandalone: {
+        updateTime: now,
+        events: [
+          event(9001, 'video_stream_start', 5, { isRead: false, author: author(1), blog: { blogUrl: DEMO_LIVE_BLOG } }),
+          // Hidden by the app: comments are excluded, owner-side types are not shown (Q3 a).
+          event(9002, 'post_comment_new', 20, { isRead: false, author: author(2), blog: { blogUrl: 'demo-blog-2' } }),
+          event(9003, 'donation_new', 30, { isRead: false, author: author(3) }),
+          event(9004, 'post_new', 90, { isRead: false, author: author(2), blog: { blogUrl: 'demo-blog-2' } }),
+          event(9005, 'promo_new', 60 * 26, { author: author(3), target: { bloggerUrl: 'demo-blog-3' } }),
+          event(9006, 'demo_unknown_event', 60 * 24 * 3, { author: author(1), blog: { blogUrl: DEMO_LIVE_BLOG } }),
+          // No blog: OK does nothing.
+          event(9007, 'post_new', 60 * 24 * 40, { author: author(4) }),
+        ],
+        count: { total: 7, unread: 4, byEventType: [] },
+      },
+    },
   };
 }
 
@@ -722,6 +764,8 @@ export function createDemoSessionManager(): SessionManager {
         return { status: 200, body: demoFeedTagsPage(request.url), delayMs: 300 };
       case '/v1/user/subscriptions':
         return { status: 200, body: demoSubscriptions(), delayMs: 300 };
+      case DEMO_EVENTS_PATH:
+        return { status: 200, body: demoEvents(), delayMs: 300 };
       case '/v1/user/current':
         // Story 5.2: the demo account owns `demo-blog-2` (7 posts, also a
         // subscription), so Подписки shows «Мой блог» first, once.

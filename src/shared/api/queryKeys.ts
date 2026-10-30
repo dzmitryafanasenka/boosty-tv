@@ -121,6 +121,12 @@ export const queryKeys = {
    * card query, which the player invalidates on exit) or `mediaSource`.
    */
   liveSource: (blogUrl: string) => ['liveSource', blogUrl] as const,
+  /**
+   * E18 the account's events (Story 7.5, `entities/event`), one request, no
+   * paging. Its own root: never a prefix of another key. Account-scoped like
+   * every key (the cache is cleared on sign-out and account switch).
+   */
+  events: () => ['events'] as const,
 } as const;
 
 /**

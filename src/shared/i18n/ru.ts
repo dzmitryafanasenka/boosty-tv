@@ -213,6 +213,36 @@ export const ru = {
     // Story 5.2: the label on the account's own blog tile (AuthorCard).
     myBlog: 'Мой блог',
   },
+  // События (Story 7.5, EVT-01, E18; docs/focus-map.md §5 J). One row per
+  // event: the author's name, then the text on one line. Empty: owner
+  // decision 2026-10-30 (Q2 a), «Событий нет» with «Обновить».
+  events: {
+    title: 'События',
+    loading: 'Загружаем события',
+    // The row's text by type: a stream start, a new post, a new promo, and
+    // the generic text for any other shown type.
+    text: {
+      streamStart: 'Начался эфир',
+      postNew: 'Новый пост',
+      promoNew: 'Новая акция',
+      generic: 'Новое событие',
+    },
+    // The text after the author's name on the row's line (the leading space
+    // separates it from the name).
+    afterName: ' {text}',
+    // The author has no name in the event.
+    noName: 'Автор',
+    streamChip: 'Эфир',
+    a11y: '{name}: {text}. {time}',
+    a11yUnread: 'Новое. {name}: {text}. {time}',
+    // A stream row also reads its visible «Эфир» chip.
+    a11yStream: '{name}: {text}. {chip}. {time}',
+    a11yStreamUnread: 'Новое. {name}: {text}. {chip}. {time}',
+    emptyTitle: 'Событий нет',
+    emptyBody: 'Здесь появится, например, начало эфира у автора, на которого вы подписаны.',
+    refresh: 'Обновить',
+    errorTitle: 'Не удалось загрузить события',
+  },
   // Автор (Story 3.3, E3 + E4; docs/focus-map.md §4 D). Missing blog (any
   // E3 404; only `blog_not_found` is verified): «Назад» only, no retry. The header reads
   // «Автор: {title}. {owner}» (or without the owner).

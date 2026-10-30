@@ -22,12 +22,17 @@
  * `live` (Story 7.1) is an in-screen capability, not a section: the
  * Author page's LiveCard (E15). While it is off, Автор sends no E15 and
  * shows no card. Owner decision 2026-10-30 (Q3 a): it ships on.
+ *
+ * `events` (Story 7.5) is the События sidebar section (E18). Owner decision
+ * 2026-10-30 (Q1 a): on after the live probe found E18 in the documented
+ * shape (first page only, no load-more). While it is off, there is no
+ * sidebar item and no E18.
  */
 export const phaseFlags = {
   home: true,
   search: true,
   subs: true,
-  events: false,
+  events: true,
   settings: true,
   player: true,
   myBlog: true,

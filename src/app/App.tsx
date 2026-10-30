@@ -203,14 +203,18 @@ function ShellRoute({
   navigation,
 }: StackScreenProps<RootStackParamList, 'Shell'>) {
   const ui = useSessionUi();
-  // OK on a Подписки tile: Автор. Only while the Shell is the focused route
-  // (the same guard as `onOpenPost`): a second OK during the transition (a
-  // double press, or another tile) is dropped (Epic 3 retro F8).
+  // OK on a Подписки tile: Автор; OK on a События row (Story 7.5): Автор
+  // with `events` as its sidebar's current item. Only while the Shell is the
+  // focused route (the same guard as `onOpenPost`): a second OK during the
+  // transition (a double press, or another tile) is dropped (Epic 3 retro F8).
+  // Returns whether it navigated (События marks a row read only then).
   const onOpenAuthor = useCallback(
-    (blogUrl: string) => {
-      if (navigation.isFocused()) {
-        navigation.navigate('Author', { blogUrl });
+    (blogUrl: string, section?: SectionId): boolean => {
+      if (!navigation.isFocused()) {
+        return false;
       }
+      navigation.navigate('Author', section === undefined ? { blogUrl } : { blogUrl, section });
+      return true;
     },
     [navigation],
   );
@@ -385,6 +389,9 @@ function App() {
           // fetched again, so a stream that started or ended while the app
           // was in the background shows at once. No observer, no request.
           queryClient.invalidateQueries({ queryKey: queryKeys.allStreams() }).catch(() => {});
+          // Story 7.5: an observed События list (the section is shown) is
+          // fetched again, so an event that arrived in the background shows.
+          queryClient.invalidateQueries({ queryKey: queryKeys.events() }).catch(() => {});
         }
       });
     });
