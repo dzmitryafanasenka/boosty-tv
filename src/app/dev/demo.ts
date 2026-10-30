@@ -498,6 +498,8 @@ const DEMO_POLL_PATH = /^\/v1\/blog\/demo-blog-\d+\/poll\/([^/]+)$/;
 const DEMO_VOTE_PATH = /^\/v1\/poll\/([^/]+)\/vote$/;
 /** E15 (Story 7.1). */
 const DEMO_STREAM_PATH = /^\/v1\/blog\/(demo-blog-\d+)\/video_stream$/;
+/** E16 (Story 7.3): the viewer heartbeat, also with `?stop=true` (the path has no query). */
+const DEMO_HEARTBEAT_PATH = /^\/v1\/blog\/demo-blog-\d+\/video_stream\/heartbeat\/viewer$/;
 /** The demo blog with a live stream (Story 7.1); the other demo blogs have none (204). */
 const DEMO_LIVE_BLOG = 'demo-blog-1';
 /** E9: `PUT /v1/viewstat/video/{mediaId}/timecode/` (Story 4.2). */
@@ -658,6 +660,10 @@ export function createDemoSessionManager(): SessionManager {
       const isVote = request.method !== 'GET' && DEMO_VOTE_PATH.test(request.path);
       const reply = isRefresh || isVote ? demoPollReply(request.method, decodeURIComponent(poll[1]), request.form) : null;
       return reply ? { ...reply, delayMs: 300 } : { status: 404, body: { error: 'not_found' }, delayMs: 300 };
+    }
+    // E16 (Story 7.3): the heartbeat and its stop answer 200 with no body; nothing reaches Boosty.
+    if (request.method === 'PUT' && DEMO_HEARTBEAT_PATH.test(request.path)) {
+      return { status: 200, delayMs: 300 };
     }
     // E15 (Story 7.1): one live demo stream, 204 for the other demo blogs.
     const stream = DEMO_STREAM_PATH.exec(request.path);

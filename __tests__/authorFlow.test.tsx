@@ -200,6 +200,10 @@ beforeEach(() => {
     if (/^\/v1\/blog\/[^/]+\/video_stream$/.test(req.path)) {
       return e15(req);
     }
+    // Story 7.3: the live Player's viewer heartbeat (E16) and its stop.
+    if (req.method === 'PUT' && /^\/v1\/blog\/[^/]+\/video_stream\/heartbeat\/viewer$/.test(req.path)) {
+      return { status: 200 };
+    }
     if (req.path === '/v1/search/blog/post/') {
       return e7(req);
     }

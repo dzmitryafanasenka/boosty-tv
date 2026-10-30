@@ -13,6 +13,7 @@ import { session } from '../src/app/session';
 import { focusRestoration } from '../src/shared/focus';
 import { DEFAULT_FILTER, filtersStore, formatDayKey, periodBounds } from '../src/shared/filters';
 import { PostRepository } from '../src/shared/entities/post';
+import { StreamRepository } from '../src/shared/entities/stream';
 import { TagRepository } from '../src/shared/entities/tag';
 import { t } from '../src/shared/i18n';
 import { createAsyncStorage } from '@react-native-async-storage/async-storage';
@@ -239,6 +240,36 @@ test('Story 7.2: OK on the demo live card → the live Player with the synthetic
   await act(async () => {
     root.unmount();
   });
+});
+
+test('Story 7.3: the demo live Player answers E16 (heartbeats and the one stop) with 200; no network', async () => {
+  fetchMock.mockClear();
+  engine.reset();
+  const heartbeat = jest.spyOn(StreamRepository, 'heartbeat');
+  const root = await renderApp();
+  await press(root, 'nav/subs');
+  await press(root, 'subs/tile/demo-blog-1');
+  await press(root, 'author/demo-blog-1/live');
+  expect(navigationRef.getCurrentRoute()?.name).toBe('Player');
+  // Watching (playing, not paused): the settles run the pending 30 s ticks.
+  await act(async () => {
+    jest.advanceTimersByTime(30_000);
+  });
+  await settle();
+  const beats = heartbeat.mock.calls.filter(call => call[2]?.stop !== true);
+  expect(beats.length).toBeGreaterThan(0);
+  expect(heartbeat.mock.calls.every(call => call[1] === 'demo-blog-1')).toBe(true);
+  expect(heartbeat.mock.calls.filter(call => call[2]?.stop === true)).toHaveLength(0);
+  await act(async () => {
+    root.unmount();
+  });
+  await settle();
+  expect(heartbeat.mock.calls.filter(call => call[2]?.stop === true)).toHaveLength(1);
+  // Every E16 (each heartbeat and the stop) was answered 200 by the demo transport.
+  const results = await Promise.allSettled(heartbeat.mock.results.map(r => r.value as Promise<void>));
+  expect(results.every(r => r.status === 'fulfilled')).toBe(true);
+  expect(logger.entries().filter(e => e.scope === 'live' && e.message === 'heartbeat failed')).toHaveLength(0);
+  expect(fetchMock).not.toHaveBeenCalled();
 });
 
 test('Story 3.4: Пост answers E8 in demo mode (paragraphs and likes, mixed blocks, a missing post)', async () => {

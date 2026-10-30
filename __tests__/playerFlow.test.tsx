@@ -18,6 +18,7 @@ import { progress } from '../src/app/progress';
 import { queryClient, resetQueryCache } from '../src/app/queryClient';
 import { queryKeys } from '../src/shared/api';
 import { type FixtureReply, type FixtureRequest, type FixtureTransport } from '../src/shared/api/fixtureTransport';
+import { accountScope } from '../src/shared/account';
 import { focusRestoration } from '../src/shared/focus';
 import { t as translate } from '../src/shared/i18n';
 import { logger } from '../src/shared/services/logger';
@@ -119,6 +120,11 @@ let e9: (req: FixtureRequest) => Reply;
 /** E15 (Story 7.2): `GET /v1/blog/{blogUrl}/video_stream`; default 204 (no stream). */
 const E15_RE = /^\/v1\/blog\/([^/]+)\/video_stream$/;
 let e15: (req: FixtureRequest) => Reply;
+/** E16 (Story 7.3): `PUT /v1/blog/{blogUrl}/video_stream/heartbeat/viewer[?stop=true]`; default 200. */
+const E16_RE = /^\/v1\/blog\/([^/]+)\/video_stream\/heartbeat\/viewer$/;
+let e16: (req: FixtureRequest) => Reply;
+/** Story 7.3: the refresh (`/oauth/token/`) reply, when a test sets one; else unhandled. */
+let tokenReply: FixtureReply | undefined;
 let transport: FixtureTransport;
 /** Story 4.4: E1 held by a test (the session check still running); null: 200 at once. */
 let e1Hold: Promise<FixtureReply> | null;
@@ -169,6 +175,8 @@ beforeEach(() => {
   withData(ONE);
   e9 = () => ({ status: 200 });
   e15 = () => ({ status: 204 });
+  e16 = () => ({ status: 200 });
+  tokenReply = undefined;
   e1Hold = null;
   const feed = syntheticFeed({ total: 3 });
   transport = installFixtureTransport((req: FixtureRequest): Reply => {
@@ -189,6 +197,13 @@ beforeEach(() => {
     // Story 7.2: the live player's E15.
     if (req.method === 'GET' && E15_RE.test(req.path)) {
       return e15(req);
+    }
+    // Story 7.3: the live viewer heartbeat (`req.path` has no query; `req.url` has `?stop=true`).
+    if (req.method === 'PUT' && E16_RE.test(req.path)) {
+      return e16(req);
+    }
+    if (req.path === '/oauth/token/') {
+      return tokenReply;
     }
     return undefined;
   });
@@ -3260,5 +3275,337 @@ describe('Story 7.2: watch a live stream (LiveRef)', () => {
     expect(playbackArbiter.current()).toBeNull();
     release();
     await unmount(root);
+  });
+
+  describe('Story 7.3: the live viewer heartbeat (E16)', () => {
+    const e16Calls = () => transport.calls.filter(c => c.method === 'PUT' && E16_RE.test(c.path));
+    const beats = () => e16Calls().filter(c => !c.url.includes('stop=true'));
+    const stops = () => e16Calls().filter(c => c.url.includes('stop=true'));
+    const HEARTBEAT_URL = `https://api.boosty.to/v1/blog/${LIVE_BLOG}/video_stream/heartbeat/viewer`;
+
+    it('Watching: the first E16 30 s after start, then every 30 s; PUT, content profile, no stop', async () => {
+      const root = await openLive();
+      await advance(28_000);
+      expect(e16Calls()).toHaveLength(0);
+      await advance(2_000);
+      expect(beats()).toHaveLength(1);
+      expect(beats()[0].url).toBe(HEARTBEAT_URL);
+      expect(beats()[0].headers.Authorization).toMatch(/^Bearer /);
+      await advance(30_000);
+      await advance(30_000);
+      expect(beats()).toHaveLength(3);
+      expect(stops()).toHaveLength(0);
+      expect(engine.props?.paused).toBe(false);
+      await unmount(root);
+    });
+
+    it('Exit within the first 30 s (Back): exactly one stop, no heartbeat; nothing after', async () => {
+      const root = await openLive();
+      await advance(10_000);
+      await back();
+      await back();
+      await advance(1_000);
+      expect(currentRoute()).not.toBe('Player');
+      expect(beats()).toHaveLength(0);
+      expect(stops()).toHaveLength(1);
+      expect(stops()[0].url).toBe(`${HEARTBEAT_URL}?stop=true`);
+      await advance(90_000);
+      expect(e16Calls()).toHaveLength(1);
+      await unmount(root);
+      expect(e16Calls()).toHaveLength(1);
+    });
+
+    it('Pause stops the ticks with no stop; play restarts the 30 s schedule', async () => {
+      const root = await openLive();
+      await advance(30_000);
+      expect(beats()).toHaveLength(1);
+      await key('up');
+      await press(root, PLAYPAUSE);
+      expect(engine.props?.paused).toBe(true);
+      await advance(120_000);
+      expect(beats()).toHaveLength(1);
+      expect(stops()).toHaveLength(0);
+      await press(root, PLAYPAUSE);
+      expect(engine.props?.paused).toBe(false);
+      await advance(29_000);
+      expect(beats()).toHaveLength(1);
+      await advance(1_000);
+      expect(beats()).toHaveLength(2);
+      await unmount(root);
+      expect(stops()).toHaveLength(1);
+    });
+
+    it('Background and audio-focus loss stop the ticks (no stop); the exit still sends one stop', async () => {
+      const appState: Array<(state: string) => void> = [];
+      jest.spyOn(AppState, 'addEventListener').mockImplementation(((_type: string, listener: (s: string) => void) => {
+        appState.push(listener);
+        return { remove: () => {} };
+      }) as unknown as typeof AppState.addEventListener);
+      const root = await openLive();
+      await act(async () => {
+        for (const h of [...appState]) {
+          h('background');
+        }
+      });
+      await settle();
+      expect(engine.props?.paused).toBe(true);
+      await advance(90_000);
+      expect(e16Calls()).toHaveLength(0);
+      await key('up');
+      await press(root, PLAYPAUSE);
+      expect(engine.props?.paused).toBe(false);
+      await fire('onAudioFocusLost');
+      expect(engine.props?.paused).toBe(true);
+      await advance(90_000);
+      expect(e16Calls()).toHaveLength(0);
+      await back();
+      await back();
+      await advance(1_000);
+      expect(currentRoute()).not.toBe('Player');
+      expect(stops()).toHaveLength(1);
+      expect(beats()).toHaveLength(0);
+      await unmount(root);
+    });
+
+    it('Ended: exactly one stop at «Стрим завершён», none at the exit after it; no more ticks', async () => {
+      const root = await openLive();
+      await advance(30_000);
+      await fire('onEnd');
+      expect(visible(root, 'player/state/ended')).toBe(true);
+      expect(stops()).toHaveLength(1);
+      expect(beats()).toHaveLength(1);
+      await advance(90_000);
+      await press(root, BACK);
+      expect(currentRoute()).not.toBe('Player');
+      await unmount(root);
+      expect(stops()).toHaveLength(1);
+      expect(beats()).toHaveLength(1);
+    });
+
+    it('Stream gone during the recovery (E15 204 → «Стрим завершён»): one stop; the recovery itself sends no tick', async () => {
+      const root = await openLive();
+      await advance(20_000);
+      let answer: (reply: FixtureReply) => void = () => {};
+      e15 = () =>
+        new Promise<FixtureReply>(resolve => {
+          answer = resolve;
+        });
+      await fire('onError', 'http');
+      // Past the 30 s mark of the watching start (the E15 stays under its 30 s timeout).
+      await advance(20_000);
+      expect(e16Calls()).toHaveLength(0);
+      await act(async () => {
+        answer({ status: 204 });
+      });
+      await settle();
+      expect(visible(root, 'player/state/ended')).toBe(true);
+      expect(stops()).toHaveLength(1);
+      await unmount(root);
+      expect(e16Calls()).toHaveLength(1);
+    });
+
+    it('A failed E16: not retried, a counts-only warning, playback untouched; the next tick goes out on schedule', async () => {
+      e16 = () => ({ status: 500 });
+      const root = await openLive();
+      await advance(30_000);
+      expect(beats()).toHaveLength(1);
+      await advance(5_000);
+      expect(beats()).toHaveLength(1);
+      const warnings = logger.entries().filter(e => e.scope === 'live' && e.message === 'heartbeat failed');
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0].fields).toEqual({ stop: false, failures: '1', kind: 'Server' });
+      expect(JSON.stringify(logger.entries())).not.toMatch(/heartbeat\/viewer|synthetic-blog|Bearer/);
+      expect(engine.props?.paused).toBe(false);
+      expect(visible(root, ERROR)).toBe(false);
+      expect(currentRoute()).toBe('Player');
+      await advance(25_000);
+      expect(beats()).toHaveLength(2);
+      e16 = () => ({ status: 200 });
+      await back();
+      await back();
+      await advance(1_000);
+      expect(stops()).toHaveLength(1);
+      await unmount(root);
+    });
+
+    it('The stop waits for a heartbeat still in flight: it goes out after that reply, exactly once', async () => {
+      let release: () => void = () => {};
+      e16 = req =>
+        req.url.includes('stop=true')
+          ? { status: 200 }
+          : new Promise<FixtureReply>(resolve => {
+              release = () => resolve({ status: 200 });
+            });
+      const root = await openLive();
+      await advance(30_000);
+      expect(beats()).toHaveLength(1);
+      await back();
+      await back();
+      await advance(1_000);
+      expect(currentRoute()).not.toBe('Player');
+      expect(stops()).toHaveLength(0);
+      await act(async () => {
+        release();
+      });
+      await settle();
+      expect(stops()).toHaveLength(1);
+      expect(e16Calls().map(c => c.url.includes('stop=true'))).toEqual([false, true]);
+      await advance(90_000);
+      await unmount(root);
+      expect(stops()).toHaveLength(1);
+      expect(beats()).toHaveLength(1);
+    });
+
+    it('In flight: a tick while the previous heartbeat still runs is skipped; the next tick after it settles goes out', async () => {
+      let held = true;
+      e16 = () => (held ? { hang: true } : { status: 200 });
+      const root = await openLive();
+      await advance(30_000);
+      expect(beats()).toHaveLength(1);
+      held = false;
+      // The 60 s tick fires while the first heartbeat is still open (it ends at its 30 s request timeout).
+      await advance(30_000);
+      expect(beats()).toHaveLength(1);
+      expect(logger.entries().filter(e => e.scope === 'live' && e.message === 'heartbeat failed')).toHaveLength(1);
+      await advance(30_000);
+      expect(beats()).toHaveLength(2);
+      await unmount(root);
+    });
+
+    it('Unauthorized (a 401, the mutation not replayed after the renewal): the schedule stops; no stop on exit', async () => {
+      installNativeModules({
+        InstallId: { getOrCreate: jest.fn().mockResolvedValue('0f8fad5b-d9cb-469f-a165-70867728950e') },
+      });
+      tokenReply = { status: refreshOk.status, body: refreshOk.body };
+      e16 = () => ({ status: 401 });
+      const root = await openLive();
+      await advance(30_000);
+      expect(beats()).toHaveLength(1);
+      const warnings = logger.entries().filter(e => e.scope === 'live' && e.message === 'heartbeat failed');
+      expect(warnings.map(w => w.fields)).toEqual([{ stop: false, failures: '1', kind: 'Client' }]);
+      await advance(120_000);
+      expect(beats()).toHaveLength(1);
+      expect(transport.callsTo('/oauth/token/')).toHaveLength(1);
+      expect(engine.props?.paused).toBe(false);
+      await back();
+      await back();
+      await advance(1_000);
+      expect(currentRoute()).not.toBe('Player');
+      await unmount(root);
+      expect(e16Calls()).toHaveLength(1);
+    });
+
+    it('Rate limited (429): the schedule stops for this playback; the stop still goes out on exit', async () => {
+      e16 = req => (req.url.includes('stop=true') ? { status: 200 } : { status: 429 });
+      const root = await openLive();
+      await advance(30_000);
+      expect(beats()).toHaveLength(1);
+      expect(logger.entries().filter(e => e.scope === 'live').map(e => e.fields)).toEqual([
+        { stop: false, failures: '1', kind: 'RateLimited' },
+      ]);
+      await advance(120_000);
+      expect(beats()).toHaveLength(1);
+      // A pause and play does not restart it either.
+      await key('up');
+      await press(root, PLAYPAUSE);
+      await press(root, PLAYPAUSE);
+      await advance(60_000);
+      expect(beats()).toHaveLength(1);
+      await back();
+      await back();
+      await advance(1_000);
+      expect(stops()).toHaveLength(1);
+      await unmount(root);
+      expect(e16Calls()).toHaveLength(2);
+    });
+
+    it('A failed stop: a counts-only warning with `stop: true`, no unhandled rejection', async () => {
+      const unhandled = jest.fn();
+      type Listener = (...args: unknown[]) => void;
+      const proc = (globalThis as unknown as { process: { on(e: string, f: Listener): void; off(e: string, f: Listener): void } })
+        .process;
+      proc.on('unhandledRejection', unhandled);
+      try {
+        e16 = req => (req.url.includes('stop=true') ? { status: 500 } : { status: 200 });
+        const root = await openLive();
+        await back();
+        await back();
+        await advance(1_000);
+        expect(stops()).toHaveLength(1);
+        const warnings = logger.entries().filter(e => e.scope === 'live' && e.message === 'heartbeat failed');
+        expect(warnings.map(w => w.fields)).toEqual([{ stop: true, failures: '1', kind: 'Server' }]);
+        expect(JSON.stringify(logger.entries())).not.toMatch(/stop=true|heartbeat\/viewer|synthetic-blog|Bearer/);
+        await unmount(root);
+        await settle();
+        expect(unhandled).not.toHaveBeenCalled();
+      } finally {
+        proc.off('unhandledRejection', unhandled);
+      }
+    });
+
+    it('Exit from the live error state (a second engine error): no tick during `error`, exactly one stop', async () => {
+      const root = await openLive();
+      await advance(20_000);
+      await fire('onError', 'http');
+      await fire('onLoad', { durationSec: 0 });
+      await fire('onError', 'http');
+      expect(visible(root, ERROR)).toBe(true);
+      await advance(90_000);
+      expect(e16Calls()).toHaveLength(0);
+      await press(root, BACK);
+      await advance(1_000);
+      expect(currentRoute()).not.toBe('Player');
+      expect(stops()).toHaveLength(1);
+      await unmount(root);
+      expect(e16Calls()).toHaveLength(1);
+    });
+
+    it('Never watched (not playable, or gone at resolve): no E16 at all', async () => {
+      e15 = () => ({ status: 200, body: e15LockedFixture.body });
+      const locked = await openLive({ leaves: true });
+      await settle();
+      await unmount(locked);
+      e15 = () => ({ status: 204 });
+      const gone = await openLive({ load: false });
+      await settle();
+      expect(visible(gone, ENDED)).toBe(true);
+      await back();
+      await unmount(gone);
+      expect(e16Calls()).toHaveLength(0);
+    });
+
+    it('An account reset while watching: nothing more is sent, not even the stop; the next tick clears the schedule', async () => {
+      const setIntervalSpy = jest.spyOn(globalThis, 'setInterval');
+      const clearIntervalSpy = jest.spyOn(globalThis, 'clearInterval');
+      const root = await openLive();
+      const heartbeatTimers = () =>
+        setIntervalSpy.mock.calls
+          .map((call, n) => ({ ms: call[1], id: setIntervalSpy.mock.results[n].value as unknown }))
+          .filter(t => t.ms === 30_000)
+          .map(t => t.id);
+      expect(heartbeatTimers()).toHaveLength(1);
+      await advance(30_000);
+      expect(beats()).toHaveLength(1);
+      await act(async () => {
+        await accountScope.reset();
+      });
+      await settle();
+      // The Player stays mounted: the next tick sees the bumped generation and clears its interval.
+      expect(currentRoute()).toBe('Player');
+      await advance(30_000);
+      expect(clearIntervalSpy.mock.calls.map(call => call[0])).toContain(heartbeatTimers()[0]);
+      await advance(90_000);
+      await unmount(root);
+      expect(e16Calls()).toHaveLength(1);
+    });
+
+    it('A VOD player sends no E16', async () => {
+      const root = await openPlayer();
+      await advance(90_000);
+      await back();
+      await back();
+      await unmount(root);
+      expect(e16Calls()).toHaveLength(0);
+    });
   });
 });

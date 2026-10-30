@@ -50,6 +50,7 @@ import {
   type SettingsSheetData,
 } from './PlayerSettingsSheet';
 import { qualityPreference } from './qualityPreference';
+import { useLiveHeartbeat } from './useLiveHeartbeat';
 import {
   countPlayback,
   createRecoveryBudget,
@@ -212,7 +213,9 @@ export type PlayerScreenProps = {
  *   with focus on «Назад» (no auto-exit, no restart). The first engine error
  *   re-fetches E15 once and replays at the edge; a second error shows the
  *   error state with «Назад» only. A stream that is live but not playable
- *   here leaves through `onLiveUnplayable` (the origin's QR).
+ *   here leaves through `onLiveUnplayable` (the origin's QR). Story 7.3:
+ *   the viewer heartbeat (`useLiveHeartbeat`, E16) while playing and not
+ *   paused, and one stop on «Стрим завершён» or the unmount.
  */
 export function PlayerScreen({
   http,
@@ -452,6 +455,10 @@ export function PlayerScreen({
     }
     return playbackArbiter.claim({ stop: () => setPaused(true) });
   }, [playing]);
+
+  // Story 7.3: the live viewer heartbeat (E16 every 30 s while watching; one
+  // stop on the end or the unmount). VOD: disabled (no blog).
+  useLiveHeartbeat(http, liveRef?.blogUrl ?? null, isLive && playing && !paused, phase === 'ended');
 
   // Spinner only after 500 ms of buffering.
   const buffered = playing && buffering;
