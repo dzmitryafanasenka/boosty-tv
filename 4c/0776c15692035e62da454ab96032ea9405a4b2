@@ -1,0 +1,75 @@
+__tests__/authorFlow.test.tsx
+  s_7477a2e6c69ec6::t_09d0bd62c09eda 32-34,168-171,206-207,209-215,2193,2202-2205,2213,2756-3243
+__tests__/demoFlow.test.tsx
+  s_7477a2e6c69ec6::t_184a677a89099c 195,275-314
+_bmad-output/implementation-artifacts/spec-7-4-like-and-share-a-live-stream.md
+  s_7477a2e6c69ec6::t_404c94a139b550 1-138
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_7477a2e6c69ec6::t_65c5c2dcf13c84 32,103
+docs/api-contract.md
+  s_7477a2e6c69ec6::t_39321367f62683 261,459,482-489
+docs/feature-parity.md
+  s_7477a2e6c69ec6::t_a9cc50c4cf8f7e 130-131
+docs/focus-map.md
+  s_7477a2e6c69ec6::t_db38e180b962e3 278,280,287-290,313,408
+docs/testing.md
+  s_7477a2e6c69ec6::t_b4197c071969ed 896-921
+src/app/dev/demo.ts
+  s_7477a2e6c69ec6::t_6cbf1d7d8b8810 503-506,587-588,590,599,608,656-657,659-667,688
+src/features/author/AuthorScreen.tsx
+  s_7477a2e6c69ec6::t_d6bb5407ade672 35,41-42,62,167-173,200-202,214-221,312-313,378,382,418-433,452,526,529-531,555-557,595,610-620,673-696
+src/features/author/LiveCard.tsx
+  s_7477a2e6c69ec6::t_6fb1d54f79ff52 2-3,8-9,11,17,27-29,36-37,50-59,101,103,249-265,273,275-382
+src/features/author/__tests__/LiveCard.test.tsx
+  s_7477a2e6c69ec6::t_7f0c5f414ebebc 6-8,14-17,20-22,24,41,133-251
+src/features/author/authorIds.ts
+  s_7477a2e6c69ec6::t_b240438d9efff4 11,13-15
+src/features/author/useAuthorActionRowFocus.ts
+  s_7477a2e6c69ec6::t_b616bb38f41cbc 14-15,46-48,57,78,80
+src/features/author/useAuthorAutoFocus.ts
+  s_7477a2e6c69ec6::t_acb746f5a79e1d 71-73,117-118,223,239-240,243
+src/features/author/useAuthorLive.tsx
+  s_7477a2e6c69ec6::t_c2b2b1127cf872 10,84-88,109-113,134-137,143-145,186-188,191-212,234-235,246-252,268,277-293,295,312
+src/features/author/useLiveLike.ts
+  s_7477a2e6c69ec6::t_07b8d91945b586 1-222
+src/shared/api/dto/stream.ts
+  s_7477a2e6c69ec6::t_d4cecede87700a 7-9,32-33
+src/shared/entities/stream/__tests__/streamRepository.test.ts
+  s_7477a2e6c69ec6::t_3009cd80bbc389 23,97,213,219-223,288-338
+src/shared/entities/stream/index.ts
+  s_7477a2e6c69ec6::t_987af140e26811 3
+src/shared/entities/stream/mapStream.ts
+  s_7477a2e6c69ec6::t_40a4d87ef656d3 76
+src/shared/entities/stream/streamRepository.ts
+  s_7477a2e6c69ec6::t_784aed5b4c272a 102-121
+src/shared/entities/stream/types.ts
+  s_7477a2e6c69ec6::t_1e861a21407f1b 25-26
+src/shared/i18n/ru.ts
+  s_7477a2e6c69ec6::t_9cbe0c85c84678 263-269
+src/shared/ui/Button.tsx
+  s_7477a2e6c69ec6::t_1072e3fdfb8755 1,11,34-51,99-110,121-123,147,165-169,197-198,227-233
+src/shared/ui/__tests__/Button.test.tsx
+  s_7477a2e6c69ec6::t_768c71265ca3f8 2,4,207-229
+src/shared/ui/__tests__/icons.test.tsx
+  s_7477a2e6c69ec6::t_1416467bb80501 10,46-54
+src/shared/ui/icons/index.tsx
+  s_7477a2e6c69ec6::t_9dea182238adb1 110-139
+src/shared/ui/index.ts
+  s_7477a2e6c69ec6::t_d036981c08ce0a 1,18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "4c0776c15692035e62da454ab96032ea9405a4b2",
+  "prompts": {},
+  "sessions": {
+    "s_7477a2e6c69ec6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d998e7e2-636f-4943-a058-23b274887697",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
