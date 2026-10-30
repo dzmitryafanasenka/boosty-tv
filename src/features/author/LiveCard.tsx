@@ -24,9 +24,10 @@ import {
  *   viewer count);
  * - needs a level (`hasAccess: false`, either status): «Нужен уровень
  *   «X»» in place of the counts; never a price.
- * One fixed size in every state (no reflow when a refetch changes it). OK
- * does nothing in Story 7.1 (owner decision 2026-10-30, Q2 b): watching is
- * Story 7.2, like and share Story 7.4.
+ * One fixed size in every state (no reflow when a refetch changes it).
+ * Story 7.2: OK (`onPress`) opens the live player when the card is playable
+ * (`liveCardPlayable`), else the stream page's QR; like and share are Story
+ * 7.4.
  */
 
 const TOKENS = components['live-card'];
@@ -45,6 +46,15 @@ export type LiveCardState = 'live' | 'scheduled' | 'needsLevel';
 /** Exactly one state per stream: no access wins, then the status. */
 export function liveCardState(stream: Stream): LiveCardState {
   return !stream.hasAccess ? 'needsLevel' : stream.status;
+}
+
+/**
+ * Story 7.2 (LIVE-02): OK may open the live player: the stream is live, the
+ * account has access, and E15 listed at least one live-edge URL. Every other
+ * card (scheduled, needs a level, no URL) shows the stream page's QR.
+ */
+export function liveCardPlayable(stream: Stream): boolean {
+  return stream.status === 'live' && stream.hasAccess && stream.hasLiveSources;
 }
 
 export function liveCardTitle(stream: Stream): string {
@@ -93,10 +103,12 @@ export type LiveCardProps = {
   /** Epoch ms for the start time (tests); defaults to now. */
   nowMs?: number;
   onFocus?: FocusableSurfaceProps['onFocus'];
+  /** Story 7.2: OK: the live player or the QR (the page decides). */
+  onPress?: () => void;
   ref?: Ref<HostView>;
 };
 
-function LiveCardView({ stream, testID, nowMs, onFocus, ref }: LiveCardProps) {
+function LiveCardView({ stream, testID, nowMs, onFocus, onPress, ref }: LiveCardProps) {
   const state = liveCardState(stream);
   const live = stream.status === 'live';
   const [coverFailed, setCoverFailed] = useState(false);
@@ -108,10 +120,11 @@ function LiveCardView({ stream, testID, nowMs, onFocus, ref }: LiveCardProps) {
       testID={testID}
       radius={rounded.lg}
       scaleFocus={TOKENS.scaleFocus}
-      // Not a button while OK does nothing (Story 7.2 adds watching).
-      accessibilityRole="summary"
+      // Story 7.2: OK opens the player or the QR (a button only with an action).
+      accessibilityRole={onPress ? 'button' : 'summary'}
       accessibilityLabel={liveCardA11yLabel(stream, nowMs)}
       onFocus={onFocus}
+      onPress={onPress}
       style={styles.slot}
       surfaceStyle={({ focused }) => [
         styles.surface,

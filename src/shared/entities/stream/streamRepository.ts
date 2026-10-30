@@ -2,6 +2,8 @@ import { AppError } from '../../api/appError';
 import { blogUrlSchema } from '../../api/dto/subscriptions';
 import type { HttpClient } from '../../api/httpClient';
 import { logger as appLogger, type Logger } from '../../services/logger';
+import type { VideoSource } from '../post/videoSources';
+import { liveSourcesOf } from './liveSources';
 import { mapStream } from './mapStream';
 import type { Stream } from './types';
 
@@ -44,4 +46,37 @@ async function fetchActive(
   return mapStream(body, logger);
 }
 
-export const StreamRepository = { fetchActive } as const;
+/**
+ * E15 for the live player (Story 7.2): `ok` with the stream and its
+ * live-edge sources (`liveSourcesOf`, possibly empty, also for
+ * `hasAccess: false`: the caller decides), or `none` when there is no live
+ * stream to play (a 204 or empty body, a malformed body, or a stream that is
+ * scheduled or no longer online).
+ */
+export type LiveSourcesResult =
+  | { kind: 'ok'; stream: Stream; sources: VideoSource[] }
+  | { kind: 'none' };
+
+/**
+ * E15 for the player: the same request as `fetchActive` (content profile, no
+ * AD-6 retry: the player owns its one automatic re-fetch). The signed URLs
+ * stay in the returned value only (memory); nothing here logs them.
+ */
+async function liveSources(
+  http: HttpClient,
+  blogUrl: string,
+  logger: Logger = appLogger,
+): Promise<LiveSourcesResult> {
+  const { status, body } = await http.request({ path: streamPath(blogUrl), retry: false });
+  if (status === 204 || body === null || body === undefined) {
+    return { kind: 'none' };
+  }
+  const stream = mapStream(body, logger);
+  if (stream === null || stream.status !== 'live') {
+    return { kind: 'none' };
+  }
+  const data = (body as { data?: unknown }).data;
+  return { kind: 'ok', stream, sources: liveSourcesOf(Array.isArray(data) ? data : []) };
+}
+
+export const StreamRepository = { fetchActive, liveSources } as const;

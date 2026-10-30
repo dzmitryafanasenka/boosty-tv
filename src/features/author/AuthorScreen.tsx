@@ -50,7 +50,12 @@ import {
   type AuthorFocusInfo,
 } from './useAuthorAutoFocus';
 import { useAuthorFilters } from './useAuthorFilters';
-import { useAuthorLiveCard, useAuthorLiveFocus, useAuthorLiveStream } from './useAuthorLive';
+import {
+  useAuthorLiveCard,
+  useAuthorLiveFocus,
+  useAuthorLivePress,
+  useAuthorLiveStream,
+} from './useAuthorLive';
 import { useAuthorPosts } from './useAuthorPosts';
 import { useAuthorSearch, type AuthorSearch } from './useAuthorSearch';
 import { useBlogSearch } from './useBlogSearch';
@@ -69,6 +74,17 @@ export type AuthorScreenProps = {
   onBack: () => void;
   /** OK on a post: open Пост (Story 3.4) by its identity. */
   onOpenPost?: (blogUrl: string, postId: string) => void;
+  /**
+   * Story 7.2: OK on a playable LiveCard: the live Player for `blogUrl`
+   * (the route's callback, `LiveRef`); exit returns focus to `focusId`.
+   */
+  onOpenLive?: (blogUrl: string, focusId: string) => void;
+  /**
+   * Story 7.2: true once when the live player left because the stream was
+   * not playable at resolve time: the page shows the stream page's QR on
+   * its return (focus back to the card).
+   */
+  takeLiveQrRequest?: () => boolean;
   /** `phaseFlags.search`: «Поиск в блоге» in the action row (Story 5.7). */
   searchEnabled?: boolean;
   /** `phaseFlags.filters`: the «Фильтры» chip; off → the default Filter. */
@@ -141,6 +157,10 @@ const OUTCOME_WAIT_PHASES: readonly Phase[] = ['loading'];
  * goes while focused, the first post takes focus; a refetch never moves
  * focus otherwise (`useAuthorLiveFocus`).
  *
+ * Story 7.2 (LIVE-02): OK on the card opens the live player when it is
+ * playable, else the stream page's QR (`useAuthorLivePress`). Back from the
+ * player returns to the card while it is shown, else to the first post.
+ *
  * This component composes those pieces with the outcome focus
  * (`useOutcomeFocus`), and keeps the phase fallback, the route focus and
  * the head refocus.
@@ -152,6 +172,8 @@ export function AuthorScreen({
   focus,
   onBack,
   onOpenPost,
+  onOpenLive,
+  takeLiveQrRequest,
   searchEnabled = false,
   filtersEnabled = false,
   liveEnabled = false,
@@ -330,6 +352,19 @@ export function AuthorScreen({
     }
   }, [liveRef, liveCard.liveViewRef, autoFocusLive, restoreOrFirst]);
 
+  // Story 7.2: OK on the LiveCard (the live player, else the stream page's QR).
+  const { onLivePress, openLiveQr } = useAuthorLivePress({
+    blogUrl,
+    stream,
+    card: liveCard,
+    focusRef,
+    modal,
+    latch,
+    onOpenLive,
+  });
+  const openLiveQrRef = useLatestRef(openLiveQr);
+  const takeLiveQrRequestRef = useLatestRef(takeLiveQrRequest);
+
   // First focus of the route and every return to it (a screen on top
   // popped). Declared before the phase effect: on the first focus it only
   // covers the phases the phase effect leaves alone.
@@ -337,6 +372,7 @@ export function AuthorScreen({
   useFocusEffect(
     useCallback(() => {
       const info = focusRef.current;
+      let qrFrame: number | null = null;
       if (firstFocus.current) {
         firstFocus.current = false;
         if (phaseRef.current === 'loading' || phaseRef.current === 'empty') {
@@ -344,20 +380,38 @@ export function AuthorScreen({
         }
       } else {
         const current = info.current();
+        // Story 7.2: the live player left because the stream is not playable here.
+        const liveQr = takeLiveQrRequestRef.current?.() === true;
         if (current === liveId && liveCard.liveViewRef.current) {
-          // Story 7.1: back to the LiveCard it left from.
+          // Story 7.1: back to the LiveCard it left from (Story 7.2: from the
+          // live player too; a QR request opens over it).
           autoFocusLive();
+          if (liveQr) {
+            // A frame later: the route's own Back listener (added in this
+            // focus pass, after this child effect) must be older than the
+            // modal host's, so Back closes the QR first (focus-map §1.4).
+            qrFrame = requestAnimationFrame(() => openLiveQrRef.current());
+          }
         } else if (current === liveId && phaseRef.current === 'grid') {
-          // The stream ended while covered: the first post (where the card was).
-          restoreOrFirst();
+          // The stream ended while covered (Story 7.2: e.g. the live player's
+          // «Стрим завершён»): the first post, where the card was
+          // (focus-map §4 D). Not `restoreOrFirst`: it would restore the
+          // remembered card id.
+          latch.auto(idsRef.current[0]);
+          restoration.focusInitial();
         } else if (current !== null && current.startsWith(cardPrefix) && phaseRef.current === 'grid') {
           restoreOrFirst();
         } else if (!(current !== null && current !== info.sectionItemId && info.focusZoneTarget())) {
           autoFocusSidebar();
         }
       }
-      return restoration.cancel;
-    }, [focusRef, cardPrefix, restoreOrFirst, restoration, autoFocusSidebar, phaseRef, liveId, liveCard.liveViewRef, autoFocusLive]),
+      return () => {
+        if (qrFrame !== null) {
+          cancelAnimationFrame(qrFrame);
+        }
+        restoration.cancel();
+      };
+    }, [focusRef, cardPrefix, restoreOrFirst, restoration, autoFocusSidebar, phaseRef, liveId, liveCard.liveViewRef, autoFocusLive, latch, takeLiveQrRequestRef, openLiveQrRef]),
   );
 
   /**
@@ -566,6 +620,7 @@ export function AuthorScreen({
             testID={liveId}
             stream={stream}
             onFocus={liveCard.onLiveFocus}
+            onPress={onLivePress}
           />
         </TVFocusGuideView>
       ) : null}

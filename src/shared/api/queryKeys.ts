@@ -114,6 +114,13 @@ export const queryKeys = {
   stream: (blogUrl: string) => ['stream', blogUrl] as const,
   /** Every blog's E15 query (a prefix of `stream`): the resume refresh. */
   allStreams: () => ['stream'] as const,
+  /**
+   * The live player's fresh E15 (Story 7.2), by the blog only (AD-9). The
+   * cached value holds signed live URLs in memory: a short `gcTime`, never
+   * persisted. Its own root: never a prefix of `stream` (the Author page's
+   * card query, which the player invalidates on exit) or `mediaSource`.
+   */
+  liveSource: (blogUrl: string) => ['liveSource', blogUrl] as const,
 } as const;
 
 /**

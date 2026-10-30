@@ -6,7 +6,8 @@
  */
 import { act } from 'react';
 import { StyleSheet } from 'react-native';
-import App from '../src/app/App';
+import App, { navigationRef } from '../src/app/App';
+import { engine } from '../src/test/playerEngineMock';
 import { resetQueryCache } from '../src/app/queryClient';
 import { session } from '../src/app/session';
 import { focusRestoration } from '../src/shared/focus';
@@ -34,6 +35,8 @@ jest.mock('../src/app/appConfig', () => ({ DEMO_MODE: true }));
 jest.mock('../src/shared/ui/requestHostFocus', () => ({
   requestHostFocus: jest.fn(),
 }));
+// Story 7.2: the live Player's engine (the PlayerEngine port, mocked).
+jest.mock('../src/shared/platform/PlayerEngineView', () => require('../src/test/playerEngineMock'));
 
 const keychain = keychainMock();
 const STORED = JSON.stringify({ v: 1, accessToken: 'a'.repeat(64), refreshToken: 'r'.repeat(64), expiresAt: 1, accountId: '1001' });
@@ -205,6 +208,36 @@ test('Story 7.1: the demo E15: a live card on demo-blog-1 (initial focus), no ca
   expect(fetchMock).not.toHaveBeenCalled();
   await act(async () => {
     none.unmount();
+  });
+});
+
+test('Story 7.2: OK on the demo live card → the live Player with the synthetic URL → its error path → «Назад»; no network', async () => {
+  fetchMock.mockClear();
+  engine.reset();
+  const focusMock = requestHostFocus as jest.Mock;
+  const root = await renderApp();
+  await press(root, 'nav/subs');
+  await press(root, 'subs/tile/demo-blog-1');
+  await press(root, 'author/demo-blog-1/live');
+  expect(navigationRef.getCurrentRoute()?.name).toBe('Player');
+  expect(engine.props?.source).toEqual({ uri: 'https://example.invalid/demo-live.m3u8', format: 'hls' });
+  // The synthetic URL never plays: the one automatic recovery (a demo E15), then the error state.
+  await act(async () => {
+    engine.props?.onError?.('http');
+  });
+  await settle();
+  await act(async () => {
+    engine.props?.onError?.('http');
+  });
+  await settle();
+  expect(root.container.queryAll(n => n.props.testID === 'player/state/error').length).toBeGreaterThan(0);
+  const targets = focusMock.mock.calls.map(call => (call[0] as { props?: { testID?: string } } | null)?.props?.testID);
+  expect(targets[targets.length - 1]).toBe('player/error/back');
+  await press(root, 'player/error/back');
+  expect(navigationRef.getCurrentRoute()?.name).toBe('Author');
+  expect(fetchMock).not.toHaveBeenCalled();
+  await act(async () => {
+    root.unmount();
   });
 });
 

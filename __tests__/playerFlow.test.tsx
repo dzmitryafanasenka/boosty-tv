@@ -12,11 +12,14 @@ import { createAsyncStorage } from '@react-native-async-storage/async-storage';
 import { notifyManager } from '@tanstack/react-query';
 import { act } from 'react';
 import { AppState, DeviceEventEmitter, StyleSheet } from 'react-native';
+import { StackActions } from '@react-navigation/native';
 import App, { navigationRef } from '../src/app/App';
+import { progress } from '../src/app/progress';
 import { queryClient, resetQueryCache } from '../src/app/queryClient';
 import { queryKeys } from '../src/shared/api';
 import { type FixtureReply, type FixtureRequest, type FixtureTransport } from '../src/shared/api/fixtureTransport';
 import { focusRestoration } from '../src/shared/focus';
+import { t as translate } from '../src/shared/i18n';
 import { logger } from '../src/shared/services/logger';
 import { progressStore } from '../src/shared/services/progress';
 import { QUALITY_PREFERENCE_KEY, debugBreakNextVideoSource, qualityPreference } from '../src/features/player';
@@ -28,6 +31,8 @@ import { engine } from '../src/test/playerEngineMock';
 import { tvEvents } from '../src/test/tvEventMock';
 import { E5_PATH, syntheticFeed } from '../src/test/feedFixtures';
 import e1Ok from '../src/test/fixtures/boosty/e1-user-current.json';
+import e15LiveFixture from '../src/test/fixtures/boosty/e15-video-stream-live.json';
+import e15LockedFixture from '../src/test/fixtures/boosty/e15-video-stream-locked.json';
 import e1Unauthorized from '../src/test/fixtures/boosty/e1-no-token.json';
 import e8NoToken from '../src/test/fixtures/boosty/e8-no-token.json';
 import refreshRejected from '../src/test/fixtures/boosty/refresh-invalid-grant.json';
@@ -111,6 +116,9 @@ let e8: (req: FixtureRequest, blogUrl: string, postId: string) => Reply;
 /** E9 (Story 4.2): `PUT /v1/viewstat/video/{mediaId}/timecode/`. */
 const E9_RE = /^\/v1\/viewstat\/video\/([^/]+)\/timecode\/$/;
 let e9: (req: FixtureRequest) => Reply;
+/** E15 (Story 7.2): `GET /v1/blog/{blogUrl}/video_stream`; default 204 (no stream). */
+const E15_RE = /^\/v1\/blog\/([^/]+)\/video_stream$/;
+let e15: (req: FixtureRequest) => Reply;
 let transport: FixtureTransport;
 /** Story 4.4: E1 held by a test (the session check still running); null: 200 at once. */
 let e1Hold: Promise<FixtureReply> | null;
@@ -160,6 +168,7 @@ beforeEach(() => {
   installNativeModules({ AppInfo: { versionName: '1.0' } });
   withData(ONE);
   e9 = () => ({ status: 200 });
+  e15 = () => ({ status: 204 });
   e1Hold = null;
   const feed = syntheticFeed({ total: 3 });
   transport = installFixtureTransport((req: FixtureRequest): Reply => {
@@ -176,6 +185,10 @@ beforeEach(() => {
     // Story 4.2: E9 progress writes.
     if (req.method === 'PUT' && E9_RE.test(req.path)) {
       return e9(req);
+    }
+    // Story 7.2: the live player's E15.
+    if (req.method === 'GET' && E15_RE.test(req.path)) {
+      return e15(req);
     }
     return undefined;
   });
@@ -2926,6 +2939,326 @@ describe('Story 6.3: timestamp link chips (owner decision 2026-10-29, option b)'
     await advance(600);
     await fire('onLoad', { durationSec: 600 });
     expect(engine.seek).toHaveBeenCalledWith(599);
+    await unmount(root);
+  });
+});
+
+describe('Story 7.2: watch a live stream (LiveRef)', () => {
+  const LIVE_BLOG = 'synthetic-blog-1';
+  const LIVE_CARD_ID = `author/${LIVE_BLOG}/live`;
+  const LIVE_HLS = 'https://example.invalid/live-hls?sig=REDACTED';
+  const LIVE_DASH = 'https://example.invalid/live-dash';
+  const ENDED = 'player/state/ended';
+  const ERROR = 'player/state/error';
+  const START = 1_700_018_000;
+  const liveBody = (more: Record<string, unknown> = {}) => ({ ...(e15LiveFixture.body as Record<string, unknown>), ...more });
+  const e15Calls = () => transport.calls.filter(c => E15_RE.test(c.path));
+  const e9Calls = () => transport.calls.filter(c => c.method === 'PUT' && E9_RE.test(c.path));
+  let progressSpies: jest.SpyInstance[] = [];
+
+  beforeEach(() => {
+    e15 = () => ({ status: 200, body: liveBody() });
+    progressSpies = (['begin', 'report', 'forget', 'resumePoint', 'onServerProgress'] as const).map(name =>
+      jest.spyOn(progress, name),
+    );
+  });
+
+  const noProgress = () => {
+    for (const spy of progressSpies) {
+      expect(spy).not.toHaveBeenCalled();
+    }
+    expect(e9Calls()).toHaveLength(0);
+  };
+
+  /** Главная, then the live Player pushed from the Shell (Автор's card is authorFlow's). */
+  async function openLive({ load = true, leaves = false } = {}): Promise<Root> {
+    const root = await render(<App />);
+    await focusOn(root, FEED_CARD);
+    const routeKey = navigationRef.getCurrentRoute()?.key ?? '';
+    focusMock.mockClear();
+    await act(async () => {
+      navigationRef.dispatch(
+        StackActions.push('Player', { ref: { kind: 'live', blogUrl: LIVE_BLOG }, origin: { routeKey, focusId: LIVE_CARD_ID } }),
+      );
+    });
+    await settle();
+    if (leaves) {
+      return root;
+    }
+    expect(currentRoute()).toBe('Player');
+    if (load) {
+      await focusOn(root, SURFACE);
+      await fire('onLoad', { durationSec: 0 });
+      await fire('onBuffering', false);
+      await advance(600);
+    }
+    return root;
+  }
+
+  it('Open live: one E15 (content profile); the live-edge HLS URL only, no headers to the engine; ids-only params', async () => {
+    jest.setSystemTime((START + 65) * 1000);
+    const root = await openLive();
+    expect(e15Calls()).toHaveLength(1);
+    expect(e15Calls()[0].url).toBe(`https://api.boosty.to/v1/blog/${LIVE_BLOG}/video_stream`);
+    expect(e15Calls()[0].headers.Authorization).toMatch(/^Bearer /);
+    // The engine gets the source URL only: no headers, so no Boosty Authorization reaches the CDN.
+    expect(engine.props?.source).toEqual({ uri: LIVE_HLS, format: 'hls' });
+    expect(Object.keys(engine.props ?? {})).not.toContain('headers');
+    const params = navigationRef.getCurrentRoute()?.params;
+    expect(params).toEqual({ ref: { kind: 'live', blogUrl: LIVE_BLOG }, origin: { routeKey: expect.any(String), focusId: LIVE_CARD_ID } });
+    expect(JSON.stringify(params)).not.toMatch(/example\.invalid|playerUrls|signedQuery|sig=/);
+    expect(JSON.stringify(logger.entries())).not.toMatch(/example\.invalid|sig=/);
+    expect(JSON.stringify(queryClient.getQueryData(queryKeys.stream(LIVE_BLOG)) ?? null)).not.toMatch(/sig=/);
+    expect(engine.props?.paused).toBe(false);
+    noProgress();
+    await unmount(root);
+  });
+
+  it('URL filter: only `live_dash` among DVR/VOD/empty entries → DASH plays', async () => {
+    e15 = () => ({
+      status: 200,
+      body: liveBody({
+        data: [
+          {
+            type: 'ok_stream',
+            id: 'synthetic-id-72',
+            playerUrls: [
+              { type: 'live_playback_hls', url: 'https://example.invalid/dvr' },
+              { type: 'hls', url: 'https://example.invalid/vod' },
+              { type: 'live_hls', url: '' },
+              { type: 'live_dash', url: LIVE_DASH },
+            ],
+          },
+        ],
+      }),
+    });
+    const root = await openLive();
+    expect(engine.props?.source).toEqual({ uri: LIVE_DASH, format: 'dash' });
+    await unmount(root);
+  });
+
+  it('Not playable at resolve (`hasAccess: false` or no live-edge URL): the player leaves at once, no engine', async () => {
+    e15 = () => ({ status: 200, body: e15LockedFixture.body });
+    const locked = await openLive({ leaves: true });
+    await settle();
+    expect(currentRoute()).not.toBe('Player');
+    expect(engine.mounts).toBe(0);
+    await unmount(locked);
+    e15 = () => ({ status: 200, body: liveBody({ data: [{ type: 'ok_stream', playerUrls: [{ type: 'live_playback_hls', url: LIVE_HLS }] }] }) });
+    const noUrl = await openLive({ leaves: true });
+    await settle();
+    expect(currentRoute()).not.toBe('Player');
+    expect(engine.mounts).toBe(0);
+    noProgress();
+    await unmount(noUrl);
+  });
+
+  it('Overlay: the LIVE badge and the ticking elapsed time; no timeline, ±10 or gear; focus on play/pause', async () => {
+    jest.setSystemTime((START + 3599) * 1000);
+    const root = await openLive();
+    focusMock.mockClear();
+    await key('up');
+    expect(visible(root, 'player/overlay')).toBe(true);
+    expect(lastFocusTarget()).toBe(PLAYPAUSE);
+    expect(playerText(root)).toContain('LIVE');
+    expect(playerText(root)).toContain('59:59');
+    await advance(1_000);
+    expect(playerText(root)).toContain('1:00:00');
+    for (const id of [TIMELINE, BACK10, FORWARD10, SETTINGS, 'player/remaining']) {
+      expect(visible(root, id)).toBe(false);
+    }
+    await unmount(root);
+  });
+
+  it('Overlay: a missing `startTime` shows no elapsed time', async () => {
+    e15 = () => ({ status: 200, body: liveBody({ startTime: null }) });
+    const root = await openLive();
+    await key('up');
+    expect(visible(root, 'player/live/badge')).toBe(true);
+    expect(visible(root, 'player/live/elapsed')).toBe(false);
+    await unmount(root);
+  });
+
+  it('Pause / play: the engine pauses; play remounts the source at the live edge (no seek, no new E15)', async () => {
+    const root = await openLive();
+    await key('up');
+    await press(root, PLAYPAUSE);
+    expect(engine.props?.paused).toBe(true);
+    const mounts = engine.mounts;
+    await press(root, PLAYPAUSE);
+    expect(engine.mounts).toBe(mounts + 1);
+    expect(engine.props?.paused).toBe(false);
+    expect(engine.props?.source).toEqual({ uri: LIVE_HLS, format: 'hls' });
+    expect(engine.seek).not.toHaveBeenCalled();
+    expect(e15Calls()).toHaveLength(1);
+    // The play/pause media key too.
+    await key('playPause');
+    expect(engine.props?.paused).toBe(true);
+    await key('playPause');
+    expect(engine.mounts).toBe(mounts + 2);
+    expect(engine.props?.paused).toBe(false);
+    expect(engine.seek).not.toHaveBeenCalled();
+    noProgress();
+    await unmount(root);
+  });
+
+  it('← → (raw and native, also held) and the seek media keys never seek: overlay only', async () => {
+    const root = await openLive();
+    await key('right');
+    expect(visible(root, 'player/overlay')).toBe(true);
+    await key('left');
+    await key('fastForward');
+    await key('rewind');
+    await act(async () => {
+      DeviceEventEmitter.emit('seekKey', { key: 'right', action: 'down', repeat: 0 });
+      DeviceEventEmitter.emit('seekKey', { key: 'right', action: 'down', repeat: 1 });
+      DeviceEventEmitter.emit('seekKey', { key: 'right', action: 'down', repeat: 2 });
+      DeviceEventEmitter.emit('seekKey', { key: 'right', action: 'up', repeat: 0 });
+    });
+    await settle();
+    await advance(1_000);
+    expect(engine.seek).not.toHaveBeenCalled();
+    expect(visible(root, 'player/bubble')).toBe(false);
+    // Back: the overlay first, then exit.
+    await back();
+    expect(visible(root, 'player/overlay')).toBe(false);
+    expect(currentRoute()).toBe('Player');
+    await back();
+    expect(currentRoute()).not.toBe('Player');
+    await unmount(root);
+  });
+
+  it('Quality: the live candidates give one entry («Авто») → no gear; Menu does not open the sheet', async () => {
+    const root = await openLive();
+    await key('up');
+    expect(visible(root, SETTINGS)).toBe(false);
+    await key('menu');
+    expect(visible(root, 'player/sheet')).toBe(false);
+    await unmount(root);
+  });
+
+  it('Ended: «Стрим завершён», focus on «Назад», the engine released; no auto-exit; exit invalidates the stream query', async () => {
+    queryClient.setQueryData(queryKeys.stream(LIVE_BLOG), null);
+    const root = await openLive();
+    focusMock.mockClear();
+    await fire('onEnd');
+    expect(visible(root, ENDED)).toBe(true);
+    expect(text(byTestId(root, ENDED)[0])).toContain('Стрим завершён');
+    expect(lastFocusTarget()).toBe(BACK);
+    expect(visible(root, RETRY)).toBe(false);
+    expect(engine.props).toBeNull();
+    await advance(10_000);
+    expect(currentRoute()).toBe('Player');
+    expect(playbackArbiter.current()).toBeNull();
+    expect(queryClient.getQueryState(queryKeys.stream(LIVE_BLOG))?.isInvalidated).toBe(false);
+    await press(root, BACK);
+    expect(currentRoute()).not.toBe('Player');
+    expect(queryClient.getQueryState(queryKeys.stream(LIVE_BLOG))?.isInvalidated).toBe(true);
+    noProgress();
+    await unmount(root);
+  });
+
+  it('Exit by Back also invalidates `[stream, blogUrl]`', async () => {
+    queryClient.setQueryData(queryKeys.stream(LIVE_BLOG), null);
+    const root = await openLive();
+    await back();
+    expect(currentRoute()).not.toBe('Player');
+    expect(queryClient.getQueryState(queryKeys.stream(LIVE_BLOG))?.isInvalidated).toBe(true);
+    await unmount(root);
+  });
+
+  it('Engine error: one automatic E15 and a replay at the edge; a second error → the error state with «Назад» only', async () => {
+    const root = await openLive();
+    const mounts = engine.mounts;
+    await fire('onError', 'http');
+    expect(e15Calls()).toHaveLength(2);
+    expect(engine.mounts).toBe(mounts + 1);
+    await fire('onLoad', { durationSec: 0 });
+    expect(engine.seek).not.toHaveBeenCalled();
+    focusMock.mockClear();
+    await fire('onError', 'http');
+    expect(visible(root, ERROR)).toBe(true);
+    expect(text(byTestId(root, ERROR)[0])).toContain('Не удалось воспроизвести эфир');
+    expect(text(byTestId(root, ERROR)[0])).toContain(translate('player.live.errorBody'));
+    expect(visible(root, RETRY)).toBe(false);
+    expect(lastFocusTarget()).toBe(BACK);
+    expect(e15Calls()).toHaveLength(2);
+    noProgress();
+    await unmount(root);
+  });
+
+  it('Stream gone at resolve: E15 204, or the stream is not live → «Стрим завершён»', async () => {
+    e15 = () => ({ status: 204 });
+    const gone = await openLive({ load: false });
+    await settle();
+    expect(visible(gone, ENDED)).toBe(true);
+    expect(lastFocusTarget()).toBe(BACK);
+    expect(engine.mounts).toBe(0);
+    await unmount(gone);
+    e15 = () => ({ status: 200, body: liveBody({ isOnline: false, isTemplate: true }) });
+    const scheduled = await openLive({ load: false });
+    await settle();
+    expect(visible(scheduled, ENDED)).toBe(true);
+    await unmount(scheduled);
+  });
+
+  it('Stream gone during the recovery: the re-fetched E15 says 204 → «Стрим завершён»', async () => {
+    const root = await openLive();
+    e15 = () => ({ status: 204 });
+    await fire('onError', 'http');
+    expect(visible(root, ENDED)).toBe(true);
+    await unmount(root);
+  });
+
+  it('A failed E15 at open: the error state with «Повторить» (one more E15) and «Назад»', async () => {
+    e15 = () => ({ status: 500 });
+    const root = await openLive({ load: false });
+    await settle();
+    expect(visible(root, ERROR)).toBe(true);
+    expect(visible(root, RETRY)).toBe(true);
+    expect(text(byTestId(root, ERROR)[0])).toContain(translate('error.Server'));
+    e15 = () => ({ status: 200, body: liveBody() });
+    await press(root, RETRY);
+    expect(engine.props?.source).toEqual({ uri: LIVE_HLS, format: 'hls' });
+    await unmount(root);
+  });
+
+  it('Progress: no ProgressRepository call through ticks, a pause, the background and the exit', async () => {
+    const appState: Array<(state: string) => void> = [];
+    jest.spyOn(AppState, 'addEventListener').mockImplementation(((_type: string, listener: (s: string) => void) => {
+      appState.push(listener);
+      return { remove: () => {} };
+    }) as unknown as typeof AppState.addEventListener);
+    const root = await openLive();
+    for (let sec = 0; sec <= 40; sec += 1) {
+      await fire('onProgress', sec);
+    }
+    await key('up');
+    await press(root, PLAYPAUSE);
+    await act(async () => {
+      for (const h of [...appState]) {
+        h('background');
+      }
+    });
+    await settle();
+    expect(engine.props?.paused).toBe(true);
+    await back();
+    await back();
+    expect(currentRoute()).not.toBe('Player');
+    await advance(5_000);
+    noProgress();
+    await unmount(root);
+  });
+
+  it('The arbiter slot is claimed while the live stream plays and released on exit', async () => {
+    const other = { stop: jest.fn() };
+    const release = playbackArbiter.claim(other);
+    const root = await openLive();
+    expect(other.stop).toHaveBeenCalledTimes(1);
+    await back();
+    await advance(1_000);
+    expect(playbackArbiter.current()).toBeNull();
+    release();
     await unmount(root);
   });
 });

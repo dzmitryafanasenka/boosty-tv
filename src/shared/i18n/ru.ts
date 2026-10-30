@@ -392,6 +392,20 @@ export const ru = {
       autoAt: 'Авто · {height}p',
       height: '{height}p',
     },
+    // Story 7.2 (LIVE-02, focus-map G9–G11): the live player. `{elapsed}`
+    // is `formatDuration` of the time since the stream started. The QR
+    // (not-playable stream) opens the stream page on a phone.
+    live: {
+      loading: 'Загружаем эфир',
+      surface: 'Прямой эфир. OK — пауза',
+      a11yBadge: 'Прямой эфир',
+      a11yElapsed: 'Прямой эфир, идёт {elapsed}',
+      endedTitle: 'Стрим завершён',
+      endedBody: 'Трансляция больше не идёт.',
+      errorTitle: 'Не удалось воспроизвести эфир',
+      errorBody: 'Попробуйте открыть эфир ещё раз.',
+      qrTitle: 'Эфир на Boosty',
+    },
   },
   common: {
     retry: 'Повторить',

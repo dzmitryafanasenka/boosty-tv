@@ -30,6 +30,7 @@ import { logger } from '../src/shared/services/logger';
 import { colors } from '../src/shared/ui';
 import { requestHostFocus } from '../src/shared/ui/requestHostFocus';
 import backHandler from '../src/test/backHandlerMock';
+import { engine } from '../src/test/playerEngineMock';
 import {
   blogPost,
   e3Body,
@@ -101,6 +102,22 @@ jest.mock('../src/features/author/LiveCard', () => {
   }
   return { ...actual, LiveCard };
 });
+
+/** Story 7.2: the live Player's engine (the PlayerEngine port, mocked). */
+jest.mock('../src/shared/platform/PlayerEngineView', () => require('../src/test/playerEngineMock'));
+
+/**
+ * Story 7.2: the QrRenderer port records the values it draws (as postFlow;
+ * the test reads the QR target from here).
+ */
+const mockQrValues: string[] = [];
+jest.mock('../src/shared/platform/qrRenderer', () => ({
+  QR_QUIET_ZONE: 16,
+  QrCode: (props: { value: string; testID?: string }) => {
+    mockQrValues.push(props.value);
+    return require('react').createElement('QrCodeMock', { testID: props.testID });
+  },
+}));
 
 /** The real FlashList behind the recorder `lists` (`src/test/flow`; `onEndReached` held back). */
 jest.mock('@shopify/flash-list', () => require('../src/test/flow').recordingFlashListModule());
@@ -220,6 +237,7 @@ afterEach(async () => {
 type Root = Awaited<ReturnType<typeof render>>;
 
 const currentRoute = () => navigationRef.getCurrentRoute()?.name;
+const routeNames = () => navigationRef.getRootState()?.routes.map(r => r.name);
 const e3Calls = (blogUrl: string = BLOG) => transport.callsTo(e3Path(blogUrl));
 const e4Calls = (blogUrl: string = BLOG) => transport.callsTo(e4Path(blogUrl));
 const authorCards = (root: Root) =>
@@ -2490,16 +2508,6 @@ describe('Story 7.1: the live stream card on the author page', () => {
     await unmount(root);
   });
 
-  it('OK on the card does nothing (no route, no request)', async () => {
-    e15 = () => e15Stream('live');
-    const root = await openAuthor();
-    const calls = transport.calls.length;
-    await press(root, LIVE);
-    expect(currentRoute()).toBe('Author');
-    expect(transport.calls).toHaveLength(calls);
-    await unmount(root);
-  });
-
   it('Flag off (`live: false`): no E15 request, no card', async () => {
     jest.replaceProperty(phaseFlags, 'live', false as true);
     e15 = () => e15Stream('live');
@@ -2533,6 +2541,192 @@ describe('Story 7.1: the live stream card on the author page', () => {
     expect(destinationIds('author/content')).toEqual([LIVE]);
     await back();
     expect(currentRoute()).toBe('Shell');
+    await unmount(root);
+  });
+});
+
+describe('Story 7.2: OK on the live card (watch, or the QR)', () => {
+  const LIVE = `author/${BLOG}/live`;
+  const STREAM_PAGE = `https://boosty.to/${BLOG}/streams/video_stream`;
+  const BACK = 'player/error/back';
+  const streamCalls = () => transport.callsTo(e15Path(BLOG));
+  const lastQr = () => mockQrValues[mockQrValues.length - 1];
+  const dialogOpen = (root: Root) => visible(root, 'dialog/qr');
+  const PLAYABLE = {
+    data: [
+      {
+        type: 'ok_stream',
+        id: 'synthetic-id-72',
+        playerUrls: [{ type: 'live_hls', url: 'https://example.invalid/live-hls?sig=REDACTED' }],
+      },
+    ],
+  };
+
+  beforeEach(() => {
+    mockQrValues.length = 0;
+    engine.reset();
+    e4 = syntheticBlogPosts({ blogUrl: BLOG, total: 12 });
+  });
+
+  async function advance(ms: number) {
+    await act(async () => {
+      jest.advanceTimersByTime(ms);
+    });
+    await settle();
+  }
+
+  it('a live card with access and a live-edge URL: OK → the Player with `LiveRef` (ids only); it plays the HLS URL', async () => {
+    e15 = () => e15Stream('live', PLAYABLE);
+    const root = await openAuthor();
+    expect(one(root, LIVE).props.accessibilityRole).toBe('button');
+    await press(root, LIVE);
+    expect(currentRoute()).toBe('Player');
+    const params = navigationRef.getCurrentRoute()?.params;
+    expect(params).toEqual({ ref: { kind: 'live', blogUrl: BLOG }, origin: { routeKey: expect.any(String), focusId: LIVE } });
+    expect(JSON.stringify(params)).not.toMatch(/example\.invalid|signedQuery|sig=/);
+    expect(JSON.stringify(queryClient.getQueryData(queryKeys.stream(BLOG)))).not.toMatch(/sig=|example\.invalid\/live/);
+    expect(JSON.stringify(logger.entries())).not.toMatch(/sig=/);
+    // The card's E15, then the player's own.
+    expect(streamCalls()).toHaveLength(2);
+    expect(engine.props?.source).toEqual({ uri: 'https://example.invalid/live-hls?sig=REDACTED', format: 'hls' });
+    expect(mockQrValues).toHaveLength(0);
+    await unmount(root);
+  });
+
+  it.each([
+    ['scheduled', () => e15Stream('scheduled', PLAYABLE)],
+    ['needs a level (`hasAccess: false`)', () => e15Stream('locked', PLAYABLE)],
+    ['live without a live-edge URL', () => e15Stream('live', { data: [] })],
+    ['live with DVR URLs only', () => e15Stream('live', { data: [{ type: 'ok_stream', playerUrls: [{ type: 'live_playback_hls', url: 'https://example.invalid/dvr' }] }] })],
+  ])('not playable (%s): OK → the QrDialog with the stream page; Back closes it, focus back on the card', async (_name, reply) => {
+    e15 = reply;
+    const root = await openAuthor();
+    await focusOn(root, LIVE);
+    const calls = transport.calls.length;
+    focusMock.mockClear();
+    await press(root, LIVE);
+    expect(currentRoute()).toBe('Author');
+    expect(dialogOpen(root)).toBe(true);
+    expect(lastQr()).toBe(STREAM_PAGE);
+    expect(text(byTestId(root, 'modal/content')[0])).toContain(t('player.live.qrTitle'));
+    expect(transport.calls).toHaveLength(calls);
+    focusMock.mockClear();
+    await back();
+    expect(dialogOpen(root)).toBe(false);
+    expect(currentRoute()).toBe('Author');
+    expect(lastFocusTarget()).toBe(LIVE);
+    await unmount(root);
+  });
+
+  it('return from the Player with the stream still live: focus back on the card; the card query is fetched again', async () => {
+    e15 = () => e15Stream('live', PLAYABLE);
+    const root = await openAuthor();
+    await press(root, LIVE);
+    expect(currentRoute()).toBe('Player');
+    const before = streamCalls().length;
+    focusMock.mockClear();
+    await back();
+    expect(currentRoute()).toBe('Author');
+    expect(streamCalls().length).toBe(before + 1);
+    expect(visible(root, LIVE)).toBe(true);
+    expect(lastFocusTarget()).toBe(LIVE);
+    await unmount(root);
+  });
+
+  it('the stream ended in the Player: «Стрим завершён» → «Назад» → the card is gone, focus on the first post', async () => {
+    e15 = () => e15Stream('live', PLAYABLE);
+    const root = await openAuthor();
+    await press(root, LIVE);
+    expect(currentRoute()).toBe('Player');
+    e15 = () => e15None();
+    await act(async () => {
+      engine.props?.onEnd?.();
+    });
+    await settle();
+    expect(visible(root, 'player/state/ended')).toBe(true);
+    focusMock.mockClear();
+    await press(root, BACK);
+    await advance(50);
+    expect(currentRoute()).toBe('Author');
+    expect(visible(root, LIVE)).toBe(false);
+    // (Null requests are earlier tests' modal frames, run by the fake timers.)
+    expect(focusTargets().filter(Boolean).pop()).toBe(SYN(0));
+    await unmount(root);
+  });
+
+  it('the stream gone while covered (the refetch lands before the return): focus on the first post, not the remembered card', async () => {
+    e15 = () => e15Stream('live', PLAYABLE);
+    const root = await openAuthor();
+    await press(root, LIVE);
+    // The card disappears while the Player covers the page.
+    await act(async () => {
+      queryClient.setQueryData(queryKeys.stream(BLOG), null);
+    });
+    await settle();
+    e15 = () => e15None();
+    focusMock.mockClear();
+    await back();
+    await advance(50);
+    expect(currentRoute()).toBe('Author');
+    expect(visible(root, LIVE)).toBe(false);
+    expect(focusTargets().filter(Boolean).pop()).toBe(SYN(0));
+    expect(focusTargets()).not.toContain(LIVE);
+    await unmount(root);
+  });
+
+  it('not playable at resolve, answered while the Player route is not focused: once it is focused, the player leaves and Автор shows the QR', async () => {
+    e15 = () => e15Stream('live', PLAYABLE);
+    const root = await openAuthor();
+    const held = deferred();
+    e15 = () => held.promise;
+    await press(root, LIVE);
+    expect(currentRoute()).toBe('Player');
+    // A screen covers the Player before its E15 answers.
+    await act(async () => {
+      navigationRef.navigate('DevFocus');
+    });
+    await settle();
+    expect(currentRoute()).toBe('DevFocus');
+    e15 = () => e15Stream('locked', PLAYABLE);
+    await act(async () => {
+      held.resolve(e15Stream('locked', PLAYABLE));
+    });
+    await advance(50);
+    // Not focused: the player stays (no leave yet).
+    expect(routeNames()).toContain('Player');
+    await act(async () => {
+      navigationRef.goBack();
+    });
+    await advance(50);
+    expect(currentRoute()).toBe('Author');
+    expect(engine.mounts).toBe(0);
+    expect(dialogOpen(root)).toBe(true);
+    expect(lastQr()).toBe(STREAM_PAGE);
+    await unmount(root);
+  });
+
+  it('not playable at resolve (the player\'s E15 says no access): the player leaves; Автор shows the QR over the card; close → the card', async () => {
+    e15 = () => e15Stream('live', PLAYABLE);
+    const root = await openAuthor();
+    e15 = () => e15Stream('locked', PLAYABLE);
+    await press(root, LIVE);
+    await advance(50);
+    expect(currentRoute()).toBe('Author');
+    expect(engine.mounts).toBe(0);
+    expect(dialogOpen(root)).toBe(true);
+    expect(lastQr()).toBe(STREAM_PAGE);
+    focusMock.mockClear();
+    await back();
+    expect(dialogOpen(root)).toBe(false);
+    expect(lastFocusTarget()).toBe(LIVE);
+    // A plain later return shows no QR again (the card's 30 s poll sees it playable).
+    e15 = () => e15Stream('live', PLAYABLE);
+    await advance(30_000);
+    await press(root, LIVE);
+    expect(currentRoute()).toBe('Player');
+    await back();
+    expect(currentRoute()).toBe('Author');
+    expect(dialogOpen(root)).toBe(false);
     await unmount(root);
   });
 });

@@ -8,6 +8,7 @@ import { PlayerScreen } from '../features/player';
 import { PostScreen, endedReturnFocusId, postIdPrefix } from '../features/post';
 import { queryKeys } from '../shared/api';
 import type { MediaRef, PostResult } from '../shared/entities/post';
+import { isLiveRef, type LiveRef } from '../shared/entities/stream';
 import {
   FocusZone,
   MAIN_SECTION,
@@ -36,6 +37,23 @@ export function takePendingShellSection(): SectionId | null {
   const pending = pendingShellSection;
   pendingShellSection = null;
   return pending?.section ?? null;
+}
+
+/**
+ * Story 7.2: the live player found the stream not playable here (no access
+ * or no live-edge URL at resolve time) and left; the Автор route below
+ * (`routeKey`) shows the stream page's QR on its return, once. Only that
+ * route's take or unmount clears it.
+ */
+let pendingLiveQr: { routeKey: string } | null = null;
+
+/** The Автор route's side: true once when the live player asked for the QR. */
+export function takePendingLiveQr(routeKey: string): boolean {
+  if (pendingLiveQr?.routeKey !== routeKey) {
+    return false;
+  }
+  pendingLiveQr = null;
+  return true;
 }
 
 /** Автор opened from Подписки: its sidebar's current item (decision A). */
@@ -268,6 +286,28 @@ export function AuthorRoute({
     [navigation, origin],
   );
 
+  // Story 7.2: OK on a playable LiveCard: the live Player (`LiveRef`, ids
+  // only); exit returns focus to the card (`focusId`). Only while Автор is
+  // the focused route (a second OK during the transition is dropped).
+  const onOpenLive = useCallback(
+    (liveBlogUrl: string, focusId: string) => {
+      if (navigation.isFocused()) {
+        const ref: LiveRef = { kind: 'live', blogUrl: liveBlogUrl };
+        navigation.push('Player', { ref, origin: { routeKey, focusId } });
+      }
+    },
+    [navigation, routeKey],
+  );
+  const takeLiveQrRequest = useCallback(() => takePendingLiveQr(routeKey), [routeKey]);
+  useEffect(
+    () => () => {
+      if (pendingLiveQr?.routeKey === routeKey) {
+        pendingLiveQr = null;
+      }
+    },
+    [routeKey],
+  );
+
   // Story 5.7: Back asks the page first (an active blog search is cleared).
   const pageBack = useRef<(() => boolean) | null>(null);
   const onBackPress = useCallback(() => pageBack.current?.() === true, []);
@@ -288,6 +328,8 @@ export function AuthorRoute({
           focus={focus}
           onBack={onBack}
           onOpenPost={onOpenPost}
+          onOpenLive={onOpenLive}
+          takeLiveQrRequest={takeLiveQrRequest}
           searchEnabled={phaseFlags.search}
           filtersEnabled={phaseFlags.filters}
           liveEnabled={phaseFlags.live}
@@ -389,6 +431,9 @@ export function PostRoute({ navigation, route }: StackScreenProps<RootStackParam
  */
 export function PlayerRoute({ navigation, route }: StackScreenProps<RootStackParamList, 'Player'>) {
   const { ref, origin, start } = route.params;
+  // Story 7.2: a live stream (`LiveRef`) or a video (`MediaRef`).
+  const vodRef: MediaRef | null = isLiveRef(ref) ? null : ref;
+  const liveBlogUrl = isLiveRef(ref) ? ref.blogUrl : null;
   const isActive = useCallback(() => navigation.isFocused(), [navigation]);
   /** Story 4.5: the return focus after a natural end (else the origin element). */
   const endedFocus = useRef<string | null>(null);
@@ -396,6 +441,7 @@ export function PlayerRoute({ navigation, route }: StackScreenProps<RootStackPar
   // section. After a natural end its card is gone (finished): Главная's
   // return picks the neighbour by the kept index, else the first feed card.
   const originSection = origin.sectionId ?? MAIN_SECTION;
+  const queryClient = useQueryClient();
   useEffect(
     () =>
       navigation.addListener('beforeRemove', () => {
@@ -407,8 +453,13 @@ export function PlayerRoute({ navigation, route }: StackScreenProps<RootStackPar
           kept?.scrollOffset ?? 0,
           kept?.index,
         );
+        // Story 7.2: leaving the live player (any path) refreshes Автор's
+        // card: an ended stream's card goes, a live one stays.
+        if (liveBlogUrl !== null) {
+          queryClient.invalidateQueries({ queryKey: queryKeys.stream(liveBlogUrl) }).catch(() => {});
+        }
       }),
-    [navigation, origin.routeKey, origin.focusId, originSection],
+    [navigation, origin.routeKey, origin.focusId, originSection, liveBlogUrl, queryClient],
   );
   const onExit = useCallback(() => {
     if (navigation.isFocused()) {
@@ -419,42 +470,64 @@ export function PlayerRoute({ navigation, route }: StackScreenProps<RootStackPar
   // (session checked): the Post's E8 is invalidated, so it refetches and
   // shows its own locked notice; the pop returns to it (the remembered row is
   // gone there, so the Post's vanished-focus fallback picks the author).
-  const queryClient = useQueryClient();
+  const vodBlogUrl = vodRef?.blogUrl ?? null;
+  const vodPostId = vodRef?.postId ?? null;
+  const vodMediaId = vodRef?.mediaId ?? null;
   const onNoAccess = useCallback(() => {
-    if (!navigation.isFocused()) {
+    if (!navigation.isFocused() || vodBlogUrl === null || vodPostId === null) {
       return;
     }
-    queryClient.invalidateQueries({ queryKey: queryKeys.post(ref.blogUrl, ref.postId) }).catch(() => {});
+    queryClient.invalidateQueries({ queryKey: queryKeys.post(vodBlogUrl, vodPostId) }).catch(() => {});
     navigation.goBack();
-  }, [navigation, queryClient, ref.blogUrl, ref.postId]);
+  }, [navigation, queryClient, vodBlogUrl, vodPostId]);
   // Story 4.5 (focus-map G «Ended»): the video played to its real end. The
   // Post (the origin) gets focus on the next unfinished MediaRow, else its
   // primary button, through the same `remember` the exit uses (the Post
   // reads restoration with `peek`, so a one-shot `setReturnFocus` would never
   // be consumed). No autoplay.
   const onEnded = useCallback(() => {
-    if (!navigation.isFocused()) {
+    if (!navigation.isFocused() || vodBlogUrl === null || vodPostId === null || vodMediaId === null) {
       return;
     }
-    const cached = queryClient.getQueryData<PostResult>(queryKeys.post(ref.blogUrl, ref.postId));
-    if (cached?.kind === 'ok' && origin.focusId.startsWith(postIdPrefix(ref.postId))) {
-      endedFocus.current = endedReturnFocusId(cached.post, ref.mediaId, mediaId =>
+    const cached = queryClient.getQueryData<PostResult>(queryKeys.post(vodBlogUrl, vodPostId));
+    if (cached?.kind === 'ok' && origin.focusId.startsWith(postIdPrefix(vodPostId))) {
+      endedFocus.current = endedReturnFocusId(cached.post, vodMediaId, mediaId =>
         progress.store.snapshot(mediaId),
       );
     }
     navigation.goBack();
-  }, [navigation, queryClient, ref.blogUrl, ref.postId, ref.mediaId, origin.focusId]);
+  }, [navigation, queryClient, vodBlogUrl, vodPostId, vodMediaId, origin.focusId]);
+  // Story 7.2: the live stream is not playable here (resolve time): Автор
+  // below shows the stream page's QR on its return, focus back to the card.
+  const onLiveUnplayable = useCallback(() => {
+    if (!navigation.isFocused()) {
+      return;
+    }
+    pendingLiveQr = { routeKey: origin.routeKey };
+    navigation.goBack();
+  }, [navigation, origin.routeKey]);
   return (
     <Screen testID="player">
-      <PlayerScreen
-        http={session.http}
-        mediaRef={ref}
-        isActive={isActive}
-        onExit={onExit}
-        onNoAccess={onNoAccess}
-        onEnded={onEnded}
-        start={start ?? 'resume'}
-      />
+      {liveBlogUrl !== null ? (
+        // Story 7.2: no post `onNoAccess` / `onEnded` (the ended state stays).
+        <PlayerScreen
+          http={session.http}
+          mediaRef={ref}
+          isActive={isActive}
+          onExit={onExit}
+          onLiveUnplayable={onLiveUnplayable}
+        />
+      ) : (
+        <PlayerScreen
+          http={session.http}
+          mediaRef={ref}
+          isActive={isActive}
+          onExit={onExit}
+          onNoAccess={onNoAccess}
+          onEnded={onEnded}
+          start={start ?? 'resume'}
+        />
+      )}
     </Screen>
   );
 }

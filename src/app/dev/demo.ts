@@ -36,7 +36,10 @@ import type { ReadResult, SecureStore } from '../../shared/platform/secureStore'
  * a retract, kept in memory for the app run; Story 6.7: the open
  * multiple-choice demo polls (n % 8 = 5) take a multi-id vote and a
  * retract), E15 (Story 7.1: `demo-blog-1` is live, needs no level and has
- * no cover URL; every other demo blog answers 204), every other request a
+ * no cover URL; Story 7.2: its `ok_stream` has one `live_hls` URL on
+ * `example.invalid`, so OK on the card reaches the live Player and its
+ * engine error path, and no real CDN is called; every other demo blog
+ * answers 204), every other request a
  * 404. The
  * keychain is never touched, so the owner's stored session survives a demo
  * run.
@@ -572,8 +575,10 @@ function demoPostDetail(blogUrl: string, postId: string) {
 
 /**
  * E15 for the demo live stream (the reference shape, as the synthetic
- * `src/test/fixtures/boosty/e15-video-stream-live.json`; no URL, no signed
- * query, no price): started an hour before the app run.
+ * `src/test/fixtures/boosty/e15-video-stream-live.json`; no signed query,
+ * no price): started an hour before the app run. Story 7.2: one synthetic,
+ * unplayable `live_hls` URL (`example.invalid` never resolves), so the live
+ * Player opens and ends in its error state.
  */
 function demoStream() {
   return {
@@ -585,7 +590,13 @@ function demoStream() {
     hasAccess: true,
     startTime: Math.floor(Date.now() / 1000) - 3600,
     isLiked: false,
-    data: [],
+    data: [
+      {
+        type: 'ok_stream',
+        id: 'demo-stream-block-1',
+        playerUrls: [{ type: 'live_hls', url: 'https://example.invalid/demo-live.m3u8' }],
+      },
+    ],
     teaser: [],
     count: { viewers: 128, likes: 42 },
   };

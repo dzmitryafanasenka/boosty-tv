@@ -1,4 +1,5 @@
 import type { MediaRef } from '../shared/entities/post';
+import type { LiveRef } from '../shared/entities/stream';
 import type { SectionId } from './phaseFlags';
 
 /**
@@ -41,9 +42,12 @@ export type RootStackParamList = {
    * that second, from a timestamp link. `origin.sectionId`
    * (Story 4.7): the FocusRestoration section of the origin (`home` for a
    * Главная «Продолжить просмотр» card on the Shell); absent: `main`.
+   * Story 7.2: `ref` can be a `LiveRef {kind: 'live', blogUrl}` (opened from
+   * Автор's LiveCard; the player resolves the live URLs through E15). `start`
+   * stays VOD-only (ignored for live).
    */
   Player: {
-    ref: MediaRef;
+    ref: MediaRef | LiveRef;
     origin: { routeKey: string; focusId: string; sectionId?: string };
     start?: 'resume' | 'beginning' | { atSec: number };
   };

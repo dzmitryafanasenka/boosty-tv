@@ -26,4 +26,26 @@ export type Stream = {
   coverUrl: string | null;
   /** The required level's name (trimmed, never a price); null when none. */
   levelName: string | null;
+  /**
+   * Story 7.2: an `ok_stream` block has at least one playable live-edge URL
+   * (`liveSourcesOf`). A flag only: the URLs themselves never enter the
+   * entity; the player resolves them through `StreamRepository.liveSources`.
+   */
+  hasLiveSources: boolean;
 };
+
+/**
+ * Story 7.2 (AD-9): a live item to play, by its blog only. Route params
+ * carry this, never a URL or `signedQuery`; the player resolves the
+ * live-edge sources through E15 when it opens. ProgressRepository never
+ * sees a LiveRef.
+ */
+export type LiveRef = {
+  kind: 'live';
+  blogUrl: string;
+};
+
+/** A `LiveRef` (the player's ref is `MediaRef | LiveRef`; a MediaRef has no `kind`). */
+export function isLiveRef(ref: object): ref is LiveRef {
+  return 'kind' in ref && ref.kind === 'live';
+}
