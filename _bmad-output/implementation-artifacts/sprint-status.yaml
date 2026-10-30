@@ -93,7 +93,7 @@ development_status:
   6-4-inline-audio: done
   6-5-poll-display: done
   6-6-vote-and-retract-in-a-single-choice-poll: done
-  6-7-multiple-choice-poll: review
+  6-7-multiple-choice-poll: done
   epic-6-retrospective: optional
 
   epic-7: backlog
