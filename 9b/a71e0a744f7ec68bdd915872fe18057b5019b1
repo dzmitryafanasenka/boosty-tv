@@ -1,0 +1,45 @@
+__tests__/authorFlow.test.tsx
+  s_7477a2e6c69ec6::t_0d106ae3b2d286 203-206
+__tests__/demoFlow.test.tsx
+  s_7477a2e6c69ec6::t_1215a562b3716e 16,245-274
+__tests__/playerFlow.test.tsx
+  s_7477a2e6c69ec6::t_4b23acacfd6ca5 21,123-127,178-179,201-207,3279-3610
+_bmad-output/implementation-artifacts/spec-7-3-live-viewer-heartbeat.md
+  s_7477a2e6c69ec6::t_f64f26102df3ca 1-78
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_7477a2e6c69ec6::t_4b92fb5c0b7515 32,102
+docs/api-contract.md
+  s_7477a2e6c69ec6::t_4a2fb2b35e7ebe 260,473-481
+docs/feature-parity.md
+  s_7477a2e6c69ec6::t_e6a8b620a14703 129
+docs/testing.md
+  s_7477a2e6c69ec6::t_1ec09d44c13157 896-907
+src/app/dev/demo.ts
+  s_7477a2e6c69ec6::t_ba36602e481c69 501-502,664-667
+src/features/player/PlayerScreen.tsx
+  s_7477a2e6c69ec6::t_e8a39392c9fbcd 53,216-218,459-462
+src/features/player/useLiveHeartbeat.ts
+  s_7477a2e6c69ec6::t_3831caa2f48459 1-156
+src/shared/entities/stream/__tests__/streamRepository.test.ts
+  s_7477a2e6c69ec6::t_a6b49fdd83e927 23,231-280
+src/shared/entities/stream/index.ts
+  s_7477a2e6c69ec6::t_075b7c8b1e4c65 3
+src/shared/entities/stream/streamRepository.ts
+  s_7477a2e6c69ec6::t_5618852ef23f13 82-102
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "9ba71e0a744f7ec68bdd915872fe18057b5019b1",
+  "prompts": {},
+  "sessions": {
+    "s_7477a2e6c69ec6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d998e7e2-636f-4943-a058-23b274887697",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
