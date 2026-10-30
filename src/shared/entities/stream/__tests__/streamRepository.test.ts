@@ -20,7 +20,7 @@ import e15Scheduled from '../../../../test/fixtures/boosty/e15-video-stream-sche
 // eslint-disable-next-line boundaries/dependencies -- test-only fixtures
 import e15Locked from '../../../../test/fixtures/boosty/e15-video-stream-locked.json';
 import { mapStream } from '../mapStream';
-import { StreamRepository, streamPath } from '../streamRepository';
+import { StreamRepository, heartbeatPath, streamPath } from '../streamRepository';
 
 function client(handler: FixtureHandler) {
   const transport = createFixtureTransport(handler);
@@ -226,5 +226,55 @@ describe('mapStream', () => {
       })?.coverUrl,
     ).toBe('https://example.invalid/preview');
     expect(map({ ...live, teaser: [], data: [] })?.coverUrl).toBeNull();
+  });
+});
+
+describe('E16 heartbeat (Story 7.3)', () => {
+  const BLOG = 'synthetic-blog-1';
+  const URL_BASE = `https://api.boosty.to/v1/blog/${BLOG}/video_stream/heartbeat/viewer`;
+
+  it('path: under the E15 path; `stop` adds `?stop=true`; an unsafe blog throws `Client`', () => {
+    expect(heartbeatPath(BLOG)).toBe(`/v1/blog/${BLOG}/video_stream/heartbeat/viewer`);
+    expect(heartbeatPath(BLOG, true)).toBe(`/v1/blog/${BLOG}/video_stream/heartbeat/viewer?stop=true`);
+    expect(() => heartbeatPath('../user')).toThrow(AppError);
+  });
+
+  it('a heartbeat and the stop: one PUT each, no body, the token; the response body is discarded', async () => {
+    const { http, transport } = client(() => ({ status: 200, body: { anything: true } }));
+    await expect(StreamRepository.heartbeat(http, BLOG)).resolves.toBeUndefined();
+    await expect(StreamRepository.heartbeat(http, BLOG, { stop: true })).resolves.toBeUndefined();
+    expect(transport.calls.map(c => [c.method, c.url, c.body])).toEqual([
+      ['PUT', URL_BASE, undefined],
+      ['PUT', `${URL_BASE}?stop=true`, undefined],
+    ]);
+    expect(transport.calls[0].headers.Authorization).toMatch(/^Bearer /);
+  });
+
+  it.each([
+    ['500', { status: 500 }, 'Server'],
+    ['429', { status: 429 }, 'RateLimited'],
+  ])('a failure (%s) rejects with its kind and is sent once (no retry)', async (_name, reply, kind) => {
+    const { http, transport } = client(() => reply);
+    expect(await kindOf(StreamRepository.heartbeat(http, BLOG))).toBe(kind);
+    expect(transport.calls).toHaveLength(1);
+  });
+
+  it('a 401 is not replayed with a renewed token (a mutation)', async () => {
+    const transport = createFixtureTransport(() => ({ status: 401 }));
+    const renew = jest.fn(() => Promise.resolve('n'.repeat(64)));
+    const http = createHttpClient({
+      transport,
+      tokens: { getAccessToken: () => Promise.resolve({ token: 't'.repeat(64), refreshed: false }), renewAfterUnauthorized: renew },
+      sleep: () => Promise.resolve(),
+      logger: createLogger(),
+    });
+    await expect(StreamRepository.heartbeat(http, BLOG, { stop: true })).rejects.toBeInstanceOf(AppError);
+    expect(transport.calls).toHaveLength(1);
+  });
+
+  it('an unsafe blog rejects with `Client` before any request', async () => {
+    const { http, transport } = client(() => ({ status: 200 }));
+    expect(await kindOf(StreamRepository.heartbeat(http, 'a/b', { stop: true }))).toBe('Client');
+    expect(transport.calls).toHaveLength(0);
   });
 });

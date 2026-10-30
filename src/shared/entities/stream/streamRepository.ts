@@ -79,4 +79,24 @@ async function liveSources(
   return { kind: 'ok', stream, sources: liveSourcesOf(Array.isArray(data) ? data : []) };
 }
 
-export const StreamRepository = { fetchActive, liveSources } as const;
+/**
+ * E16 path (Story 7.3, api-contract E16): the viewer heartbeat; `stop` adds
+ * the `?stop=true` query (the HttpClient has no query option). The blog is
+ * validated by `streamPath`.
+ */
+export function heartbeatPath(blogUrl: string, stop = false): string {
+  return `${streamPath(blogUrl)}/heartbeat/viewer${stop ? '?stop=true' : ''}`;
+}
+
+/**
+ * E16: one viewer heartbeat (`stop: true` for the single stop on exit or
+ * end). A mutation: sent once, never retried (`retry: false`, and the
+ * HttpClient never replays a non-GET after a 401); the body is discarded.
+ * Rejects with the HttpClient's `AppError` (an invalid blog with
+ * `AppError('Client')`, before a request is sent).
+ */
+async function heartbeat(http: HttpClient, blogUrl: string, { stop = false }: { stop?: boolean } = {}): Promise<void> {
+  await http.request({ method: 'PUT', path: heartbeatPath(blogUrl, stop), retry: false });
+}
+
+export const StreamRepository = { fetchActive, liveSources, heartbeat } as const;
