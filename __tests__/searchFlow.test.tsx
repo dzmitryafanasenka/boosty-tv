@@ -256,6 +256,8 @@ describe('matrix «Submit»', () => {
     expect(lastFocusTarget()).toBe(RESULT(0));
     // The field keeps the submitted text.
     expect(one(root, FIELD).props.value).toBe('  капуста ');
+    // Story 7.1 (Never-list): Поиск never asks for a live stream (E15).
+    expect(transport.calls.filter(c => /\/video_stream$/.test(c.path))).toHaveLength(0);
     await unmount(root);
   });
 

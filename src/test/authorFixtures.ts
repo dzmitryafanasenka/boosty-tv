@@ -7,6 +7,9 @@
  * - `e4Page(n, …)`: the live E4 page `n` (1 or 2, 20 posts each).
  * - `syntheticBlogPosts(total)`: an E4 handler that pages `total` synthetic
  *   posts (`blog-post-<n>`) by a synthetic opaque cursor (`cursor:<n>`).
+ * - Story 7.1: `e15Path(blogUrl)`, `e15None()` (the live 204) and
+ *   `e15Stream(kind, overrides)` (the synthetic 200 fixtures: no live 200
+ *   was ever observed).
  */
 import type { FixtureReply, FixtureRequest } from '../shared/api/fixtureTransport';
 import { cursorFor, cursorOf, feedPost } from './feedFixtures';
@@ -14,6 +17,10 @@ import e3Blog from './fixtures/boosty/e3-blog.json';
 import e3Missing from './fixtures/boosty/e3-missing-blog.json';
 import e4Posts1 from './fixtures/boosty/e4-blog-posts-1.json';
 import e4Posts2 from './fixtures/boosty/e4-blog-posts-2.json';
+import e15None1 from './fixtures/boosty/e15-video-stream-1.json';
+import e15Live from './fixtures/boosty/e15-video-stream-live.json';
+import e15Locked from './fixtures/boosty/e15-video-stream-locked.json';
+import e15Scheduled from './fixtures/boosty/e15-video-stream-scheduled.json';
 
 type Json = Record<string, unknown>;
 
@@ -79,4 +86,20 @@ export function syntheticBlogPosts({
       body: { data, extra: { offset: cursorFor(end), isLast: end >= total } },
     };
   };
+}
+
+/** E15 path of `blogUrl` (Story 7.1). */
+export const e15Path = (blogUrl: string) => `/v1/blog/${blogUrl}/video_stream`;
+
+/** The live E15 204 (no stream): an empty body. */
+export function e15None(): FixtureReply {
+  return { status: e15None1.status };
+}
+
+const E15_BODIES = { live: e15Live, scheduled: e15Scheduled, locked: e15Locked } as const;
+
+/** A synthetic E15 200 (`live`, `scheduled` or `locked`: live and needs a level); fields overridable. */
+export function e15Stream(kind: keyof typeof E15_BODIES, overrides: Json = {}): FixtureReply {
+  const fixture = E15_BODIES[kind];
+  return { status: fixture.status, body: { ...clone(fixture.body as unknown as Json), ...overrides } };
 }

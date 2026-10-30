@@ -35,7 +35,9 @@ import type { ReadResult, SecureStore } from '../../shared/platform/secureStore'
  * them), E10–E12 (Story 6.6: the open demo polls take a vote, a change and
  * a retract, kept in memory for the app run; Story 6.7: the open
  * multiple-choice demo polls (n % 8 = 5) take a multi-id vote and a
- * retract), every other request a 404. The
+ * retract), E15 (Story 7.1: `demo-blog-1` is live, needs no level and has
+ * no cover URL; every other demo blog answers 204), every other request a
+ * 404. The
  * keychain is never touched, so the owner's stored session survives a demo
  * run.
  *
@@ -491,6 +493,10 @@ const DEMO_POST_PATH = /^\/v1\/blog\/(demo-blog-\d+)\/post\/([^/]+)$/;
 const DEMO_POLL_PATH = /^\/v1\/blog\/demo-blog-\d+\/poll\/([^/]+)$/;
 /** E11 / E12 (Story 6.6). */
 const DEMO_VOTE_PATH = /^\/v1\/poll\/([^/]+)\/vote$/;
+/** E15 (Story 7.1). */
+const DEMO_STREAM_PATH = /^\/v1\/blog\/(demo-blog-\d+)\/video_stream$/;
+/** The demo blog with a live stream (Story 7.1); the other demo blogs have none (204). */
+const DEMO_LIVE_BLOG = 'demo-blog-1';
 /** E9: `PUT /v1/viewstat/video/{mediaId}/timecode/` (Story 4.2). */
 const DEMO_TIMECODE_PATH = /^\/v1\/viewstat\/video\/[^/]+\/timecode\/$/;
 /** The demo post whose E8 answers 404 `not_found` («Пост недоступен»). */
@@ -564,6 +570,27 @@ function demoPostDetail(blogUrl: string, postId: string) {
   };
 }
 
+/**
+ * E15 for the demo live stream (the reference shape, as the synthetic
+ * `src/test/fixtures/boosty/e15-video-stream-live.json`; no URL, no signed
+ * query, no price): started an hour before the app run.
+ */
+function demoStream() {
+  return {
+    id: 'demo-stream-1',
+    int_id: 1,
+    title: 'Демо-эфир: разбор вопросов зрителей',
+    isOnline: true,
+    isTemplate: false,
+    hasAccess: true,
+    startTime: Math.floor(Date.now() / 1000) - 3600,
+    isLiked: false,
+    data: [],
+    teaser: [],
+    count: { viewers: 128, likes: 42 },
+  };
+}
+
 const DEMO_SESSION = JSON.stringify({
   v: 1,
   accessToken: 'demo-access-token',
@@ -620,6 +647,13 @@ export function createDemoSessionManager(): SessionManager {
       const isVote = request.method !== 'GET' && DEMO_VOTE_PATH.test(request.path);
       const reply = isRefresh || isVote ? demoPollReply(request.method, decodeURIComponent(poll[1]), request.form) : null;
       return reply ? { ...reply, delayMs: 300 } : { status: 404, body: { error: 'not_found' }, delayMs: 300 };
+    }
+    // E15 (Story 7.1): one live demo stream, 204 for the other demo blogs.
+    const stream = DEMO_STREAM_PATH.exec(request.path);
+    if (stream) {
+      return stream[1] === DEMO_LIVE_BLOG
+        ? { status: 200, body: demoStream(), delayMs: 300 }
+        : { status: 204, delayMs: 300 };
     }
     const blogTags = DEMO_BLOG_TAGS_PATH.exec(request.path);
     if (blogTags) {

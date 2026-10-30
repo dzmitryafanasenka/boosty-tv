@@ -10,6 +10,7 @@ test('Story 3.2 enables Главная, Подписки and Настройки 
     player: true,
     myBlog: true,
     filters: true,
+    live: true,
   });
   expect(enabledSections()).toEqual(['home', 'search', 'subs', 'settings']);
 });
@@ -34,4 +35,9 @@ test('Story 5.2: «Мой блог» is a capability, not a sidebar section', ()
 test('Story 5.3: the feed filters are a capability, not a sidebar section', () => {
   expect(phaseFlags.filters).toBe(true);
   expect(SECTION_ORDER as readonly string[]).not.toContain('filters');
+});
+
+test('Story 7.1: the live card is a capability, not a sidebar section; it ships on (owner decision Q3 a)', () => {
+  expect(phaseFlags.live).toBe(true);
+  expect(SECTION_ORDER as readonly string[]).not.toContain('live');
 });

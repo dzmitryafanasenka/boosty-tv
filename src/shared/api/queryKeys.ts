@@ -105,6 +105,15 @@ export const queryKeys = {
    */
   mediaSource: (blogUrl: string, postId: string, mediaId: string) =>
     ['mediaSource', blogUrl, postId, mediaId] as const,
+  /**
+   * E15 a blog's active or scheduled live stream (Story 7.1,
+   * `entities/stream`), or null for none. `blogUrl` is the blog's identity
+   * (AD-9); the cached Stream holds no URL or signed value. Its own root:
+   * never a prefix of `author` or `authorPosts`.
+   */
+  stream: (blogUrl: string) => ['stream', blogUrl] as const,
+  /** Every blog's E15 query (a prefix of `stream`): the resume refresh. */
+  allStreams: () => ['stream'] as const,
 } as const;
 
 /**

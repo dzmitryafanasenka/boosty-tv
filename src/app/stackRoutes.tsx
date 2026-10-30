@@ -290,6 +290,7 @@ export function AuthorRoute({
           onOpenPost={onOpenPost}
           searchEnabled={phaseFlags.search}
           filtersEnabled={phaseFlags.filters}
+          liveEnabled={phaseFlags.live}
           backHandlerRef={pageBack}
         />
       )}

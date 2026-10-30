@@ -35,6 +35,7 @@ import { accountScope } from '../shared/account';
 import {
   SessionCheckContext,
   createSessionCheck,
+  queryKeys,
   type SignInResult,
   type ValidateResult,
 } from '../shared/api';
@@ -380,6 +381,10 @@ function App() {
           const now = Date.now();
           refreshFeedHead(queryClient, session.http, getFilter('feed'), now).catch(() => {});
           refreshAuthorPostsHeads(queryClient, session.http, now).catch(() => {});
+          // Story 7.1: every observed E15 (an Author route in the stack) is
+          // fetched again, so a stream that started or ended while the app
+          // was in the background shows at once. No observer, no request.
+          queryClient.invalidateQueries({ queryKey: queryKeys.allStreams() }).catch(() => {});
         }
       });
     });

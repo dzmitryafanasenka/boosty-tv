@@ -10,8 +10,10 @@
  */
 import { notifyManager } from '@tanstack/react-query';
 import { act } from 'react';
-import { AppState } from 'react-native';
+import { AppState, StyleSheet } from 'react-native';
 import App, { navigationRef } from '../src/app/App';
+import { phaseFlags } from '../src/app/phaseFlags';
+import { LIVE_CARD_BLOCK_HEIGHT } from '../src/features/author/LiveCard';
 import { queryClient, resetQueryCache } from '../src/app/queryClient';
 import { accountScope } from '../src/shared/account';
 import { QUERY_STALE_TIME_MS, queryKeys } from '../src/shared/api';
@@ -23,7 +25,9 @@ import {
 import { DEFAULT_FILTER, filtersStore, getFilter } from '../src/shared/filters';
 import { focusRestoration } from '../src/shared/focus';
 import { t } from '../src/shared/i18n';
+import { formatCount } from '../src/shared/i18n/format';
 import { logger } from '../src/shared/services/logger';
+import { colors } from '../src/shared/ui';
 import { requestHostFocus } from '../src/shared/ui/requestHostFocus';
 import backHandler from '../src/test/backHandlerMock';
 import {
@@ -33,6 +37,9 @@ import {
   e3Path,
   e4Page,
   e4Path,
+  e15None,
+  e15Path,
+  e15Stream,
   syntheticBlogPosts,
 } from '../src/test/authorFixtures';
 import { E5_PATH, cursorFor, cursorOf, e5Page, lockedPost } from '../src/test/feedFixtures';
@@ -75,6 +82,26 @@ jest.mock('react-native/Libraries/Components/TV/TVFocusGuideView', () =>
   require('../src/test/flow').recordingFocusGuideModule(),
 );
 
+/**
+ * Story 7.1: the real LiveCard, plus a hook a test may set to run while the
+ * card unmounts (its layout cleanup runs in the commit, before the page's
+ * passive effects): Android moves native focus when the focused view goes.
+ */
+jest.mock('../src/features/author/LiveCard', () => {
+  const actual = jest.requireActual('../src/features/author/LiveCard');
+  const React = jest.requireActual('react');
+  function LiveCard(props: Record<string, unknown>) {
+    React.useLayoutEffect(
+      () => () => {
+        (globalThis as { onLiveCardUnmount?: () => void }).onLiveCardUnmount?.();
+      },
+      [],
+    );
+    return React.createElement(actual.LiveCard, props);
+  }
+  return { ...actual, LiveCard };
+});
+
 /** The real FlashList behind the recorder `lists` (`src/test/flow`; `onEndReached` held back). */
 jest.mock('@shopify/flash-list', () => require('../src/test/flow').recordingFlashListModule());
 
@@ -116,6 +143,8 @@ let e4: (req: FixtureRequest) => Reply;
 /** Story 5.7: E7 blog search and E14 blog tags. */
 let e7: (req: FixtureRequest) => Reply;
 let e14: (req: FixtureRequest) => Reply;
+/** Story 7.1: E15 (the live stream); default the live 204 (no stream). */
+let e15: (req: FixtureRequest) => Reply;
 let transport: FixtureTransport;
 
 beforeAll(() => {
@@ -149,7 +178,11 @@ beforeEach(() => {
   e4 = syntheticBlogPosts({ blogUrl: BLOG, total: 7 });
   e7 = () => undefined;
   e14 = () => undefined;
+  e15 = () => e15None();
   transport = installFixtureTransport(req => {
+    if (/^\/v1\/blog\/[^/]+\/video_stream$/.test(req.path)) {
+      return e15(req);
+    }
     if (req.path === '/v1/search/blog/post/') {
       return e7(req);
     }
@@ -1427,6 +1460,33 @@ describe('head refresh on reopen and resume (spec-author-posts-refresh)', () => 
       },
     );
 
+    it('Story 7.1: the live card holds the automatic focus: a stale resume with a new first post leaves it there', async () => {
+      e15 = () => e15Stream('live');
+      e4 = postsWithHead(60);
+      const root = await openAuthor();
+      expect(lastFocusTarget()).toBe(`author/${BLOG}/live`);
+      // The native event of the page's own card focus.
+      await focusOn(root, `author/${BLOG}/live`);
+      focusMock.mockClear();
+      head = () => headPage([newPost(0), newPost(1), ...known(0, 18)], 18);
+      await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+      expect(gridPosts()[0]).toBe('new-0');
+      expect(focusTargets()).not.toContain(CARD('new-0'));
+      expect(focusTargets()).toEqual([]);
+      await unmount(root);
+    });
+
+    it('Story 7.1: a scheduled card, the first post auto-focused: a stale resume still follows the new first post', async () => {
+      e15 = () => e15Stream('scheduled');
+      const root = await firstOpenUntouched(true);
+      expect(visible(root, `author/${BLOG}/live`)).toBe(true);
+      head = () => headPage([newPost(0), newPost(1), ...known(0, 18)], 18);
+      await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+      expect(gridPosts().slice(0, 3)).toEqual(['new-0', 'new-1', 'blog-post-0']);
+      expect(focusTargets()).toEqual([CARD('new-0')]);
+      await unmount(root);
+    });
+
     it('a deliberate move to another sidebar item latches: a stale resume leaves focus on the user\'s item', async () => {
       const root = await firstOpenUntouched(true);
       await focusOn(root, 'author/nav/home');
@@ -2040,5 +2100,439 @@ describe('Story 5.7: search and filters inside an author', () => {
       expect(searchCalls()).toHaveLength(e7Before);
       await unmount(root);
     });
+  });
+});
+
+describe('Story 7.1: the live stream card on the author page', () => {
+  const LIVE = `author/${BLOG}/live`;
+  const LIVE_GUIDE = 'author/live/guide';
+  const GRID_GUIDE = 'author/posts/guide';
+  const streamCalls = (blogUrl: string = BLOG) => transport.callsTo(e15Path(blogUrl));
+  const allStreamCalls = () => transport.calls.filter(c => /\/video_stream$/.test(c.path));
+  const cardText = (root: Root) => text(byTestId(root, LIVE)[0]);
+  const gridHeight = () => grid().style[1].height as number;
+  /** The field is a text input (Story 5.7's profile). */
+  const withInput = createFlow({
+    settle: { rounds: 30, timerRounds: 0 },
+    one: 'focusableOrInput',
+    pressFocuses: true,
+    submitSettles: true,
+  });
+  /** The 30 s poll (fake timers), then settle. */
+  async function advance(ms: number) {
+    await act(async () => {
+      jest.advanceTimersByTime(ms);
+    });
+    await settle();
+  }
+
+  beforeEach(() => {
+    e4 = syntheticBlogPosts({ blogUrl: BLOG, total: 12 });
+  });
+
+  it('No stream (E15 204): no card; one E15 with the content profile; layout and focus as before; none from Главная or Подписки', async () => {
+    const root = await openSubs();
+    expect(allStreamCalls()).toHaveLength(0);
+    focusMock.mockClear();
+    await press(root, TILE(1));
+    expect(streamCalls()).toHaveLength(1);
+    expect(streamCalls()[0].url).toBe(`https://api.boosty.to/v1/blog/${BLOG}/video_stream`);
+    expect(streamCalls()[0].headers.Authorization).toBe(`Bearer ${'a'.repeat(64)}`);
+    expect(visible(root, LIVE)).toBe(false);
+    expect(visible(root, LIVE_GUIDE)).toBe(false);
+    expect(focusTargets().filter(Boolean)).toEqual([SIDEBAR_SUBS, SYN(0)]);
+    const heightWithout = gridHeight();
+    await unmount(root);
+
+    // The same page with a card: the grid gives up exactly the card's block.
+    await resetQueryCache();
+    e15 = () => e15Stream('live');
+    const withCard = await openAuthor();
+    expect(gridHeight()).toBe(heightWithout - LIVE_CARD_BLOCK_HEIGHT);
+    await unmount(withCard);
+  });
+
+  it('Live: LIVE badge on colors.live, title, viewers and likes, cover; initial focus on the card; the label', async () => {
+    e15 = () => e15Stream('live', { count: { viewers: 1643, likes: 21 } });
+    const root = await openAuthor();
+    expect(visible(root, LIVE)).toBe(true);
+    const badge = byTestId(root, `${LIVE}/badge`)[0];
+    expect(text(badge)).toContain(t('author.live.badgeLive'));
+    expect(StyleSheet.flatten(badge.props.style).backgroundColor).toBe(colors.live);
+    expect(cardText(root)).toContain('redacted');
+    expect(cardText(root)).toContain(t('author.live.statusLive'));
+    expect(text(byTestId(root, `${LIVE}/details`)[0])).toContain(`${formatCount(1643)} зрителя · 21 лайк`);
+    expect(byTestId(root, `${LIVE}/cover`)[0].props.source).toEqual({ uri: 'https://example.invalid/cover' });
+    expect(focusableIds(root)).toContain(LIVE);
+    // Initial focus: the card (after the skeleton's sidebar item), never the first post after it.
+    const targets = focusTargets().filter(Boolean);
+    expect(targets[targets.length - 1]).toBe(LIVE);
+    expect(targets).not.toContain(SYN(0));
+    expect(byTestId(root, LIVE).find(n => n.props.focusable)?.props.accessibilityLabel).toBe(
+      `Эфир: redacted. Идёт эфир. ${formatCount(1643)} зрителя · 21 лайк`,
+    );
+    // No price anywhere on the card.
+    expect(cardText(root)).not.toMatch(/₽|RUB|руб/);
+    await unmount(root);
+  });
+
+  it('Live (device lesson): the card focus request is repeated two frames later (a view mounted in the same commit drops it); not after a user move', async () => {
+    e15 = () => e15Stream('live');
+    const root = await openAuthor();
+    const liveRequests = () => focusTargets().filter(id => id === LIVE).length;
+    const before = liveRequests();
+    expect(before).toBeGreaterThan(0);
+    await advance(50);
+    expect(liveRequests()).toBeGreaterThan(before);
+    await unmount(root);
+
+    // The user moves before the frames: no repeat.
+    await resetQueryCache();
+    focusRestoration.clear();
+    const moved = await openAuthor();
+    await focusOn(moved, SYN(2));
+    focusMock.mockClear();
+    await advance(50);
+    expect(focusTargets()).not.toContain(LIVE);
+    await unmount(moved);
+  });
+
+  it('Live: ↓ from the card → the grid (the remembered card, else the first post); ↑ from the grid → the card; ↓ from the row → the card', async () => {
+    e15 = () => e15Stream('live');
+    const root = await openAuthor();
+    // ↑ from any grid column enters the live guide: the card.
+    expect(destinationIds(LIVE_GUIDE)).toEqual([LIVE]);
+    await focusOn(root, LIVE);
+    expect(destinationIds(GRID_GUIDE)).toEqual([SYN(0)]);
+    await focusOn(root, SYN(4));
+    expect(destinationIds(GRID_GUIDE)).toEqual([]);
+    await focusOn(root, LIVE);
+    expect(destinationIds(GRID_GUIDE)).toEqual([SYN(4)]);
+    // On the row, the grid guide points nowhere: ↓ finds the card (the nearest stop below).
+    await withInput.focusOn(root, FIELD);
+    expect(destinationIds(GRID_GUIDE)).toEqual([]);
+    // ↑ from the card: the row guide → the field (unchanged).
+    expect(destinationIds('author/action-row')).toEqual([FIELD_HOST]);
+    await unmount(root);
+  });
+
+  it('Live: the focused card shows one ring and scales without reflow (same layout size focused and not)', async () => {
+    e15 = () => e15Stream('live');
+    const root = await openAuthor();
+    const sizeOf = () => {
+      const scale = StyleSheet.flatten(byTestId(root, `${LIVE}/scale`)[0].props.style);
+      return [scale.width, scale.height];
+    };
+    const outer = () => StyleSheet.flatten(byTestId(root, LIVE).find(n => n.props.focusable)?.props.style);
+    const before = { size: sizeOf(), outer: outer() };
+    expect(visible(root, `${LIVE}/ring`)).toBe(false);
+    await focusOn(root, LIVE);
+    expect(byTestId(root, `${LIVE}/ring`)).toHaveLength(1);
+    expect(sizeOf()).toEqual(before.size);
+    expect(before.size).toEqual([520, 120]);
+    expect(outer()).toEqual(before.outer);
+    await unmount(root);
+  });
+
+  it('Scheduled: «Запланирован», the start date and time, no viewer count; initial focus stays on the first post', async () => {
+    const start = new Date(2026, 9, 31, 19, 0).getTime() / 1000;
+    e15 = () => e15Stream('scheduled', { startTime: start });
+    const root = await openAuthor();
+    expect(text(byTestId(root, `${LIVE}/badge`)[0])).toContain(t('author.live.badgeScheduled'));
+    expect(StyleSheet.flatten(byTestId(root, `${LIVE}/badge`)[0].props.style).backgroundColor).not.toBe(colors.live);
+    expect(text(byTestId(root, `${LIVE}/status`)[0])).toMatch(/Начало .* в 19:00/);
+    expect(cardText(root)).not.toContain('зрител');
+    expect(text(byTestId(root, `${LIVE}/details`)[0])).toContain('5 лайков');
+    expect(lastFocusTarget()).toBe(SYN(0));
+    // A focus stop: ↓ from the row reaches it, ↑ from the grid too.
+    expect(focusableIds(root)).toContain(LIVE);
+    expect(destinationIds(LIVE_GUIDE)).toEqual([LIVE]);
+    await unmount(root);
+  });
+
+  it('Needs level (hasAccess false): «Нужен уровень «…»», no price, no counts; never a session check', async () => {
+    e15 = () => e15Stream('locked', { subscriptionLevel: { name: 'Золото', currencyPrices: { RUB: 500 } } });
+    const root = await openAuthor();
+    const e1Before = transport.callsTo(E1).length;
+    expect(text(byTestId(root, `${LIVE}/details`)[0])).toContain('Нужен уровень «Золото»');
+    expect(cardText(root)).not.toMatch(/500|₽|RUB|зрител/);
+    // Live and locked: still the LIVE badge and the initial focus (watching is Story 7.2).
+    expect(text(byTestId(root, `${LIVE}/badge`)[0])).toContain('LIVE');
+    expect(lastFocusTarget()).toBe(LIVE);
+    await settle();
+    expect(transport.callsTo(E1)).toHaveLength(e1Before);
+    expect(currentRoute()).toBe('Author');
+    await unmount(root);
+  });
+
+  it.each([
+    ['no id', { id: undefined }],
+    ['isOnline not a boolean', { isOnline: 'yes' }],
+  ])('Malformed 200 (%s): no card; a counts-only warning; the page works', async (_name, overrides) => {
+    e15 = () => e15Stream('live', overrides);
+    const root = await openAuthor();
+    expect(visible(root, LIVE)).toBe(false);
+    expect(lastFocusTarget()).toBe(SYN(0));
+    const warnings = logger.entries().filter(e => e.scope === 'stream');
+    expect(warnings).toEqual([expect.objectContaining({ level: 'warn', message: 'dropped', fields: { issues: '1' } })]);
+    expect(JSON.stringify(logger.entries())).not.toMatch(/example\.invalid|sig=/);
+    await unmount(root);
+  });
+
+  it.each([
+    ['5xx', { status: 503 }],
+    ['network', { network: true as const }],
+  ])('E15 fails on the first load (%s): no card, no error UI, sent once; no polling', async (_name, reply) => {
+    e15 = () => reply;
+    const root = await openAuthor();
+    expect(visible(root, LIVE)).toBe(false);
+    expect(visible(root, 'state/author/action')).toBe(false);
+    expect(authorCards(root).length).toBeGreaterThan(0);
+    expect(lastFocusTarget()).toBe(SYN(0));
+    expect(streamCalls()).toHaveLength(1);
+    await advance(60_000);
+    expect(streamCalls()).toHaveLength(1);
+    await unmount(root);
+  });
+
+  it('Polling: every 30 s while focused (live and scheduled); stops on blur and unmount; a failed poll keeps the card', async () => {
+    e15 = () => e15Stream('scheduled');
+    const root = await openAuthor();
+    expect(streamCalls()).toHaveLength(1);
+    await advance(29_000);
+    expect(streamCalls()).toHaveLength(1);
+    await advance(1_000);
+    expect(streamCalls()).toHaveLength(2);
+    // The stream goes live: still polled, the card updates in place, no focus move.
+    e15 = () => e15Stream('live');
+    focusMock.mockClear();
+    await advance(30_000);
+    expect(streamCalls()).toHaveLength(3);
+    expect(text(byTestId(root, `${LIVE}/badge`)[0])).toContain('LIVE');
+    expect(focusTargets()).toEqual([]);
+    // A failed poll keeps the last card; polling goes on.
+    e15 = () => ({ status: 503 });
+    await advance(30_000);
+    expect(streamCalls()).toHaveLength(4);
+    expect(visible(root, LIVE)).toBe(true);
+    e15 = () => e15Stream('live');
+    await advance(30_000);
+    expect(streamCalls()).toHaveLength(5);
+    // Blur (Пост on top): no poll.
+    await press(root, SYN(1));
+    expect(currentRoute()).toBe('Post');
+    await advance(90_000);
+    expect(streamCalls()).toHaveLength(5);
+    // Back: polling again.
+    await back();
+    expect(currentRoute()).toBe('Author');
+    await advance(30_000);
+    expect(streamCalls()).toHaveLength(6);
+    // Unmount (Back pops Автор): no more polls.
+    await back();
+    expect(currentRoute()).toBe('Shell');
+    await advance(90_000);
+    expect(streamCalls()).toHaveLength(6);
+    await unmount(root);
+  });
+
+  it('Stream ends while the card has focus: the card goes and the first post takes focus', async () => {
+    e15 = () => e15Stream('live');
+    const root = await openAuthor();
+    await focusOn(root, LIVE);
+    focusMock.mockClear();
+    e15 = () => e15None();
+    await advance(30_000);
+    expect(visible(root, LIVE)).toBe(false);
+    expect(visible(root, LIVE_GUIDE)).toBe(false);
+    expect(lastFocusTarget()).toBe(SYN(0));
+    // No card: no more polling.
+    await advance(60_000);
+    expect(streamCalls()).toHaveLength(2);
+    await unmount(root);
+  });
+
+  it('Stream ends while a post has focus: the card goes, focus stays (no request)', async () => {
+    e15 = () => e15Stream('live');
+    const root = await openAuthor();
+    await focusOn(root, SYN(4));
+    focusMock.mockClear();
+    e15 = () => e15None();
+    await advance(30_000);
+    expect(visible(root, LIVE)).toBe(false);
+    expect(focusTargets()).toEqual([]);
+    await unmount(root);
+  });
+
+  it('A stream that appears on a later refetch (resume) never takes focus', async () => {
+    let appStateHandlers: Array<(state: string) => void> = [];
+    jest.spyOn(AppState, 'addEventListener').mockImplementation(((
+      _type: string,
+      listener: (state: string) => void,
+    ) => {
+      appStateHandlers.push(listener);
+      return {
+        remove: () => {
+          appStateHandlers = appStateHandlers.filter(h => h !== listener);
+        },
+      };
+    }) as unknown as typeof AppState.addEventListener);
+    const changeAppState = async (state: string) => {
+      await act(async () => {
+        for (const h of [...appStateHandlers]) {
+          h(state);
+        }
+      });
+      await settle();
+    };
+    const root = await openAuthor();
+    expect(visible(root, LIVE)).toBe(false);
+    expect(lastFocusTarget()).toBe(SYN(0));
+    focusMock.mockClear();
+    e15 = () => e15Stream('live');
+    // The resume invalidates the observed E15 (App), which now finds a live stream.
+    await changeAppState('background');
+    await changeAppState('active');
+    expect(streamCalls()).toHaveLength(2);
+    expect(visible(root, LIVE)).toBe(true);
+    expect(focusTargets()).toEqual([]);
+    await unmount(root);
+  });
+
+  /** Capture AppState listeners (the App's resume and the poll's foreground state). */
+  function captureAppState() {
+    let handlers: Array<(state: string) => void> = [];
+    jest.spyOn(AppState, 'addEventListener').mockImplementation(((
+      _type: string,
+      listener: (state: string) => void,
+    ) => {
+      handlers.push(listener);
+      return {
+        remove: () => {
+          handlers = handlers.filter(h => h !== listener);
+        },
+      };
+    }) as unknown as typeof AppState.addEventListener);
+    return async (state: string) => {
+      await act(async () => {
+        for (const h of [...handlers]) {
+          h(state);
+        }
+      });
+      await settle();
+    };
+  }
+
+  it('Polling stops while the app is in the background; the resume fetches again and polling goes on', async () => {
+    const changeAppState = captureAppState();
+    e15 = () => e15Stream('live');
+    const root = await openAuthor();
+    expect(streamCalls()).toHaveLength(1);
+    await changeAppState('background');
+    await advance(90_000);
+    expect(streamCalls()).toHaveLength(1);
+    await changeAppState('active');
+    expect(streamCalls()).toHaveLength(2);
+    await advance(30_000);
+    expect(streamCalls()).toHaveLength(3);
+    await unmount(root);
+  });
+
+  it('Every open sends one E15: a reopen within 60 s does not trust the cached answer', async () => {
+    const root = await openAuthor();
+    expect(streamCalls()).toHaveLength(1);
+    await back();
+    expect(currentRoute()).toBe('Shell');
+    e15 = () => e15Stream('live');
+    focusMock.mockClear();
+    await press(root, TILE(1));
+    expect(currentRoute()).toBe('Author');
+    expect(streamCalls()).toHaveLength(2);
+    // The stream that started meanwhile shows, with the initial focus.
+    expect(visible(root, LIVE)).toBe(true);
+    expect(lastFocusTarget()).toBe(LIVE);
+    await unmount(root);
+  });
+
+  it('Stream ends while the card has focus, and Android moves native focus in the same commit: the first post still takes focus', async () => {
+    e15 = () => e15Stream('live');
+    const root = await openAuthor();
+    await focusOn(root, LIVE);
+    focusMock.mockClear();
+    const hook = globalThis as { onLiveCardUnmount?: () => void };
+    hook.onLiveCardUnmount = () => {
+      byTestId(root, SYN(5))
+        .find(n => n.props.focusable)
+        ?.props.onFocus({ nativeEvent: {} });
+    };
+    try {
+      e15 = () => e15None();
+      await advance(30_000);
+    } finally {
+      delete hook.onLiveCardUnmount;
+    }
+    expect(visible(root, LIVE)).toBe(false);
+    expect(lastFocusTarget()).toBe(SYN(0));
+    await unmount(root);
+  });
+
+  it('A post focused, then a filter change (the skeleton): focus goes to the live card (the nearest action above), not the field', async () => {
+    e15 = () => e15Stream('live');
+    const root = await openAuthor();
+    await focusOn(root, SYN(4));
+    focusMock.mockClear();
+    await act(async () => {
+      filtersStore.getState().setAccess(`author:${navigationRef.getCurrentRoute()?.key}`, 'all');
+    });
+    await settle();
+    expect(focusTargets()).toContain(LIVE);
+    expect(focusTargets()).not.toContain(FIELD_HOST);
+    await unmount(root);
+  });
+
+  it('OK on the card does nothing (no route, no request)', async () => {
+    e15 = () => e15Stream('live');
+    const root = await openAuthor();
+    const calls = transport.calls.length;
+    await press(root, LIVE);
+    expect(currentRoute()).toBe('Author');
+    expect(transport.calls).toHaveLength(calls);
+    await unmount(root);
+  });
+
+  it('Flag off (`live: false`): no E15 request, no card', async () => {
+    jest.replaceProperty(phaseFlags, 'live', false as true);
+    e15 = () => e15Stream('live');
+    const root = await openAuthor();
+    expect(allStreamCalls()).toHaveLength(0);
+    expect(visible(root, LIVE)).toBe(false);
+    expect(lastFocusTarget()).toBe(SYN(0));
+    await unmount(root);
+  });
+
+  it('A filter change (phase loading → grid) with the card focused keeps it; search outcomes work as before', async () => {
+    e15 = () => e15Stream('live');
+    e14 = () => ({ status: 200, body: { data: [] } });
+    const root = await openAuthor();
+    await focusOn(root, LIVE);
+    focusMock.mockClear();
+    await act(async () => {
+      filtersStore.getState().setAccess(`author:${navigationRef.getCurrentRoute()?.key}`, 'all');
+    });
+    await settle();
+    expect(e4Calls().some(c => c.url.includes('is_only_allowed=false'))).toBe(true);
+    expect(focusTargets()).toEqual([]);
+    expect(visible(root, LIVE)).toBe(true);
+    await unmount(root);
+  });
+
+  it('Back on the card pops to Подписки (the card is a content zone item)', async () => {
+    e15 = () => e15Stream('live');
+    const root = await openAuthor();
+    await focusOn(root, LIVE);
+    expect(destinationIds('author/content')).toEqual([LIVE]);
+    await back();
+    expect(currentRoute()).toBe('Shell');
+    await unmount(root);
   });
 });

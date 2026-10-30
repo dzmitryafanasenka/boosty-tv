@@ -18,6 +18,10 @@
  * `search` gates both search scopes: the Поиск sidebar section («Поиск по
  * подпискам», E6, Story 5.6) and Автор's «Поиск в блоге» field (E7, Story
  * 5.7). While it is off, neither is rendered.
+ *
+ * `live` (Story 7.1) is an in-screen capability, not a section: the
+ * Author page's LiveCard (E15). While it is off, Автор sends no E15 and
+ * shows no card. Owner decision 2026-10-30 (Q3 a): it ships on.
  */
 export const phaseFlags = {
   home: true,
@@ -28,6 +32,7 @@ export const phaseFlags = {
   player: true,
   myBlog: true,
   filters: true,
+  live: true,
 } as const satisfies Record<string, boolean>;
 
 export type Capability = keyof typeof phaseFlags;

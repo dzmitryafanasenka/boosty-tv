@@ -32,10 +32,12 @@ import {
 import { AUTHOR_ACTION_ROW_HEIGHT, AUTHOR_ACTION_ROW_TOP, AuthorActionRow } from './AuthorActionRow';
 import { AUTHOR_HEADER_HEIGHT, AuthorHeader, AuthorHeaderSkeleton } from './AuthorHeader';
 import { AuthorListState, AuthorPageState } from './AuthorStates';
+import { LIVE_CARD_BLOCK_HEIGHT, LiveCard, liveCardBlockStyle } from './LiveCard';
 import {
   AUTHOR_STATE_ACTION_ID,
   authorCardPrefix,
   authorFiltersId,
+  authorLiveId,
   authorResetId,
   authorRetryId,
   authorSearchId,
@@ -48,6 +50,7 @@ import {
   type AuthorFocusInfo,
 } from './useAuthorAutoFocus';
 import { useAuthorFilters } from './useAuthorFilters';
+import { useAuthorLiveCard, useAuthorLiveFocus, useAuthorLiveStream } from './useAuthorLive';
 import { useAuthorPosts } from './useAuthorPosts';
 import { useAuthorSearch, type AuthorSearch } from './useAuthorSearch';
 import { useBlogSearch } from './useBlogSearch';
@@ -70,6 +73,8 @@ export type AuthorScreenProps = {
   searchEnabled?: boolean;
   /** `phaseFlags.filters`: the «Фильтры» chip; off → the default Filter. */
   filtersEnabled?: boolean;
+  /** `phaseFlags.live`: the LiveCard (E15, Story 7.1); off → no E15, no card. */
+  liveEnabled?: boolean;
   /**
    * Story 5.7: the route's Back hook. The page sets it to its handler (an
    * active search: clear it, focus the field, return true); the route calls
@@ -128,6 +133,14 @@ const OUTCOME_WAIT_PHASES: readonly Phase[] = ['loading'];
  * route asks `backHandlerRef`). The field is the nearest action above the
  * grid (the fallback chain's last step).
  *
+ * Story 7.1 (LIVE-01, docs/focus-map.md §4 D): the LiveCard between the
+ * action row and the grid (`LiveCard`, E15 through `useAuthorLiveStream`,
+ * polled every 30 s while shown and focused). Initial focus is the card
+ * when the stream is live; ↓ from the row reaches the card, ↓ from the card
+ * the grid, ↑ from the grid's first row the card (its guide). When the card
+ * goes while focused, the first post takes focus; a refetch never moves
+ * focus otherwise (`useAuthorLiveFocus`).
+ *
  * This component composes those pieces with the outcome focus
  * (`useOutcomeFocus`), and keeps the phase fallback, the route focus and
  * the head refocus.
@@ -141,6 +154,7 @@ export function AuthorScreen({
   onOpenPost,
   searchEnabled = false,
   filtersEnabled = false,
+  liveEnabled = false,
   backHandlerRef,
 }: AuthorScreenProps) {
   const client = useQueryClient();
@@ -150,6 +164,7 @@ export function AuthorScreen({
   const fieldId = authorSearchId(blogUrl);
   const chipId = authorFiltersId(blogUrl);
   const resetId = authorResetId(blogUrl);
+  const liveId = authorLiveId(blogUrl);
   // The search and filter actions call the outcome focus and the grid's
   // restoration, composed further down (they need the list the search
   // selects); the filter resets call the search. Read in handlers only,
@@ -160,6 +175,10 @@ export function AuthorScreen({
 
   const field = useAuthorField(fieldId);
   const { focusField, fieldAuto } = field;
+  const liveCard = useAuthorLiveCard(liveId);
+  const { stream, answered: liveAnswered } = useAuthorLiveStream(http, blogUrl, liveEnabled);
+  const liveShown = stream !== null;
+  const liveShownRef = useLatestRef(liveShown);
 
   // Story 5.7: the route's own Filter (owner decision 2026-10-29 Q3 b) and
   // its submitted query (local state; null: the normal list).
@@ -206,12 +225,13 @@ export function AuthorScreen({
   const windowHeight = useWindowDimensions().height;
   // A bounded viewport (Story 2.4 device lesson): the content zone's height
   // (window − 2 × safe-y) minus the header, the action row and the grid's
-  // top gap.
+  // top gap, and the LiveCard's block while it is shown (Story 7.1).
   const listHeight =
     windowHeight -
     2 * spacing['safe-y'] -
     AUTHOR_HEADER_HEIGHT -
     (rowShown ? AUTHOR_ACTION_ROW_TOP + AUTHOR_ACTION_ROW_HEIGHT : 0) -
+    (liveShown ? LIVE_CARD_BLOCK_HEIGHT : 0) -
     POST_GRID_LIST_TOP_GAP;
 
   const listRef = useRef<FlashListRef<PostRowItem>>(null);
@@ -237,6 +257,7 @@ export function AuthorScreen({
     stateActionRef,
     autoFocusSidebar,
     autoFocusAction,
+    autoFocusLive,
     focusAbove,
     focusAfterLoss,
     canFocus,
@@ -245,6 +266,7 @@ export function AuthorScreen({
     focus,
     modal,
     field,
+    live: liveCard,
     rowShown,
     cardPrefix,
     retryId,
@@ -297,6 +319,16 @@ export function AuthorScreen({
   const restoreOrFirst = useCallback(() => {
     restoreElseFirst(restoration, () => latch.auto(idsRef.current[0]));
   }, [restoration, latch]);
+  /** Story 7.1: the page's own focus on the grid: the LiveCard while a stream is live, else the posts. */
+  // Only this page's own E15 answer counts (a cached card may be stale).
+  const liveRef = useLatestRef(liveAnswered && stream?.status === 'live');
+  const focusGridOrLive = useCallback(() => {
+    if (liveRef.current && liveCard.liveViewRef.current) {
+      autoFocusLive();
+    } else {
+      restoreOrFirst();
+    }
+  }, [liveRef, liveCard.liveViewRef, autoFocusLive, restoreOrFirst]);
 
   // First focus of the route and every return to it (a screen on top
   // popped). Declared before the phase effect: on the first focus it only
@@ -312,14 +344,20 @@ export function AuthorScreen({
         }
       } else {
         const current = info.current();
-        if (current !== null && current.startsWith(cardPrefix) && phaseRef.current === 'grid') {
+        if (current === liveId && liveCard.liveViewRef.current) {
+          // Story 7.1: back to the LiveCard it left from.
+          autoFocusLive();
+        } else if (current === liveId && phaseRef.current === 'grid') {
+          // The stream ended while covered: the first post (where the card was).
+          restoreOrFirst();
+        } else if (current !== null && current.startsWith(cardPrefix) && phaseRef.current === 'grid') {
           restoreOrFirst();
         } else if (!(current !== null && current !== info.sectionItemId && info.focusZoneTarget())) {
           autoFocusSidebar();
         }
       }
       return restoration.cancel;
-    }, [focusRef, cardPrefix, restoreOrFirst, restoration, autoFocusSidebar, phaseRef]),
+    }, [focusRef, cardPrefix, restoreOrFirst, restoration, autoFocusSidebar, phaseRef, liveId, liveCard.liveViewRef, autoFocusLive]),
   );
 
   /**
@@ -377,7 +415,7 @@ export function AuthorScreen({
       }
     } else if (phase === 'grid') {
       if (mayTakeFocus()) {
-        restoreOrFirst();
+        focusGridOrLive();
       }
     } else if (phase === 'empty' && !emptyAction) {
       // Nothing focusable in the empty view: a focused action or card is gone.
@@ -389,6 +427,15 @@ export function AuthorScreen({
       autoFocusAction();
     }
   });
+
+  // Story 7.1: while the live card holds the page's own focus, a head
+  // refresh never moves it to the new first post (a first post that took
+  // the initial focus beside a scheduled card still follows the head).
+  const followHeadUnlessLive = useCallback(
+    (focused: string | null) =>
+      !(liveShownRef.current && focused === liveId) && latch.followHead(focused),
+    [liveShownRef, liveId, latch],
+  );
 
   // A head refresh (reopen or resume, spec-author-posts-refresh) changed the
   // shown cards other than by an append: the new first post while the user
@@ -402,8 +449,22 @@ export function AuthorScreen({
     canFocus,
     restoration,
     list: adapterRef,
-    followHead: latch.followHead,
+    followHead: followHeadUnlessLive,
     onFollowHead: latch.onFollowHead,
+  });
+
+  // Story 7.1: the LiveCard's initial focus and card loss.
+  useAuthorLiveFocus({
+    stream,
+    answered: liveAnswered,
+    card: liveCard,
+    focusRef,
+    modal,
+    latch,
+    restoration,
+    idsRef,
+    mayTakeFocus,
+    autoFocusLive,
   });
 
   const onRetryLoadMore = useLoadMoreRetry(list, ids, restoration, () => {
@@ -433,6 +494,8 @@ export function AuthorScreen({
     fieldId,
     chipId,
     resetId,
+    liveId,
+    liveShown,
     fieldAuto,
     ids,
     gridShown: phase === 'grid',
@@ -442,6 +505,10 @@ export function AuthorScreen({
   const chip = filtersEnabled ? chipLabels(filter) : null;
   const showReset = rowShown && (searching || filtered);
   const downDestinations = useMemo(() => (downTarget ? [downTarget] : []), [downTarget]);
+  const liveDestinations = useMemo(
+    () => (liveCard.liveView ? [liveCard.liveView] : []),
+    [liveCard.liveView],
+  );
 
   if (phase === 'unavailable' || phase === 'error') {
     return (
@@ -485,6 +552,22 @@ export function AuthorScreen({
           onResetAll={onResetAll}
           rowFocus={rowFocus}
         />
+      ) : null}
+      {stream !== null ? (
+        // Story 7.1: ↑ from any grid column (and ↓ from the action row)
+        // enters this guide and lands on the card.
+        <TVFocusGuideView
+          testID="author/live/guide"
+          destinations={liveDestinations}
+          style={liveCardBlockStyle}
+        >
+          <LiveCard
+            ref={liveCard.liveHostRef}
+            testID={liveId}
+            stream={stream}
+            onFocus={liveCard.onLiveFocus}
+          />
+        </TVFocusGuideView>
       ) : null}
       <AuthorListState
         phase={phase}
