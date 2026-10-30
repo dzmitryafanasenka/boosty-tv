@@ -13,16 +13,19 @@ import { PollRepository, applyPoll } from '../../shared/entities/poll';
  * - E11 (vote) or E12 (retract), never retried and never replayed (the
  *   HttpClient sends a mutation once, also after a 401). No optimistic
  *   update: the poll changes only from E10.
- * - After a 2xx: E10, then `applyPoll` into every cached post and page.
+ * - After a 2xx: E10, then `applyPoll` into every cached post and page. A
+ *   running E8 of this post is cancelled first: it started before the vote
+ *   and would bring the pre-vote poll back over the E10. A list page fetch
+ *   running at that moment is not cancelled (list cards show no results).
  *   When E10 fails, the post's E8 query is invalidated (the poll comes back
  *   with the post) and no error is shown: the mutation did succeed.
  * - A failed mutation sets `error` (`vote` or `retract`); the previous poll
  *   state is kept. `clearError` (the next OK) clears it.
  * - Account-scoped (AD-4): `submit` captures `accountScope.generation()`.
  *   After a sign-out or account switch (a bump), a late E11/E12/E10 result
- *   writes nothing (no `applyPoll`, no invalidation, no error), and the
- *   in-flight entry is keyed by generation + poll id, so it never blocks
- *   the next account's vote on the same poll.
+ *   writes nothing (no `applyPoll`, no invalidation, no error), a late
+ *   E11/E12 sends no E10, and the in-flight entry is keyed by generation +
+ *   poll id, so it never blocks the next account's vote on the same poll.
  */
 
 /** `<generation>:<pollId>` → the key of the control whose request is running. */
@@ -119,6 +122,11 @@ export function usePollVote({ http, blogUrl, postId, pollId }: PollVoteTarget): 
           }
           return;
         }
+        if (!current()) {
+          // Signed out or switched: the old account's poll is not read with
+          // another session (or none).
+          return;
+        }
         let fresh;
         try {
           fresh = await PollRepository.fetchPoll(http, blogUrl, pollId);
@@ -129,6 +137,13 @@ export function usePollVote({ http, blogUrl, postId, pollId }: PollVoteTarget): 
           }
           return;
         }
+        if (!current()) {
+          return;
+        }
+        // An E8 of this post started before the vote would land with the
+        // pre-vote poll over the fresher E10: cancel it (TanStack reverts it).
+        // The key is not account-scoped, hence the generation checks around.
+        await client.cancelQueries({ queryKey: queryKeys.post(blogUrl, postId), exact: true });
         if (current()) {
           applyPoll(client, fresh);
         }

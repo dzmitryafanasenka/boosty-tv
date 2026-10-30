@@ -332,3 +332,6 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-6-6-vote-and-retract-in-a-single-choice-poll.md`
   summary: Add a demoFlow test that votes, changes and retracts on the demo open poll (demo transport E10–E12).
   evidence: demo.ts routes E10–E12 in memory but no test presses OK in demo mode; a path regex or form-parse slip would show «Не удалось отправить голос» unnoticed (Story 6.6 verification-gap review).
+- source_spec: `_bmad-output/implementation-artifacts/spec-epic-6-retro-a1-a2.md`
+  summary: Add an ESLint `no-restricted-imports` rule (or a boundaries.test.js case) that forbids `src/shared/platform/**` from importing `src/shared/ui/**`.
+  evidence: A2 removed the only platform → ui import, but no rule keeps the cycle from returning (Blind Hunter review of the A1–A2 fix).
