@@ -19,6 +19,7 @@ import {
   type VideoRow,
 } from '../../shared/entities/post';
 import {
+  focusSoonRun,
   mayTakeScreenFocus,
   useLatestRef,
   useModal,
@@ -528,15 +529,12 @@ export function PostScreen({
    * unless focus moved meanwhile (the tracked id is no longer `gone`).
    */
   const focusAfterUnmount = useCallback((gone: string, moveFocus: () => void) => {
-    moveFocus();
-    requestAnimationFrame(() =>
-      requestAnimationFrame(() => {
+    focusSoonRun(moveFocus, {
+      guard: () => {
         const info = focusRef.current;
-        if (info.isActive() && info.current() === gone) {
-          moveFocus();
-        }
-      }),
-    );
+        return info.isActive() && info.current() === gone;
+      },
+    });
   }, []);
 
   /**
@@ -553,19 +551,23 @@ export function PostScreen({
    */
   const focusLaidOut = useCallback(
     (gone: string, candidates: readonly string[]) => {
-      requestAnimationFrame(() =>
-        requestAnimationFrame(() => {
-          const info = focusRef.current;
-          const current = info.current();
-          if (info.isActive() && (current === gone || current === authorId)) {
-            const target = candidates.map(id => views.current.get(id)).find(view => view !== undefined);
-            if (target) {
-              requestHostFocus(target);
-            } else {
-              focusInitial();
-            }
+      focusSoonRun(
+        () => {
+          const target = candidates.map(id => views.current.get(id)).find(view => view !== undefined);
+          if (target) {
+            requestHostFocus(target);
+          } else {
+            focusInitial();
           }
-        }),
+        },
+        {
+          now: false,
+          guard: () => {
+            const info = focusRef.current;
+            const current = info.current();
+            return info.isActive() && (current === gone || current === authorId);
+          },
+        },
       );
     },
     [authorId, focusInitial],

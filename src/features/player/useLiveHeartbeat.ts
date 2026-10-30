@@ -1,5 +1,5 @@
 import { useEffect, useRef, type RefObject } from 'react';
-import { accountScope } from '../../shared/account';
+import { captureGeneration } from '../../shared/account';
 import { isAppError, type HttpClient } from '../../shared/api';
 import { StreamRepository } from '../../shared/entities/stream';
 import { useLatestRef } from '../../shared/focus';
@@ -61,8 +61,8 @@ function clearTimer(timer: RefObject<Timer | null>) {
  * `blogUrl` null (a VOD player) disables the hook.
  */
 export function useLiveHeartbeat(http: HttpClient, blogUrl: string | null, watching: boolean, ended: boolean): void {
-  /** The generation captured when watching first started; null before. */
-  const generation = useRef<number | null>(null);
+  /** The account check captured when watching first started; null before. */
+  const sameAccountSince = useRef<(() => boolean) | null>(null);
   const stopped = useRef(false);
   const halted = useRef<Halt | null>(null);
   /** The heartbeat in flight (settles, never rejects); null when none. */
@@ -71,7 +71,7 @@ export function useLiveHeartbeat(http: HttpClient, blogUrl: string | null, watch
   const failures = useRef(0);
   const target = useLatestRef({ http, blogUrl });
 
-  const sameAccount = () => generation.current !== null && generation.current === accountScope.generation();
+  const sameAccount = () => sameAccountSince.current !== null && sameAccountSince.current();
 
   const onFailure = (error: unknown, stop: boolean) => {
     failures.current += 1;
@@ -84,7 +84,7 @@ export function useLiveHeartbeat(http: HttpClient, blogUrl: string | null, watch
 
   const sendStop = useLatestRef(() => {
     const { http: client, blogUrl: blog } = target.current;
-    if (blog === null || generation.current === null || stopped.current) {
+    if (blog === null || sameAccountSince.current === null || stopped.current) {
       return;
     }
     stopped.current = true;
@@ -138,8 +138,8 @@ export function useLiveHeartbeat(http: HttpClient, blogUrl: string | null, watch
     if (!active || stopped.current || halted.current !== null) {
       return;
     }
-    if (generation.current === null) {
-      generation.current = accountScope.generation();
+    if (sameAccountSince.current === null) {
+      sameAccountSince.current = captureGeneration();
     }
     timer.current = setInterval(() => tick.current(), HEARTBEAT_INTERVAL_MS);
     return () => clearTimer(timer);

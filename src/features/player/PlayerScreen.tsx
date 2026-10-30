@@ -9,8 +9,8 @@ import {
 } from 'react-native';
 import type { HttpClient } from '../../shared/api';
 import type { MediaRef } from '../../shared/entities/post';
-import { isLiveRef, type LiveRef } from '../../shared/entities/stream';
-import { useLatestRef, useModal } from '../../shared/focus';
+import type { LiveRef } from '../../shared/entities/stream';
+import { focusSoon, useLatestRef, useModal } from '../../shared/focus';
 import { t } from '../../shared/i18n';
 import { subscribeAppBackground, subscribeAppForeground } from '../../shared/platform/appLifecycle';
 import { playbackArbiter } from '../../shared/platform/playbackArbiter';
@@ -25,7 +25,6 @@ import {
   Text,
   colors,
   motion,
-  requestHostFocus,
   spacing,
   type HostView,
 } from '../../shared/ui';
@@ -33,7 +32,6 @@ import {
   pickSource,
   qualityOf,
   qualityOptions,
-  useLiveSource,
   useMediaSource,
   type QualityKey,
 } from './mediaResolver';
@@ -51,6 +49,14 @@ import {
 } from './PlayerSettingsSheet';
 import { qualityPreference } from './qualityPreference';
 import { useLiveHeartbeat } from './useLiveHeartbeat';
+import {
+  liveCopy,
+  liveQualitySwitch,
+  liveSettingsShown,
+  splitMediaRef,
+  useLivePlayback,
+  useLiveUnplayableExit,
+} from './useLivePlayback';
 import {
   countPlayback,
   createRecoveryBudget,
@@ -201,21 +207,8 @@ export type PlayerScreenProps = {
  *   sheet closes with focus on «Настройки». The stored preference feeds
  *   `pickSource` on every open.
  * - No autoplay of the next video (Story 4.5).
- * - Live (Story 7.2, `LiveRef`, focus-map G9–G11): the source is a fresh E15
- *   (`useLiveSource`, live-edge URLs only). No ProgressRepository at all
- *   (no begin, tick, pause, exit or forget), no seek (← → and the media
- *   seek keys only show the overlay), no ±10 s, no timeline; the overlay
- *   shows the LIVE badge and the elapsed time, focus on play/pause. Play
- *   after a pause remounts the source (the engine starts at the live edge).
- *   The gear only when the live quality list has a real choice (owner
- *   decision 2026-10-30); a pick replays at the edge. The engine's end, or
- *   no live stream at the open or after a recovery, shows «Стрим завершён»
- *   with focus on «Назад» (no auto-exit, no restart). The first engine error
- *   re-fetches E15 once and replays at the edge; a second error shows the
- *   error state with «Назад» only. A stream that is live but not playable
- *   here leaves through `onLiveUnplayable` (the origin's QR). Story 7.3:
- *   the viewer heartbeat (`useLiveHeartbeat`, E16) while playing and not
- *   paused, and one stop on «Стрим завершён» or the unmount.
+ * - Live (Story 7.2, `LiveRef`, focus-map G9–G11) and the Story 7.3
+ *   heartbeat: see `useLivePlayback.ts`.
  */
 export function PlayerScreen({
   http,
@@ -228,8 +221,7 @@ export function PlayerScreen({
   onLiveUnplayable,
 }: PlayerScreenProps) {
   // Story 7.2: the ref kind is fixed for a mounted player (route params).
-  const liveRef = isLiveRef(mediaRef) ? mediaRef : null;
-  const vodRef = isLiveRef(mediaRef) ? null : mediaRef;
+  const { liveRef, vodRef } = splitMediaRef(mediaRef);
   const isLive = liveRef !== null;
   const progressRepository = useProgressRepository();
   // No progress is ever written for a live stream: every call site guards null.
@@ -262,12 +254,13 @@ export function PlayerScreen({
   const vodMedia = useMediaSource(http, vodRef, progress?.onServerProgress, preference ?? null, {
     keep: keepQuality,
   });
-  const liveMedia = useLiveSource(http, liveRef, { keep: keepQuality });
+  // Story 7.2: the live source, `liveEnded` and the live-edge epoch (useLivePlayback).
+  const { liveMedia, liveEnded, markEnded, epoch, bumpEpoch, liveUnplayable } = useLivePlayback(
+    http,
+    liveRef,
+    keepQuality,
+  );
   const media = isLive ? liveMedia : vodMedia;
-  /** Story 7.2: the engine reported the end of the live stream. */
-  const [liveEnded, setLiveEnded] = useState(false);
-  /** Story 7.2: bumped by a play after a pause: the engine remounts at the live edge. */
-  const [liveEpoch, setLiveEpoch] = useState(0);
   // The local store is loaded before the engine starts, so the resume point
   // is known at `onLoad` (a cold start reads the persisted entry).
   const [progressReady, setProgressReady] = useState(() => progress === null || progress.store.isReady());
@@ -609,15 +602,9 @@ export function PlayerScreen({
     if (view === null || !isActive() || sheetOpenRef.current) {
       return;
     }
-    requestHostFocus(view.current);
-    let frame = requestAnimationFrame(() => {
-      frame = requestAnimationFrame(() => {
-        if (focused.current !== id && isActive() && !sheetOpenRef.current) {
-          requestHostFocus(view.current);
-        }
-      });
+    return focusSoon(() => view.current, {
+      guard: () => focused.current !== id && isActive() && !sheetOpenRef.current,
     });
-    return () => cancelAnimationFrame(frame);
   }, [errorTarget, playing, overlay, surfaceFocusable, isActive, isLive]);
 
   // -------------------------------------------------------------- actions
@@ -628,7 +615,7 @@ export function PlayerScreen({
   }, []);
 
   /** Story 7.2 (owner decision 2026-10-30): live shows the gear only with a real quality choice. */
-  const settingsShown = ready !== null && (!isLive || qualityOptions(ready.sources).length > 1);
+  const settingsShown = ready !== null && (!isLive || liveSettingsShown(ready.sources));
   const live = useLatestRef({ phase, overlay, paused, positionSec, durationSec, isActive, onExit, vodRef, ready, settingsShown });
 
   /**
@@ -712,8 +699,7 @@ export function PlayerScreen({
       if (isLive) {
         // Story 7.2 (owner decision 2026-10-30): the chosen live source plays
         // from the live edge (no position, no stored preference).
-        const next = current === null ? null : (current.sources.find(source => qualityOf(source) === key) ?? null);
-        if (current !== null && next !== null && next !== current.source) {
+        if (liveQualitySwitch(current, key)) {
           setKeepQuality(key);
           gate.current = { kind: 'load' };
           setBuffering(true);
@@ -810,7 +796,7 @@ export function PlayerScreen({
         // seek to a position.
         heldByLifecycle.current = false;
         gate.current = { kind: 'load' };
-        setLiveEpoch(n => n + 1);
+        bumpEpoch();
         setBuffering(true);
         setAutoHeight(null);
         setPaused(false);
@@ -856,7 +842,7 @@ export function PlayerScreen({
       setPaused(!play);
       showOverlay();
     },
-    [showOverlay, reportProgress, live, progress, readyProgressRef, seek, media, isLive],
+    [showOverlay, reportProgress, live, progress, readyProgressRef, seek, media, isLive, bumpEpoch],
   );
   const togglePause = useCallback(() => setPlaying(live.current.paused), [live, setPlaying]);
   /**
@@ -1191,7 +1177,7 @@ export function PlayerScreen({
       // auto-exit, no restart; the engine unmounts.
       ended.current = true;
       setPaused(true);
-      setLiveEnded(true);
+      markEnded();
       return;
     }
     // The final position is written (finished). Story 4.5: then leave for
@@ -1207,7 +1193,7 @@ export function PlayerScreen({
       return;
     }
     showOverlay();
-  }, [showOverlay, live, reportRef, onEndedRef, isLive]);
+  }, [showOverlay, live, reportRef, onEndedRef, isLive, markEnded]);
   /**
    * An engine error (Story 4.4: an expired signed URL, a CDN or decoder
    * failure, also before the first `onLoad`). With the budget left: the
@@ -1307,38 +1293,23 @@ export function PlayerScreen({
 
   // Story 7.2: live but not playable here (no access, no live-edge URL):
   // leave at once, so the origin shows the stream page's QR.
-  const liveUnplayable = isLive && state.kind === 'noSource' && !liveEnded;
-  const onLiveUnplayableRef = useLatestRef(onLiveUnplayable ?? onExit);
-  // A focus effect: an answer that lands while the route is not focused
-  // (the push transition, a covering screen) leaves once it is focused.
-  useFocusEffect(
-    useCallback(() => {
-      if (!liveUnplayable) {
-        return;
-      }
-      logger.info('player', 'live stream not playable here; leaving');
-      onLiveUnplayableRef.current();
-    }, [liveUnplayable, onLiveUnplayableRef]),
-  );
+  useLiveUnplayableExit(liveUnplayable, onLiveUnplayable ?? onExit);
 
   // --------------------------------------------------------------- render
 
+  // Story 7.2: `ended` is live only; live copy comes from `liveCopy`.
+  const liveText = isLive ? liveCopy({ ended: phase === 'ended', loading: phase === 'loading', state }) : null;
   const errorCopy =
-    phase === 'ended'
-      ? { title: t('player.live.endedTitle'), body: t('player.live.endedBody') }
-      : isLive
-        ? {
-            title: t('player.live.errorTitle'),
-            body: state.kind === 'error' ? t(`error.${state.error}`) : t('player.live.errorBody'),
-          }
-        : phase === 'locked'
-      ? { title: t('player.noAccessTitle'), body: t('player.noAccessBody') }
-      : phase === 'unavailable'
-        ? { title: t('player.unavailableTitle'), body: t('player.unavailableBody') }
-        : {
-            title: t('player.errorTitle'),
-            body: state.kind === 'error' ? t(`error.${state.error}`) : t('player.errorBody'),
-          };
+    liveText !== null
+      ? liveText.state
+      : phase === 'locked'
+        ? { title: t('player.noAccessTitle'), body: t('player.noAccessBody') }
+        : phase === 'unavailable'
+          ? { title: t('player.unavailableTitle'), body: t('player.unavailableBody') }
+          : {
+              title: t('player.errorTitle'),
+              body: state.kind === 'error' ? t(`error.${state.error}`) : t('player.errorBody'),
+            };
 
   return (
     <View testID="player/page" style={styles.root}>
@@ -1346,15 +1317,7 @@ export function PlayerScreen({
         ref={surfaceView}
         testID={PLAYER_SURFACE_ID}
         focusable={surfaceFocusable}
-        accessibilityLabel={
-          phase === 'loading'
-            ? isLive
-              ? t('player.live.loading')
-              : t('player.loading')
-            : isLive
-              ? t('player.live.surface')
-              : t('player.surface')
-        }
+        accessibilityLabel={liveText?.surfaceLabel ?? (phase === 'loading' ? t('player.loading') : t('player.surface'))}
         onFocus={onSurfaceFocus}
         onPress={onSurfacePress}
         style={styles.surface}
@@ -1363,7 +1326,7 @@ export function PlayerScreen({
           <PlayerEngineView
             // A new E8 or a quality switch (Story 4.3) remounts the engine;
             // so does a live play after a pause (Story 7.2: the live edge).
-            key={`${ready.resolution}:${ready.source.type}:${liveEpoch}`}
+            key={`${ready.resolution}:${ready.source.type}:${epoch}`}
             ref={engine}
             testID="player/engine"
             source={{ uri: ready.source.url, format: ready.source.format }}

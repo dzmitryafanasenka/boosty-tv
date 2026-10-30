@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { accountScope } from '../../shared/account';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { captureGeneration, createGenerationKeyedStore } from '../../shared/account';
 import { queryKeys, type HttpClient } from '../../shared/api';
 import { PollRepository, applyPoll } from '../../shared/entities/poll';
 
@@ -29,27 +29,11 @@ import { PollRepository, applyPoll } from '../../shared/entities/poll';
  */
 
 /** `<generation>:<pollId>` → the key of the control whose request is running. */
-const inFlight = new Map<string, string>();
-const flightKey = (pollId: string) => `${accountScope.generation()}:${pollId}`;
-const listeners = new Set<() => void>();
-
-function notify() {
-  for (const listener of listeners) {
-    listener();
-  }
-}
-
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-  };
-}
+const inFlight = createGenerationKeyedStore<string>();
 
 /** Test-only: whether any poll request is running (and forget them all). */
 export function resetPollVotesForTests() {
-  inFlight.clear();
-  notify();
+  inFlight.reset();
 }
 
 export type PollMutation = 'vote' | 'retract';
@@ -94,21 +78,18 @@ export function usePollVote({ http, blogUrl, postId, pollId }: PollVoteTarget): 
       mounted.current = false;
     };
   }, []);
-  const snapshot = () => inFlight.get(flightKey(pollId)) ?? null;
-  const sendingKey = useSyncExternalStore(subscribe, snapshot, snapshot);
+  const sendingKey = inFlight.useEntry(pollId);
 
   const submit = useCallback(
     (mutation: PollMutation, optionIds: readonly string[], controlKey: string) => {
-      const generation = accountScope.generation();
-      const key = `${generation}:${pollId}`;
-      if (inFlight.has(key)) {
+      /** No sign-out or account switch since `submit`. */
+      const current = captureGeneration();
+      const key = inFlight.key(pollId, current.generation);
+      if (inFlight.getAt(key) !== undefined) {
         return false;
       }
       inFlight.set(key, controlKey);
-      notify();
       setError(null);
-      /** No sign-out or account switch since `submit`. */
-      const current = () => accountScope.generation() === generation;
       const run = async () => {
         try {
           if (mutation === 'vote') {
@@ -149,10 +130,7 @@ export function usePollVote({ http, blogUrl, postId, pollId }: PollVoteTarget): 
         }
       };
       run().finally(() => {
-        if (inFlight.get(key) === controlKey) {
-          inFlight.delete(key);
-          notify();
-        }
+        inFlight.deleteIf(key, controlKey);
       });
       return true;
     },
@@ -160,7 +138,7 @@ export function usePollVote({ http, blogUrl, postId, pollId }: PollVoteTarget): 
   );
 
   const clearError = useCallback(() => setError(null), []);
-  const isBusy = useCallback(() => inFlight.has(flightKey(pollId)), [pollId]);
+  const isBusy = useCallback(() => inFlight.get(pollId) !== undefined, [pollId]);
 
   return { sendingKey, error, submit, isBusy, clearError };
 }

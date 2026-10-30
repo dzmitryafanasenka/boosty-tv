@@ -9,6 +9,7 @@ import { boostyStreamUrl } from '../../shared/entities/externalUrls';
 import { t } from '../../shared/i18n';
 import { QrDialog, requestHostFocus, type HostView, type NotMovedLatch } from '../../shared/ui';
 import { liveCardPlayable } from './LiveCard';
+import { liveFocusRole, liveReturnTarget, type LiveFocusRole } from './liveReturnTarget';
 import type { AuthorFocusInfo } from './useAuthorAutoFocus';
 
 /**
@@ -180,19 +181,21 @@ export function useAuthorLiveFocus({
   // turns null, before the commit removes the card: on Android, removing
   // the focused view moves native focus at once (the Story 6.7 device
   // lesson), so its focus event can reach JS before this effect runs.
+  const ids = { liveId: card.liveId, likeId: like.liveId, shareId: share.liveId };
   const renderedShown = useRef(shown);
-  const lostWhileFocused = useRef(false);
+  /** The live-block element focused when the card went (render-phase); null: none. */
+  const lostWhileFocused = useRef<LiveFocusRole | null>(null);
   if (renderedShown.current !== shown) {
-    const current = focusRef.current.current();
-    lostWhileFocused.current =
-      !shown && (current === card.liveId || current === like.liveId || current === share.liveId);
+    lostWhileFocused.current = shown ? null : liveFocusRole(focusRef.current.current(), ids);
     renderedShown.current = shown;
   }
   const likeVisible = shown && likeShown;
   const renderedLike = useRef(likeVisible);
-  const likeLostWhileFocused = useRef(false);
+  /** «Нравится» had focus when it went with the card staying (render-phase). */
+  const likeLostWhileFocused = useRef<Extract<LiveFocusRole, 'like'> | null>(null);
   if (renderedLike.current !== likeVisible) {
-    likeLostWhileFocused.current = shown && !likeVisible && focusRef.current.current() === like.liveId;
+    likeLostWhileFocused.current =
+      shown && !likeVisible && focusRef.current.current() === like.liveId ? 'like' : null;
     renderedLike.current = likeVisible;
   }
   const wasLike = useRef(likeVisible);
@@ -202,10 +205,17 @@ export function useAuthorLiveFocus({
     if (!before || likeVisible) {
       return;
     }
-    const hadFocus = likeLostWhileFocused.current;
-    likeLostWhileFocused.current = false;
+    const lost = likeLostWhileFocused.current;
+    likeLostWhileFocused.current = null;
+    // Without the card, the card-loss effect below decides (no grid target here).
+    const target = liveReturnTarget(lost, {
+      card: shown,
+      like: false,
+      share: share.liveViewRef.current !== null,
+      grid: false,
+    });
     const info = focusRef.current;
-    if (hadFocus && shown && info.isActive() && !modal.isOpen()) {
+    if (target === 'share' && info.isActive() && !modal.isOpen()) {
       latch.auto(share.liveId);
       requestHostFocus(share.liveViewRef.current);
     }
@@ -217,10 +227,13 @@ export function useAuthorLiveFocus({
     if (!before || shown) {
       return;
     }
-    const hadFocus = lostWhileFocused.current;
-    lostWhileFocused.current = false;
+    const lost = lostWhileFocused.current;
+    lostWhileFocused.current = null;
+    // The whole block is gone; `restoration.focusInitial` falls back to the
+    // nearest action above when there is no post, hence `grid: true`.
+    const target = liveReturnTarget(lost, { card: false, like: false, share: false, grid: true });
     const info = focusRef.current;
-    if (hadFocus && info.isActive() && !modal.isOpen()) {
+    if (target === 'firstPost' && info.isActive() && !modal.isOpen()) {
       latch.auto(idsRef.current[0]);
       restoration.focusInitial();
     }

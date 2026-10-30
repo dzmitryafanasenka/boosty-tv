@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { mayTakeScreenFocus, useLatestRef, useZoneItem, type ModalApi } from '../../shared/focus';
+import { focusSoon, mayTakeScreenFocus, useLatestRef, useZoneItem, type ModalApi } from '../../shared/focus';
 import { requestHostFocus, useNotMovedLatch, type HostView, type NotMovedLatch } from '../../shared/ui';
 import { AUTHOR_STATE_ACTION_ID } from './authorIds';
 
@@ -162,35 +162,32 @@ export function useAuthorAutoFocus({
   // repeated two frames later, while focus is still where the page may take
   // it (nothing yet, or an element the page focused by itself, the card
   // included) and no modal is open; a user move cancels it.
-  const liveFrame = useRef<number | null>(null);
+  const cancelLive = useRef<(() => void) | null>(null);
   useEffect(
     () => () => {
-      if (liveFrame.current !== null) {
-        cancelAnimationFrame(liveFrame.current);
-      }
+      cancelLive.current?.();
     },
     [],
   );
   const autoFocusLive = useCallback(() => {
     latch.auto(liveId);
-    requestHostFocus(liveViewRef.current);
-    if (liveFrame.current !== null) {
-      cancelAnimationFrame(liveFrame.current);
-    }
-    liveFrame.current = requestAnimationFrame(() => {
-      liveFrame.current = requestAnimationFrame(() => {
-        liveFrame.current = null;
+    cancelLive.current?.();
+    let cancel: (() => void) | null = null;
+    cancel = focusSoon(() => liveViewRef.current, {
+      guard: () => {
+        // The deferred run: nothing is pending any more (as the old frame ref).
+        if (cancelLive.current === cancel) {
+          cancelLive.current = null;
+        }
         const info = focusRef.current;
-        const view = liveViewRef.current;
-        if (view === null || !info.isActive() || modal.isOpen()) {
-          return;
+        if (liveViewRef.current === null || !info.isActive() || modal.isOpen()) {
+          return false;
         }
         const current = info.current();
-        if (current === liveId || current === null || latch.followHead(current)) {
-          requestHostFocus(view);
-        }
-      });
+        return current === liveId || current === null || latch.followHead(current);
+      },
     });
+    cancelLive.current = cancel;
   }, [latch, liveId, liveViewRef, modal]);
   // The nearest action above the grid: the LiveCard (Story 7.1) while it is
   // shown, else the field (Story 5.7) when the action row is shown, else the

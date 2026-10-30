@@ -338,3 +338,9 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-7-2-watch-a-live-stream.md`
   summary: Live play after a long pause or a background/sleep return remounts the same signed live URL; consider a quiet E15 re-fetch on a stale play so an expired URL does not spend the single automatic recovery.
   evidence: maybe-false, medium if true — the live URL lifetime was never observed (no live sample); a live stream played across a sleep, or a pause longer than the URL lifetime, would settle it (Story 7.2 review).
+- source_spec: `_bmad-output/implementation-artifacts/spec-epic-7-retro-a2-live-and-focus-refactor.md`
+  summary: Fix the flaky playerFlow «Expired URL» assertion `JSON.stringify(playerLogs)).not.toMatch(/example\.invalid|312|v1/)`, which also matches the digits of a log timestamp (e.g. 1793373531280); assert on the log messages and fields without `time`.
+  evidence: pre-existing; one failed run in 30 during the A2 verification, caused by a timestamp containing «312» (`__tests__/playerFlow.test.tsx:2386`).
+- source_spec: `_bmad-output/implementation-artifacts/spec-epic-7-retro-a2-live-and-focus-refactor.md`
+  summary: Finish the PlayerScreen live/VOD split before Epic 8 Story 8.1. A2 extracted `useLivePlayback` (live media, ended, epoch, unplayable exit, copy), but most of the roughly 20 `isLive` branches stay in `PlayerScreen.tsx`: retryable, the overlay focus target, live `pickQuality`, play after a pause, seek disabled, live `onEnd`, the recovery target.
+  evidence: the remaining branches mutate screen refs and state (`gate`, `heldByLifecycle`, `seek`, `setBuffering`, `setPaused`, `showOverlay`), so moving them needs a designed seam (for example an engine-state reducer), not callbacks; `PlayerScreen.tsx` went only from 1514 to 1477 lines (A2 Implementation Notes).

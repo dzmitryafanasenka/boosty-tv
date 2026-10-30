@@ -163,6 +163,35 @@ test('focus is sent to the initiator before the unmount, after it, and two frame
   await act(async () => root.unmount());
 });
 
+test('a dialog opened again within those two frames: the late request to the first initiator is skipped', async () => {
+  const root = await render();
+  await press(root, 'probe/open');
+  jest.useFakeTimers();
+  await act(async () => {
+    api.close();
+  });
+  // Opened again before the two frames passed.
+  await press(root, 'probe/open');
+  expect(api.isOpen()).toBe(true);
+  focusMock.mockClear();
+  await act(async () => {
+    jest.advanceTimersByTime(100);
+  });
+  const toInitiator = focusMock.mock.calls.filter(
+    ([target]) => (target as { props?: { testID?: string } } | null)?.props?.testID === 'probe/open',
+  );
+  expect(toInitiator).toHaveLength(0);
+  // Close the second dialog and let its frames run before real timers return.
+  await act(async () => {
+    api.close();
+  });
+  await act(async () => {
+    jest.advanceTimersByTime(100);
+  });
+  jest.useRealTimers();
+  await act(async () => root.unmount());
+});
+
 test('closing from inside (OK on a dialog button) also returns focus to the initiator', async () => {
   const root = await render();
   await press(root, 'probe/open');

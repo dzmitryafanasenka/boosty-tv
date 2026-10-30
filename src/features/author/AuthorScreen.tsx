@@ -37,9 +37,6 @@ import {
   AUTHOR_STATE_ACTION_ID,
   authorCardPrefix,
   authorFiltersId,
-  authorLiveId,
-  authorLiveLikeId,
-  authorLiveShareId,
   authorResetId,
   authorRetryId,
   authorSearchId,
@@ -52,14 +49,9 @@ import {
   type AuthorFocusInfo,
 } from './useAuthorAutoFocus';
 import { useAuthorFilters } from './useAuthorFilters';
-import {
-  useAuthorLiveCard,
-  useAuthorLiveFocus,
-  useAuthorLivePress,
-  useAuthorLiveStream,
-} from './useAuthorLive';
+import { useAuthorLiveFocus } from './useAuthorLive';
+import { useAuthorLiveActions, useAuthorLiveBlock } from './useAuthorLiveBlock';
 import { useAuthorPosts } from './useAuthorPosts';
-import { liveLikeShown, useLiveLike } from './useLiveLike';
 import { useAuthorSearch, type AuthorSearch } from './useAuthorSearch';
 import { useBlogSearch } from './useBlogSearch';
 
@@ -196,10 +188,6 @@ export function AuthorScreen({
   const fieldId = authorSearchId(blogUrl);
   const chipId = authorFiltersId(blogUrl);
   const resetId = authorResetId(blogUrl);
-  const liveId = authorLiveId(blogUrl);
-  const likeId = authorLiveLikeId(blogUrl);
-  const shareId = authorLiveShareId(blogUrl);
-  const liveActionIds = useMemo(() => [likeId, shareId], [likeId, shareId]);
   // The search and filter actions call the outcome focus and the grid's
   // restoration, composed further down (they need the list the search
   // selects); the filter resets call the search. Read in handlers only,
@@ -210,16 +198,11 @@ export function AuthorScreen({
 
   const field = useAuthorField(fieldId);
   const { focusField, fieldAuto } = field;
-  const liveCard = useAuthorLiveCard(liveId);
-  // Story 7.4: «Нравится» and «Поделиться» have the card's shape (zone item + host view).
-  const likeButton = useAuthorLiveCard(likeId);
-  const shareButton = useAuthorLiveCard(shareId);
-  const { stream: queriedStream, answered: liveAnswered } = useAuthorLiveStream(http, blogUrl, liveEnabled);
-  // Story 7.4: the shown stream carries the optimistic like over the query.
-  const like = useLiveLike(http, blogUrl, queriedStream);
-  const stream = like.stream;
-  const likeShown = stream !== null && liveLikeShown(stream);
-  const liveShown = stream !== null;
+  // Stories 7.1, 7.4: the LiveCard, «Нравится» and «Поделиться» (useAuthorLiveBlock).
+  const liveBlock = useAuthorLiveBlock({ http, blogUrl, liveEnabled });
+  const { liveId, likeId, shareId, liveActionIds, liveCard, likeButton, shareButton, liveAnswered, like, stream } =
+    liveBlock;
+  const { likeShown, liveShown } = liveBlock;
   const liveShownRef = useLatestRef(liveShown);
 
   // Story 5.7: the route's own Filter (owner decision 2026-10-29 Q3 b) and
@@ -374,19 +357,22 @@ export function AuthorScreen({
     }
   }, [liveRef, liveCard.liveViewRef, autoFocusLive, restoreOrFirst]);
 
-  // Story 7.2: OK on the LiveCard (the live player, else the stream page's QR).
-  const { onLivePress, onSharePress, openLiveQr } = useAuthorLivePress({
+  // Story 7.2: OK on the LiveCard (the live player, else the stream page's
+  // QR); Story 7.4: «Нравится», «Поделиться»; the live block's return focus.
+  const gridShown = useCallback(() => phaseRef.current === 'grid', [phaseRef]);
+  const { onLivePress, onSharePress, onLikePress, returnFocus: returnToLive } = useAuthorLiveActions({
+    block: liveBlock,
     blogUrl,
-    stream,
-    card: liveCard,
-    share: shareButton,
     focusRef,
     modal,
     latch,
+    restoration,
+    idsRef,
+    gridShown,
+    autoFocusLive,
     onOpenLive,
+    takeLiveQrRequest,
   });
-  const openLiveQrRef = useLatestRef(openLiveQr);
-  const takeLiveQrRequestRef = useLatestRef(takeLiveQrRequest);
 
   // First focus of the route and every return to it (a screen on top
   // popped). Declared before the phase effect: on the first focus it only
@@ -395,7 +381,7 @@ export function AuthorScreen({
   useFocusEffect(
     useCallback(() => {
       const info = focusRef.current;
-      let qrFrame: number | null = null;
+      let liveCleanup: (() => void) | null = null;
       if (firstFocus.current) {
         firstFocus.current = false;
         if (phaseRef.current === 'loading' || phaseRef.current === 'empty') {
@@ -403,53 +389,22 @@ export function AuthorScreen({
         }
       } else {
         const current = info.current();
-        // Story 7.2: the live player left because the stream is not playable here.
-        const liveQr = takeLiveQrRequestRef.current?.() === true;
-        if (current === liveId && liveCard.liveViewRef.current) {
-          // Story 7.1: back to the LiveCard it left from (Story 7.2: from the
-          // live player too; a QR request opens over it).
-          autoFocusLive();
-          if (liveQr) {
-            // A frame later: the route's own Back listener (added in this
-            // focus pass, after this child effect) must be older than the
-            // modal host's, so Back closes the QR first (focus-map §1.4).
-            qrFrame = requestAnimationFrame(() => openLiveQrRef.current());
+        // Stories 7.1, 7.2, 7.4: focus on the live block (and the live
+        // player's QR request, consumed on every return).
+        liveCleanup = returnToLive(current);
+        if (liveCleanup === null) {
+          if (current !== null && current.startsWith(cardPrefix) && phaseRef.current === 'grid') {
+            restoreOrFirst();
+          } else if (!(current !== null && current !== info.sectionItemId && info.focusZoneTarget())) {
+            autoFocusSidebar();
           }
-        } else if (
-          (current === likeId && likeButton.liveViewRef.current) ||
-          (current === shareId && shareButton.liveViewRef.current)
-        ) {
-          // Story 7.4: back to «Нравится» / «Поделиться» while still shown.
-          const view = current === likeId ? likeButton.liveViewRef.current : shareButton.liveViewRef.current;
-          latch.auto(current);
-          requestHostFocus(view);
-        } else if (current === likeId && shareButton.liveViewRef.current) {
-          // Story 7.4: the like went while covered (it needs live + access)
-          // and the card stays: «Поделиться», as when uncovered.
-          latch.auto(shareId);
-          requestHostFocus(shareButton.liveViewRef.current);
-        } else if ((current === likeId || current === shareId) && liveCard.liveViewRef.current) {
-          autoFocusLive();
-        } else if ((current === liveId || current === likeId || current === shareId) && phaseRef.current === 'grid') {
-          // The stream ended while covered (Story 7.2: e.g. the live player's
-          // «Стрим завершён»): the first post, where the card was
-          // (focus-map §4 D). Not `restoreOrFirst`: it would restore the
-          // remembered card id.
-          latch.auto(idsRef.current[0]);
-          restoration.focusInitial();
-        } else if (current !== null && current.startsWith(cardPrefix) && phaseRef.current === 'grid') {
-          restoreOrFirst();
-        } else if (!(current !== null && current !== info.sectionItemId && info.focusZoneTarget())) {
-          autoFocusSidebar();
         }
       }
       return () => {
-        if (qrFrame !== null) {
-          cancelAnimationFrame(qrFrame);
-        }
+        liveCleanup?.();
         restoration.cancel();
       };
-    }, [focusRef, cardPrefix, restoreOrFirst, restoration, autoFocusSidebar, phaseRef, liveId, likeId, shareId, liveCard.liveViewRef, likeButton.liveViewRef, shareButton.liveViewRef, autoFocusLive, latch, takeLiveQrRequestRef, openLiveQrRef]),
+    }, [focusRef, cardPrefix, restoreOrFirst, restoration, autoFocusSidebar, phaseRef, returnToLive]),
   );
 
   /**
@@ -607,18 +562,6 @@ export function AuthorScreen({
     () => (liveCard.liveView ? [liveCard.liveView] : []),
     [liveCard.liveView],
   );
-  // Story 7.4: OK on «Нравится» clears the last failure and toggles.
-  const likeToggle = like.toggle;
-  const onLikePress = useCallback(() => {
-    const info = focusRef.current;
-    if (!info.isActive() || modal.isOpen()) {
-      return;
-    }
-    if (likeToggle()) {
-      latch.move();
-    }
-  }, [focusRef, modal, likeToggle, latch]);
-
   if (phase === 'unavailable' || phase === 'error') {
     return (
       <View testID="author/page" style={styles.root}>
