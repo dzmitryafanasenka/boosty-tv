@@ -7,3 +7,9 @@ export {
   type ResetResult,
 } from './accountScope';
 export { defineAccountScoped, type AccountScopedStore } from './defineAccountScoped';
+export {
+  captureGeneration,
+  createGenerationKeyedStore,
+  type GenerationCheck,
+  type GenerationKeyedStore,
+} from './generationKeyed';

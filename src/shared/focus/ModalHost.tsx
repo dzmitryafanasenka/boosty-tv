@@ -13,6 +13,7 @@ import { BackHandler, StyleSheet, TVFocusGuideView, View } from 'react-native';
 import type { HostView } from '../ui/FocusableSurface';
 import { requestHostFocus } from '../ui/requestHostFocus';
 import { colors } from '../ui/tokens';
+import { focusSoon } from './focusSoon';
 
 /**
  * The one modal host (AD-13, docs/focus-map.md §1.3–1.4), rendered above the
@@ -127,18 +128,11 @@ export function ModalHostProvider({ children }: { children?: ReactNode }) {
     const initiator = returnTo.current;
     returnTo.current = undefined;
     if (initiator) {
-      requestHostFocus(initiator.current);
       // Device (Story 2.4): a request sent in the same commit as the unmount
       // was lost (nothing focused afterwards). Two frames later the overlay
       // is gone natively and the request sticks. Skipped if a new dialog
-      // opened meanwhile.
-      requestAnimationFrame(() =>
-        requestAnimationFrame(() => {
-          if (!modalRef.current) {
-            requestHostFocus(initiator.current);
-          }
-        }),
-      );
+      // opened meanwhile. Never cancelled (as before).
+      focusSoon(() => initiator.current, { guard: () => !modalRef.current });
     }
     return undefined;
   }, [visible, close]);

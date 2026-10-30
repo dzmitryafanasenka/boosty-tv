@@ -16,7 +16,7 @@ import {
   type SurfaceState,
 } from '../ui';
 import { daysInMonth, formatDayKey, type CalendarDay } from './filter';
-import { focusSoon } from './focusSoon';
+import { focusSoon } from '../focus';
 import { formatRange } from './periodLabel';
 
 /** Focus ids (docs/focus-map.md §1.5, D10). */

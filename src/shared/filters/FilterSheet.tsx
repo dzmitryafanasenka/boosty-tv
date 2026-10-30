@@ -18,7 +18,7 @@ import {
   type PeriodPresetDays,
 } from './filter';
 import { filtersStore, useFilter } from './filtersStore';
-import { focusSoon } from './focusSoon';
+import { focusSoon } from '../focus';
 import { formatPeriod } from './periodLabel';
 import { PeriodStepper } from './PeriodStepper';
 import { TagList } from './TagList';

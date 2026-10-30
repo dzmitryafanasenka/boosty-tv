@@ -405,6 +405,8 @@ describe('open the player (matrix «Open from a row», «Source order», «Progr
     const page = byTestId(root, 'player/page')[0];
     expect(page.queryAll(n => n.props.focusable === true).map(n => n.props.testID)).toEqual([SURFACE]);
     expect(lastFocusTarget()).toBe(SURFACE);
+    // The VOD surface's accessibility label while loading.
+    expect(byTestId(root, SURFACE)[0].props.accessibilityLabel).toBe(translate('player.loading'));
     pending.resolve({ status: 200, body: postDetail(FEED_BLOG, POST, ONE) });
     await settle();
     expect(engine.props?.source.format).toBe('hls');
@@ -3025,6 +3027,8 @@ describe('Story 7.2: watch a live stream (LiveRef)', () => {
     expect(JSON.stringify(logger.entries())).not.toMatch(/example\.invalid|sig=/);
     expect(JSON.stringify(queryClient.getQueryData(queryKeys.stream(LIVE_BLOG)) ?? null)).not.toMatch(/sig=/);
     expect(engine.props?.paused).toBe(false);
+    // Story 7.2 (liveCopy): the live surface's accessibility label while playing.
+    expect(byTestId(root, SURFACE)[0].props.accessibilityLabel).toBe(translate('player.live.surface'));
     noProgress();
     await unmount(root);
   });

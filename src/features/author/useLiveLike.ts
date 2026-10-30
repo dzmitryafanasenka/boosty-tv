@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { accountScope } from '../../shared/account';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { accountScope, captureGeneration, createGenerationKeyedStore } from '../../shared/account';
 import { isAppError, queryKeys, type AppErrorKind, type HttpClient } from '../../shared/api';
 import { StreamRepository, type Stream } from '../../shared/entities/stream';
 import { useLatestRef } from '../../shared/focus';
@@ -48,36 +48,18 @@ type Overlay = {
 };
 
 /** `<generation>:<blogUrl>` → the optimistic state (in flight, or settled and not yet seen). */
-const overlays = new Map<string, Overlay>();
-const listeners = new Set<() => void>();
-const overlayKey = (generation: number, blogUrl: string) => `${generation}:${blogUrl}`;
-
-function notify() {
-  for (const listener of listeners) {
-    listener();
-  }
-}
-
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-  };
-}
+const overlays = createGenerationKeyedStore<Overlay>();
 
 /** Drops this blog's settled overlay (current account), if any. */
 function dropSettled(blogUrl: string) {
-  const key = overlayKey(accountScope.generation(), blogUrl);
-  if (overlays.get(key)?.settled) {
-    overlays.delete(key);
-    notify();
+  if (overlays.get(blogUrl)?.settled) {
+    overlays.delete(overlays.key(blogUrl));
   }
 }
 
 /** Test-only: forget every like request and overlay. */
 export function resetLiveLikesForTests() {
-  overlays.clear();
-  notify();
+  overlays.reset();
 }
 
 /** Owner decision Q2 a: the like shows only for a live stream with access. */
@@ -109,8 +91,7 @@ export function useLiveLike(http: HttpClient, blogUrl: string, stream: Stream | 
       dropSettled(blogUrl);
     };
   }, [blogUrl]);
-  const snapshot = () => overlays.get(overlayKey(accountScope.generation(), blogUrl)) ?? null;
-  const overlay = useSyncExternalStore(subscribe, snapshot, snapshot);
+  const overlay = overlays.useEntry(blogUrl);
 
   // A settled overlay goes once the page's stream value changes after it
   // (the query write, a poll, or the stream gone): that value carries the
@@ -144,9 +125,11 @@ export function useLiveLike(http: HttpClient, blogUrl: string, stream: Stream | 
 
   const toggle = useCallback(() => {
     const current = shownRef.current;
-    const generation = accountScope.generation();
-    const key = overlayKey(generation, blogUrl);
-    const running = overlays.get(key);
+    /** No sign-out or account switch since the toggle. */
+    const sameAccount = captureGeneration();
+    const generation = sameAccount.generation;
+    const key = overlays.key(blogUrl, generation);
+    const running = overlays.getAt(key);
     if (current === null || !liveLikeShown(current) || (running !== undefined && !running.settled)) {
       return false;
     }
@@ -159,10 +142,7 @@ export function useLiveLike(http: HttpClient, blogUrl: string, stream: Stream | 
     client.cancelQueries({ queryKey, exact: true }).catch(() => {});
     const entry: Overlay = { streamId, isLiked, likes, settled: false };
     overlays.set(key, entry);
-    notify();
     setError(null);
-    /** No sign-out or account switch since the toggle. */
-    const sameAccount = () => accountScope.generation() === generation;
     const run = async () => {
       try {
         await StreamRepository.like(http, blogUrl, isLiked);
@@ -181,7 +161,7 @@ export function useLiveLike(http: HttpClient, blogUrl: string, stream: Stream | 
     };
     run()
       .then(ok => {
-        if (overlays.get(key) !== entry) {
+        if (overlays.getAt(key) !== entry) {
           return;
         }
         if (ok && sameAccount()) {
@@ -213,7 +193,6 @@ export function useLiveLike(http: HttpClient, blogUrl: string, stream: Stream | 
           // The rollback (or an old account's entry, which nothing shows).
           overlays.delete(key);
         }
-        notify();
       })
       .catch(() => {});
     return true;

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { BackHandler, StyleSheet, View } from 'react-native';
+import { focusSoon } from '../../shared/focus';
 import { t, tf } from '../../shared/i18n';
-import { SettingRow, SideSheet, requestHostFocus, spacing, type HostView } from '../../shared/ui';
+import { SettingRow, SideSheet, spacing, type HostView } from '../../shared/ui';
 import type { QualityKey } from './mediaResolver';
 
 /** Focus ids (docs/focus-map.md §1.5, §4 G). */
@@ -111,11 +112,7 @@ export function PlayerSettingsSheet({ model, onPick, onClosed }: PlayerSettingsS
   // a request in the same commit as an unmount can be lost).
   useEffect(() => {
     const view = level === 'sheet' ? qualityView : selectedView;
-    requestHostFocus(view.current);
-    let frame = requestAnimationFrame(() => {
-      frame = requestAnimationFrame(() => requestHostFocus(view.current));
-    });
-    return () => cancelAnimationFrame(frame);
+    return focusSoon(() => view.current);
   }, [level]);
 
   if (level === 'sheet') {

@@ -21,6 +21,7 @@ export {
   type ModalOptions,
   type ModalPlacement,
 } from './ModalHost';
+export { focusSoon, focusSoonRun, type FocusSoonOptions } from './focusSoon';
 export { Screen, type ScreenProps } from './Screen';
 export {
   mayTakeScreenFocus,
