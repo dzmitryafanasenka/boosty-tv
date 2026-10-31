@@ -1,0 +1,23 @@
+_bmad-output/implementation-artifacts/spec-8-1-playback-speed.md
+  s_7477a2e6c69ec6::t_09eda569525f4f 5
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_7477a2e6c69ec6::t_1527007b00954d 32,108
+docs/testing.md
+  s_7477a2e6c69ec6::t_d4430a7f78f67c 25,909,920-925
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "e7d979495ad94b6cc1b9f06214e16773148f728f",
+  "prompts": {},
+  "sessions": {
+    "s_7477a2e6c69ec6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d998e7e2-636f-4943-a058-23b274887697",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
