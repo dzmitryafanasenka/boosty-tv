@@ -2,7 +2,7 @@
 title: 'Finish the PlayerScreen live/VOD split before Epic 8'
 type: 'refactor'
 created: '2026-10-31'
-status: 'in-review'
+status: 'done'
 route: 'dispatch'
 review_loop_iteration: 0
 baseline_commit: 'af673791240e3c4a817db603626d27a7e007358e'

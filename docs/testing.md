@@ -905,7 +905,7 @@ Host tests: `src/shared/services/progress/__tests__/progressRepository.test.ts` 
 
 ### PlayerScreen live/VOD split before Epic 8, 2026-10-31
 
-**Status: behaviour-preserving refactor plus review patches, host-tested only; no device run by the agent (the owner runs the device check).** `spec-player-live-vod-split.md`. `PlayerScreen.tsx` 1477 → 389 lines: `playbackMode.ts` (the live/VOD decisions), `livePolicy.ts`, `playerPhase.ts`, `usePlaybackSession.ts`, `usePlayerSource.ts`, `usePlayerSettings.tsx`, `usePlayerFocus.ts`, `usePlayerKeys.ts`, `usePlayerProgress.ts`. The hook call order keeps the old effect order. Existing tests unchanged in meaning (`playerPhase.test.ts` is new in this change). New tests: `src/features/player/__tests__/playbackMode.test.ts` (the intent matrix for VOD and live), `playerPhase.test.ts` (phase, recovering, error target and copy), `entryGuard.test.ts` (the entry guard with a fake clock) and `playerFlow` «Story 7.2 › Quality pick (a live list with a real choice)» (the repository result gets an extra 720p candidate, since real E15 live candidates are «Авто» only). `jest.config.js` now ignores `.claude/worktrees/` (agent worktrees).
+**Status: behaviour-preserving refactor plus review patches; host-tested, plus a short agent device run (below).** `spec-player-live-vod-split.md`. `PlayerScreen.tsx` 1477 → 389 lines: `playbackMode.ts` (the live/VOD decisions), `livePolicy.ts`, `playerPhase.ts`, `usePlaybackSession.ts`, `usePlayerSource.ts`, `usePlayerSettings.tsx`, `usePlayerFocus.ts`, `usePlayerKeys.ts`, `usePlayerProgress.ts`. The hook call order keeps the old effect order. Existing tests unchanged in meaning (`playerPhase.test.ts` is new in this change). New tests: `src/features/player/__tests__/playbackMode.test.ts` (the intent matrix for VOD and live), `playerPhase.test.ts` (phase, recovering, error target and copy), `entryGuard.test.ts` (the entry guard with a fake clock) and `playerFlow` «Story 7.2 › Quality pick (a live list with a real choice)» (the repository result gets an extra 720p candidate, since real E15 live candidates are «Авто» only). `jest.config.js` now ignores `.claude/worktrees/` (agent worktrees).
 
 Checks run after the review patches:
 - `npm run lint -- --max-warnings 0`, `npm run typecheck`, `npm run check:fixtures` (30): clean.
@@ -914,9 +914,11 @@ Checks run after the review patches:
 
 Before the review: the same suites with CLI ignore flags for `.claude/worktrees/`; full run ×3: 125 suites, 2791 passed each; the touched files ×30: 0 failed runs, 662 each.
 
+Device (agent over adb, Chromecast with Google TV, release-like build from `8bd3669`, `adb install -r`): the Continue-row card → OK opened the player at the saved position (2:11) and it played about 2 s with no pause; Menu opened «Настройки» with focus on «Качество 1440p»; Back closed the sheet and focus returned to the gear; two more Back returned to the same Continue card, still «Осталось 108 мин» (no progress write). The whole run took under 10 s.
+
 Not checked:
-- Device rows (owner, release-like build on the Chromecast): open a video, play under 10 s, Back; open quality settings and close; no pause on the owner's content. Live cannot be checked (no subscribed blog is live).
-- The physical remote and TalkBack.
+- Seeks, hold-to-seek, the ±10 s skip, sleep/resume, audio-focus loss and «Повторить» on the device (a seek on the owner's content would count as movement and write progress); host-tested only.
+- Live (no subscribed blog is live), the physical remote and TalkBack.
 
 ### Epic 3 retro A4 — sidebar OK from Автор/Пост with animations off, 2026-10-31
 
