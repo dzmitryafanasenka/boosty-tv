@@ -96,3 +96,19 @@ Turn the Post screen built in Epic 3 (header on top, MediaRows, paragraph focus 
 - **Where the poll lives:** the API contract models the poll as top-level `Post.poll`, but the current DTO also knows a `poll` *block* type. No live poll sample exists, so verify which shape real posts use.
 - **Unverified audio, files and polls:** no live sample exists. Audio, file and poll stories may only be verifiable with fixtures and the demo unless a sample post is found. The owner's rule is auto-scan only.
 - **Signed query policy:** reading `signedQuery` changes a documented DTO rule ("never parsed into the post") and needs a deliberate, tested in-memory path.
+
+## As-built reconciliation (2026-10-31)
+
+Epic 6 is done. Where this context differs from the as-built, the as-built wins. Sources: Epic 6 retro A5, closed by Epic 7 retro A3 (`spec-epic-7-retro-a3-planning-reconcile.md`).
+
+- **Collapse vs. focus stops:** resolved. There is no collapse (Story 6.1, owner decision 2026-10-29 Q1 a). Every paragraph is a stop, and a paragraph over 600 characters is split.
+- **Column layout:** images use the one column's width, capped at `text-measure` and 300 dp tall. A focused image gets the ring with no scale (Story 6.2).
+- **QR:** `react-native-qrcode-svg` is pinned at **6.3.26**, not the spiked 6.3.27, under the two-week age rule (ADR 0014). `react-native-svg` is 15.15.5 (ADR 0013).
+- **Chips** (Story 6.3, owner decisions 2026-10-29): a Boosty post link opens the post in the app («· Открыть»). A timestamp link plays the video at that second («· Смотреть»). `header` blocks render as non-focusable headings.
+- **Where the poll lives:** live posts carry the poll top-level only, so it renders after the body (Story 6.5, `docs/focus-map.md` I).
+- **Poll interaction:**
+  - In a single-choice poll, two OK presses on another option change the vote (Story 6.6 Q1 a).
+  - A failed vote or retract shows one line per mutation, whatever the error kind. This is an accepted exception, recorded in ARCHITECTURE-SPINE AD-5.
+  - `usePollVote`'s generation-keyed in-flight state is the AD-4 exception, now through `src/shared/account/generationKeyed.ts`.
+- **Live samples:** audio and file blocks were found live in Stories 6.3 and 6.4 (api-contract §4.1); one single-choice poll was found by the Story 6.5 scan (api-contract §4.2). No multiple-choice sample exists.
+- **The deferred PostCard item:** the avatar-on-a-plate placeholder for cards without a preview landed separately (`spec-post-card-no-preview-placeholder.md`, 2026-10-30).
