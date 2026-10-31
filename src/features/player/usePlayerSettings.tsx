@@ -4,6 +4,7 @@ import type { HostView } from '../../shared/ui';
 import { qualityOf, qualityOptions, type MediaSourceState, type QualityKey } from './mediaResolver';
 import type { Phase } from './playerPhase';
 import { PlayerSettingsSheet, createSettingsSheetModel, type SettingsSheetData } from './PlayerSettingsSheet';
+import type { PlaybackSpeed } from './speedPreference';
 
 type ReadySource = Extract<MediaSourceState, { kind: 'ready' }>;
 
@@ -38,8 +39,8 @@ export type PlayerSettings = {
 /**
  * The player's settings sheet (Story 4.3, `PlayerSettingsSheet`, the one
  * modal host, a right side sheet). A quality pick goes to `pickQuality`
- * (the session), then the sheet closes with focus on «Настройки» and the
- * overlay shows. The sheet exists only while playing: leaving that phase
+ * and a speed pick (Story 8.1) to `pickSpeed` (the session), then the sheet
+ * closes with focus on «Настройки» and the overlay shows. The sheet exists only while playing: leaving that phase
  * closes it without restoring focus, before the focus effect picks its
  * target (`PlayerScreen` calls this hook before `usePlayerFocus`).
  */
@@ -51,6 +52,8 @@ export function usePlayerSettings({
   settingsShown,
   showOverlay,
   pickQuality,
+  speed,
+  pickSpeed,
 }: {
   sheet: SheetOpen;
   ready: ReadySource | null;
@@ -60,17 +63,24 @@ export function usePlayerSettings({
   settingsShown: boolean;
   showOverlay: () => void;
   pickQuality: (key: QualityKey) => void;
+  /** Story 8.1: the current speed for the «Скорость» row; null: no row (`PlaybackMode.speedShown` off). */
+  speed: PlaybackSpeed | null;
+  pickSpeed: (speed: PlaybackSpeed) => void;
 }): PlayerSettings {
   const { sheetOpenRef, setSheetOpen } = sheet;
   const playing = phase === 'playing';
   const modal = useModal();
   const settingsView = useRef<HostView | null>(null);
   /** The sheet's data (the modal host renders the sheet element once; this updates under it). */
-  const [sheetModel] = useState(() => createSettingsSheetModel({ options: [], selected: 'auto', autoHeight: null }));
+  const [sheetModel] = useState(() =>
+    createSettingsSheetModel({ options: [], selected: 'auto', autoHeight: null, speed: null }),
+  );
   const sheetData = useMemo<SettingsSheetData | null>(
     () =>
-      ready === null ? null : { options: qualityOptions(ready.sources), selected: qualityOf(ready.source), autoHeight },
-    [ready, autoHeight],
+      ready === null
+        ? null
+        : { options: qualityOptions(ready.sources), selected: qualityOf(ready.source), autoHeight, speed },
+    [ready, autoHeight, speed],
   );
   useEffect(() => {
     if (sheetData !== null) {
@@ -105,6 +115,11 @@ export function usePlayerSettings({
     closeSheet(true);
     showOverlay();
   });
+  const onPickSpeedRef = useLatestRef((next: PlaybackSpeed) => {
+    pickSpeed(next);
+    closeSheet(true);
+    showOverlay();
+  });
 
   const openSettings = useCallback(() => {
     if (latest.current.phase !== 'playing' || sheetOpenRef.current || !latest.current.settingsShown) {
@@ -117,6 +132,7 @@ export function usePlayerSettings({
       <PlayerSettingsSheet
         model={sheetModel}
         onPick={key => onPickRef.current(key)}
+        onPickSpeed={next => onPickSpeedRef.current(next)}
         onClosed={() => {
           sheetOpenRef.current = false;
           setSheetOpen(false);
@@ -125,7 +141,7 @@ export function usePlayerSettings({
       settingsView,
       { placement: 'end' },
     );
-  }, [latest, sheetOpenRef, setSheetOpen, showOverlay, modal, sheetModel, onPickRef]);
+  }, [latest, sheetOpenRef, setSheetOpen, showOverlay, modal, sheetModel, onPickRef, onPickSpeedRef]);
 
   return { openSettings, closeSheet, settingsView };
 }

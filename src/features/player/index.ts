@@ -23,9 +23,22 @@ export {
   PLAYER_TIMELINE_ID,
 } from './PlayerOverlay';
 export { debugBreakNextVideoSource } from './mediaResolver';
-export { PLAYER_SHEET_ID, PLAYER_SHEET_QUALITY_ID, qualityRowId } from './PlayerSettingsSheet';
+export {
+  PLAYER_SHEET_ID,
+  PLAYER_SHEET_QUALITY_ID,
+  PLAYER_SHEET_SPEED_ID,
+  qualityRowId,
+  speedRowId,
+} from './PlayerSettingsSheet';
 export {
   QUALITY_PREFERENCE_KEY,
   qualityPreference,
   setQualityPreferenceKeyValueStore,
 } from './qualityPreference';
+export {
+  PLAYBACK_SPEEDS,
+  SPEED_PREFERENCE_KEY,
+  setSpeedPreferenceKeyValueStore,
+  speedPreference,
+  type PlaybackSpeed,
+} from './speedPreference';

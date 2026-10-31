@@ -165,3 +165,24 @@ describe('recoveryTarget', () => {
     expect(pendingSeek).not.toHaveBeenCalled();
   });
 });
+
+describe('speed (Story 8.1)', () => {
+  test('VOD with the phase flag on: the row, the stored speed is the rate', () => {
+    const mode = createVodMode(repository, { speed: true });
+    expect(mode.speedShown).toBe(true);
+    expect(mode.rate(1.5)).toBe(1.5);
+    expect(mode.rate(0.5)).toBe(0.5);
+    expect(mode.rate(1)).toBe(1);
+  });
+
+  test('VOD with the flag off (the default): no row, always 1×', () => {
+    expect(vod.speedShown).toBe(false);
+    expect(vod.rate(2)).toBe(1);
+  });
+
+  test('live: no row, forced 1× whatever is stored', () => {
+    expect(live.speedShown).toBe(false);
+    expect(live.rate(2)).toBe(1);
+    expect(live.rate(3)).toBe(1);
+  });
+});

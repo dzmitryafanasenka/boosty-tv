@@ -5,21 +5,25 @@ import type { LiveRef } from '../../shared/entities/stream';
 import { useMediaSource, type MediaSource, type QualityKey } from './mediaResolver';
 import type { PlaybackMode } from './playbackMode';
 import { qualityPreference } from './qualityPreference';
+import { DEFAULT_SPEED, speedPreference, type PlaybackSpeed } from './speedPreference';
 import { useLivePlayback, type LivePlayback } from './useLivePlayback';
 
 export type PlayerSource = Omit<LivePlayback, 'liveMedia'> & {
   /** The playing media (`PlaybackMode.pickMedia`: the VOD or the live hook). */
   media: MediaSource;
-  /** The device's quality preference is read (the engine waits for it). */
+  /** The device's quality and speed preferences are read (the engine waits for both). */
   preferenceReady: boolean;
   setPreference: (key: QualityKey) => void;
+  /** Story 8.1: the stored speed (1× until read, when none or unknown); `PlaybackMode.rate` decides whether it applies. */
+  speed: PlaybackSpeed;
+  setSpeed: (speed: PlaybackSpeed) => void;
   setKeepQuality: (key: QualityKey | null) => void;
   /** The local progress store is loaded (always true for live). */
   progressReady: boolean;
 };
 
 /**
- * The player's source (Stories 4.1–4.4, 7.2): the quality preference, the
+ * The player's source (Stories 4.1–4.4, 7.2, 8.1): the quality and speed preferences, the
  * quality a recovery keeps, both media hooks (always both, in this order;
  * the one for the other kind is disabled) and the progress store's
  * readiness. Called first in `PlayerScreen` (effect order).
@@ -48,6 +52,23 @@ export function usePlayerSource(
       alive = false;
     };
   }, [preference]);
+  // Story 8.1: the device's speed preference, read like the quality one, so
+  // the first engine starts at the stored speed.
+  const [speed, setSpeed] = useState<PlaybackSpeed | undefined>(() => speedPreference.peek());
+  useEffect(() => {
+    if (speed !== undefined) {
+      return;
+    }
+    let alive = true;
+    speedPreference.read().then(value => {
+      if (alive) {
+        setSpeed(value);
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, [speed]);
   /**
    * The quality a recovery or a retry keeps (Story 4.4): the broken source's
    * key, picked instead of the preference while the video has it. Cleared by
@@ -80,8 +101,10 @@ export function usePlayerSource(
   return {
     ...livePlayback,
     media,
-    preferenceReady: preference !== undefined,
+    preferenceReady: preference !== undefined && speed !== undefined,
     setPreference,
+    speed: speed ?? DEFAULT_SPEED,
+    setSpeed,
     setKeepQuality,
     progressReady,
   };

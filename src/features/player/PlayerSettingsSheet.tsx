@@ -4,11 +4,14 @@ import { focusSoon } from '../../shared/focus';
 import { t, tf } from '../../shared/i18n';
 import { SettingRow, SideSheet, spacing, type HostView } from '../../shared/ui';
 import type { QualityKey } from './mediaResolver';
+import { PLAYBACK_SPEEDS, speedLabel, type PlaybackSpeed } from './speedPreference';
 
 /** Focus ids (docs/focus-map.md §1.5, §4 G). */
 export const PLAYER_SHEET_ID = 'player/sheet';
 export const PLAYER_SHEET_QUALITY_ID = 'player/sheet/quality';
 export const qualityRowId = (key: QualityKey) => `${PLAYER_SHEET_QUALITY_ID}/${key}`;
+export const PLAYER_SHEET_SPEED_ID = 'player/sheet/speed';
+export const speedRowId = (speed: PlaybackSpeed) => `${PLAYER_SHEET_SPEED_ID}/${speed}`;
 
 /** What the sheet shows; the player updates it while the sheet is open. */
 export type SettingsSheetData = {
@@ -18,6 +21,8 @@ export type SettingsSheetData = {
   selected: QualityKey;
   /** The height the engine reports for the adaptive source; null before a report or for a progressive source. */
   autoHeight: number | null;
+  /** Story 8.1: the current speed; null: no «Скорость» row (live, or the phase flag off). */
+  speed: PlaybackSpeed | null;
 };
 
 /** A tiny observable value: the modal host renders the sheet element once, the data changes under it. */
@@ -36,6 +41,7 @@ export function createSettingsSheetModel(initial: SettingsSheetData): SettingsSh
       if (
         next.selected === value.selected &&
         next.autoHeight === value.autoHeight &&
+        next.speed === value.speed &&
         next.options.length === value.options.length &&
         next.options.every((key, i) => key === value.options[i])
       ) {
@@ -69,6 +75,8 @@ export type PlayerSettingsSheetProps = {
   model: SettingsSheetModel;
   /** A quality row was picked (the player reloads, stores the preference and closes the sheet). */
   onPick: (key: QualityKey) => void;
+  /** Story 8.1: a speed row was picked (the player applies and stores it and closes the sheet). */
+  onPickSpeed: (speed: PlaybackSpeed) => void;
   /** The sheet left the modal host (any close path: Back, a pick, the player going away). */
   onClosed: () => void;
 };
@@ -76,18 +84,22 @@ export type PlayerSettingsSheetProps = {
 /**
  * G Settings sheet (Story 4.3, docs/focus-map.md §4 G): a 340 dp right side
  * sheet in the one modal host (AD-13), which traps focus and closes it on
- * Back (focus → «Настройки», the initiator). One row «Качество · <current>»;
- * OK opens the quality submenu (radio rows, initial focus on the selected
- * one). Back in the submenu returns to the sheet with focus on «Качество»
- * (this sheet's own Back listener, newer than the host's). No speed row
- * (Epic 8), no subtitles or audio tracks.
+ * Back (focus → «Настройки», the initiator). Rows «Качество · <current>»
+ * and, for recordings (Story 8.1), «Скорость · <current>» under it; OK opens
+ * that row's submenu (radio rows, initial focus on the selected one). Back
+ * in a submenu returns to the sheet with focus on the row it came from (this
+ * sheet's own Back listener, newer than the host's). No subtitles or audio
+ * tracks.
  */
-export function PlayerSettingsSheet({ model, onPick, onClosed }: PlayerSettingsSheetProps) {
+export function PlayerSettingsSheet({ model, onPick, onPickSpeed, onClosed }: PlayerSettingsSheetProps) {
   const data = useSyncExternalStore(model.subscribe, model.get);
-  const [level, setLevel] = useState<'sheet' | 'quality'>('sheet');
+  const [level, setLevel] = useState<'sheet' | 'quality' | 'speed'>('sheet');
+  /** The sheet row focused on the sheet level: the submenu Back came from. */
+  const [sheetRow, setSheetRow] = useState<'quality' | 'speed'>('quality');
   const levelRef = useRef(level);
   levelRef.current = level;
   const qualityView = useRef<HostView | null>(null);
+  const speedView = useRef<HostView | null>(null);
   const selectedView = useRef<HostView | null>(null);
   const onClosedRef = useRef(onClosed);
   onClosedRef.current = onClosed;
@@ -97,7 +109,9 @@ export function PlayerSettingsSheet({ model, onPick, onClosed }: PlayerSettingsS
   // The submenu is the deepest Back layer: Back there returns to the sheet.
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (levelRef.current === 'quality') {
+      const from = levelRef.current;
+      if (from !== 'sheet') {
+        setSheetRow(from);
         setLevel('sheet');
         return true;
       }
@@ -107,13 +121,16 @@ export function PlayerSettingsSheet({ model, onPick, onClosed }: PlayerSettingsS
     return () => sub.remove();
   }, []);
 
-  // Each level's initial focus: «Качество» on the sheet, the selected row in
-  // the submenu. Repeated two frames later (the modal host's device lesson:
-  // a request in the same commit as an unmount can be lost).
+  // Each level's initial focus: on the sheet «Качество» (or the row a
+  // submenu's Back came from), the selected row in a submenu. Repeated two
+  // frames later (the modal host's device lesson: a request in the same
+  // commit as an unmount can be lost).
+  const speedRow = data.speed !== null;
+  const backToSpeed = sheetRow === 'speed' && speedRow;
   useEffect(() => {
-    const view = level === 'sheet' ? qualityView : selectedView;
+    const view = level !== 'sheet' ? selectedView : backToSpeed ? speedView : qualityView;
     return focusSoon(() => view.current);
-  }, [level]);
+  }, [level, backToSpeed]);
 
   if (level === 'sheet') {
     return (
@@ -124,9 +141,44 @@ export function PlayerSettingsSheet({ model, onPick, onClosed }: PlayerSettingsS
           kind="nav"
           label={t('player.quality.title')}
           value={qualityLabel(data.selected, data.selected === 'auto' ? data.autoHeight : null)}
-          hasTVPreferredFocus
+          hasTVPreferredFocus={!backToSpeed}
           onPress={() => setLevel('quality')}
         />
+        {data.speed !== null ? (
+          <SettingRow
+            ref={speedView}
+            testID={PLAYER_SHEET_SPEED_ID}
+            kind="nav"
+            label={t('player.speed.title')}
+            value={speedLabel(data.speed)}
+            hasTVPreferredFocus={backToSpeed}
+            onPress={() => setLevel('speed')}
+          />
+        ) : null}
+      </SideSheet>
+    );
+  }
+  if (level === 'speed' && data.speed !== null) {
+    const current = data.speed;
+    return (
+      <SideSheet testID={`${PLAYER_SHEET_SPEED_ID}/menu`} variant="player" title={t('player.speed.title')}>
+        <View accessibilityRole="radiogroup" style={styles.rows}>
+          {PLAYBACK_SPEEDS.map(speed => {
+            const selected = speed === current;
+            return (
+              <SettingRow
+                key={String(speed)}
+                ref={selected ? selectedView : undefined}
+                testID={speedRowId(speed)}
+                kind="radio"
+                selected={selected}
+                label={speedLabel(speed)}
+                hasTVPreferredFocus={selected}
+                onPress={() => onPickSpeed(speed)}
+              />
+            );
+          })}
+        </View>
       </SideSheet>
     );
   }
