@@ -33,7 +33,53 @@ export function parseJson(text: string): unknown {
   }
 }
 
-/** The path only, for logs: no host, query or fragment. */
+/**
+ * The fixed words of the API paths this client calls. Story 8.3 review:
+ * every other segment (a blog slug, a post, media or poll id) reveals the
+ * account's subscriptions or viewing history, and http lines now reach the
+ * diagnostics file, so it is masked.
+ */
+const API_WORDS: ReadonlySet<string> = new Set([
+  'v1',
+  'blog',
+  'post',
+  'feed',
+  'user',
+  'current',
+  'subscriptions',
+  'search',
+  'tag',
+  'video_stream',
+  'poll',
+  'vote',
+  'notification',
+  'standalone',
+  'event',
+  'viewstat',
+  'video',
+  'timecode',
+  'oauth',
+  'token',
+]);
+
+/**
+ * The path only, for logs: no host, query or fragment, and every variable
+ * segment masked: the one after `/v1/blog/` is `<blog>` (whatever it spells), any
+ * other word outside `API_WORDS` is `<seg>`. `/v1/feed/post/` and
+ * `/v1/user/current` stay as they are.
+ */
 export function logPath(url: string): string {
-  return url.replace(/^https?:\/\/[^/]*/i, '').replace(/[?#].*$/, '');
+  const path = url.replace(/^https?:\/\/[^/]*/i, '').replace(/[?#].*$/, '');
+  const parts = path.split('/');
+  return parts
+    .map((part, index) => {
+      if (part === '') {
+        return part;
+      }
+      if (index > 1 && parts[index - 1] === 'blog' && parts[index - 2] === 'v1') {
+        return '<blog>';
+      }
+      return API_WORDS.has(part) ? part : '<seg>';
+    })
+    .join('/');
 }

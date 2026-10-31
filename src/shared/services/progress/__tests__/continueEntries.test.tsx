@@ -86,6 +86,7 @@ const silent: Logger = {
   error: () => {},
   entries: () => [],
   clear: () => {},
+  setSink: () => {},
 };
 
 describe('useContinueEntries', () => {

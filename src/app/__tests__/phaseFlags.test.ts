@@ -13,6 +13,7 @@ test('Story 3.2 enables Главная, Подписки and Настройки 
     live: true,
     speed: true,
     externalPlayer: true,
+    diagnostics: true,
   });
   expect(enabledSections()).toEqual(['home', 'search', 'subs', 'events', 'settings']);
 });
@@ -60,4 +61,9 @@ test('Story 8.1: the playback speed is a capability, not a sidebar section; it s
 test('Story 8.2: the system video player is a capability, not a sidebar section; it ships on', () => {
   expect(phaseFlags.externalPlayer).toBe(true);
   expect(SECTION_ORDER as readonly string[]).not.toContain('externalPlayer');
+});
+
+test('Story 8.3: the hidden diagnostics are a capability, not a sidebar section; they ship on', () => {
+  expect(phaseFlags.diagnostics).toBe(true);
+  expect(SECTION_ORDER as readonly string[]).not.toContain('diagnostics');
 });

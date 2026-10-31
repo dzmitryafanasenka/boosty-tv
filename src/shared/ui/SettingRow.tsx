@@ -7,7 +7,8 @@ import { colors, components, spacing } from './tokens';
 
 /**
  * Kinds implemented so far (DESIGN.md SettingRow): `info` shows a value and
- * OK does nothing; `nav` opens something on OK; `radio` (Story 4.3) is one
+ * OK does nothing visible (Story 8.3: an optional `onPress` is called, with
+ * no press scale and the same `text` role, e.g. «Версия»'s hidden gesture); `nav` opens something on OK; `radio` (Story 4.3) is one
  * choice of a list, with an accent mark when `selected`, and OK picks it;
  * `check` (Story 5.5, a tag) is one of several independent choices, an
  * accent box with a tick when `checked`, and OK toggles it; `toggle`
@@ -34,7 +35,11 @@ export type SettingRowProps = {
    * description»), e.g. the «Системный видеоплеер» note (Story 8.2).
    */
   description?: string;
-  /** `nav`, `radio`, `check` and `toggle` rows; ignored for `info`. */
+  /**
+   * `nav`, `radio`, `check` and `toggle` rows. `info` rows (Story 8.3): called
+   * on OK too, but the row looks and reads the same (no press scale, role
+   * `text`).
+   */
   onPress?: () => void;
   /** `radio` rows: this choice is the current one (accent mark, `accessibilityState.selected`). */
   selected?: boolean;
@@ -76,7 +81,7 @@ export function SettingRow({
   const radio = kind === 'radio';
   const check = kind === 'check';
   const toggle = kind === 'toggle';
-  const pressable = kind === 'nav' || radio || check || toggle;
+  const info = kind === 'info';
   const surfaceStyle = ({ focused }: SurfaceState) => [
     styles.surface,
     focused && { backgroundColor: TOKENS.bgFocus },
@@ -89,6 +94,8 @@ export function SettingRow({
       testID={testID}
       radius={TOKENS.radius}
       scaleFocus={TOKENS.scaleFocus}
+      // An info row's OK is not a «click» (Story 8.3): no visible press.
+      scalePressed={info ? 1 : undefined}
       hasTVPreferredFocus={hasTVPreferredFocus}
       accessibilityRole={
         radio ? 'radio' : check ? 'checkbox' : toggle ? 'switch' : kind === 'nav' ? 'button' : 'text'
@@ -97,7 +104,7 @@ export function SettingRow({
       accessibilityState={
         radio ? { selected, checked: selected } : check || toggle ? { checked } : undefined
       }
-      onPress={pressable ? onPress : undefined}
+      onPress={onPress}
       onFocus={onFocus}
       onBlur={onBlur}
       surfaceStyle={surfaceStyle}

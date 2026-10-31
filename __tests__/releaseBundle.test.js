@@ -4,7 +4,9 @@
  * mode (FixtureTransport); Story 2.6: nor the in-memory A11 trigger.
  * Builds the Metro bundle with `--dev false` (and, as a control that the
  * grep can see them, `--dev true`) and searches it for the
- * dev route names and focus ids. Plain JS; runs the local react-native CLI.
+ * dev route names and focus ids. Story 8.3: the hidden Diagnostics route is
+ * product code and must be in the release bundle. Plain JS; runs the local
+ * react-native CLI.
  */
 const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
@@ -75,6 +77,10 @@ function bundle(dev) {
 test('the release bundle has the Shell but no dev route or dev focus id', () => {
   const release = bundle(false);
   expect(release).toContain('nav/settings');
+  // Story 8.3: the hidden Diagnostics ship in release (only the gesture
+  // reveals them), so their ids are not on the debug-only marker list.
+  expect(release).toContain('settings/diagnostics/capture');
+  expect(release).toContain('diagnostics.capture.v1');
   for (const marker of DEV_MARKERS) {
     expect({ marker, found: release.includes(marker) }).toEqual({ marker, found: false });
   }

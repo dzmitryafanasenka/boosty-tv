@@ -4,6 +4,7 @@ import {
   NavigationContainer,
   DarkTheme,
   createNavigationContainerRef,
+  useFocusEffect,
   type Theme,
 } from '@react-navigation/native';
 import {
@@ -18,7 +19,7 @@ import {
   useState,
   type RefObject,
 } from 'react';
-import { AppState, StatusBar, StyleSheet, View } from 'react-native';
+import { AppState, BackHandler, StatusBar, StyleSheet, View } from 'react-native';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import {
@@ -30,7 +31,7 @@ import {
 import { refreshAuthorPostsHeads } from '../features/author';
 import { refreshFeedHead } from '../features/home';
 import { debugBreakNextVideoSource } from '../features/player';
-import { SignOutDialog } from '../features/settings';
+import { DiagnosticsScreen, SignOutDialog } from '../features/settings';
 import { accountScope } from '../shared/account';
 import {
   SessionCheckContext,
@@ -152,6 +153,23 @@ function Expired({ navigation }: StackScreenProps<RootStackParamList, 'Expired'>
 }
 
 /**
+ * Story 8.3: the hidden Diagnostics over the Shell. Back pops it (one route)
+ * while it is focused; the Shell then restores its content focus, «Версия».
+ */
+function Diagnostics({ navigation }: StackScreenProps<RootStackParamList, 'Diagnostics'>) {
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        navigation.goBack();
+        return true;
+      });
+      return () => sub.remove();
+    }, [navigation]),
+  );
+  return <DiagnosticsScreen />;
+}
+
+/**
  * Story 2.6: replace the whole stack with A11. Not ready yet: nothing
  * happens, and `onNavigationReady` resets once the navigator is mounted.
  * Already `[Expired]`: nothing happens (no remount).
@@ -242,6 +260,13 @@ function ShellRoute({
     },
     [navigation],
   );
+  // Story 8.3: the «Версия» gesture. Only while the Shell is focused (a
+  // press during a transition is dropped).
+  const onOpenDiagnostics = useCallback(() => {
+    if (navigation.isFocused()) {
+      navigation.push('Diagnostics');
+    }
+  }, [navigation]);
   const modal = useModal();
   const onOpenSignOut = useCallback(
     (initiator: RefObject<HostView | null>) => {
@@ -263,6 +288,7 @@ function ShellRoute({
       onOpenFocusCheck={
         __DEV__ ? () => navigation.navigate('DevFocus') : undefined
       }
+      onOpenDiagnostics={phaseFlags.diagnostics ? onOpenDiagnostics : undefined}
       onCheckSession={__DEV__ ? ui.onCheckSession : undefined}
       onExpireSession={__DEV__ ? ui.onExpireSession : undefined}
       onBreakNextVideoUrl={__DEV__ ? debugBreakNextVideoSource : undefined}
@@ -475,6 +501,9 @@ function App() {
                       <Stack.Screen name="Post" component={PostRoute} />
                       <Stack.Screen name="Player" component={PlayerRoute} />
                       <Stack.Screen name="Expired" component={Expired} />
+                      {phaseFlags.diagnostics ? (
+                        <Stack.Screen name="Diagnostics" component={Diagnostics} />
+                      ) : null}
                       {__DEV__ && dev ? (
                         <>
                           <Stack.Screen

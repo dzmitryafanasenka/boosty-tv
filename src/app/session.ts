@@ -6,6 +6,7 @@ import {
   setQualityPreferenceKeyValueStore,
   setSpeedPreferenceKeyValueStore,
 } from '../features/player';
+import { diagnosticsCapture, setDiagnosticsCaptureKeyValueStore } from '../shared/services/logFileSink';
 import { setProgressKeyValueStore } from '../shared/services/progress';
 import { DEMO_MODE } from './appConfig';
 import { phaseFlags } from './phaseFlags';
@@ -38,13 +39,15 @@ export const session: SessionManager = demo
 
 // The demo keeps its progress (Story 4.2 review), its quality preference
 // (Story 4.3), its speed (Story 8.1) and its «Системный видеоплеер» toggle
-// (Story 8.2) in memory: the owner's real `boostytv-account` and
-// `boostytv-device` databases are never read, written or cleared.
+// (Story 8.2) and its «Запись логов» toggle (Story 8.3) in memory: the
+// owner's real `boostytv-account` and `boostytv-device` databases are
+// never read, written or cleared.
 if (demo) {
   setProgressKeyValueStore(demo.createDemoKeyValueStore());
   setQualityPreferenceKeyValueStore(demo.createDemoKeyValueStore());
   setSpeedPreferenceKeyValueStore(demo.createDemoKeyValueStore());
   setExternalPlayerPreferenceKeyValueStore(demo.createDemoKeyValueStore());
+  setDiagnosticsCaptureKeyValueStore(demo.createDemoKeyValueStore());
 }
 
 // Story 8.2 review: warm the «Системный видеоплеер» value (after the demo
@@ -53,6 +56,13 @@ if (demo) {
 // read is off (and logged by the store).
 if (phaseFlags.externalPlayer) {
   externalPlayerPreference.read().catch(() => {});
+}
+
+// Story 8.3: a stored «Запись логов» on resumes capture at startup (the
+// ring so far first), so a problem right after launch is in the file too.
+// A failed read is off (and logged by the store).
+if (phaseFlags.diagnostics) {
+  diagnosticsCapture.read().catch(() => {});
 }
 
 /**

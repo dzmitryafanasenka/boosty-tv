@@ -436,7 +436,8 @@ export const AudioBlock = memo(function AudioBlockView({
   }, [live]);
   const onError = useCallback(
     (code: string | null) => {
-      logger.warn('audio', 'engine error', { code: code ?? 'none', recovered: recoveryUsed.current });
+      // `error`, not `code`: a `code` field is redacted as a secret (Story 8.3).
+      logger.warn('audio', 'engine error', { error: code ?? 'none', recovered: recoveryUsed.current });
       if (!recoveryUsed.current) {
         // One fresh E8 (same block), then on from the last position.
         recoveryUsed.current = true;

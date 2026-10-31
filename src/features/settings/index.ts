@@ -12,3 +12,15 @@ export {
   SignOutDialog,
   type SignOutDialogProps,
 } from './SignOutDialog';
+export {
+  DIAGNOSTICS_CAPTURE_ID,
+  DIAGNOSTICS_CLEAR_ID,
+  DiagnosticsScreen,
+  type DiagnosticsScreenProps,
+} from './DiagnosticsScreen';
+export {
+  VERSION_PRESS_COUNT,
+  VERSION_PRESS_GAP_MS,
+  createVersionPressCounter,
+  useVersionPresses,
+} from './useVersionPresses';

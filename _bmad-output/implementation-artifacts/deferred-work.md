@@ -349,3 +349,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-8-1-playback-speed.md`
   summary: At 2–3× the E9 tick (≥ `WRITE_MOVEMENT_SEC` media seconds of movement) fires every ~3–5 s of wall time; consider a wall-clock floor for ticks in ProgressRepository.
   evidence: bounded today (one E9 in flight, re-sent only with the latest position); out of scope for Story 8.1 because its frozen block keeps the progress rules unchanged in media time (Story 8.1 review, Blind Hunter).
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-8-3-hidden-diagnostics.md`
+  summary: Add a JVM (or instrumented) test for LogFileModule rotation, clear of both files and the append/clear order.
+  evidence: The native log file behaviour is guarded only by source-text assertions (`__tests__/logFileModule.test.js`); the repo has no JVM test setup (Story 8.3 review, V4).

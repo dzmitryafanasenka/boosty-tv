@@ -28,8 +28,11 @@ import type { AccountScopedStore } from './defineAccountScoped';
  *   Contract: the generation is checked once, before `await write(value)`.
  *   So `write` must apply synchronously to the same store a reset clears;
  *   an async writer (disk, keychain) must re-check `isCurrent()` after its
- *   write and undo it when a reset happened meanwhile. No async writer
- *   exists yet (Story 2.8).
+ *   write and undo it when a reset happened meanwhile. The first async
+ *   writer is the diagnostics log file (Story 8.3,
+ *   `shared/services/logFileSink.ts`): its undo is its own store's reset,
+ *   a native clear that the serial native thread always runs after any
+ *   append sent before the bump.
  * - Logs only store names and the outcome.
  */
 

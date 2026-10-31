@@ -4,6 +4,7 @@ import { searchQueryAccountStore } from '../features/search';
 import { accountScope } from '../shared/account';
 import { filtersAccountStore } from '../shared/filters';
 import { focusRestorationAccountStore } from '../shared/focus';
+import { logFileAccountStore } from '../shared/services/logFileSink';
 import { loggerAccountStore } from '../shared/services/logger';
 import { progressAccountStore } from '../shared/services/progress';
 import { queryCacheAccountStore } from './queryClient';
@@ -38,6 +39,8 @@ accountScope.register(
   focusRestorationAccountStore,
   authFlowAccountStore,
   loggerAccountStore,
+  // Story 8.3: the diagnostics log file, right after the ring it mirrors.
+  logFileAccountStore,
   queryCacheAccountStore,
   progressAccountStore,
   filtersAccountStore,

@@ -1,5 +1,5 @@
 import { act } from 'react';
-import { StyleSheet } from 'react-native';
+import { AccessibilityInfo, Animated, StyleSheet } from 'react-native';
 import { createRoot, type Root } from 'test-renderer';
 import { NavItem } from '../NavItem';
 import { SettingRow } from '../SettingRow';
@@ -77,14 +77,12 @@ describe('NavItem', () => {
 });
 
 describe('SettingRow', () => {
-  it('info: focusable, label + value, OK does nothing, setting-row tokens', async () => {
-    const onPress = jest.fn();
-    const root = await render(
-      <SettingRow testID={ID} kind="info" label="Версия" value="1.0" onPress={onPress} />,
-    );
+  it('info: focusable, label + value, OK does nothing without onPress, setting-row tokens', async () => {
+    const root = await render(<SettingRow testID={ID} kind="info" label="Версия" value="1.0" />);
     const node = host(root);
     expect(node.props.focusable).toBe(true);
     expect(node.props.accessibilityLabel).toBe('Версия 1.0');
+    expect(node.props.accessibilityRole).toBe('text');
     expect(surface(root)).toMatchObject({
       minHeight: components['setting-row'].minHeight,
       borderRadius: components['setting-row'].radius,
@@ -92,12 +90,49 @@ describe('SettingRow', () => {
     await act(async () => {
       host(root).props.onClick({ nativeEvent: {} });
     });
-    expect(onPress).not.toHaveBeenCalled();
 
     await setFocused(root, true);
     expect(surface(root).backgroundColor).toBe(components['setting-row'].bgFocus);
     expect(byId(root, `${ID}/ring`)).toHaveLength(1);
     expect(focus['scale-row']).toBe(components['setting-row'].scaleFocus);
+  });
+
+  it('Story 8.3: info with onPress: OK calls it; the role and the look stay', async () => {
+    const onPress = jest.fn();
+    const root = await render(<SettingRow testID={ID} kind="info" label="Версия" value="1.0" onPress={onPress} />);
+    const plain = await render(<SettingRow testID={ID} kind="info" label="Версия" value="1.0" />);
+    expect(host(root).props.accessibilityRole).toBe('text');
+    expect(host(root).props.accessibilityState).toEqual(host(plain).props.accessibilityState);
+    expect(surface(root)).toEqual(surface(plain));
+    await act(async () => {
+      host(root).props.onClick({ nativeEvent: {} });
+    });
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
+  it('Story 8.3 review: an info row with onPress never animates to the pressed scale', async () => {
+    jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(false);
+    jest
+      .spyOn(AccessibilityInfo, 'addEventListener')
+      .mockReturnValue({ remove: () => {} } as ReturnType<typeof AccessibilityInfo.addEventListener>);
+    const timing = jest.spyOn(Animated, 'timing');
+    try {
+      const evt = { nativeEvent: {}, persist: () => {} };
+      const root = await render(<SettingRow testID={ID} kind="info" label="Версия" value="1.0" onPress={() => {}} />);
+      await act(async () => host(root).props.onFocus(evt));
+      await act(async () => host(root).props.onPressIn(evt));
+      const pressedTo = timing.mock.calls.map(([, config]) => config.toValue);
+      expect(pressedTo).not.toContain(focus['pressed-scale']);
+
+      // Control: a nav row does animate to it.
+      timing.mockClear();
+      const nav = await render(<SettingRow testID={ID} kind="nav" label="Выйти" onPress={() => {}} />);
+      await act(async () => host(nav).props.onFocus(evt));
+      await act(async () => host(nav).props.onPressIn(evt));
+      expect(timing.mock.calls.map(([, config]) => config.toValue)).toContain(focus['pressed-scale']);
+    } finally {
+      jest.restoreAllMocks();
+    }
   });
 
   it('nav: OK calls onPress', async () => {
