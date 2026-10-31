@@ -1,0 +1,37 @@
+__tests__/externalPlayerFlow.test.tsx
+  s_7477a2e6c69ec6::t_9a43abd0087400 26,50,306-311
+__tests__/playerRecoveryFlow.test.tsx
+  s_7477a2e6c69ec6::t_59c5732a1bb6eb 177-178
+_bmad-output/implementation-artifacts/spec-epic-8-retro-a5-diagnostics-polish.md
+  s_7477a2e6c69ec6::t_0344396d9151fe 1-58
+_bmad-output/planning-artifacts/architecture/architecture-boosty-tv-2026-10-25/ARCHITECTURE-SPINE.md
+  s_7477a2e6c69ec6::t_1db97fe13d5b76 95
+docs/feature-parity.md
+  s_7477a2e6c69ec6::t_85aa1ddd4dc4b6 119,148
+docs/testing.md
+  s_7477a2e6c69ec6::t_70a48dc6c6c552 992
+src/features/player/PlayerScreen.tsx
+  s_7477a2e6c69ec6::t_d3d103cac11afc 1,220-223,225,233-249,346
+src/features/player/usePlaybackSession.ts
+  s_7477a2e6c69ec6::t_6ed7c58da60af9 61-62,656,672,675
+src/shared/services/__tests__/logFileSink.test.ts
+  s_7477a2e6c69ec6::t_2df44d59ccda8f 71-73,76-77,79-81,90-92,198,200,203,208
+src/shared/services/logFileSink.ts
+  s_7477a2e6c69ec6::t_b9b79868bde14f 2,78-79,90,98,170,175-176
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "4ae998457ac7de7830b9d119a30711ad786a07a5",
+  "prompts": {},
+  "sessions": {
+    "s_7477a2e6c69ec6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d998e7e2-636f-4943-a058-23b274887697",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
