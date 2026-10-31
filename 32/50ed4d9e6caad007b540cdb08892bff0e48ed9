@@ -1,0 +1,97 @@
+__tests__/accountScopeRegistry.test.js
+  s_7477a2e6c69ec6::t_73492a7ddac7b2 53
+__tests__/diagnosticsFlow.test.tsx
+  s_7477a2e6c69ec6::t_e51ec8d62d95aa 1-318
+__tests__/logFileModule.test.js
+  s_7477a2e6c69ec6::t_255f8407fd370a 1-59
+__tests__/releaseBundle.test.js
+  s_7477a2e6c69ec6::t_2f4c016137416b 7-9,80-83
+_bmad-output/implementation-artifacts/spec-8-3-hidden-diagnostics.md
+  s_7477a2e6c69ec6::t_fbdae9659318f0 77-82
+_bmad-output/planning-artifacts/ux-designs/ux-boosty-tv-2026-10-25/EXPERIENCE.md
+  s_7477a2e6c69ec6::t_569d86f8fa37db 94
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/BoostyNativePackage.kt
+  s_7477a2e6c69ec6::t_5cabc4e5ac1fc3 17
+docs/feature-parity.md
+  s_7477a2e6c69ec6::t_b808a27bcc03bd 147-149
+docs/focus-map.md
+  s_7477a2e6c69ec6::t_2934720650a4b6 483,486,496-500
+docs/testing.md
+  s_7477a2e6c69ec6::t_a2a827d077f29b 907-958
+src/app/App.tsx
+  s_7477a2e6c69ec6::t_dfe20cbd6bdb7a 7,22,34,155-171,263-269,291,504-506
+src/app/Shell.tsx
+  s_7477a2e6c69ec6::t_2d9e290ce310f0 41-45,113,358,383,402,442,491-494,496,503-509
+src/app/__tests__/phaseFlags.test.ts
+  s_7477a2e6c69ec6::t_cca43ca11816df 16,65-69
+src/app/bootstrap.ts
+  s_7477a2e6c69ec6::t_81892e44d52264 7,42-43
+src/app/phaseFlags.ts
+  s_7477a2e6c69ec6::t_f18438774fd240 39-44,58
+src/app/routes.ts
+  s_7477a2e6c69ec6::t_dcf2bb44d32aec 57-62
+src/app/session.ts
+  s_7477a2e6c69ec6::t_10536350ed1fb1 9,42-44,50,61-67
+src/features/player/AudioBlock.tsx
+  s_7477a2e6c69ec6::t_b13c1c44c969bc 439-440
+src/features/settings/DiagnosticsScreen.tsx
+  s_7477a2e6c69ec6::t_47c7efddbe9629 1-191
+src/features/settings/SettingsScreen.tsx
+  s_7477a2e6c69ec6::t_d58d5aea6ca8f3 7,32-38,76-78,85,93,136
+src/features/settings/index.ts
+  s_7477a2e6c69ec6::t_db5f5fa6dd2813 15-26
+src/shared/account/accountScope.ts
+  s_7477a2e6c69ec6::t_8510abb5e40f9b 31-35
+src/shared/i18n/ru.ts
+  s_7477a2e6c69ec6::t_e79eb9e939ea7a 624-650
+src/shared/services/__tests__/logFileSink.test.ts
+  s_7477a2e6c69ec6::t_2f16e64a162997 1-338
+src/shared/services/__tests__/logger.test.ts
+  s_7477a2e6c69ec6::t_8105b9aadd0f7e 1,20-39,54-65,74-90,92-139
+src/shared/services/logger.ts
+  s_7477a2e6c69ec6::t_5a9431dd3fbcaa 10-13,39-44,47-49,53-56,58-68,76-80,86-87,89,97-130,142-147,170,192-198,201,208,210,224-226
+src/shared/services/progress/__tests__/continueEntries.test.tsx
+  s_7477a2e6c69ec6::t_16282a125afabb 89
+src/shared/services/progress/__tests__/progressRepository.test.ts
+  s_7477a2e6c69ec6::t_40abc7197ef94a 131
+src/shared/ui/SettingRow.tsx
+  s_7477a2e6c69ec6::t_a0507082f0a584 10-11,38-42,84,97-98,107
+src/shared/ui/__tests__/shellPrimitives.test.tsx
+  s_7477a2e6c69ec6::t_b4c80a24593f14 80-81,85,100-112
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/LogFileModule.kt
+  s_32c217a8b95399::t_38d8b4d4620f06 1-147
+src/shared/platform/__tests__/logFile.test.ts
+  s_32c217a8b95399::t_55292611e5bc5f 1-63
+src/shared/platform/logFile.ts
+  s_32c217a8b95399::t_3be68293e27095 1-77
+src/shared/services/logFileSink.ts
+  s_32c217a8b95399::t_2f1ada80c27b92 1-296
+src/features/settings/__tests__/useVersionPresses.test.ts
+  s_7477a2e6c69ec6::t_1acd1d67172601 1-67
+src/features/settings/useVersionPresses.ts
+  s_7477a2e6c69ec6::t_d714ee11b63128 1-77
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "3250ed4d9e6caad007b540cdb08892bff0e48ed9",
+  "prompts": {},
+  "sessions": {
+    "s_32c217a8b95399": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-aa19f6e83fc84579c",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_7477a2e6c69ec6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d998e7e2-636f-4943-a058-23b274887697",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
