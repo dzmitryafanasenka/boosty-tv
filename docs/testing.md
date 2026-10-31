@@ -935,7 +935,8 @@ Device (agent over adb, Chromecast with Google TV API 34, release-like build fro
 - First build (chooser with `MATCH_DEFAULT_ONLY`): OK fell back to the built-in player with «Внешний плеер не найден» (correct fallback path, but File Commander was installed); the agent left within ~2 s with no pause; the card still said «Осталось 73 мин». A count-only probe (removed) showed the finding above. A second build with flags 0 opened the system chooser, which listed no targets.
 - Final build: OK on 1440p opened File Commander's `VideoPlayerActivity` directly and it played (`dumpsys audio`: USAGE_MEDIA started); Back returned to Boosty TV with focus on the origin Continue card, still «Осталось 73 мин».
 - Restored after the run: the toggle back to «Выкл»; the stored quality stays 1440p.
-- Not checked on the device: the chooser with two or more players (only one real player is installed), sign-out keeping the toggle, `adb logcat` for a signed URL beyond the probe tag, the physical remote.
+- Owner check (2026-10-31): the owner checked the flow with the physical remote and reported it OK.
+- Not checked on the device: the chooser with two or more players (only one real player is installed), sign-out keeping the toggle, `adb logcat` for a signed URL beyond the probe tag.
 
 ### Story 8.1 — Playback speed, 2026-10-31
 
