@@ -2253,8 +2253,9 @@ describe('Story 4.7: «Продолжить просмотр» on Главная
 
   it('Story 8.2 «Hand-off» from a Continue card: the «Качество» list, OK opens the chooser; back on the same card, its resume point unchanged (no E9)', async () => {
     seed(1, 720, 1000);
-    const open = jest.fn().mockResolvedValue('opened');
-    installNativeModules({ ExternalPlayer: { open } });
+    const prepare = jest.fn().mockResolvedValue('ready');
+    const launch = jest.fn().mockResolvedValue('opened');
+    installNativeModules({ ExternalPlayer: { prepare, launch } });
     await createAsyncStorage('boostytv-device').setItem(EXTERNAL_PLAYER_PREFERENCE_KEY, 'on');
     // An earlier player in this file read the value (off) into memory.
     externalPlayerPreference.forget();
@@ -2268,8 +2269,13 @@ describe('Story 4.7: «Продолжить просмотр» on Главная
       focusMock.mockClear();
       await press(root, 'player/external/quality/auto');
       // No start position: only the URL, the title and the chooser title.
-      expect(open).toHaveBeenCalledWith('https://example.invalid/player', expect.any(String), 'Открыть в');
+      expect(prepare).toHaveBeenCalledWith('https://example.invalid/player', expect.any(String), 'Открыть в');
       expect(currentRoute()).toBe('Shell');
+      // The card has focus again before the external player starts (device run: not the sidebar).
+      expect(lastFocusTarget()).toBe(card(1));
+      expect(launch).not.toHaveBeenCalled();
+      await advance(300);
+      expect(launch).toHaveBeenCalledTimes(1);
       expect(lastFocusTarget()).toBe(card(1));
       expect(engine.mounts).toBe(0);
       await advance(60_000);

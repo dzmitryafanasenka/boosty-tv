@@ -23,8 +23,9 @@ type Step = 'read' | 'handoff' | 'builtin';
  * is on (Story 8.2, PLAY-13). It reads the device's «Системный видеоплеер»
  * value once, then:
  * - off → `PlayerScreen` exactly as before;
- * - on → `ExternalHandoff` (quality list → the Android chooser). The
- *   chooser opened → `onExit` (no progress call, no E9). No real player →
+ * - on → `ExternalHandoff` (quality list → the installed player: one opens
+ *   directly, several get the Android chooser). A player resolves →
+ *   `onExit` before it starts (no progress call, no E9). No real player →
  *   the picked quality is kept in memory until the app restarts
  *   (`qualityPreference.remember`: later built-in videos start there too;
  *   the stored preference is untouched) and `PlayerScreen` with «Внешний плеер

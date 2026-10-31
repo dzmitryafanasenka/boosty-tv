@@ -34,6 +34,7 @@ context:
 - No automatic retry once the URL has left the app.
 - The external quality pick does not overwrite the stored quality preference; it uses memory-only `remember`.
 - No player-specific UI and no "default app" setting.
+- Launch (owner decision 2026-10-31, after the device run): one real player → open it directly with an explicit intent; two or more → the system chooser listing those players as explicit intents. On the pinned Google TV the plain chooser (and `MATCH_DEFAULT_ONLY`) sees only the framework stub.
 - No start position is passed: the external player always starts from 0:00, even with a resume point or a post timestamp (owner decision 2026-10-31).
 
 ## I/O & Edge-Case Matrix
@@ -114,6 +115,8 @@ Pass 1 (Blind Hunter B, Edge Case Hunter E, Verification Gap V):
 | 16 | B14: demo mode launches a real chooser | low | Dev-only mode. rejected |
 | 17 | B15/E6: hand-off ignores `isActive` / long background | low | The sheet owns focus inside its route; 23 h staleness negligible. rejected |
 | 18 | E4: hand-off consumes the `__DEV__` break-next-video one-shot | low | Dev-only. rejected |
+| 20 | Device: chooser shows «Действие не поддерживается»; File Commander invisible to `MATCH_DEFAULT_ONLY` and to the system chooser | high | Probe: flags 0 return File Commander + stub; `MATCH_DEFAULT_ONLY` only the stub; the chooser shows no targets. Owner decision recorded in Boundaries; patch |
+| 21 | Device: after the chooser closed, focus landed on the sidebar «Главная», not the origin card | medium | Screenshot `dev82/26`. patch |
 | 19 | E5: `http` media URLs hidden by `<queries>` | false | Signed media URLs are https (api-contract) |
 
 ## Design Notes

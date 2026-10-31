@@ -5,7 +5,7 @@ import type { HttpClient } from '../../shared/api';
 import type { MediaRef } from '../../shared/entities/post';
 import { focusSoon, useLatestRef } from '../../shared/focus';
 import { t } from '../../shared/i18n';
-import { openExternalPlayer } from '../../shared/platform/externalPlayer';
+import { launchExternalPlayer, prepareExternalPlayer } from '../../shared/platform/externalPlayer';
 import { logger } from '../../shared/services/logger';
 import { Spinner, colors, type HostView } from '../../shared/ui';
 import { pickSource, qualityOf, qualityOptions, useMediaSource, type PlayerMeta, type QualityKey } from './mediaResolver';
@@ -17,6 +17,14 @@ import { qualityPreference } from './qualityPreference';
 export const EXTERNAL_SURFACE_ID = 'player/external/surface';
 export const EXTERNAL_SHEET_ID = 'player/external/sheet';
 export const externalQualityRowId = (key: QualityKey) => `player/external/quality/${key}`;
+
+/**
+ * After the route popped, the external player starts this much later: the
+ * origin's focus restoration (now and two frames later) lands first, while
+ * the app still has window focus (Story 8.2 device run: a restoration sent
+ * while the external activity covered the app was lost).
+ */
+export const EXTERNAL_LAUNCH_DELAY_MS = 300;
 
 /** The title the external player shows: the post title, then the video title when it differs. */
 export function externalTitle(meta: PlayerMeta): string {
@@ -46,13 +54,16 @@ export type ExternalHandoffProps = {
  * call, no E9, no Continue entry), then the «Качество» list (the player's
  * `QualityMenu`, a right `player` SideSheet) with focus on the quality the
  * device preference picks. OK on a row hands that source's signed URL and
- * the title to the ExternalPlayer port:
- * - `opened` → `onOpened` (the route exits; no retry once the URL left);
- * - `none` (no player, a launch failure) → `onFallback(key)`.
+ * the title to the ExternalPlayer port (one real player opens directly,
+ * several get the chooser):
+ * - `prepare` → `ready`: `onOpened` (the route pops, the origin restores
+ *   its focus), then `launch` after `EXTERNAL_LAUNCH_DELAY_MS`; a failed
+ *   launch is only logged (the route is gone; no retry once the URL left);
+ * - `prepare` → `none` (no player, a failure) → `onFallback(key)`.
  *
  * Focus stays inside the route's screen (trapped on all sides): the
- * loading surface, then only the list's rows. Back (any time but the launch
- * itself) leaves the route. The URL never reaches logs, storage or route
+ * loading surface, then only the list's rows. Back (any time but while
+ * `prepare` runs) leaves the route. The URL never reaches logs, storage or route
  * params; the log line carries the outcome only.
  */
 export function ExternalHandoff({ http, mediaRef, onOpened, onFallback, onNotReady, onBack }: ExternalHandoffProps) {
@@ -97,8 +108,13 @@ export function ExternalHandoff({ http, mediaRef, onOpened, onFallback, onNotRea
   const sheetShown = ready !== null && !launching;
   const surfaceView = useRef<HostView | null>(null);
   const selectedView = useRef<HostView | null>(null);
+  /** The route is leaving (popped for the launch, or Back): never pull focus back here. */
+  const leaving = useRef(false);
   useEffect(
-    () => focusSoon(() => (sheetShown ? selectedView.current : surfaceView.current)),
+    () =>
+      focusSoon(() => (sheetShown ? selectedView.current : surfaceView.current), {
+        guard: () => !leaving.current,
+      }),
     [sheetShown],
   );
 
@@ -107,6 +123,7 @@ export function ExternalHandoff({ http, mediaRef, onOpened, onFallback, onNotRea
       const sub = BackHandler.addEventListener('hardwareBackPress', () => {
         // The launch is in flight: its outcome decides (exit or fallback).
         if (!launchingRef.current) {
+          leaving.current = true;
           callbacks.current.onBack();
         }
         return true;
@@ -127,18 +144,30 @@ export function ExternalHandoff({ http, mediaRef, onOpened, onFallback, onNotRea
     }
     launchingRef.current = true;
     setLaunching(true);
-    openExternalPlayer({ url: source.url, title: externalTitle(ready.meta), chooserTitle: t('player.external.chooser') })
-      .then(outcome => {
-        // Outcome only: never the URL or the title.
-        logger.info('player', 'external player hand-off', { outcome });
+    prepareExternalPlayer({ url: source.url, title: externalTitle(ready.meta), chooserTitle: t('player.external.chooser') })
+      .then(prepared => {
         if (!alive.current) {
           return;
         }
-        if (outcome === 'opened') {
-          callbacks.current.onOpened();
-        } else {
+        if (prepared === 'none') {
+          // Outcome only: never the URL or the title.
+          logger.info('player', 'external player hand-off', { outcome: 'none' });
           callbacks.current.onFallback(key);
+          return;
         }
+        // Pop first, so the origin gets its focus back while the app still
+        // has window focus; the player starts once that has landed.
+        leaving.current = true;
+        callbacks.current.onOpened();
+        setTimeout(() => {
+          launchExternalPlayer().then(outcome => {
+            logger.info('player', 'external player hand-off', { outcome });
+            if (outcome !== 'opened') {
+              // The route is gone: nothing to fall back to, no retry.
+              logger.warn('player', 'external player launch failed');
+            }
+          });
+        }, EXTERNAL_LAUNCH_DELAY_MS);
       })
       .catch(() => {
         // A callback threw: never leave the spinner stuck with Back ignored. No URL, no title.

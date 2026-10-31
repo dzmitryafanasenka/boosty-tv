@@ -35,6 +35,7 @@ import {
   speedPreference,
 } from '../src/features/player';
 import { resetBreakSource } from '../src/features/player/debugBreakSource';
+import { EXTERNAL_LAUNCH_DELAY_MS } from '../src/features/player/ExternalHandoff';
 import { playbackArbiter } from '../src/shared/platform/playbackArbiter';
 import { colors } from '../src/shared/ui';
 import { requestHostFocus } from '../src/shared/ui/requestHostFocus';
@@ -4066,7 +4067,8 @@ describe('Story 8.2: the system video player (PLAY-13, SET-02)', () => {
   ];
   const device = () => createAsyncStorage('boostytv-device');
   const e9Sent = () => transport.calls.filter(c => c.method === 'PUT' && E9_RE.test(c.path));
-  let open: jest.Mock;
+  let prepare: jest.Mock;
+  let launch: jest.Mock;
   const sheetRows = (root: Root) =>
     byTestId(root, SHEET)[0]
       .queryAll(n => n.props.focusable === true)
@@ -4074,13 +4076,15 @@ describe('Story 8.2: the system video player (PLAY-13, SET-02)', () => {
   const valueText = (root: Root) => byTestId(root, `${ROW}/value`)[0].props.children as string;
 
   beforeEach(() => {
-    open = jest.fn().mockResolvedValue('opened');
-    installNativeModules({ ExternalPlayer: { open } });
+    prepare = jest.fn().mockResolvedValue('ready');
+    launch = jest.fn().mockResolvedValue('opened');
+    installNativeModules({ ExternalPlayer: { prepare, launch } });
   });
 
   /** The toggle is on (stored), then Пост → OK on v1 → the hand-off list. */
   async function openHandoff(sources: unknown[] = MIXED): Promise<Root> {
     await device().setItem(EXTERNAL_PLAYER_PREFERENCE_KEY, 'on');
+    externalPlayerPreference.forget();
     withData([okVideo('v1', sources), ...paragraph('Body')]);
     const root = await openPost();
     focusMock.mockClear();
@@ -4153,6 +4157,8 @@ describe('Story 8.2: the system video player (PLAY-13, SET-02)', () => {
       await device().setItem(QUALITY_PREFERENCE_KEY, '720');
       const pending = deferred();
       await device().setItem(EXTERNAL_PLAYER_PREFERENCE_KEY, 'on');
+      // The app warms the value at startup (off before this test stored it).
+      externalPlayerPreference.forget();
       withData([okVideo('v1', MIXED), ...paragraph('Body')]);
       const root = await openPost();
       e8 = () => pending.promise;
@@ -4178,11 +4184,23 @@ describe('Story 8.2: the system video player (PLAY-13, SET-02)', () => {
       expect(lastFocusTarget()).toBe(Q(720));
       focusMock.mockClear();
       await press(root, Q(360));
-      expect(open).toHaveBeenCalledTimes(1);
-      expect(open).toHaveBeenCalledWith(`${URL}-360`, expect.any(String), 'Открыть в');
-      expect(open.mock.calls[0][1]).not.toBe('');
+      expect(prepare).toHaveBeenCalledTimes(1);
+      expect(prepare).toHaveBeenCalledWith(`${URL}-360`, expect.any(String), 'Открыть в');
+      expect(prepare.mock.calls[0][1]).not.toBe('');
+      // The route pops first and the origin gets its focus back; the player
+      // starts only after that (Story 8.2 device run: a restoration sent
+      // while the external activity covered the app was lost).
       expect(currentRoute()).toBe('Post');
       expect(lastFocusTarget()).toBe(VIDEO('v1'));
+      expect(launch).not.toHaveBeenCalled();
+      let focusAtLaunch: string | undefined;
+      launch.mockImplementation(async () => {
+        focusAtLaunch = lastFocusTarget();
+        return 'opened';
+      });
+      await advance(EXTERNAL_LAUNCH_DELAY_MS);
+      expect(launch).toHaveBeenCalledTimes(1);
+      expect(focusAtLaunch).toBe(VIDEO('v1'));
       expect(engine.mounts).toBe(0);
       await advance(60_000);
       expect(e9Sent()).toHaveLength(0);
@@ -4205,7 +4223,7 @@ describe('Story 8.2: the system video player (PLAY-13, SET-02)', () => {
       const root = await openHandoff();
       expect(lastFocusTarget()).toBe(Q('auto'));
       await press(root, Q('auto'));
-      expect(open).toHaveBeenCalledWith(`${URL}-hls`, expect.any(String), 'Открыть в');
+      expect(prepare).toHaveBeenCalledWith(`${URL}-hls`, expect.any(String), 'Открыть в');
       expect(currentRoute()).toBe('Post');
       await unmount(root);
     });
@@ -4213,7 +4231,7 @@ describe('Story 8.2: the system video player (PLAY-13, SET-02)', () => {
     it('a resume point or a timestamp start is not passed (owner decision 2026-10-31): only the URL, the title and the chooser title', async () => {
       const root = await openHandoff();
       await press(root, Q(720));
-      expect(open.mock.calls[0]).toHaveLength(3);
+      expect(prepare.mock.calls[0]).toHaveLength(3);
       await unmount(root);
     });
 
@@ -4224,7 +4242,7 @@ describe('Story 8.2: the system video player (PLAY-13, SET-02)', () => {
       await back();
       expect(currentRoute()).toBe('Post');
       expect(lastFocusTarget()).toBe(VIDEO('v1'));
-      expect(open).not.toHaveBeenCalled();
+      expect(prepare).not.toHaveBeenCalled();
       expect(engine.mounts).toBe(0);
       await advance(60_000);
       expect(e9Sent()).toHaveLength(0);
@@ -4236,8 +4254,8 @@ describe('Story 8.2: the system video player (PLAY-13, SET-02)', () => {
       ['the module answers `none` (only this app or the TV stub)', () => jest.fn().mockResolvedValue('none')],
       ['the launch throws', () => jest.fn().mockRejectedValue(new Error(`ActivityNotFoundException ${URL}-720`))],
     ])('matrix «No player» (%s): the built-in player at the picked quality with «Внешний плеер не найден»; progress as usual; the stored quality unchanged', async (_name, make) => {
-      open = make();
-      installNativeModules({ ExternalPlayer: { open } });
+      prepare = make();
+      installNativeModules({ ExternalPlayer: { prepare, launch } });
       const root = await openHandoff();
       const e8Before = e8Calls().length;
       await press(root, Q(720));
@@ -4268,17 +4286,17 @@ describe('Story 8.2: the system video player (PLAY-13, SET-02)', () => {
     });
 
     it('Back while the launch is in flight is ignored (the outcome decides): `none` then mounts the fallback with «Внешний плеер не найден»', async () => {
-      const launch = deferred<string>();
-      open = jest.fn(() => launch.promise);
-      installNativeModules({ ExternalPlayer: { open } });
+      const preparing = deferred<string>();
+      prepare = jest.fn(() => preparing.promise);
+      installNativeModules({ ExternalPlayer: { prepare, launch } });
       const root = await openHandoff();
       await press(root, Q(720));
-      expect(open).toHaveBeenCalledTimes(1);
+      expect(prepare).toHaveBeenCalledTimes(1);
       expect(visible(root, LOADING)).toBe(true);
       await back();
       expect(currentRoute()).toBe('Player');
       expect(engine.mounts).toBe(0);
-      launch.resolve('none');
+      preparing.resolve('none');
       await settle();
       expect(currentRoute()).toBe('Player');
       expect(engine.props?.source).toEqual({ uri: `${URL}-720`, format: 'progressive' });
@@ -4300,8 +4318,24 @@ describe('Story 8.2: the system video player (PLAY-13, SET-02)', () => {
       expect(lastFocusTarget()).toBe(VIDEO('v1'));
       pending.resolve({ status: 200, body: postDetail(FEED_BLOG, POST, [okVideo('v1', MIXED), ...paragraph('Body')]) });
       await settle();
-      expect(open).not.toHaveBeenCalled();
+      expect(prepare).not.toHaveBeenCalled();
       expect(currentRoute()).toBe('Post');
+      await unmount(root);
+    });
+
+    it('a launch that fails after the pop is only logged (outcome, no URL); the origin keeps focus, no fallback, no retry', async () => {
+      launch.mockResolvedValue('none');
+      const root = await openHandoff();
+      await press(root, Q(720));
+      expect(currentRoute()).toBe('Post');
+      await advance(EXTERNAL_LAUNCH_DELAY_MS);
+      await settle();
+      expect(launch).toHaveBeenCalledTimes(1);
+      expect(currentRoute()).toBe('Post');
+      expect(engine.mounts).toBe(0);
+      const messages = logger.entries().map(e => e.message);
+      expect(messages).toContain('external player launch failed');
+      expect(JSON.stringify(logger.entries())).not.toContain('example.invalid');
       await unmount(root);
     });
 
@@ -4324,7 +4358,7 @@ describe('Story 8.2: the system video player (PLAY-13, SET-02)', () => {
       expect(currentRoute()).toBe('Player');
       expect(visible(root, SHEET)).toBe(false);
       expect(playerText(root)).toContain('Видео недоступно');
-      expect(open).not.toHaveBeenCalled();
+      expect(prepare).not.toHaveBeenCalled();
       await unmount(root);
     });
 
@@ -4335,7 +4369,7 @@ describe('Story 8.2: the system video player (PLAY-13, SET-02)', () => {
       expect(visible(root, SHEET)).toBe(false);
       expect(engine.props?.source.format).toBe('hls');
       expect(visible(root, 'player/notice')).toBe(false);
-      expect(open).not.toHaveBeenCalled();
+      expect(prepare).not.toHaveBeenCalled();
       await unmount(root);
     });
 
@@ -4349,7 +4383,7 @@ describe('Story 8.2: the system video player (PLAY-13, SET-02)', () => {
         expect(visible(root, SHEET)).toBe(false);
         expect(engine.props?.source.format).toBe('hls');
         expect(read).not.toHaveBeenCalled();
-        expect(open).not.toHaveBeenCalled();
+        expect(prepare).not.toHaveBeenCalled();
         await unmount(root);
       } finally {
         flag.restore();
@@ -4374,7 +4408,7 @@ describe('Story 8.2: the system video player (PLAY-13, SET-02)', () => {
       expect(currentRoute()).toBe('Player');
       expect(visible(root, SHEET)).toBe(false);
       expect(engine.mounts).toBe(1);
-      expect(open).not.toHaveBeenCalled();
+      expect(prepare).not.toHaveBeenCalled();
       await unmount(root);
     });
   });
