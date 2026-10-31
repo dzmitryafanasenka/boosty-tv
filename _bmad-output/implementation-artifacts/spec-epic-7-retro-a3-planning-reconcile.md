@@ -96,9 +96,9 @@ context:
   - A «Superseded mocks» note lists the 4-column and two-column mock files.
 - **Components:**
   - The ≈ 260 dp post left-column estimate is marked obsolete.
-  - LiveCard: the as-built states, details line and button column (`LiveCard.tsx`, `:237`).
-  - ImageBlock: one-column width, no focus scale (spec 6.2, `:239`).
-  - ParagraphStop: every paragraph (`:240`).
+  - LiveCard: the as-built states, details line and button column (`LiveCard.tsx`, now `:240`).
+  - ImageBlock: one-column width, no focus scale (spec 6.2, now `:242`).
+  - ParagraphStop: every paragraph (now `:243`).
   - LinkChip: the action suffixes.
 
 ### `_bmad-output/planning-artifacts/architecture/architecture-boosty-tv-2026-10-25/ARCHITECTURE-SPINE.md`

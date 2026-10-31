@@ -256,7 +256,7 @@ Arrows mean "may import". `shared` never imports `features` or `app`. Features n
   - **`docs/focus-map.md`** (English) must exist before the first UI story starts.
   - *As built (Epic 3 retro, accepted):*
     - On stack screens the screen segment carries the route's entity (`author/<blogUrl>/post/<postId>`, `post/<postId>/…`). `docs/focus-map.md` §1 lists every id.
-    - `setReturnFocus` is a Shell section callback, used by Главная and Подписки (ADR 0012), not `setReturnFocus(routeKey, focusId)`. The player writes its return target through `focusRestoration.remember`.
+    - `setReturnFocus` is a Shell section callback, used by every Shell section (Главная, Поиск, Подписки, События; ADR 0012), not `setReturnFocus(routeKey, focusId)`. The player writes its return target through `focusRestoration.remember`.
     - Пост keeps its own column focus memory, a deliberate deviation explained in `docs/focus-map.md` §1.6.
 
 ### AD-13 — Navigation model

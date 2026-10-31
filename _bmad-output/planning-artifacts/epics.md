@@ -1547,7 +1547,7 @@ So that I learn about streams without visiting each author.
 - **Empty state** (Q2 a): «Событий нет» comes with «Обновить» (focused; it refetches).
 - **Hidden types** (Q3 a): blog-owner event types are hidden (donations, new subscribers, stat reports, purchases, referrals, support tickets, level limits, `target_new`), and comment types are never shown. Shown: `video_stream_start` («Начался эфир»), `post_new` and `promo_new` with their own text, and unknown types with generic text.
 - **Refetch:** the query uses `staleTime: 0`, so every open of the section fetches again, and a resume invalidates it.
-- **Read marks:** OK marks a row read locally for the session. No read mutation is sent.
+- **Read marks:** OK marks a row read locally for the session, only when Автор really opens. No read mutation is sent.
 
 ## Epic 8: Viewing preferences and diagnostics (P2)
 

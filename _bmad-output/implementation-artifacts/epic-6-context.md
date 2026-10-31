@@ -110,5 +110,5 @@ Epic 6 is done. Where this context differs from the as-built, the as-built wins.
   - In a single-choice poll, two OK presses on another option change the vote (Story 6.6 Q1 a).
   - A failed vote or retract shows one line per mutation, whatever the error kind. This is an accepted exception, recorded in ARCHITECTURE-SPINE AD-5.
   - `usePollVote`'s generation-keyed in-flight state is the AD-4 exception, now through `src/shared/account/generationKeyed.ts`.
-- **Live samples:** audio and file blocks were found live in Stories 6.3 and 6.4 (api-contract §4.1), and so was one single-choice poll. No multiple-choice sample exists.
+- **Live samples:** audio and file blocks were found live in Stories 6.3 and 6.4 (api-contract §4.1); one single-choice poll was found by the Story 6.5 scan (api-contract §4.2). No multiple-choice sample exists.
 - **The deferred PostCard item:** the avatar-on-a-plate placeholder for cards without a preview landed separately (`spec-post-card-no-preview-placeholder.md`, 2026-10-30).

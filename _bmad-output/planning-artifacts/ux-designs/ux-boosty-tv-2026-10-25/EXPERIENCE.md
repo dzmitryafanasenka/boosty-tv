@@ -90,7 +90,7 @@ This section is behavior only; visual specs are in `DESIGN.md › Components`. �
 | **Sign-out Dialog** | Initial focus is «Отмена». Confirming clears secure storage (tokens, stored phone), the query cache, the continue-watching history and filters, then shows Welcome. Cancel returns focus to «Выйти из аккаунта». |
 | **QrDialog** | Traps focus. The only action is «Закрыть»; Back also closes it. Focus returns to the initiator. The QR is generated on the device and the URL is never logged. |
 | **StateView** | The single action gets the initial focus. ← moves to the sidebar. |
-| **EventRow** *(conditional; shown since Story 7.5)* | OK opens the author page; for a live event the page is focused on the LiveCard. OK also marks the row read locally; no read request is sent. A row without a valid blog does nothing on OK. |
+| **EventRow** *(conditional; shown since Story 7.5)* | OK opens the author page; for a live event the page is focused on the LiveCard. OK also marks the row read locally, only when Автор really opens; no read request is sent. A row without a valid blog does nothing on OK. |
 | **Diagnostics** | Revealed by 7 OK presses on «Версия». Toggles log capture and explains log retrieval (adb). Logs are redacted: no tokens, cookies, phone, code or signed URLs. |
 | **«Системный видеоплеер»** | A toggle. When on, the user picks a quality, then the Android chooser opens. The row description says progress is not tracked in this mode. If no external player is installed, the built-in player is used and the hint «Внешний плеер не найден» is shown. |
 
@@ -288,7 +288,7 @@ Error classes stay distinct (CLAUDE.md): session expired ≠ no access ≠ media
 - On A2 after A11, the initial focus is «Получить код».
 - For more than 30 subscriptions, show «Показаны первые 30» instead of «28 из 55».
 - **Superseded mock layouts (as built, 2026-10-31 reconcile):**
-  - The post grids (Главная, Автор, Поиск) have **3 columns**, not the mocks' 4 (owner decision 2026-10-26; `Home Feed.dc.html`, `Boosty TV - D-L.dc.html` D3, the 1280×720 notes in `Boosty TV - A B C.dc.html`).
+  - The post grids (Главная, Автор, Поиск) have **3 columns**, not the mocks' 4 (owner decision 2026-10-26; `Home Feed.dc.html`, `Author Page.dc.html`, `Search Screen.dc.html`, `Boosty TV - D-L.dc.html` D3, the 1280×720 notes in `Boosty TV - A B C.dc.html`).
   - Пост is **one column with the header on top**, not two columns (owner decision 2026-10-27; `Post Screen.dc.html`, F screens in `Boosty TV - D-L.dc.html`).
   - Автор and Пост show the Shell sidebar (ADR 0012).
   - The order of the post's elements is unchanged. See `DESIGN.md › Layout & Spacing`.

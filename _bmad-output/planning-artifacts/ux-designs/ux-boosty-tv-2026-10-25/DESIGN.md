@@ -191,7 +191,7 @@ Golos Text, bundled with the app, full Cyrillic. The UI reads from 2–3 m, so n
   - Posts: 4 × `{spacing.card-width}`, gaps `{spacing.card-gap-x}` / `{spacing.card-gap-y}`. *Superseded (owner decision 2026-10-26, Story 3.1 device review): the post grids (Главная, Автор, Поиск) have **3 columns** of 221 dp in the 720 dp content, with `{spacing.focus-headroom}` on both sides (see PostCard). The `card-width` token is the mocks' 4-column value.*
   - Authors: 3 × `{spacing.author-tile-width}`, gap `{spacing.author-tile-gap}`.
 - **Superseded mocks.** The Claude Design mocks are not updated. Where they differ from this file, this file wins:
-  - 4-column grids: `Home Feed.dc.html`; `Boosty TV - D-L.dc.html` D3; the 720p notes in `Boosty TV - A B C.dc.html`.
+  - 4-column grids: `Home Feed.dc.html`, `Author Page.dc.html`, `Search Screen.dc.html`; `Boosty TV - D-L.dc.html` D3; the 720p notes in `Boosty TV - A B C.dc.html`.
   - The two-column Post: `Post Screen.dc.html`; `Boosty TV - D-L.dc.html` F1–F8.
 - **Fifth card.** The fifth card of a horizontal row is cut by the edge as a scroll hint. The focused card is always fully inside the safe area. Rows keep `{spacing.focus-headroom}` inner padding so scaling is never clipped.
 - **Post screen.** One vertically scrolling column in the content area, header on top (owner decision 2026-10-27; supersedes the two columns of `Post Screen.dc.html`).
