@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 10-25-2026 14:34
-last_updated: 10-31-2026 22:17
+last_updated: 10-31-2026 22:25
 project: Boosty TV
 project_key: NOKEY
 tracking_system: file-system
@@ -407,7 +407,7 @@ action_items:
       epic-8-context, ARCHITECTURE-SPINE AD-2/AD-4/AD-14, feature-parity PLAY-07/PLAY-13
       device status, logFile fail-closed note, per-port error rule)"
     owner: "agent"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-8-retro-2026-10-31.md"
   - id: "epic-8-retro-item-41-extract-createdevicepreference-t-and-use"
     epic: 8
