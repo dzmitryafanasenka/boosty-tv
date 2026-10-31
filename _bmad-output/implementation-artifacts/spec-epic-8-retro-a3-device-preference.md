@@ -2,7 +2,7 @@
 title: 'Epic 8 retro A3: one device-preference factory'
 type: 'refactor'
 created: '2026-10-31'
-status: 'in-review'
+status: 'done'
 baseline_commit: 'fa9eb3170648e9005c0c1479b882c192e9a8c4c3'
 route: 'dispatch'
 review_loop_iteration: 0
