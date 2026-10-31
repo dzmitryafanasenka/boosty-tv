@@ -1,0 +1,55 @@
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_7477a2e6c69ec6::t_8563f396d1b19c 348
+_bmad-output/implementation-artifacts/spec-player-live-vod-split.md
+  s_7477a2e6c69ec6::t_6d31e3946fc8b2 1-115
+docs/focus-map.md
+  s_7477a2e6c69ec6::t_146cd8638b9d1b 416
+docs/testing.md
+  s_7477a2e6c69ec6::t_dd10c35ecbd1bf 906-919
+src/features/player/PlayerScreen.tsx
+  s_7477a2e6c69ec6::t_368275f81a528e 1-2,6,9-14,16-26,118-125,141-144,146-150,154-166,168-178,182-192,195-216,220,223-224,226-245,248-256,260,266,271,273,275,279,283-284,288-295,310-322,334,337,340,345,351-353,358,363
+src/features/player/__tests__/playbackMode.test.ts
+  s_7477a2e6c69ec6::t_eeebb668d1436f 1-160
+src/features/player/__tests__/playerPhase.test.ts
+  s_7477a2e6c69ec6::t_dc216a5234cdfe 1-137
+src/features/player/playbackMode.ts
+  s_a12b884e5bb81c::t_2f093dbf494a04 1-117
+src/features/player/playerPhase.ts
+  s_a12b884e5bb81c::t_da5acbc38a8154 1-102
+src/features/player/usePlaybackSession.ts
+  s_a12b884e5bb81c::t_15346d61874cc0 1-696
+src/features/player/usePlayerFocus.ts
+  s_a12b884e5bb81c::t_a56e4528cdf58d 1-195
+src/features/player/usePlayerKeys.ts
+  s_a12b884e5bb81c::t_36314f9d72bcdf 1-313
+src/features/player/usePlayerProgress.ts
+  s_a12b884e5bb81c::t_a4c972aa51e32f 1-106
+src/features/player/usePlayerSettings.tsx
+  s_a12b884e5bb81c::t_3191c4dd8c03f6 1-131
+src/features/player/usePlayerSource.ts
+  s_a12b884e5bb81c::t_18f19b40f1e61a 1-88
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "793ef0bd3336f2d68e2fec009c78b65923c84689",
+  "prompts": {},
+  "sessions": {
+    "s_7477a2e6c69ec6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d998e7e2-636f-4943-a058-23b274887697",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_a12b884e5bb81c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-abce7e5107eb24765",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
