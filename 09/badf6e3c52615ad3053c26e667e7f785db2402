@@ -1,0 +1,25 @@
+__tests__/playerFlow.test.tsx
+  s_7477a2e6c69ec6::t_831536a4e8f02e 6-11
+_bmad-output/implementation-artifacts/spec-epic-8-retro-a4-split-player-flow.md
+  s_7477a2e6c69ec6::t_bcf385e3ba225a 5,67-93
+docs/testing.md
+  s_7477a2e6c69ec6::t_2a0862ebfa6178 903,909,911,1028,1083,1126
+src/test/playerFlowHarness.tsx
+  s_7477a2e6c69ec6::t_9a9d61ff0ea382 137-138,140,142-145
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "09badf6e3c52615ad3053c26e667e7f785db2402",
+  "prompts": {},
+  "sessions": {
+    "s_7477a2e6c69ec6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d998e7e2-636f-4943-a058-23b274887697",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
