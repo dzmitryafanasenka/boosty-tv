@@ -1,8 +1,14 @@
 import { createSessionManager, type SessionManager } from '../shared/api';
 import { defineAccountScoped } from '../shared/account';
-import { setQualityPreferenceKeyValueStore, setSpeedPreferenceKeyValueStore } from '../features/player';
+import {
+  externalPlayerPreference,
+  setExternalPlayerPreferenceKeyValueStore,
+  setQualityPreferenceKeyValueStore,
+  setSpeedPreferenceKeyValueStore,
+} from '../features/player';
 import { setProgressKeyValueStore } from '../shared/services/progress';
 import { DEMO_MODE } from './appConfig';
+import { phaseFlags } from './phaseFlags';
 import type * as DemoModule from './dev/demo';
 
 /**
@@ -31,12 +37,22 @@ export const session: SessionManager = demo
   : createSessionManager();
 
 // The demo keeps its progress (Story 4.2 review), its quality preference
-// (Story 4.3) and its speed (Story 8.1) in memory: the owner's real `boostytv-account` and
+// (Story 4.3), its speed (Story 8.1) and its «Системный видеоплеер» toggle
+// (Story 8.2) in memory: the owner's real `boostytv-account` and
 // `boostytv-device` databases are never read, written or cleared.
 if (demo) {
   setProgressKeyValueStore(demo.createDemoKeyValueStore());
   setQualityPreferenceKeyValueStore(demo.createDemoKeyValueStore());
   setSpeedPreferenceKeyValueStore(demo.createDemoKeyValueStore());
+  setExternalPlayerPreferenceKeyValueStore(demo.createDemoKeyValueStore());
+}
+
+// Story 8.2 review: warm the «Системный видеоплеер» value (after the demo
+// store wiring above), so it is in memory before Настройки can open and the
+// toggle row is not inserted above an already focused «Версия». A failed
+// read is off (and logged by the store).
+if (phaseFlags.externalPlayer) {
+  externalPlayerPreference.read().catch(() => {});
 }
 
 /**

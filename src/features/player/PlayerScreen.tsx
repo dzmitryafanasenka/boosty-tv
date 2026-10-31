@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import type { HttpClient } from '../../shared/api';
 import type { MediaRef } from '../../shared/entities/post';
@@ -62,6 +62,13 @@ export type PlayerScreenProps = {
   onLiveUnplayable?: () => void;
   /** Story 8.1: `phaseFlags.speed` (from the route): the «Скорость» row for recordings (live ignores it). */
   speedEnabled: boolean;
+  /**
+   * Story 8.2: a hint in the overlay's top band («Внешний плеер не найден»
+   * after a system-player fallback). The overlay shows once when playback
+   * starts, so the hint is seen; it then hides by the usual rules. Nothing
+   * else changes.
+   */
+  notice?: string;
 };
 
 /**
@@ -136,6 +143,7 @@ export function PlayerScreen({
   start = 'resume',
   onLiveUnplayable,
   speedEnabled,
+  notice,
 }: PlayerScreenProps) {
   // Story 7.2: the ref kind is fixed for a mounted player (route params).
   const { liveRef, vodRef } = splitMediaRef(mediaRef);
@@ -208,6 +216,16 @@ export function PlayerScreen({
     onBackground: () => commands.background(settings.closeSheet),
     onForeground: commands.foreground,
   });
+
+  // Story 8.2: show the overlay once when playback starts, so the notice is read.
+  const noticeShown = useRef(false);
+  const showOverlayRef = useLatestRef(commands.showOverlay);
+  useEffect(() => {
+    if (notice && playing && !noticeShown.current) {
+      noticeShown.current = true;
+      showOverlayRef.current();
+    }
+  }, [notice, playing, showOverlayRef]);
 
   /** Exit (Back, Stop, «Назад»): report, then leave. */
   const onExitRef = useLatestRef(onExit);
@@ -304,6 +322,7 @@ export function PlayerScreen({
           settingsRef={settings.settingsView}
           live={ready.live}
           showSettings={settingsShown}
+          notice={notice}
         />
       ) : null}
       {phase === 'recovering' ? (

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type RefObject } from 'react';
 import { BackHandler, StyleSheet, View } from 'react-native';
 import { focusSoon } from '../../shared/focus';
 import { t, tf } from '../../shared/i18n';
@@ -193,19 +193,53 @@ export function PlayerSettingsSheet({ model, onPick, onPickSpeed, onClosed }: Pl
     );
   }
   return (
-    <SideSheet testID={`${PLAYER_SHEET_QUALITY_ID}/menu`} variant="player" title={t('player.quality.title')}>
+    <QualityMenu
+      testID={`${PLAYER_SHEET_QUALITY_ID}/menu`}
+      rowId={qualityRowId}
+      options={data.options}
+      selected={data.selected}
+      autoHeight={data.autoHeight}
+      selectedRef={selectedView}
+      onPick={onPick}
+    />
+  );
+}
+
+export type QualityMenuProps = {
+  testID: string;
+  /** Each row's focus id. */
+  rowId: (key: QualityKey) => string;
+  /** `qualityOptions` of the video. */
+  options: readonly QualityKey[];
+  /** The checked row (initial focus). */
+  selected: QualityKey;
+  /** «Авто · 1080p» on the selected «Авто» row; null: «Авто». */
+  autoHeight: number | null;
+  /** The selected row's host view (the caller moves focus to it). */
+  selectedRef: RefObject<HostView | null>;
+  onPick: (key: QualityKey) => void;
+};
+
+/**
+ * The «Качество» radio list (Story 4.3), a `player` SideSheet: the player
+ * settings sheet's quality submenu and, since Story 8.2, the system-player
+ * hand-off list (`ExternalHandoff`). Initial focus on the selected row.
+ */
+export function QualityMenu({ testID, rowId, options, selected, autoHeight, selectedRef, onPick }: QualityMenuProps) {
+  return (
+    <SideSheet testID={testID} variant="player" title={t('player.quality.title')}>
       <View accessibilityRole="radiogroup" style={styles.rows}>
-        {data.options.map(key => {
-          const selected = key === data.selected;
+        {options.map(key => {
+          const isSelected = key === selected;
           return (
             <SettingRow
               key={String(key)}
-              ref={selected ? selectedView : undefined}
-              testID={qualityRowId(key)}
+              ref={isSelected ? selectedRef : undefined}
+              testID={rowId(key)}
               kind="radio"
-              selected={selected}
-              label={qualityLabel(key, key === 'auto' && selected ? data.autoHeight : null)}
-              hasTVPreferredFocus={selected}
+              selected={isSelected}
+              label={qualityLabel(key, key === 'auto' && isSelected ? autoHeight : null)}
+              hasTVPreferredFocus={isSelected}
               onPress={() => onPick(key)}
             />
           );

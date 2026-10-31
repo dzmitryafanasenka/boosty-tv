@@ -434,6 +434,13 @@ export const ru = {
       title: 'Скорость',
       value: '{speed}×',
     },
+    // Story 8.2 (PLAY-13): the hand-off to an installed player. `notFound`
+    // is the fallback hint in the built-in player's overlay; `chooser` heads
+    // the Android chooser.
+    external: {
+      notFound: 'Внешний плеер не найден',
+      chooser: 'Открыть в',
+    },
     // Story 7.2 (LIVE-02, focus-map G9–G11): the live player. `{elapsed}`
     // is `formatDuration` of the time since the stream started. The QR
     // (not-playable stream) opens the stream page on a phone.
@@ -605,6 +612,14 @@ export const ru = {
     versionUnknown: 'неизвестна',
     signOut: {
       row: 'Выйти из аккаунта',
+    },
+    // Story 8.2 (PLAY-13, SET-02): the device-scoped toggle; the
+    // description says progress is not tracked in this mode.
+    externalPlayer: {
+      row: 'Системный видеоплеер',
+      description: 'Видео откроется в установленном плеере. Прогресс просмотра в этом режиме не сохраняется.',
+      on: 'Вкл',
+      off: 'Выкл',
     },
   },
   // The sign-out confirmation (Story 2.7, docs/focus-map.md K4); copy from

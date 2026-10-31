@@ -10,10 +10,12 @@ import { colors, components, spacing } from './tokens';
  * OK does nothing; `nav` opens something on OK; `radio` (Story 4.3) is one
  * choice of a list, with an accent mark when `selected`, and OK picks it;
  * `check` (Story 5.5, a tag) is one of several independent choices, an
- * accent box with a tick when `checked`, and OK toggles it. Toggle comes
- * with the story that needs it.
+ * accent box with a tick when `checked`, and OK toggles it; `toggle`
+ * (Story 8.2) is an on/off setting: its value is the caller's «Вкл»
+ * (accent, `checked`) or «Выкл», and OK flips it (the caller flips
+ * `checked` at once, EXPERIENCE.md).
  */
-export type SettingRowKind = 'info' | 'nav' | 'radio' | 'check';
+export type SettingRowKind = 'info' | 'nav' | 'radio' | 'check' | 'toggle';
 
 export type SettingRowProps = {
   kind: SettingRowKind;
@@ -27,11 +29,16 @@ export type SettingRowProps = {
    * period range does not fit beside its label on the 320 dp filter sheet).
    */
   valueLines?: number;
-  /** `nav`, `radio` and `check` rows; ignored for `info`. */
+  /**
+   * A secondary line under the label (DESIGN.md SettingRow: «optional
+   * description»), e.g. the «Системный видеоплеер» note (Story 8.2).
+   */
+  description?: string;
+  /** `nav`, `radio`, `check` and `toggle` rows; ignored for `info`. */
   onPress?: () => void;
   /** `radio` rows: this choice is the current one (accent mark, `accessibilityState.selected`). */
   selected?: boolean;
-  /** `check` rows: checked (accent box with a tick, `accessibilityState.checked`). */
+  /** `check` rows: checked (accent box with a tick, `accessibilityState.checked`); `toggle` rows: on (accent value). */
   checked?: boolean;
   onFocus?: (event: FocusEvent) => void;
   onBlur?: (event: BlurEvent) => void;
@@ -55,6 +62,7 @@ export function SettingRow({
   kind,
   label,
   value,
+  description,
   valueLines = 1,
   onPress,
   selected = false,
@@ -67,12 +75,13 @@ export function SettingRow({
 }: SettingRowProps) {
   const radio = kind === 'radio';
   const check = kind === 'check';
-  const pressable = kind === 'nav' || radio || check;
+  const toggle = kind === 'toggle';
+  const pressable = kind === 'nav' || radio || check || toggle;
   const surfaceStyle = ({ focused }: SurfaceState) => [
     styles.surface,
     focused && { backgroundColor: TOKENS.bgFocus },
   ];
-  const a11yLabel = value ? `${label} ${value}` : label;
+  const a11yLabel = [label, value, description].filter(Boolean).join(' ');
 
   return (
     <FocusableSurface
@@ -82,11 +91,11 @@ export function SettingRow({
       scaleFocus={TOKENS.scaleFocus}
       hasTVPreferredFocus={hasTVPreferredFocus}
       accessibilityRole={
-        radio ? 'radio' : check ? 'checkbox' : kind === 'nav' ? 'button' : 'text'
+        radio ? 'radio' : check ? 'checkbox' : toggle ? 'switch' : kind === 'nav' ? 'button' : 'text'
       }
       accessibilityLabel={a11yLabel}
       accessibilityState={
-        radio ? { selected, checked: selected } : check ? { checked } : undefined
+        radio ? { selected, checked: selected } : check || toggle ? { checked } : undefined
       }
       onPress={pressable ? onPress : undefined}
       onFocus={onFocus}
@@ -94,45 +103,58 @@ export function SettingRow({
       surfaceStyle={surfaceStyle}
     >
       {({ focused }) => (
-        <View style={valueLines > 1 ? styles.stacked : styles.content}>
-          {radio ? (
-            <View
-              testID={testID ? `${testID}/radio` : undefined}
-              style={[styles.radio, selected && styles.radioSelected]}
-            >
-              {selected ? (
-                <View testID={testID ? `${testID}/selected` : undefined} style={styles.radioDot} />
-              ) : null}
-            </View>
-          ) : null}
-          {check ? (
-            <View
-              testID={testID ? `${testID}/check` : undefined}
-              style={[styles.check, checked && styles.checkOn]}
-            >
-              {checked ? (
-                <CheckIcon
-                  testID={testID ? `${testID}/checked` : undefined}
-                  color={colors['accent-ink']}
-                  size={CHECK - 4}
-                />
-              ) : null}
-            </View>
-          ) : null}
-          <Text
-            variant="body"
-            numberOfLines={1}
-            style={valueLines > 1 ? undefined : styles.label}
-          >
-            {label}
-          </Text>
-          {value ? (
+        <View style={description ? styles.described : undefined}>
+          <View style={valueLines > 1 ? styles.stacked : styles.content}>
+            {radio ? (
+              <View
+                testID={testID ? `${testID}/radio` : undefined}
+                style={[styles.radio, selected && styles.radioSelected]}
+              >
+                {selected ? (
+                  <View testID={testID ? `${testID}/selected` : undefined} style={styles.radioDot} />
+                ) : null}
+              </View>
+            ) : null}
+            {check ? (
+              <View
+                testID={testID ? `${testID}/check` : undefined}
+                style={[styles.check, checked && styles.checkOn]}
+              >
+                {checked ? (
+                  <CheckIcon
+                    testID={testID ? `${testID}/checked` : undefined}
+                    color={colors['accent-ink']}
+                    size={CHECK - 4}
+                  />
+                ) : null}
+              </View>
+            ) : null}
             <Text
               variant="body"
-              numberOfLines={valueLines}
-              color={focused ? 'text-secondary' : 'text-meta'}
+              numberOfLines={1}
+              style={valueLines > 1 ? undefined : styles.label}
             >
-              {value}
+              {label}
+            </Text>
+            {value ? (
+              <Text
+                testID={testID ? `${testID}/value` : undefined}
+                variant="body"
+                numberOfLines={valueLines}
+                color={toggle && checked ? 'accent' : focused ? 'text-secondary' : 'text-meta'}
+              >
+                {value}
+              </Text>
+            ) : null}
+          </View>
+          {description ? (
+            <Text
+              testID={testID ? `${testID}/description` : undefined}
+              variant="body-s"
+              color={focused ? 'text-secondary' : 'text-meta'}
+              style={styles.description}
+            >
+              {description}
             </Text>
           ) : null}
         </View>
@@ -159,6 +181,13 @@ const styles = StyleSheet.create({
   // value beside the label squeezed the label or overflowed the row).
   stacked: {
     paddingVertical: spacing['3'],
+  },
+  // A row with a description (Story 8.2): the label line, then the description.
+  described: {
+    paddingVertical: spacing['3'],
+  },
+  description: {
+    marginTop: spacing['1'],
   },
   // The radio mark (DESIGN.md: selected radio marks use `accent`).
   radio: {
