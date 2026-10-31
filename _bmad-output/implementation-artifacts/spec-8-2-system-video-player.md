@@ -2,7 +2,7 @@
 title: 'Story 8.2: System video player option'
 type: 'feature'
 created: '2026-10-31'
-status: 'in-progress'
+status: 'in-review'
 baseline_commit: 'ddaa4b9dfa8272eaae28fc7c9b8713f1792c6069'
 route: 'dispatch'
 review_loop_iteration: 0
@@ -85,6 +85,36 @@ context:
 - Given the flag off, when Настройки or a recording opens, then the app behaves exactly as before.
 - Given the hand-off sheet, when it opens, then focus is trapped in the sheet, and Back exits to the origin item with the focus restored.
 - Given a fallback, when the built-in player runs, then progress is written as usual and the stored quality preference is unchanged.
+
+## Implementation Notes
+
+## Spec Change Log
+
+## Review Triage Log
+
+Pass 1 (Blind Hunter B, Edge Case Hunter E, Verification Gap V):
+
+| # | Finding | Verdict | Evidence / route |
+|---|---------|---------|------------------|
+| 1 | V1/B7: Kotlin never compiled, native half unverified | medium | Real: my `assembleRelease` failed on `video/*` inside KDoc (nested comment). Fixed in the module KDoc; the build now passes. Device rows remain (step 5). patch |
+| 2 | V2/B9: no test for Back during an in-flight launch | medium | Every `open` mock resolves immediately. patch (test) |
+| 3 | V-other/B9/E2: `.catch(() => {})` after the callbacks can leave the spinner stuck | low | A throw in `onOpened`/`onFallback` keeps `launchingRef` true; direct fix. patch |
+| 4 | E1/E7/B5/V-other: `remember()` keeps the fallback pick for the whole app run | low | `qualityPreference.ts:91` sets process memory; the spec chose memory-only `remember` and the stored key is untouched, but docs say "this run only". patch (docs: until the app restarts) |
+| 5 | B4: toggle row appears after an async read, above the focused «Версия» | medium | `Shell.tsx` `SettingsSection` renders the row once the read resolves; the first Настройки visit shifts the focused row. patch (warm the read at startup) |
+| 6 | B11: focus-map Back table has no hand-off rows | low | Doc edit. patch |
+| 7 | E3: `pickSource` null on a row → OK does nothing | low | Effectively unreachable (options come from the same sources); direct fix (fall back). patch |
+| 8 | B1: no-player check happens only after the pick | false | Intent: list first, then chooser; fallback is the specified outcome |
+| 9 | B2: `video/*` for HLS/DASH | maybe-false | Reference parity passes `video/*`; settle with a device HLS pick. rejected |
+| 10 | B3: sheet lacks a title; «Загружаем видео» during launch | low | Cosmetic; launch is sub-second. rejected |
+| 11 | B6: logs cannot tell `none` from a thrown launch | low | Diagnostics are Story 8.3. rejected |
+| 12 | B8: chooser even with one real player | low | Reference parity (always a chooser). rejected |
+| 13 | B10: E8 sent twice on fallback / not-ready | false | By design (Design Notes): fresh signed URLs for PlayerScreen |
+| 14 | B12: SettingRow description padding may double | maybe-false | Settle on the device screenshot. rejected unless seen |
+| 15 | B13: TalkBack announces on/off twice | low | TalkBack not a release path today. rejected |
+| 16 | B14: demo mode launches a real chooser | low | Dev-only mode. rejected |
+| 17 | B15/E6: hand-off ignores `isActive` / long background | low | The sheet owns focus inside its route; 23 h staleness negligible. rejected |
+| 18 | E4: hand-off consumes the `__DEV__` break-next-video one-shot | low | Dev-only. rejected |
+| 19 | E5: `http` media URLs hidden by `<queries>` | false | Signed media URLs are https (api-contract) |
 
 ## Design Notes
 

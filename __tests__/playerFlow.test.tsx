@@ -4267,6 +4267,44 @@ describe('Story 8.2: the system video player (PLAY-13, SET-02)', () => {
       await unmount(root);
     });
 
+    it('Back while the launch is in flight is ignored (the outcome decides): `none` then mounts the fallback with «Внешний плеер не найден»', async () => {
+      const launch = deferred<string>();
+      open = jest.fn(() => launch.promise);
+      installNativeModules({ ExternalPlayer: { open } });
+      const root = await openHandoff();
+      await press(root, Q(720));
+      expect(open).toHaveBeenCalledTimes(1);
+      expect(visible(root, LOADING)).toBe(true);
+      await back();
+      expect(currentRoute()).toBe('Player');
+      expect(engine.mounts).toBe(0);
+      launch.resolve('none');
+      await settle();
+      expect(currentRoute()).toBe('Player');
+      expect(engine.props?.source).toEqual({ uri: `${URL}-720`, format: 'progressive' });
+      expect(byTestId(root, 'player/notice')[0].props.children).toBe('Внешний плеер не найден');
+      await unmount(root);
+    });
+
+    it('Back while the fresh E8 is pending pops to the origin; nothing is launched', async () => {
+      const pending = deferred();
+      await device().setItem(EXTERNAL_PLAYER_PREFERENCE_KEY, 'on');
+      const root = await openPost();
+      e8 = () => pending.promise;
+      focusMock.mockClear();
+      await press(root, VIDEO('v1'));
+      await advance(50);
+      expect(visible(root, LOADING)).toBe(true);
+      await back();
+      expect(currentRoute()).toBe('Post');
+      expect(lastFocusTarget()).toBe(VIDEO('v1'));
+      pending.resolve({ status: 200, body: postDetail(FEED_BLOG, POST, [okVideo('v1', MIXED), ...paragraph('Body')]) });
+      await settle();
+      expect(open).not.toHaveBeenCalled();
+      expect(currentRoute()).toBe('Post');
+      await unmount(root);
+    });
+
     it('no native module (another platform, tests): the same fallback', async () => {
       clearNativeModules();
       installNativeModules({ AppInfo: { versionName: '1.0' } });

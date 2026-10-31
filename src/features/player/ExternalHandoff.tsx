@@ -121,6 +121,8 @@ export function ExternalHandoff({ http, mediaRef, onOpened, onFallback, onNotRea
     }
     const source = pickSource(ready.sources, { preference: key });
     if (source === null) {
+      // Nothing to hand over: the built-in player decides (its own E8 and states).
+      callbacks.current.onFallback(key);
       return;
     }
     launchingRef.current = true;
@@ -138,7 +140,14 @@ export function ExternalHandoff({ http, mediaRef, onOpened, onFallback, onNotRea
           callbacks.current.onFallback(key);
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        // A callback threw: never leave the spinner stuck with Back ignored. No URL, no title.
+        logger.warn('player', 'external player hand-off failed');
+        launchingRef.current = false;
+        if (alive.current) {
+          setLaunching(false);
+        }
+      });
   };
 
   return (

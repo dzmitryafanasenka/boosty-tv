@@ -25,8 +25,9 @@ type Step = 'read' | 'handoff' | 'builtin';
  * - off → `PlayerScreen` exactly as before;
  * - on → `ExternalHandoff` (quality list → the Android chooser). The
  *   chooser opened → `onExit` (no progress call, no E9). No real player →
- *   the picked quality for this run only (`qualityPreference.remember`, the
- *   stored preference is untouched) and `PlayerScreen` with «Внешний плеер
+ *   the picked quality is kept in memory until the app restarts
+ *   (`qualityPreference.remember`: later built-in videos start there too;
+ *   the stored preference is untouched) and `PlayerScreen` with «Внешний плеер
  *   не найден» in the overlay. A non-playable E8 → `PlayerScreen`, which
  *   owns those states. Both mount PlayerScreen, which sends its own fresh
  *   E8 (fresh signed URLs) and runs the normal progress session.

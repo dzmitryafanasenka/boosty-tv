@@ -16,7 +16,7 @@ import com.facebook.react.bridge.ReactMethod
  * installed Android player through the system chooser. JS reaches it only
  * through `src/shared/platform/externalPlayer.ts`.
  *
- * `open(url, title, chooserTitle)` builds an `ACTION_VIEW` with `video/*`
+ * `open(url, title, chooserTitle)` builds an `ACTION_VIEW` with the generic video MIME type
  * data plus the title extras the reference passes (`title` for MX Player,
  * `forcename` for Vimu). It resolves the activities for that intent and
  * drops this app and the Google TV framework stub (Google TV resolves VIEW
@@ -90,7 +90,7 @@ class ExternalPlayerModule(reactContext: ReactApplicationContext) :
     private const val EXTRA_TITLE = "title"
     /** Vimu's title extra (the reference passes it). */
     private const val EXTRA_FORCE_NAME = "forcename"
-    /** Google TV resolves VIEW `video/*` to this stub; it is not a player. */
+    /** Google TV resolves the video VIEW intent to this stub; it is not a player. */
     private const val TV_STUB_PACKAGE = "com.android.tv.frameworkpackagestubs"
     private const val OUTCOME_OPENED = "opened"
     private const val OUTCOME_NONE = "none"

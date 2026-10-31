@@ -1,12 +1,14 @@
 import { createSessionManager, type SessionManager } from '../shared/api';
 import { defineAccountScoped } from '../shared/account';
 import {
+  externalPlayerPreference,
   setExternalPlayerPreferenceKeyValueStore,
   setQualityPreferenceKeyValueStore,
   setSpeedPreferenceKeyValueStore,
 } from '../features/player';
 import { setProgressKeyValueStore } from '../shared/services/progress';
 import { DEMO_MODE } from './appConfig';
+import { phaseFlags } from './phaseFlags';
 import type * as DemoModule from './dev/demo';
 
 /**
@@ -43,6 +45,14 @@ if (demo) {
   setQualityPreferenceKeyValueStore(demo.createDemoKeyValueStore());
   setSpeedPreferenceKeyValueStore(demo.createDemoKeyValueStore());
   setExternalPlayerPreferenceKeyValueStore(demo.createDemoKeyValueStore());
+}
+
+// Story 8.2 review: warm the «Системный видеоплеер» value (after the demo
+// store wiring above), so it is in memory before Настройки can open and the
+// toggle row is not inserted above an already focused «Версия». A failed
+// read is off (and logged by the store).
+if (phaseFlags.externalPlayer) {
+  externalPlayerPreference.read().catch(() => {});
 }
 
 /**

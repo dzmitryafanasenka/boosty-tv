@@ -474,7 +474,10 @@ function SectionContent({
 /**
  * Настройки with the device-scoped «Системный видеоплеер» toggle (Story
  * 8.2): the row exists only while `phaseFlags.externalPlayer` is on, and
- * only once the device value is read (no «Выкл» → «Вкл» flash).
+ * only once the device value is read (no «Выкл» → «Вкл» flash). The app
+ * warms the read at startup (`src/app/session.ts`), so the row is normally
+ * there on the first visit and never inserted above a focused «Версия»;
+ * this gate is the safety net.
  */
 function SettingsSection(props: Omit<SettingsScreenProps, 'externalPlayer'>) {
   const enabled = phaseFlags.externalPlayer;
