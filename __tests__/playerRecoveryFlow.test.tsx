@@ -174,6 +174,8 @@ describe('recovery (Story 4.4)', () => {
     // The player's recovery logs carry no URL, id or position.
     const playerLogs = logger.entries().filter(entry => entry.scope === 'player');
     expect(playerLogs.map(entry => entry.message)).toContain('playback failed; recovering');
+    // Epic 8 retro A5: the engine's short error code is in the line.
+    expect(playerLogs.find(entry => entry.message === 'playback failed; recovering')?.fields).toEqual({ error: 'http' });
     // Every field but the wall-clock `time`, which can contain «312» by chance.
     const logged = playerLogs.map(({ level, scope, message, fields }) => ({ level, scope, message, fields }));
     expect(JSON.stringify(logged)).not.toMatch(/example\.invalid|312|v1/);

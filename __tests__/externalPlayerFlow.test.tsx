@@ -23,6 +23,7 @@ import {
   qualityPreference,
 } from '../src/features/player';
 import { EXTERNAL_LAUNCH_DELAY_MS } from '../src/features/player/ExternalHandoff';
+import { OVERLAY_HIDE_MS } from '../src/features/player/PlayerScreen';
 import { colors } from '../src/shared/ui';
 import { engine } from '../src/test/playerEngineMock';
 import e15LiveFixture from '../src/test/fixtures/boosty/e15-video-stream-live.json';
@@ -46,6 +47,7 @@ import {
   press,
   back,
   advance,
+  key,
   FEED_BLOG,
   POST,
   FEED_CARD,
@@ -301,6 +303,12 @@ describe('Story 8.2: the system video player (PLAY-13, SET-02)', () => {
       await advance(600);
       expect(visible(root, 'player/overlay')).toBe(true);
       expect(byTestId(root, 'player/notice')[0].props.children).toBe('Внешний плеер не найден');
+      // Epic 8 retro A5: the notice goes with that overlay's first auto-hide.
+      await advance(OVERLAY_HIDE_MS + 100);
+      expect(visible(root, 'player/overlay')).toBe(false);
+      await key('up');
+      expect(visible(root, 'player/overlay')).toBe(true);
+      expect(byTestId(root, 'player/notice')).toHaveLength(0);
       for (let sec = 0; sec <= 40; sec += 1) {
         await fire('onProgress', sec);
       }

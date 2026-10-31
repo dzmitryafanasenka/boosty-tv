@@ -1,5 +1,5 @@
-import { AppState } from 'react-native';
 import { accountScope as appAccountScope, defineAccountScoped, type AccountScope } from '../account';
+import { subscribeAppBackground } from '../platform/appLifecycle';
 import { logFile as appLogFile, type LogFilePort } from '../platform/logFile';
 import { logger as appLogger, type LogEntry, type Logger } from './logger';
 
@@ -75,12 +75,8 @@ export type LogFileSinkOptions = {
   scope?: Pick<AccountScope, 'guard'>;
   batchSize?: number;
   batchMs?: number;
-  /** The app-state source (React Native's `AppState`). */
-  appState?: AppStateSource;
-};
-
-export type AppStateSource = {
-  addEventListener(type: 'change', listener: (state: string) => void): { remove(): void };
+  /** Calls the listener when the app leaves the foreground; returns the unsubscribe (the AppLifecycle port). */
+  subscribeBackground?: (listener: () => void) => () => void;
 };
 
 type Batch = { lines: string[]; commit: (lines: string[]) => Promise<boolean> };
@@ -91,7 +87,7 @@ export function createLogFileSink({
   scope = appAccountScope,
   batchSize = LOG_FILE_BATCH_SIZE,
   batchMs = LOG_FILE_BATCH_MS,
-  appState = AppState,
+  subscribeBackground = subscribeAppBackground,
 }: LogFileSinkOptions = {}): LogFileSink {
   let enabled = false;
   let warned = false;
@@ -99,7 +95,7 @@ export function createLogFileSink({
   let quiet = false;
   let batch: Batch | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
-  let appStateSub: { remove(): void } | null = null;
+  let unsubscribeBackground: (() => void) | null = null;
 
   const cancelTimer = () => {
     if (timer !== null) {
@@ -171,17 +167,13 @@ export function createLogFileSink({
         queue(formatLogLine(entry));
       }
       logger.setSink(sink);
-      appStateSub = appState.addEventListener('change', state => {
-        if (state === 'background') {
-          flush();
-        }
-      });
+      unsubscribeBackground = subscribeBackground(flush);
     },
     disable() {
       enabled = false;
       logger.setSink(null);
-      appStateSub?.remove();
-      appStateSub = null;
+      unsubscribeBackground?.();
+      unsubscribeBackground = null;
       drop();
       // Also when it was off: a file left by an earlier run goes too.
       return file.clear();
