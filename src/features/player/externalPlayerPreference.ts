@@ -31,7 +31,7 @@ export function serializeExternalPlayer(on: boolean): string {
   return on ? 'on' : 'off';
 }
 
-export type ExternalPlayerPreferenceStore = Omit<DevicePreference<boolean>, 'remember'>;
+export type ExternalPlayerPreferenceStore = DevicePreference<boolean>;
 
 export function createExternalPlayerPreferenceStore(kv?: () => KeyValueStore): ExternalPlayerPreferenceStore {
   return createDevicePreference({

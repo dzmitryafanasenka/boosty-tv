@@ -14,7 +14,9 @@ import { logger as appLogger, type Logger } from '../services/logger';
  * - `write` updates memory at once and stores in the background.
  * - A failed read or write, or a `kv()` that throws synchronously, only
  *   logs a warning (`<label> not read` / `<label> not stored`), never the
- *   value. An unreadable or junk value is the fallback.
+ *   value. An unreadable or junk value is the fallback. A throwing
+ *   `onValue` logs `<label> not applied`; nothing escapes.
+ * - `remember` (memory only) exists only with `rememberable: true`.
  * - `forget()` (tests only) drops memory, never the store.
  */
 
@@ -31,8 +33,10 @@ export type DevicePreferenceDefinition<T, D> = {
   /** Defaults to the app's device store (`setDevicePreferenceKeyValueStore`). */
   kv?: () => KeyValueStore;
   logger?: Logger;
-  /** Called whenever memory takes a value (a finished read or a write), before it is stored. */
+  /** Called whenever memory takes a value (a finished read or a write), before it is stored; never on `remember`. */
   onValue?(value: T | D): void;
+  /** Adds `remember` (memory only, no `onValue`). */
+  rememberable?: boolean;
 };
 
 export type DevicePreference<T, D = T> = {
@@ -43,10 +47,13 @@ export type DevicePreference<T, D = T> = {
   read(): Promise<T | D>;
   /** Memory at once, the store in the background (a failed write is only logged). */
   write(value: T): void;
-  /** This run's value, in memory only (not stored). */
-  remember(value: T): void;
   /** Tests: forget the memory copy (the store is untouched). */
   forget(): void;
+};
+
+export type RememberablePreference<T, D = T> = DevicePreference<T, D> & {
+  /** This run's value, in memory only (not stored). */
+  remember(value: T): void;
 };
 
 /** Where device preferences persist: the `device` KeyValueStore, unless the app replaced it. */
@@ -61,12 +68,30 @@ export function setDevicePreferenceKeyValueStore(kv: KeyValueStore): void {
   deviceKeyValueStore = () => kv;
 }
 
-export function createDevicePreference<T, D = T>(definition: DevicePreferenceDefinition<T, D>): DevicePreference<T, D> {
+/** Tests only: back to the app's `device` KeyValueStore. */
+export function resetDevicePreferenceKeyValueStore(): void {
+  deviceKeyValueStore = () => asyncKeyValueStore('device');
+}
+
+export function createDevicePreference<T, D = T>(
+  definition: DevicePreferenceDefinition<T, D> & { rememberable: true },
+): RememberablePreference<T, D>;
+export function createDevicePreference<T, D = T>(definition: DevicePreferenceDefinition<T, D>): DevicePreference<T, D>;
+export function createDevicePreference<T, D = T>(
+  definition: DevicePreferenceDefinition<T, D>,
+): DevicePreference<T, D> | RememberablePreference<T, D> {
   const { key, parse, serialize, fallback, scope, label, onValue } = definition;
   const kv = definition.kv ?? (() => deviceKeyValueStore());
   const logger = definition.logger ?? appLogger;
   let value: T | D | undefined;
   let reading: Promise<T | D> | null = null;
+  const apply = (next: T | D) => {
+    try {
+      onValue?.(next);
+    } catch {
+      logger.warn(scope, `${label} not applied`);
+    }
+  };
   const getStored = (): Promise<string | null> => {
     try {
       return kv().get(key);
@@ -75,7 +100,7 @@ export function createDevicePreference<T, D = T>(definition: DevicePreferenceDef
       return Promise.reject(error);
     }
   };
-  return {
+  const store: DevicePreference<T, D> = {
     fallback,
     peek: () => value,
     read() {
@@ -92,12 +117,12 @@ export function createDevicePreference<T, D = T>(definition: DevicePreferenceDef
             },
           )
           .then(parsed => {
+            reading = null;
             // A pick while the read ran wins (and was applied already).
             if (value === undefined) {
               value = parsed;
-              onValue?.(parsed);
+              apply(parsed);
             }
-            reading = null;
             return value;
           });
       }
@@ -105,7 +130,7 @@ export function createDevicePreference<T, D = T>(definition: DevicePreferenceDef
     },
     write(next) {
       value = next;
-      onValue?.(next);
+      apply(next);
       try {
         kv()
           .set(key, serialize(next))
@@ -115,12 +140,18 @@ export function createDevicePreference<T, D = T>(definition: DevicePreferenceDef
         logger.warn(scope, `${label} not stored`);
       }
     },
-    remember(next) {
-      value = next;
-    },
     forget() {
       value = undefined;
       reading = null;
+    },
+  };
+  if (!definition.rememberable) {
+    return store;
+  }
+  return {
+    ...store,
+    remember(next: T) {
+      value = next;
     },
   };
 }
@@ -128,15 +159,25 @@ export function createDevicePreference<T, D = T>(definition: DevicePreferenceDef
 type Readable<T, D> = Pick<DevicePreference<T, D>, 'fallback' | 'peek' | 'read' | 'write'>;
 
 /**
- * A preference for a screen: `undefined` until the first read finished (a
+ * A preference for one screen: `undefined` until the first read finished (a
  * rejected read is the fallback), then the value; `write` stores it and
  * updates the screen at once. `enabled` false: never read.
+ *
+ * A single-consumer snapshot, not a subscription: it copies the store's
+ * value at mount (and again when `store` changes) and then follows only its
+ * own reads and writes. A write elsewhere is not seen until it remounts.
  */
 export function usePreference<T, D>(
   store: Readable<T, D>,
   enabled: boolean,
 ): { value: T | D | undefined; write: (next: T) => void } {
   const [value, setValue] = useState<T | D | undefined>(() => store.peek());
+  const [seen, setSeen] = useState(store);
+  if (seen !== store) {
+    // Another store: start again from its snapshot (adjusting state during render).
+    setSeen(store);
+    setValue(store.peek());
+  }
   useEffect(() => {
     if (!enabled || value !== undefined) {
       return;

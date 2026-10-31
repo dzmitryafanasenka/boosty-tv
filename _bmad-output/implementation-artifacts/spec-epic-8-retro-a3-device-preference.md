@@ -2,7 +2,7 @@
 title: 'Epic 8 retro A3: one device-preference factory'
 type: 'refactor'
 created: '2026-10-31'
-status: 'in-progress'
+status: 'in-review'
 baseline_commit: 'fa9eb3170648e9005c0c1479b882c192e9a8c4c3'
 route: 'dispatch'
 review_loop_iteration: 0
@@ -62,7 +62,7 @@ They differ in their verb (`write` vs `set`) and their placement. Their tests re
 - `src/app/session.ts` l.40-62 -- four demo setters become one. The two warm reads stay, gated by their flags.
 - `src/features/settings/DiagnosticsScreen.tsx` l.41-61 -- the peek/read/alive pattern → `usePreference`. Keep the rejection fallback to off.
 - Tests:
-  - `speedPreference.test.ts`, `externalPlayerPreference.test.ts`, the store part of `qualityPreference.test.ts` and `logFileSink.test.ts` «createDiagnosticsCapture»: fold their store cases into one `src/shared/storage/__tests__/devicePreference.test.ts`, parameterised over the four definitions;
+  - `speedPreference.test.ts`, `externalPlayerPreference.test.ts`, the store part of `qualityPreference.test.ts` and `logFileSink.test.ts` «createDiagnosticsCapture»: fold their store cases into `src/shared/storage/__tests__/devicePreference.test.tsx` (the factory on generic definitions, shared-only) and `__tests__/devicePreferences.test.tsx` (the contract parameterised over the four definitions, the keys, the singletons and the setter);
   - keep the store-specific parse/label cases;
   - grep the flow tests for `set*PreferenceKeyValueStore` / `setDiagnosticsCaptureKeyValueStore` / `.forget()` and update them.
 
@@ -79,6 +79,28 @@ They differ in their verb (`write` vs `set`) and their placement. Their tests re
 - Given the same stored values as before, when the app starts, then the quality, speed, «Системный видеоплеер» and «Запись логов» values are identical to before.
 - Given demo mode, when any device preference is written, then `boostytv-device` is never touched.
 - Given the change, then the line count across the four store files plus the factory is lower than the four store files today.
+
+## Spec Change Log
+
+## Review Triage Log
+
+Pass 1 (Blind Hunter B, Edge Case Hunter E, Verification Gap V):
+
+| # | Finding | Verdict | Route |
+|---|---------|---------|-------|
+| 1 | B1/E1: `remember` exists at runtime on every store; on capture it skips `onValue` (sink off while memory says on) | medium | `createDevicePreference` always returns it; capture spreads `...preference`. patch (opt-in) |
+| 2 | B2: a throwing `onValue` leaves `reading` set and escapes `write` | medium | Factory doc promises nothing escapes. patch (clear first, try/catch + warn) |
+| 3 | B3/E5: no test of `onValue` call counts (once per read/write, not after a won pick, not on remember); first-run capture disable not asserted | medium | stub sink fns never asserted. patch (tests) |
+| 4 | B4: `ExternalHandoff` quality peek/read not migrated | low | It gates `useMediaSource` on the read; record as deliberately kept. patch (doc note) |
+| 5 | B5/E2: `usePreference` does not subscribe; stale value when `store` identity changes | medium | Shared recommended hook; old hooks had the same limit. patch (reset on store change; document single-consumer) |
+| 6 | B6: demo isolation tested for writes only | low | patch (a read through the replaced store) |
+| 7 | B7/E3: test swaps the module-global KV and never restores it | low | patch (restore in afterEach) |
+| 8 | E4: setter test runs the real `logFileSink.disable()` unawaited | low | patch (stub sink or await) |
+| 9 | B8: line-count AC has no recorded numbers | low | 513 → 397 (edge reviewer's count). patch (docs) |
+| 10 | B9/E6: shared test imports `features/player` behind a lint disable | medium | Breaks the layer rule. patch (move the four-definition contract suite to root `__tests__/`) |
+| 11 | B9: directory-level `services` ↔ `storage` import edges | low | No module cycle; document in AD-4. patch (doc) |
+| 12 | B10: Code Map names `.ts`, AD-4 device list stale, positional `undefined` in `createDiagnosticsCapture`, single `npm test` run | low | patch (docs, optional trailing kv); ×3 run on my side |
+| 13 | V: no verification gaps | — | — |
 
 ## Verification
 

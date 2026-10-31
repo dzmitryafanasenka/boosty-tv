@@ -1,5 +1,5 @@
 import type { KeyValueStore } from '../../shared/platform/keyValueStore';
-import { createDevicePreference, type DevicePreference } from '../../shared/storage/devicePreference';
+import { createDevicePreference, type RememberablePreference } from '../../shared/storage/devicePreference';
 import type { QualityKey } from './mediaResolver';
 
 /**
@@ -36,7 +36,7 @@ export function serializeQualityPreference(value: QualityKey): string {
 }
 
 /** `remember` is this run's choice in memory only; `write` also stores it. */
-export type QualityPreferenceStore = DevicePreference<QualityKey, null>;
+export type QualityPreferenceStore = RememberablePreference<QualityKey, null>;
 
 export function createQualityPreferenceStore(kv?: () => KeyValueStore): QualityPreferenceStore {
   return createDevicePreference<QualityKey, null>({
@@ -47,6 +47,7 @@ export function createQualityPreferenceStore(kv?: () => KeyValueStore): QualityP
     scope: 'player',
     label: 'quality preference',
     kv,
+    rememberable: true,
   });
 }
 

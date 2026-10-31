@@ -13,15 +13,20 @@ import { logger as appLogger, type Logger } from './logger';
  */
 export const DIAGNOSTICS_CAPTURE_KEY = 'diagnostics.capture.v1';
 
-export type DiagnosticsCapture = Omit<DevicePreference<boolean>, 'remember'> & {
+export type DiagnosticsCapture = DevicePreference<boolean> & {
   /** «Очистить логи»: the ring and the file. Resolves false when the file was not cleared. */
   clearLogs(): Promise<boolean>;
 };
 
+export type DiagnosticsCaptureOptions = {
+  /** Defaults to the app's device store (`setDevicePreferenceKeyValueStore`). */
+  kv?: () => KeyValueStore;
+  logger?: Logger;
+};
+
 export function createDiagnosticsCapture(
-  kv: (() => KeyValueStore) | undefined,
   sink: LogFileSink,
-  logger: Logger = appLogger,
+  { kv, logger = appLogger }: DiagnosticsCaptureOptions = {},
 ): DiagnosticsCapture {
   const preference = createDevicePreference<boolean>({
     key: DIAGNOSTICS_CAPTURE_KEY,
@@ -42,7 +47,11 @@ export function createDiagnosticsCapture(
     },
   });
   return {
-    ...preference,
+    fallback: preference.fallback,
+    peek: preference.peek,
+    read: preference.read,
+    write: preference.write,
+    forget: preference.forget,
     clearLogs() {
       return sink.clear().then(
         () => true,
@@ -56,4 +65,4 @@ export function createDiagnosticsCapture(
 }
 
 /** The app's «Запись логов» toggle, driving `logFileSink` (the device store, `setDevicePreferenceKeyValueStore`). */
-export const diagnosticsCapture: DiagnosticsCapture = createDiagnosticsCapture(undefined, logFileSink);
+export const diagnosticsCapture: DiagnosticsCapture = createDiagnosticsCapture(logFileSink);

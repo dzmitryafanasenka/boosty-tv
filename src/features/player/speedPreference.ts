@@ -41,7 +41,7 @@ export function speedLabel(value: PlaybackSpeed): string {
   return tf('player.speed.value', { speed: serializeSpeed(value) });
 }
 
-export type SpeedPreferenceStore = Omit<DevicePreference<PlaybackSpeed>, 'remember'>;
+export type SpeedPreferenceStore = DevicePreference<PlaybackSpeed>;
 
 export function createSpeedPreferenceStore(kv?: () => KeyValueStore): SpeedPreferenceStore {
   return createDevicePreference({

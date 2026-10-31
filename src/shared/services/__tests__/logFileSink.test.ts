@@ -305,7 +305,7 @@ describe('account reset with capture on (acceptance)', () => {
 describe('createDiagnosticsCapture (Story 8.3)', () => {
   it('a stored `on` turns the sink on at read', async () => {
     const { sink, logger } = setup();
-    const capture = createDiagnosticsCapture(() => memoryKv({ [DIAGNOSTICS_CAPTURE_KEY]: 'on' }), sink, logger);
+    const capture = createDiagnosticsCapture(sink, { kv: () => memoryKv({ [DIAGNOSTICS_CAPTURE_KEY]: 'on' }), logger });
     await expect(capture.read()).resolves.toBe(true);
     expect(sink.isEnabled()).toBe(true);
   });
@@ -313,7 +313,7 @@ describe('createDiagnosticsCapture (Story 8.3)', () => {
   it('write stores the device key and applies at once; a toggle during the read wins', async () => {
     const { sink, logger } = setup();
     const kv = memoryKv({ [DIAGNOSTICS_CAPTURE_KEY]: 'off' });
-    const capture = createDiagnosticsCapture(() => kv, sink, logger);
+    const capture = createDiagnosticsCapture(sink, { kv: () => kv, logger });
     const reading = capture.read();
     capture.write(true);
     await expect(reading).resolves.toBe(true);
@@ -328,7 +328,7 @@ describe('createDiagnosticsCapture (Story 8.3)', () => {
 
   it('review: off deletes the log file; a failed delete is logged', async () => {
     const { sink, logger, file } = setup();
-    const capture = createDiagnosticsCapture(() => memoryKv(), sink, logger);
+    const capture = createDiagnosticsCapture(sink, { kv: () => memoryKv(), logger });
     capture.write(true);
     logger.info('t', 'line');
     sink.flush();
@@ -354,7 +354,7 @@ describe('createDiagnosticsCapture (Story 8.3)', () => {
       remove: () => Promise.resolve(),
       clear: () => Promise.resolve(),
     };
-    const capture = createDiagnosticsCapture(() => broken, sink, logger);
+    const capture = createDiagnosticsCapture(sink, { kv: () => broken, logger });
     await expect(capture.read()).resolves.toBe(false);
     capture.write(true);
     await flushPromises();
@@ -366,7 +366,7 @@ describe('createDiagnosticsCapture (Story 8.3)', () => {
 
   it('clearLogs resolves true, or false (and logs) when the file was not cleared', async () => {
     const { sink, logger, file } = setup();
-    const capture = createDiagnosticsCapture(() => memoryKv(), sink, logger);
+    const capture = createDiagnosticsCapture(sink, { kv: () => memoryKv(), logger });
     await expect(capture.clearLogs()).resolves.toBe(true);
     file.state.failClear = true;
     await expect(capture.clearLogs()).resolves.toBe(false);

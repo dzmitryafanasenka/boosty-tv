@@ -1,24 +1,21 @@
 /**
- * Epic 8 retro A3: the device-preference contract, once for every
- * definition (quality, speed, «Системный видеоплеер», «Запись логов»). The
- * store-specific parse / label cases stay next to each store.
+ * Epic 8 retro A3: the factory and `usePreference` on generic definitions.
+ * The four app definitions (keys, singletons, the demo setter) are
+ * `__tests__/devicePreferences.test.tsx`; each store keeps its parse / label
+ * cases next to it.
  */
 import { act } from 'react';
 import { createRoot } from 'test-renderer';
-/* eslint-disable boundaries/dependencies -- test-only: the contract runs over the player's definitions too */
-import {
-  EXTERNAL_PLAYER_PREFERENCE_KEY,
-  createExternalPlayerPreferenceStore,
-  externalPlayerPreference,
-} from '../../../features/player/externalPlayerPreference';
-import { QUALITY_PREFERENCE_KEY, createQualityPreferenceStore, qualityPreference } from '../../../features/player/qualityPreference';
-import { SPEED_PREFERENCE_KEY, createSpeedPreferenceStore, speedPreference } from '../../../features/player/speedPreference';
-/* eslint-enable boundaries/dependencies */
 import type { KeyValueStore } from '../../platform/keyValueStore';
-import { DIAGNOSTICS_CAPTURE_KEY, createDiagnosticsCapture, diagnosticsCapture } from '../../services/diagnosticsCapture';
-import type { LogFileSink } from '../../services/logFileSink';
 import { logger } from '../../services/logger';
-import { setDevicePreferenceKeyValueStore, usePreference, type DevicePreference } from '../devicePreference';
+import {
+  createDevicePreference,
+  usePreference,
+  type DevicePreference,
+  type DevicePreferenceDefinition,
+} from '../devicePreference';
+
+const KEY = 'test.level.v1';
 
 function memoryKv(seed: Record<string, string> = {}) {
   const values = new Map(Object.entries(seed));
@@ -36,82 +33,19 @@ function memoryKv(seed: Record<string, string> = {}) {
   return kv;
 }
 
-/** The capture's sink, only counted here (its effects are covered in logFileSink.test.ts). */
-const stubSink = {
-  enable: jest.fn(),
-  disable: jest.fn(() => Promise.resolve()),
-  clear: jest.fn(() => Promise.resolve()),
-} as unknown as LogFileSink;
-
-type Store = Pick<DevicePreference<unknown, unknown>, 'peek' | 'read' | 'forget'> & { write(value: unknown): void };
-
-type Case = {
-  name: string;
-  key: string;
-  create(kv: () => KeyValueStore): Store;
-  fallback: unknown;
-  /** A stored string and its value. */
-  stored: [string, unknown];
-  junk: string;
-  /** Two picks and their stored strings. */
-  picks: [[unknown, string], [unknown, string]];
-  label: string;
-};
-
-const CASES: Case[] = [
-  {
-    name: 'quality',
-    key: QUALITY_PREFERENCE_KEY,
-    create: kv => createQualityPreferenceStore(kv) as Store,
-    fallback: null,
-    stored: ['720', 720],
-    junk: 'junk',
-    picks: [
-      ['auto', 'auto'],
-      [1080, '1080'],
-    ],
-    label: 'quality preference',
-  },
-  {
-    name: 'speed',
-    key: SPEED_PREFERENCE_KEY,
-    create: kv => createSpeedPreferenceStore(kv) as Store,
-    fallback: 1,
-    stored: ['2', 2],
-    junk: 'fast',
-    picks: [
-      [1.75, '1.75'],
-      [3, '3'],
-    ],
-    label: 'speed preference',
-  },
-  {
-    name: 'external player',
-    key: EXTERNAL_PLAYER_PREFERENCE_KEY,
-    create: kv => createExternalPlayerPreferenceStore(kv) as Store,
-    fallback: false,
-    stored: ['on', true],
-    junk: 'yes',
-    picks: [
-      [true, 'on'],
-      [false, 'off'],
-    ],
-    label: 'external player preference',
-  },
-  {
-    name: 'diagnostics capture',
-    key: DIAGNOSTICS_CAPTURE_KEY,
-    create: kv => createDiagnosticsCapture(kv, stubSink) as Store,
-    fallback: false,
-    stored: ['on', true],
-    junk: 'true',
-    picks: [
-      [true, 'on'],
-      [false, 'off'],
-    ],
-    label: 'capture preference',
-  },
-];
+/** A generic definition: `1`–`9` as a number, fallback 0. */
+function level(kv: () => KeyValueStore, extra: Partial<DevicePreferenceDefinition<number, number>> = {}) {
+  return createDevicePreference<number>({
+    key: KEY,
+    parse: raw => (raw !== null && /^[1-9]$/.test(raw) ? Number(raw) : null),
+    serialize: String,
+    fallback: 0,
+    scope: 'test',
+    label: 'level preference',
+    kv,
+    ...extra,
+  });
+}
 
 const messages = () => logger.entries().map(entry => entry.message);
 
@@ -124,159 +58,154 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-describe.each(CASES)('the $name preference', ({ key, create, fallback, stored, junk, picks, label }) => {
-  it('first run (nothing stored): the fallback', async () => {
-    const store = create(() => memoryKv());
-    expect(store.peek()).toBeUndefined();
-    await expect(store.read()).resolves.toBe(fallback);
-    expect(store.peek()).toBe(fallback);
-  });
-
-  it('reads the device key once (single-flight), then serves memory', async () => {
-    const kv = memoryKv({ [key]: stored[0] });
-    const store = create(() => kv);
-    const [a, b] = await Promise.all([store.read(), store.read()]);
-    expect([a, b]).toEqual([stored[1], stored[1]]);
-    await expect(store.read()).resolves.toBe(stored[1]);
-    expect(kv.get).toHaveBeenCalledTimes(1);
-    expect(kv.get).toHaveBeenCalledWith(key);
-  });
-
-  it('a junk value or a failed read → the fallback; the failure is only logged', async () => {
-    await expect(create(() => memoryKv({ [key]: junk })).read()).resolves.toBe(fallback);
+describe('createDevicePreference', () => {
+  it('nothing stored, junk or a failed read: the fallback, a failure logged once without fields', async () => {
+    await expect(level(() => memoryKv()).read()).resolves.toBe(0);
+    await expect(level(() => memoryKv({ [KEY]: 'x' })).read()).resolves.toBe(0);
     const failing = memoryKv();
     (failing.get as jest.Mock).mockRejectedValueOnce(new Error('io'));
-    await expect(create(() => failing).read()).resolves.toBe(fallback);
-    expect(messages()).toEqual([`${label} not read`]);
-    expect(logger.entries()[0].level).toBe('warn');
+    await expect(level(() => failing).read()).resolves.toBe(0);
+    expect(messages()).toEqual(['level preference not read']);
     expect(logger.entries()[0].fields).toBeUndefined();
   });
 
-  it('a write updates memory at once and stores the string; a pick during the read wins', async () => {
-    const kv = memoryKv({ [key]: stored[0] });
-    const store = create(() => kv);
-    const reading = store.read();
-    store.write(picks[0][0]);
-    await expect(reading).resolves.toBe(picks[0][0]);
-    expect(kv.values.get(key)).toBe(picks[0][1]);
-    store.write(picks[1][0]);
-    expect(store.peek()).toBe(picks[1][0]);
-    await Promise.resolve();
-    expect(kv.values.get(key)).toBe(picks[1][1]);
+  it('one single-flight read, then memory', async () => {
+    const kv = memoryKv({ [KEY]: '4' });
+    const store = level(() => kv);
+    await expect(Promise.all([store.read(), store.read()])).resolves.toEqual([4, 4]);
+    await expect(store.read()).resolves.toBe(4);
+    expect(kv.get).toHaveBeenCalledTimes(1);
   });
 
-  it('a failed write keeps the memory value, does not throw, and is only logged (no value)', async () => {
+  it('a pick during the read wins; a write is in memory at once and stored', async () => {
+    const kv = memoryKv({ [KEY]: '4' });
+    const store = level(() => kv);
+    const reading = store.read();
+    store.write(7);
+    expect(store.peek()).toBe(7);
+    await expect(reading).resolves.toBe(7);
+    expect(kv.values.get(KEY)).toBe('7');
+  });
+
+  it('a failed or synchronously throwing store: memory kept, only logged, nothing escapes', async () => {
     const kv = memoryKv();
     (kv.set as jest.Mock).mockRejectedValueOnce(new Error('io'));
-    const store = create(() => kv);
-    store.write(picks[0][0]);
+    level(() => kv).write(3);
     await Promise.resolve();
     await Promise.resolve();
-    expect(store.peek()).toBe(picks[0][0]);
-    expect(messages()).toEqual([`${label} not stored`]);
-    expect(logger.entries()[0].fields).toBeUndefined();
-  });
-
-  it('forget drops memory only: the next read comes from the store', async () => {
-    const kv = memoryKv();
-    const store = create(() => kv);
-    store.write(picks[1][0]);
-    await Promise.resolve();
-    store.forget();
-    expect(store.peek()).toBeUndefined();
-    await expect(store.read()).resolves.toBe(picks[1][0]);
-    expect(kv.values.get(key)).toBe(picks[1][1]);
-  });
-
-  it('a store that throws synchronously: read → the fallback, write → logged, memory kept; nothing escapes', async () => {
-    const store = create(() => {
+    const throwing = level(() => {
       throw new Error('no native module');
     });
-    await expect(store.read()).resolves.toBe(fallback);
-    store.forget();
-    expect(() => store.write(picks[0][0])).not.toThrow();
-    expect(store.peek()).toBe(picks[0][0]);
-    expect(messages()).toEqual([`${label} not read`, `${label} not stored`]);
+    await expect(throwing.read()).resolves.toBe(0);
+    throwing.forget();
+    expect(() => throwing.write(2)).not.toThrow();
+    expect(throwing.peek()).toBe(2);
+    expect(messages()).toEqual(['level preference not stored', 'level preference not read', 'level preference not stored']);
   });
-});
 
-it('the stored keys are unchanged (no migration)', () => {
-  expect([QUALITY_PREFERENCE_KEY, SPEED_PREFERENCE_KEY, EXTERNAL_PLAYER_PREFERENCE_KEY, DIAGNOSTICS_CAPTURE_KEY]).toEqual([
-    'player.quality.v1',
-    'player.speed.v1',
-    'player.external.v1',
-    'diagnostics.capture.v1',
-  ]);
-});
-
-describe('remember (quality only)', () => {
-  it('memory only, nothing stored', async () => {
+  it('forget drops memory only', async () => {
     const kv = memoryKv();
-    const store = createQualityPreferenceStore(() => kv);
-    store.remember(1440);
-    expect(store.peek()).toBe(1440);
+    const store = level(() => kv);
+    store.write(5);
+    store.forget();
+    expect(store.peek()).toBeUndefined();
+    await expect(store.read()).resolves.toBe(5);
+  });
+
+  it('onValue: once per finished read, once per write, not again when a pick won the read', async () => {
+    const onValue = jest.fn();
+    const store = level(() => memoryKv({ [KEY]: '4' }), { onValue });
+    await store.read();
+    expect(onValue.mock.calls).toEqual([[4]]);
+    store.write(6);
+    expect(onValue.mock.calls).toEqual([[4], [6]]);
+
+    const raced = jest.fn();
+    const other = level(() => memoryKv({ [KEY]: '4' }), { onValue: raced });
+    const reading = other.read();
+    other.write(8);
+    await reading;
+    expect(raced.mock.calls).toEqual([[8]]);
+  });
+
+  it('a throwing onValue: logged once per call (no value), the read is not stuck, write does not throw', async () => {
+    const kv = memoryKv({ [KEY]: '4' });
+    const store = level(() => kv, {
+      onValue: () => {
+        throw new Error('apply failed');
+      },
+    });
+    await expect(store.read()).resolves.toBe(4);
+    store.forget();
+    await expect(store.read()).resolves.toBe(4);
+    expect(kv.get).toHaveBeenCalledTimes(2);
+    expect(() => store.write(5)).not.toThrow();
+    expect(store.peek()).toBe(5);
+    await Promise.resolve();
+    expect(kv.values.get(KEY)).toBe('5');
+    expect(messages()).toEqual(['level preference not applied', 'level preference not applied', 'level preference not applied']);
+    expect(logger.entries().every(entry => entry.fields === undefined)).toBe(true);
+  });
+
+  it('remember only with `rememberable`: memory only, nothing stored, no onValue', async () => {
+    expect('remember' in level(() => memoryKv())).toBe(false);
+    const kv = memoryKv();
+    const onValue = jest.fn();
+    const store = createDevicePreference<number>({
+      key: KEY,
+      parse: () => null,
+      serialize: String,
+      fallback: 0,
+      scope: 'test',
+      label: 'level preference',
+      kv: () => kv,
+      onValue,
+      rememberable: true,
+    });
+    store.remember(9);
+    expect(store.peek()).toBe(9);
     await Promise.resolve();
     expect(kv.set).not.toHaveBeenCalled();
-  });
-});
-
-describe('setDevicePreferenceKeyValueStore (the demo)', () => {
-  it('one setter moves every app device preference to the given store', async () => {
-    const kv = memoryKv();
-    setDevicePreferenceKeyValueStore(kv);
-    qualityPreference.write(480);
-    speedPreference.write(1.25);
-    externalPlayerPreference.write(true);
-    diagnosticsCapture.write(false);
-    await Promise.resolve();
-    expect(Object.fromEntries(kv.values)).toEqual({
-      [QUALITY_PREFERENCE_KEY]: '480',
-      [SPEED_PREFERENCE_KEY]: '1.25',
-      [EXTERNAL_PLAYER_PREFERENCE_KEY]: 'on',
-      [DIAGNOSTICS_CAPTURE_KEY]: 'off',
-    });
-    for (const store of [qualityPreference, speedPreference, externalPlayerPreference, diagnosticsCapture]) {
-      store.forget();
-    }
+    expect(onValue).not.toHaveBeenCalled();
   });
 });
 
 describe('usePreference', () => {
-  type Seen = { value: unknown; write: (next: boolean) => void };
+  type Seen = { value: unknown; write: (next: number) => void };
+  type Store = Pick<DevicePreference<number>, 'fallback' | 'peek' | 'read' | 'write'>;
 
-  async function mount(store: Parameters<typeof usePreference<boolean, boolean>>[0], enabled: boolean) {
+  function Probe({ store, enabled, seen }: { store: Store; enabled: boolean; seen: Seen[] }) {
+    seen.push(usePreference(store, enabled));
+    return null;
+  }
+
+  async function mount(store: Store, enabled: boolean) {
     const seen: Seen[] = [];
-    function Probe() {
-      seen.push(usePreference(store, enabled));
-      return null;
-    }
     const root = createRoot();
-    await act(async () => root.render(<Probe />));
-    return { seen, root };
+    await act(async () => root.render(<Probe store={store} enabled={enabled} seen={seen} />));
+    return { seen, root, last: () => seen[seen.length - 1] };
   }
 
   it('undefined, then the read value; write stores it and updates at once', async () => {
-    const kv = memoryKv({ [EXTERNAL_PLAYER_PREFERENCE_KEY]: 'on' });
-    const store = createExternalPlayerPreferenceStore(() => kv);
-    const { seen, root } = await mount(store, true);
+    const kv = memoryKv({ [KEY]: '4' });
+    const { seen, root, last } = await mount(level(() => kv), true);
     expect(seen[0].value).toBeUndefined();
-    expect(seen[seen.length - 1].value).toBe(true);
-    await act(async () => seen[seen.length - 1].write(false));
-    expect(seen[seen.length - 1].value).toBe(false);
-    expect(kv.values.get(EXTERNAL_PLAYER_PREFERENCE_KEY)).toBe('off');
+    expect(last().value).toBe(4);
+    await act(async () => last().write(6));
+    expect(last().value).toBe(6);
+    expect(kv.values.get(KEY)).toBe('6');
     await act(async () => root.unmount());
   });
 
   it('a value already in memory: no read; disabled: never read', async () => {
     const kv = memoryKv();
-    const warm = createExternalPlayerPreferenceStore(() => kv);
-    warm.write(true);
+    const warm = level(() => kv);
+    warm.write(3);
     (kv.get as jest.Mock).mockClear();
     const first = await mount(warm, true);
-    expect(first.seen[0].value).toBe(true);
-    const cold = createExternalPlayerPreferenceStore(() => kv);
-    const second = await mount(cold, false);
-    expect(second.seen[second.seen.length - 1].value).toBeUndefined();
+    expect(first.seen[0].value).toBe(3);
+    const second = await mount(level(() => kv), false);
+    expect(second.last().value).toBeUndefined();
     expect(kv.get).not.toHaveBeenCalled();
     await act(async () => {
       first.root.unmount();
@@ -285,14 +214,27 @@ describe('usePreference', () => {
   });
 
   it('a rejected read shows the fallback', async () => {
-    const store = {
-      fallback: false,
+    const store: Store = {
+      fallback: 0,
       peek: () => undefined,
       read: () => Promise.reject(new Error('apply failed')),
       write: () => {},
     };
-    const { seen, root } = await mount(store, true);
-    expect(seen[seen.length - 1].value).toBe(false);
+    const { last, root } = await mount(store, true);
+    expect(last().value).toBe(0);
+    await act(async () => root.unmount());
+  });
+
+  it('another store: starts again from its snapshot, then its read', async () => {
+    const a = level(() => memoryKv());
+    a.write(2);
+    const b = level(() => memoryKv({ [KEY]: '8' }));
+    const seen: Seen[] = [];
+    const root = createRoot();
+    await act(async () => root.render(<Probe store={a} enabled seen={seen} />));
+    expect(seen[seen.length - 1].value).toBe(2);
+    await act(async () => root.render(<Probe store={b} enabled seen={seen} />));
+    expect(seen[seen.length - 1].value).toBe(8);
     await act(async () => root.unmount());
   });
 });
