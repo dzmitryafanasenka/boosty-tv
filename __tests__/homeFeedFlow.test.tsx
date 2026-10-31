@@ -108,7 +108,7 @@ const focusMock = requestHostFocus as jest.Mock;
  * need the AD-6 backoff pass `WITH_TIMERS`. TanStack's notifications are
  * moved from a 0 ms timer to a microtask (below), so no timer is needed.
  */
-const { settle, render, one, focusOn, press, back } = createFlow({
+const { settle, render, one, focusOn, press, back, advance } = createFlow({
   settle: { rounds: 30, timerRounds: 0 },
   one: 'focusable',
   pressFocuses: true,
@@ -2086,12 +2086,6 @@ describe('Story 4.7: «Продолжить просмотр» on Главная
       const handler = engine.props?.[name] as ((...a: unknown[]) => void) | undefined;
       expect(handler).toBeDefined();
       handler?.(...args);
-    });
-    await settle();
-  }
-  async function advance(ms: number) {
-    await act(async () => {
-      jest.advanceTimersByTime(ms);
     });
     await settle();
   }

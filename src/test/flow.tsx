@@ -11,8 +11,10 @@
  * helpers bound to it. Story-specific helpers (route handlers, AppState
  * capture, call-order trackers) stay in the test files.
  *
- * Files that call `back()` must mock BackHandler with `./backHandlerMock`;
- * files that call `lastFocusTarget()` or `focusTargets()` must mock
+ * Files that call `back()` must mock BackHandler with `./backHandlerMock`,
+ * files that call `key()` TVEventHandler with `./tvEventMock`, and files
+ * that call `advance()` use fake timers; frame counting is in `./frames`.
+ * Files that call `lastFocusTarget()` or `focusTargets()` must mock
  * `shared/ui/requestHostFocus` with a `jest.fn()`. Files that read
  * `destinationIds()` or `lists` install the recorders (see «Recorders») and
  * call `resetRecorders()` in `beforeEach`.
@@ -28,6 +30,7 @@ import {
   type FixtureTransport,
 } from '../shared/api/fixtureTransport';
 import { requestHostFocus } from '../shared/ui/requestHostFocus';
+import { tvEvents } from './tvEventMock';
 
 export type Node = ReturnType<Root['container']['queryAll']>[number];
 
@@ -352,8 +355,29 @@ export function createFlow(profile: FlowProfile) {
     await settleWith({ ...profile.backSettle, ...overrides });
   }
 
+  /** Advances fake time (timers and `Date.now`) by `ms`, then settles. */
+  async function advance(ms: number, overrides?: Partial<SettleOptions>) {
+    await act(async () => {
+      jest.advanceTimersByTime(ms);
+    });
+    await settleWith(overrides);
+  }
+
+  /**
+   * A raw remote key through the TVEventHandler mock (key up, `action` 1,
+   * unless said otherwise), then settles. Needs the `./tvEventMock` mock.
+   */
+  async function key(eventType: string, action = 1) {
+    await act(async () => {
+      tvEvents.emit({ eventType, eventKeyAction: action });
+    });
+    await settleWith();
+  }
+
   return {
     settle: settleWith,
+    advance,
+    key,
     render: (element: ReactElement, overrides?: Partial<SettleOptions>) =>
       render(element, { ...profile.settle, ...profile.renderSettle, ...overrides }),
     one,

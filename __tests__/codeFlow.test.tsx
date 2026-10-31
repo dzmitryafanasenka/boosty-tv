@@ -78,7 +78,7 @@ const native = NativeModules as {
  * render and Back always do.
  */
 const TIMERS = { timerRounds: 2 };
-const { settle, render, one, press, type, submit, back } = createFlow({
+const { settle, render, one, press, type, submit, back, advance } = createFlow({
   settle: { rounds: 20, timerRounds: 0 },
   renderSettle: TIMERS,
   backSettle: TIMERS,
@@ -140,12 +140,6 @@ afterEach(async () => {
   jest.restoreAllMocks();
 });
 
-async function advance(ms: number) {
-  await act(async () => {
-    jest.advanceTimersByTime(ms);
-  });
-  await settle();
-}
 
 function topScreen(root: Root): string | undefined {
   return topScreenOf(root, ['auth/welcome', 'auth/phone', 'auth/code', 'shell']);

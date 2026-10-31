@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, TVFocusGuideView, View, useTVEventHandler } from 'react-native';
 import type { AudioSourceResult } from '../../shared/entities/post';
-import { useLatestRef, useZoneItem } from '../../shared/focus';
+import { useColumnStop, useLatestRef } from '../../shared/focus';
 import { t, tf } from '../../shared/i18n';
 import { formatDuration } from '../../shared/i18n/format';
 import { subscribeAppBackground } from '../../shared/platform/appLifecycle';
@@ -108,15 +108,7 @@ export const AudioBlock = memo(function AudioBlockView({
   onView,
   onFocus,
 }: AudioBlockProps) {
-  const zone = useZoneItem(id);
-  const zoneRef = zone.ref;
-  const ref = useCallback(
-    (view: HostView | null) => {
-      zoneRef?.(view);
-      onView(id, view);
-    },
-    [zoneRef, onView, id],
-  );
+  const { ref, handleFocus: reportFocus } = useColumnStop(id, onView, onFocus);
 
   const [status, setStatus] = useState<Status>('idle');
   /** The signed URI (memory only), while resolved. */
@@ -390,9 +382,8 @@ export const AudioBlock = memo(function AudioBlockView({
     entry.current = { at: Date.now(), used: false };
     swallowUp.current = { left: false, right: false };
     setFocused(true);
-    zone.onFocus();
-    onFocus(id);
-  }, [zone, onFocus, id]);
+    reportFocus();
+  }, [reportFocus]);
   const handleBlur = useCallback(() => {
     focusedRef.current = false;
     hold.current = { key: null, lastAt: 0, ignored: false };

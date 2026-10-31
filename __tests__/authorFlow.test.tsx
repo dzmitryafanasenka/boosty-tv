@@ -128,7 +128,7 @@ jest.mock('@shopify/flash-list', () => require('../src/test/flow').recordingFlas
 const focusMock = requestHostFocus as jest.Mock;
 
 /** As subscriptionsFlow: 30 rounds, no timers unless a row needs the AD-6 backoff. */
-const { settle, render, one, focusOn, press, back } = createFlow({
+const { settle, render, one, focusOn, press, back, advance } = createFlow({
   settle: { rounds: 30, timerRounds: 0 },
   one: 'focusable',
   pressFocuses: true,
@@ -2158,12 +2158,6 @@ describe('Story 7.1: the live stream card on the author page', () => {
     submitSettles: true,
   });
   /** The 30 s poll (fake timers), then settle. */
-  async function advance(ms: number) {
-    await act(async () => {
-      jest.advanceTimersByTime(ms);
-    });
-    await settle();
-  }
 
   beforeEach(() => {
     e4 = syntheticBlogPosts({ blogUrl: BLOG, total: 12 });
@@ -2592,12 +2586,6 @@ describe('Story 7.2: OK on the live card (watch, or the QR)', () => {
     e4 = syntheticBlogPosts({ blogUrl: BLOG, total: 12 });
   });
 
-  async function advance(ms: number) {
-    await act(async () => {
-      jest.advanceTimersByTime(ms);
-    });
-    await settle();
-  }
 
   it('a live card with access and a live-edge URL: OK → the Player with `LiveRef` (ids only); it plays the HLS URL', async () => {
     e15 = () => e15Stream('live', PLAYABLE);
@@ -2777,12 +2765,6 @@ describe('Story 7.4: like and share a live stream', () => {
     e4 = syntheticBlogPosts({ blogUrl: BLOG, total: 12 });
   });
 
-  async function advance(ms: number) {
-    await act(async () => {
-      jest.advanceTimersByTime(ms);
-    });
-    await settle();
-  }
   /** An E15 refetch now (as the 30 s poll), then settle. */
   async function pollNow() {
     await act(async () => {

@@ -1,36 +1,19 @@
 import { focusSoon, focusSoonRun } from '../focusSoon';
 import { requestHostFocus } from '../../ui/requestHostFocus';
 import type { HostView } from '../../ui/FocusableSurface';
+// eslint-disable-next-line boundaries/dependencies -- test-only helpers
+import { frame, installFrameQueue, queuedFrames } from '../../../test/frames';
 
 jest.mock('../../ui/requestHostFocus', () => ({ requestHostFocus: jest.fn() }));
 const focusMock = requestHostFocus as jest.Mock;
 
-// A manual frame queue: each `frame()` runs the callbacks requested before it.
-let queue: Map<number, (t: number) => void>;
-let nextFrameId: number;
-function frame() {
-  const callbacks = [...queue.values()];
-  queue.clear();
-  callbacks.forEach(callback => callback(0));
-}
 
 const viewA = { name: 'a' } as unknown as HostView;
 const viewB = { name: 'b' } as unknown as HostView;
 
 beforeEach(() => {
   focusMock.mockClear();
-  queue = new Map();
-  nextFrameId = 1;
-  jest.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((callback: (t: number) => void) => {
-    const id = nextFrameId++;
-    queue.set(id, callback);
-    return id;
-  });
-  jest.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation((id?: number | null) => {
-    if (id !== undefined && id !== null) {
-      queue.delete(id);
-    }
-  });
+  installFrameQueue();
 });
 
 afterEach(() => {
@@ -126,7 +109,7 @@ describe('focusSoon', () => {
     frame();
     frame();
     expect(action).not.toHaveBeenCalled();
-    expect(queue.size).toBe(0);
+    expect(queuedFrames()).toBe(0);
   });
 
   test('a requestAnimationFrame that calls back synchronously does not throw', () => {
@@ -172,6 +155,6 @@ describe('focusSoon', () => {
     cancelLate();
     frame();
     expect(focusMock.mock.calls).toEqual([[viewB]]);
-    expect(queue.size).toBe(0);
+    expect(queuedFrames()).toBe(0);
   });
 });

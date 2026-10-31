@@ -81,7 +81,7 @@ jest.mock('../src/shared/platform/PlayerEngineView', () => require('../src/test/
 
 const focusMock = requestHostFocus as jest.Mock;
 
-const { settle, render, one, focusOn, press, back } = createFlow({
+const { settle, render, one, focusOn, press, back, advance, key } = createFlow({
   settle: { rounds: 30, timerRounds: 0 },
   one: 'focusable',
   pressFocuses: true,
@@ -231,21 +231,7 @@ const routeNames = () => navigationRef.getRootState()?.routes.map(r => r.name);
 const e8Calls = () => transport.calls.filter(c => E8_RE.test(c.path));
 const playerText = (root: Root) => text(byTestId(root, 'player/page')[0]);
 
-/** Advance fake time (timers and `Date.now`), then settle. */
-async function advance(ms: number) {
-  await act(async () => {
-    jest.advanceTimersByTime(ms);
-  });
-  await settle();
-}
 
-/** A raw remote key (key up unless `action` says otherwise). */
-async function key(eventType: string, action = 1) {
-  await act(async () => {
-    tvEvents.emit({ eventType, eventKeyAction: action });
-  });
-  await settle();
-}
 
 /** Engine events through the mocked port. */
 async function fire<

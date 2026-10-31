@@ -72,6 +72,7 @@ import {
   unmount,
   visible,
 } from '../src/test/flow';
+import { frames, installFrameQueue } from '../src/test/frames';
 
 jest.mock('react-native-keychain');
 jest.mock('../src/shared/ui/requestHostFocus', () => ({
@@ -129,38 +130,6 @@ const { settle, render, one, focusOn, press, back } = createFlow({
   submitSettles: false,
 });
 const WITH_TIMERS = { timerRounds: 30 };
-/**
- * A manual animation-frame queue for the poll focus deferrals (Stories
- * 6.6, 6.7). The RN Jest preset's `requestAnimationFrame` is a 0 ms timeout,
- * and a fake-timer advance runs a chain of them in one go, so the tests that
- * count frames queue them here instead: `frames(n)` runs n frames, each only
- * the callbacks queued before it.
- */
-let frameQueue: Array<{ id: number; callback: (t: number) => void }> = [];
-function queueFrames() {
-  frameQueue = [];
-  let next = 1;
-  jest.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((callback: (t: number) => void) => {
-    const id = next++;
-    frameQueue.push({ id, callback });
-    return id;
-  });
-  jest.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation((id?: number | null) => {
-    frameQueue = frameQueue.filter(entry => entry.id !== id);
-  });
-}
-async function frames(n: number) {
-  for (let i = 0; i < n; i += 1) {
-    const due = frameQueue;
-    frameQueue = [];
-    await act(async () => {
-      for (const entry of due) {
-        entry.callback(Date.now());
-      }
-      await Promise.resolve();
-    });
-  }
-}
 
 const STORED = JSON.stringify({
   v: 1,
@@ -1062,7 +1031,7 @@ describe('focus (focus-map §4 F)', () => {
     ['focus still tracked on the vanished paragraph → a second request two frames later', false, 2],
     ['the user focused another stop meanwhile → no second request', true, 1],
   ] as const)('a refetch that drops the focused paragraph (`focusAfterUnmount`): %s', async (_name, movedAway, requests) => {
-    queueFrames();
+    installFrameQueue();
     const root = await openFromHome();
     const id = FEED_ID(0);
     await focusOn(root, BLOCK(id, 'text@2'));
@@ -2970,7 +2939,7 @@ describe('Story 6.6: vote and retract in a single-choice poll', () => {
     ['Android moved focus to the author', 'author', true],
     ['the user moved to another stop', 'other', false],
   ] as const)('E10 returns the poll finished: the focused option is gone → two frames later focus goes to the poll`s block stop (not the top) — %s', async (_name, moved, expected) => {
-    queueFrames();
+    installFrameQueue();
     const root = await openFromHome();
     const id = FEED_ID(0);
     pollReply = req =>
@@ -3128,7 +3097,7 @@ describe('Story 6.7: multiple-choice poll', () => {
   });
 
   it('matrix «Vote»: 1 and 3 checked, OK on «Проголосовать» → E11 `answer=1,3`, then E10; results with the checks; focus stays on the same control, now «Отозвать голос»', async () => {
-    queueFrames();
+    installFrameQueue();
     const root = await openFromHome();
     const id = FEED_ID(0);
     pollReply = req =>
@@ -3174,7 +3143,7 @@ describe('Story 6.7: multiple-choice poll', () => {
 
   it('matrix «Retract»: answer [1, 3]; «Отозвать голос» is the only stop; OK → pending hint; OK → E12, then E10; no checks; focus on the first option', async () => {
     e8Poll = apiPoll([1, 3], [11, 8, 4]);
-    queueFrames();
+    installFrameQueue();
     const root = await openFromHome();
     const id = FEED_ID(0);
     pollReply = req => (req.method === 'GET' ? { status: 200, body: { data: { poll: apiPoll(null) } } } : { status: 200 });
@@ -3241,7 +3210,7 @@ describe('Story 6.7: multiple-choice poll', () => {
   });
 
   it('E10 fails after the vote: the post`s E8 brings the voted poll; focus stays on the same control, now «Отозвать голос»; no error', async () => {
-    queueFrames();
+    installFrameQueue();
     const root = await openFromHome();
     const id = FEED_ID(0);
     pollReply = req => (req.method === 'GET' ? { status: 404, body: { error: 'not_found' } } : { status: 200 });

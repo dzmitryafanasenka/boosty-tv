@@ -6,6 +6,8 @@ import { requestHostFocus } from '../../../shared/ui/requestHostFocus';
 import type { AuthorFocusInfo } from '../useAuthorAutoFocus';
 import type { AuthorLiveCard } from '../useAuthorLive';
 import { useAuthorLiveActions, type AuthorLiveActions, type AuthorLiveBlock } from '../useAuthorLiveBlock';
+// eslint-disable-next-line boundaries/dependencies -- test-only helpers
+import { frame, installFrameQueue } from '../../../test/frames';
 
 jest.mock('../../../shared/ui/requestHostFocus', () => ({ requestHostFocus: jest.fn() }));
 const focusMock = requestHostFocus as jest.Mock;
@@ -15,14 +17,6 @@ const LIVE = `author/${BLOG}/live`;
 const LIKE = `author/${BLOG}/live/like`;
 const SHARE = `author/${BLOG}/live/share`;
 
-// A manual frame queue: each `frame()` runs the callbacks requested before it.
-let queue: Map<number, (t: number) => void>;
-let nextFrameId: number;
-function frame() {
-  const callbacks = [...queue.values()];
-  queue.clear();
-  callbacks.forEach(callback => callback(0));
-}
 
 const view = (name: string) => ({ name }) as unknown as HostView;
 function card(id: string, mounted: boolean): AuthorLiveCard {
@@ -81,18 +75,7 @@ async function render({ card: cardShown = true, like = true, share = true, grid 
 
 beforeEach(() => {
   focusMock.mockClear();
-  queue = new Map();
-  nextFrameId = 1;
-  jest.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((callback: (t: number) => void) => {
-    const id = nextFrameId++;
-    queue.set(id, callback);
-    return id;
-  });
-  jest.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation((id?: number | null) => {
-    if (id !== undefined && id !== null) {
-      queue.delete(id);
-    }
-  });
+  installFrameQueue();
   modal = { open: jest.fn(), close: jest.fn(), isOpen: () => false };
   latch = { auto: jest.fn(), move: jest.fn() };
   restoration = { focusInitial: jest.fn() };
