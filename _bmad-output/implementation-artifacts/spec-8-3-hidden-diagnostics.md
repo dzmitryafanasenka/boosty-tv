@@ -2,7 +2,7 @@
 title: 'Story 8.3: Hidden diagnostics for testing'
 type: 'feature'
 created: '2026-10-31'
-status: 'in-review'
+status: 'done'
 baseline_commit: '61440e97e3530152ff8e0b587061fee4a71f4140'
 route: 'dispatch'
 review_loop_iteration: 0
