@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import type { HttpClient } from '../../shared/api';
 import type { MediaRef } from '../../shared/entities/post';
@@ -217,8 +217,12 @@ export function PlayerScreen({
     onForeground: commands.foreground,
   });
 
-  // Story 8.2: show the overlay once when playback starts, so the notice is read.
+  // Story 8.2: show the overlay once when playback starts, so the notice is
+  // read. Epic 8 retro A5: the notice goes when that overlay hides while the
+  // video plays (the auto-hide, or Back); a hide caused by an error, a
+  // recovery or leaving playback keeps it for the next show.
   const noticeShown = useRef(false);
+  const [noticeDone, setNoticeDone] = useState(false);
   const showOverlayRef = useLatestRef(commands.showOverlay);
   useEffect(() => {
     if (notice && playing && !noticeShown.current) {
@@ -226,6 +230,23 @@ export function PlayerScreen({
       showOverlayRef.current();
     }
   }, [notice, playing, showOverlayRef]);
+  const noticeOverlayOpen = useRef(false);
+  useEffect(() => {
+    if (!noticeShown.current) {
+      return;
+    }
+    if (overlay) {
+      noticeOverlayOpen.current = true;
+    } else if (noticeOverlayOpen.current) {
+      // Hidden while playing: read. Hidden by an error or a recovery: not
+      // yet, so the next show (of a playing video) counts again.
+      noticeOverlayOpen.current = false;
+      if (playing) {
+        setNoticeDone(true);
+      }
+    }
+  }, [overlay, playing]);
+  const shownNotice = noticeDone ? undefined : notice;
 
   /** Exit (Back, Stop, «Назад»): report, then leave. */
   const onExitRef = useLatestRef(onExit);
@@ -322,7 +343,7 @@ export function PlayerScreen({
           settingsRef={settings.settingsView}
           live={ready.live}
           showSettings={settingsShown}
-          notice={notice}
+          notice={shownNotice}
         />
       ) : null}
       {phase === 'recovering' ? (

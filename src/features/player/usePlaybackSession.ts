@@ -58,7 +58,8 @@ export type EngineProps = {
   onBuffering: (buffering: boolean) => void;
   onSeekDone: (sec: number) => void;
   onEnd: () => void;
-  onError: () => void;
+  /** The engine's safe short error code (`PlayerEngineView`), or null. */
+  onError: (code?: string | null) => void;
   onResolution: (height: number | null) => void;
   onAudioFocusLost: () => void;
 };
@@ -652,7 +653,7 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
    * gate («Восстанавливаем воспроизведение…»). Otherwise the error state
    * («Повторить» focused). No E9 for the error itself.
    */
-  const onError = useCallback(() => {
+  const onError = useCallback((code?: string | null) => {
     // A switched source that failed before `onLoad` is never stored.
     pendingPreferenceWrite.current = null;
     const current = latest.current.ready;
@@ -668,10 +669,10 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
     const failure: Failure = { target, key: qualityOf(current.source), byQuality: current.byQuality, paused: pausedAtError };
     lastFailure.current = failure;
     if (!takeRecovery(budget.current)) {
-      logger.info('player', 'playback failed again; waiting for the user');
+      logger.info('player', 'playback failed again; waiting for the user', { error: code ?? 'none' });
       return;
     }
-    logger.info('player', 'playback failed; recovering');
+    logger.info('player', 'playback failed; recovering', { error: code ?? 'none' });
     nextStart.current = { target, paused: pausedAtError };
     setKeepQuality(failure.key);
     setRecovery({ from: resolution });

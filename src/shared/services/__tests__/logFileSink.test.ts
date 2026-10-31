@@ -68,14 +68,17 @@ async function flushPromises() {
 }
 
 /** A fake AppState: `emit(state)` calls the live listeners. */
-function fakeAppState() {
-  const listeners = new Set<(state: string) => void>();
+/** The AppLifecycle port's background subscription (Epic 8 retro A5), faked. */
+function fakeBackground() {
+  const listeners = new Set<() => void>();
   return {
     listeners,
-    emit: (state: string) => [...listeners].forEach(listener => listener(state)),
-    addEventListener: (_type: 'change', listener: (state: string) => void) => {
+    emit: () => [...listeners].forEach(listener => listener()),
+    subscribe: (listener: () => void) => {
       listeners.add(listener);
-      return { remove: () => listeners.delete(listener) };
+      return () => {
+        listeners.delete(listener);
+      };
     },
   };
 }
@@ -84,9 +87,9 @@ function setup() {
   const logger: Logger = createLogger({ now: () => Date.UTC(2026, 9, 31, 12, 0, 0) });
   const scope = createAccountScope({ logger: () => logger });
   const file = fakeFile();
-  const appState = fakeAppState();
-  const sink = createLogFileSink({ logger, file: file.port, scope, appState });
-  return { logger, scope, file, sink, appState };
+  const background = fakeBackground();
+  const sink = createLogFileSink({ logger, file: file.port, scope, subscribeBackground: background.subscribe });
+  return { logger, scope, file, sink, background };
 }
 
 beforeEach(() => {
@@ -192,18 +195,17 @@ describe('createLogFileSink (Story 8.3)', () => {
   });
 
   it('review: going to the background writes the waiting batch at once; the listener goes with disable', async () => {
-    const { logger, file, sink, appState } = setup();
+    const { logger, file, sink, background } = setup();
     sink.enable();
-    expect(appState.listeners.size).toBe(1);
+    expect(background.listeners.size).toBe(1);
     logger.info('t', 'waiting');
-    appState.emit('inactive');
     expect(file.port.append).not.toHaveBeenCalled();
-    appState.emit('background');
+    background.emit();
     expect(file.port.append).toHaveBeenCalledTimes(1);
     await flushPromises();
     expect(file.state.lines[0]).toContain('waiting');
     await sink.disable();
-    expect(appState.listeners.size).toBe(0);
+    expect(background.listeners.size).toBe(0);
   });
 
   it('a failed append logs one warning to the ring only; capture stays on', async () => {
