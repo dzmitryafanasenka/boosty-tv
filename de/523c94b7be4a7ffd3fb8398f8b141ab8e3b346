@@ -1,0 +1,39 @@
+__tests__/playerFlow.test.tsx
+  s_7477a2e6c69ec6::t_d3456ee05d9bb2 4270-4307
+_bmad-output/implementation-artifacts/spec-8-2-system-video-player.md
+  s_7477a2e6c69ec6::t_3abe3fe9c42fc8 5,89-118
+_bmad-output/planning-artifacts/ux-designs/ux-boosty-tv-2026-10-25/EXPERIENCE.md
+  s_7477a2e6c69ec6::t_1e392912a645de 95
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/ExternalPlayerModule.kt
+  s_7477a2e6c69ec6::t_42be840b352998 19,93
+docs/feature-parity.md
+  s_7477a2e6c69ec6::t_9961b26c298590 119
+docs/focus-map.md
+  s_7477a2e6c69ec6::t_4dcb93d4731c4d 397-399
+docs/testing.md
+  s_7477a2e6c69ec6::t_0a2265461fbbce 909,916-919
+src/app/Shell.tsx
+  s_7477a2e6c69ec6::t_4e287d815cfaea 477-480
+src/app/session.ts
+  s_7477a2e6c69ec6::t_356b2b31a85c9d 4,11,50-57
+src/features/player/ExternalHandoff.tsx
+  s_7477a2e6c69ec6::t_72773d742c093b 124-125,143-150
+src/features/player/PlayerEntry.tsx
+  s_7477a2e6c69ec6::t_ad2fb2aed2a072 28-30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "de523c94b7be4a7ffd3fb8398f8b141ab8e3b346",
+  "prompts": {},
+  "sessions": {
+    "s_7477a2e6c69ec6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d998e7e2-636f-4943-a058-23b274887697",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
