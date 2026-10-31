@@ -906,6 +906,7 @@ Host tests: `src/shared/services/progress/__tests__/progressRepository.test.ts` 
 ### Epic 3 retro A4 — sidebar OK from Автор/Пост with animations off, 2026-10-31
 
 Device: Chromecast with Google TV, the release-like build from `48b1a22` over adb. Window and transition animation scales set to 0 and animator duration to 0 for the check, then restored (1.0, 1.0, unset). Пост (opened from Главная) → Left → sidebar «Подписки» → OK: the Подписки section opened with the tab selected and focus on the first author card. Автор (opened from Подписки) → Left → sidebar «События» → OK: the События section opened (empty state) with focus on «Обновить»; Back moved focus to the sidebar and did not bring Автор back. No stuck or doubled screen, so the `pendingShellSection` unmount timing holds with animations off. Not checked with the physical remote.
+
 ### Retro follow-ups: PostBody / PollWidget split and boundary tests, 2026-10-31
 
 **Status: host-tested only; no device run (no adb in this change).** `spec-retro-post-split-and-boundary-tests.md`. It covers `epic-6-retro-item-28` (A3), `epic-6-retro-item-29` (A4), `epic-7-retro-item-36` (A4) and `epic-3-retro-item-13` (A5).
