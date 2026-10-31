@@ -25,6 +25,18 @@ Rules for every device run that drives the app with injected keys, own or delega
 - **Settle before key batches in a sheet or list.** After Menu the settings sheet needs about 1 s before ↓ lands on its rows; a ↓ sent sooner is lost and the next OKs pick the wrong row (Story 8.1: quality «Авто» and speed 1.5× were stored by mistake, then restored). Repeated ←/→ events sent back to back act as hold-to-seek (one long jump to 0:00); space single seeks ≥ 1.3 s apart, and avoid seeks on the owner's content (a seek counts as movement).
 - **Outward actions need the owner's approval.** That covers a poll vote, a like (E17) and a live heartbeat (E16). Never sign out, uninstall or clear app data; install with `adb install -r`.
 - **No secrets in device logs.** Temporary probes log counts, types and key sets only, never names, URLs, tokens or signed values. Remove every probe before the commit, and check that it is gone from the release bundle. Grep the built Hermes bundle for the probe's marker and expect a count of 0, as the story sections record (for example «`TEMP75` 0»).
+- **Check where focus went after the first key of a batch.** On a freshly rendered screen the first ← toward the sidebar was sometimes lost, and the following ↓ keys moved through the grid instead (Story 8.3, Epic 8 retro A3 runs; nothing opened because no OK followed). Screenshot after the first key, then continue.
+
+## Platform probes before the spec (Epic 8 retro A6)
+
+A story that depends on Android platform behaviour probes that behaviour on the pinned device while its spec is written, before the spec checkpoint. Platform behaviour here means intents and the chooser, package visibility, storage paths, permissions, `run-as` and the release build's flags. In Epic 8 the planning text was wrong twice, and both times it was found only on the device:
+- 8.2 assumed the system chooser lists the installed players. On the pinned Google TV, `queryIntentActivities` with `MATCH_DEFAULT_ONLY` returns only `com.android.tv.frameworkpackagestubs`, and the plain chooser lists no targets. That cost three probe builds after implementation.
+- 8.3 assumed internal storage can be pulled over adb. One `adb shell run-as io.github.dzmitryafanasenka.boostytv ls` at spec time showed the release build is not debuggable, and the owner chose the app-specific external files dir before any code.
+
+How to probe:
+- **Shell first.** Use `pm query-activities`, `dumpsys package <pkg>`, `run-as`, `ls /sdcard/Android/data/…` and `getprop ro.build.version.sdk`. Remember that adb shell sees more than the app does: `pm` lists activities that the app's own query may not return.
+- **Then from inside the app, when the question is what the app sees.** Add a temporary probe in the native module that logs counts and package names only (no URLs or user data) to `logcat` under a marker tag. Build release-like, read it with `adb logcat -s <TAG>`, and remove the probe before the commit (see «No secrets in device logs»).
+- **Record the result in the spec**, as a Code Map note or an Open Question for the owner, so implementation starts from the device's real behaviour.
 
 ## Build configuration
 
