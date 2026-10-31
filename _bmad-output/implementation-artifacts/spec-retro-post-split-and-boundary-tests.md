@@ -2,7 +2,7 @@
 title: 'Retro follow-ups: PostBody / PollWidget split and story-boundary tests (Epic 6 A3/A4, Epic 7 A4, Epic 3 A5)'
 type: 'refactor'
 created: '2026-10-31'
-status: 'in-review'
+status: 'done'
 route: 'dispatch'
 review_loop_iteration: 0
 baseline_commit: '48b1a22b8104ed032b633660e4f4b37df4ea42ce'

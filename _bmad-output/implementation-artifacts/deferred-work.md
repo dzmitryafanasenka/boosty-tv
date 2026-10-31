@@ -341,6 +341,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-epic-7-retro-a2-live-and-focus-refactor.md`
   summary: Fix the flaky playerFlow «Expired URL» assertion `JSON.stringify(playerLogs)).not.toMatch(/example\.invalid|312|v1/)`, which also matches the digits of a log timestamp (e.g. 1793373531280); assert on the log messages and fields without `time`.
   evidence: pre-existing; one failed run in 30 during the A2 verification, caused by a timestamp containing «312» (`__tests__/playerFlow.test.tsx:2386`).
+  status: Done 2026-10-31 in `_bmad-output/implementation-artifacts/spec-retro-post-split-and-boundary-tests.md`: the logs are serialized without `time` before the leak check (playerFlow «Expired URL», and the same latent issue in eventsFlow «Malformed»).
 - source_spec: `_bmad-output/implementation-artifacts/spec-epic-7-retro-a2-live-and-focus-refactor.md`
   summary: Finish the PlayerScreen live/VOD split before Epic 8 Story 8.1. A2 extracted `useLivePlayback` (live media, ended, epoch, unplayable exit, copy), but most of the roughly 20 `isLive` branches stay in `PlayerScreen.tsx`: retryable, the overlay focus target, live `pickQuality`, play after a pause, seek disabled, live `onEnd`, the recovery target.
   evidence: the remaining branches mutate screen refs and state (`gate`, `heldByLifecycle`, `seek`, `setBuffering`, `setPaused`, `showOverlay`), so moving them needs a designed seam (for example an engine-state reducer), not callbacks; `PlayerScreen.tsx` went only from 1514 to 1477 lines (A2 Implementation Notes).
