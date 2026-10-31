@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 10-25-2026 14:34
-last_updated: 10-31-2026 22:00
+last_updated: 10-31-2026 22:02
 project: Boosty TV
 project_key: NOKEY
 tracking_system: file-system
@@ -104,11 +104,11 @@ development_status:
   7-5-events-list: done
   epic-7-retrospective: done
 
-  epic-8: in-progress
+  epic-8: done
   8-1-playback-speed: done
   8-2-system-video-player-option: done
   8-3-hidden-diagnostics-for-testing: done
-  epic-8-retrospective: optional
+  epic-8-retrospective: done
 
   epic-9: backlog
   9-1-signed-release-on-github-releases: backlog
@@ -393,3 +393,56 @@ action_items:
     owner: "agent"
     status: done
     ref: "_bmad-output/implementation-artifacts/epic-7-retro-2026-10-30.md"
+  - id: "epic-8-retro-item-39-before-epic-9-narrow-the-logger-field-ke"
+    epic: 8
+    action: "Before Epic 9: narrow the logger field-key rule so non-secret keys (versionCode,
+      errorCode, statusCode, codec) survive; add a source-scan test of logger call-site
+      field keys"
+    owner: "agent"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-8-retro-2026-10-31.md"
+  - id: "epic-8-retro-item-40-reconcile-planning-and-parity-docs-to-th"
+    epic: 8
+    action: "Reconcile planning and parity docs to the Epic 8 as-built (epics.md 8.2/8.3,
+      epic-8-context, ARCHITECTURE-SPINE AD-2/AD-4/AD-14, feature-parity PLAY-07/PLAY-13
+      device status, logFile fail-closed note, per-port error rule)"
+    owner: "agent"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-8-retro-2026-10-31.md"
+  - id: "epic-8-retro-item-41-extract-createdevicepreference-t-and-use"
+    epic: 8
+    action: "Extract createDevicePreference<T> and usePreference; migrate the quality,
+      speed, external-player and diagnostics-capture stores; one parameterised test
+      suite"
+    owner: "agent"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-8-retro-2026-10-31.md"
+  - id: "epic-8-retro-item-42-split-__tests__-playerflow-test-tsx-4415"
+    epic: 8
+    action: "Split __tests__/playerFlow.test.tsx (4415 lines): move the 8.2 hand-off
+      tests to externalPlayerFlow.test.tsx, then split by story area"
+    owner: "agent"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-8-retro-2026-10-31.md"
+  - id: "epic-8-retro-item-43-diagnostics-polish-log-the-main-video-en"
+    epic: 8
+    action: "Diagnostics polish: log the main video engine short error code; flush
+      logFileSink through the appLifecycle port; clear the 8.2 fallback notice after
+      its first auto-hide"
+    owner: "agent"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-8-retro-2026-10-31.md"
+  - id: "epic-8-retro-item-44-add-a-spec-time-rule-to-docs-testing-md"
+    epic: 8
+    action: "Add a spec-time rule to docs/testing.md: stories depending on Android
+      platform behaviour probe it on the pinned device before the spec checkpoint"
+    owner: "agent"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-8-retro-2026-10-31.md"
+  - id: "epic-8-retro-item-45-owner-device-pass-chooser-with-2-video-p"
+    epic: 8
+    action: "Owner device pass: chooser with 2+ video players, log file cleared by
+      sign-out with capture on, live at 1x when a subscribed blog is live"
+    owner: "owner"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-8-retro-2026-10-31.md"
