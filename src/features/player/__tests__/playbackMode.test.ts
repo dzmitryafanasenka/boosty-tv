@@ -27,22 +27,24 @@ const live = createLiveMode();
 const GATES: StartGate[] = [{ kind: 'load' }, { kind: 'load', target: 12 }, { kind: 'seek', target: 30 }, { kind: 'first' }, { kind: 'started' }];
 
 describe('PlaybackMode flags (the old isLive branches)', () => {
-  test('VOD: seeks, holds, timeline focus, no heartbeat, the repository', () => {
+  test('VOD: seeks (and holds), timeline focus, no heartbeat, the repository, no stream rules', () => {
     expect(vod).toMatchObject({
       kind: 'vod',
       canSeek: true,
-      holdSeeks: true,
+      streamEnds: false,
+      noSourceLeaves: false,
       heartbeat: false,
       overlayFocus: 'timeline',
       progress: repository,
     });
   });
 
-  test('live: no seek, no held target, play/pause focus, the heartbeat, no progress', () => {
+  test('live: no seek and no held target, play/pause focus, the heartbeat, no progress, the stream rules', () => {
     expect(live).toMatchObject({
       kind: 'live',
       canSeek: false,
-      holdSeeks: false,
+      streamEnds: true,
+      noSourceLeaves: true,
       heartbeat: true,
       overlayFocus: 'playPause',
       progress: null,
@@ -65,6 +67,8 @@ describe('retryable', () => {
     { kind: 'noSource' },
     { kind: 'locked', confirmed: true, verified: false },
     readyWith(hls, [hls]),
+    { kind: 'unavailable' },
+    { kind: 'loading' },
   ];
 
   test.each(states.map(state => [state.kind, state] as const))('VOD %s: «Повторить»', (_kind, state) => {
@@ -72,7 +76,7 @@ describe('retryable', () => {
   });
 
   test('live: only a failed E15 request', () => {
-    expect(states.map(state => live.retryable(state))).toEqual([true, false, false, false]);
+    expect(states.map(state => live.retryable(state))).toEqual([true, false, false, false, false, false]);
   });
 });
 
@@ -85,6 +89,7 @@ describe('settingsShown', () => {
   test('live: only with a real quality choice', () => {
     expect(live.settingsShown([hls])).toBe(false);
     expect(live.settingsShown([hls, mp4(720)])).toBe(true);
+    expect(live.settingsShown([])).toBe(false);
   });
 });
 
@@ -126,6 +131,8 @@ describe('qualityIntent', () => {
     const progressive = [mp4(1080), mp4(720)];
     // 480p is missing: the default order picks 1080p, the playing one.
     expect(vod.qualityIntent(readyWith(progressive[0], progressive), 480)).toBe('storeOnly');
+    // The pick is the playing non-auto source: nothing switches.
+    expect(vod.qualityIntent(readyWith(progressive[1], progressive), 720)).toBe('storeOnly');
   });
 
   test('live: another source of the same E15 replays at the edge; anything else does nothing', () => {

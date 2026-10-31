@@ -147,7 +147,8 @@ export function PlayerScreen({
   // settings, focus, progress and lifecycle, remote, access endings, live exit.
   const source = usePlayerSource(http, mode, liveRef, vodRef);
   const session = usePlaybackSession({ mode, source, vodRef, start, onEnded });
-  const { phase, state, ready, failed, playing, paused, overlay, showOverlay, seek } = session;
+  const { phase, state, ready, failed, playing, seek, view, commands } = session;
+  const { paused, overlay } = view;
 
   // Story 7.3: the live viewer heartbeat (E16 every 30 s while watching; one
   // stop on the end or the unmount). VOD: disabled (no blog).
@@ -156,13 +157,13 @@ export function PlayerScreen({
   const sheet = useSheetOpen();
   const spinner = useOverlayTimers({
     playing,
-    buffering: session.buffering,
+    buffering: view.buffering,
     overlay,
     paused,
-    seeking: session.seeking,
+    seeking: view.seeking,
     sheetOpen: sheet.sheetOpen,
-    interaction: session.interaction,
-    setOverlay: session.setOverlay,
+    interaction: view.interaction,
+    hideOverlay: commands.hideOverlay,
   });
 
   /** Story 7.2 (owner decision 2026-10-30): live shows the gear only with a real quality choice. */
@@ -170,11 +171,11 @@ export function PlayerScreen({
   const settings = usePlayerSettings({
     sheet,
     ready,
-    autoHeight: session.autoHeight,
+    autoHeight: view.autoHeight,
     phase,
     settingsShown,
-    showOverlay,
-    pickQuality: session.pickQuality,
+    showOverlay: commands.showOverlay,
+    pickQuality: commands.pickQuality,
   });
 
   // Live (Story 7.2): only a failed E15 request offers «Повторить»; a broken
@@ -196,32 +197,16 @@ export function PlayerScreen({
     progress: mode.progress,
     vodRef,
     readyResolution: session.readyResolution,
-    readyProgressRef: session.readyProgressRef,
-    reportRef: session.reportRef,
-    // Background (device sleep included): a forced write (best effort; the
-    // app may be stopped), then the player pauses itself (Story 4.6), so
-    // react-native-video's `onHostResume` does not restart playback; a
-    // pending seek target is dropped without seeking, the settings sheet
-    // closes. Every phase: a source still loading or recovering starts
-    // paused too. Hidden now, so the foreground's overlay is a change.
-    onBackground: () => {
-      session.reportRef.current('background');
-      session.pauseForLifecycle();
-      seek.reset();
-      settings.closeSheet(false);
-      session.setOverlay(false);
-    },
-    // Foreground (Story 4.6): paused, the overlay shown (focus → the timeline).
-    onForeground: () => {
-      if (session.live.current.phase === 'playing') {
-        showOverlay();
-      }
-    },
+    readyProgressRef: session.progress.readyProgressRef,
+    reportRef: session.progress.reportRef,
+    // Story 4.6: the session pauses itself; the settings sheet closes in between.
+    onBackground: () => commands.background(settings.closeSheet),
+    onForeground: commands.foreground,
   });
 
   /** Exit (Back, Stop, «Назад»): report, then leave. */
   const onExitRef = useLatestRef(onExit);
-  const report = session.report;
+  const report = session.progress.report;
   const exitPlayer = useCallback(() => {
     report('exit');
     onExitRef.current();
@@ -231,16 +216,16 @@ export function PlayerScreen({
     phase,
     overlay,
     isActive,
-    holdSeeks: mode.holdSeeks,
+    canSeek: mode.canSeek,
     seek,
     focused: focus.focused,
     sheetOpenRef: sheet.sheetOpenRef,
     entryGuard,
-    setOverlay: session.setOverlay,
-    showOverlay,
-    seekBy: session.seekBy,
-    togglePause: session.togglePause,
-    setPlaying: session.setPlaying,
+    hideOverlay: commands.hideOverlay,
+    showOverlay: commands.showOverlay,
+    seekBy: commands.seekBy,
+    togglePause: commands.togglePause,
+    setPlaying: commands.setPlaying,
     exitPlayer,
     openSettings: settings.openSettings,
   });
@@ -249,7 +234,7 @@ export function PlayerScreen({
     state,
     everReady: session.everReady,
     isActive,
-    reportRef: session.reportRef,
+    reportRef: session.progress.reportRef,
     onNoAccess: onNoAccess ?? onExit,
     progress: mode.progress,
     vodMediaId: vodRef?.mediaId ?? null,
@@ -281,18 +266,9 @@ export function PlayerScreen({
             // A new E8 or a quality switch (Story 4.3) remounts the engine;
             // so does a live play after a pause (Story 7.2: the live edge).
             key={`${ready.resolution}:${ready.source.type}:${source.epoch}`}
-            ref={session.engine}
+            {...session.engineProps}
             testID="player/engine"
             source={{ uri: ready.source.url, format: ready.source.format }}
-            paused={paused}
-            onLoad={session.onLoad}
-            onProgress={session.onProgress}
-            onBuffering={session.onBuffering}
-            onSeekDone={session.onSeekDone}
-            onEnd={session.onEnd}
-            onError={session.onError}
-            onResolution={session.onResolution}
-            onAudioFocusLost={session.onAudioFocusLost}
           />
         ) : null}
       </Pressable>
@@ -307,13 +283,13 @@ export function PlayerScreen({
         <PlayerOverlay
           meta={ready.meta}
           paused={paused}
-          positionSec={session.positionSec}
-          durationSec={session.durationSec}
-          seekTargetSec={session.seekTarget}
-          onTogglePause={session.onOk}
+          positionSec={view.positionSec}
+          durationSec={view.durationSec}
+          seekTargetSec={view.seekTarget}
+          onTogglePause={commands.onOk}
           onTimelineFocus={focus.onTimelineFocus}
           onPlayPauseFocus={focus.onPlayPauseFocus}
-          onSkip={session.onSkip}
+          onSkip={commands.onSkip}
           onControlFocus={focus.onControlFocus}
           onOpenSettings={settings.openSettings}
           onSettingsFocus={focus.onSettingsFocus}
@@ -349,7 +325,7 @@ export function PlayerScreen({
                 // A locked answer whose session check still runs is not
                 // done yet: «Повторить» stays busy until it exits or stays.
                 busy={source.media.isFetching || (state.kind === 'locked' && !state.confirmed)}
-                onPress={session.onRetry}
+                onPress={commands.onRetry}
                 onFocus={focus.onRetryFocus}
                 style={styles.action}
               />

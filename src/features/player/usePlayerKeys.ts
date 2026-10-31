@@ -102,12 +102,12 @@ export function usePlayerKeys({
   phase,
   overlay,
   isActive,
-  holdSeeks,
+  canSeek,
   seek,
   focused,
   sheetOpenRef,
   entryGuard,
-  setOverlay,
+  hideOverlay,
   showOverlay,
   seekBy,
   togglePause,
@@ -118,13 +118,13 @@ export function usePlayerKeys({
   phase: Phase;
   overlay: boolean;
   isActive: () => boolean;
-  /** `PlaybackMode.holdSeeks`. */
-  holdSeeks: boolean;
+  /** `PlaybackMode.canSeek` (also gates held targets). */
+  canSeek: boolean;
   seek: SeekController;
   focused: RefObject<string | null>;
   sheetOpenRef: RefObject<boolean>;
   entryGuard: EntryGuard;
-  setOverlay: (shown: boolean) => void;
+  hideOverlay: () => void;
   showOverlay: () => void;
   seekBy: (direction: SeekDirection) => void;
   togglePause: () => void;
@@ -132,12 +132,12 @@ export function usePlayerKeys({
   exitPlayer: () => void;
   openSettings: () => void;
 }): { onSurfacePress: () => void } {
-  const live = useLatestRef({ phase, overlay, isActive });
+  const latest = useLatestRef({ phase, overlay, isActive });
   const entryGuarded = entryGuard.guarded;
 
   /** OK on the surface (overlay hidden): pause and show the overlay (a pending seek: commit it). */
   const onSurfacePress = useCallback(() => {
-    if (live.current.phase !== 'playing' || entryGuarded()) {
+    if (latest.current.phase !== 'playing' || entryGuarded()) {
       return;
     }
     if (seek.commitNow()) {
@@ -145,7 +145,7 @@ export function usePlayerKeys({
       return;
     }
     setPlaying(false);
-  }, [live, seek, showOverlay, entryGuarded, setPlaying]);
+  }, [latest, seek, showOverlay, entryGuarded, setPlaying]);
 
   const hold = useRef<{ key: 'left' | 'right' | null; repeats: number; lastAt: number; ignored: boolean }>({
     key: null,
@@ -156,7 +156,7 @@ export function usePlayerKeys({
   const swallowUp = useRef({ left: false, right: false });
   const onSeekKey = useCallback(
     (event: SeekKeyEvent) => {
-      const { phase: current, isActive: active } = live.current;
+      const { phase: current, isActive: active } = latest.current;
       // The settings sheet owns the remote while it is open. ↑ ↓ (forwarded
       // for the period stepper, Story 5.4) are not seek keys.
       if (event.key === 'up' || event.key === 'down') {
@@ -183,8 +183,8 @@ export function usePlayerKeys({
           }
           return;
         }
-        // Story 7.2: a held key on a live stream never seeks (no pending target).
-        if (hold.current.ignored || onControls || !holdSeeks) {
+        // Story 7.2: a mode that cannot seek (live) never builds a held target.
+        if (hold.current.ignored || onControls || !canSeek) {
           return;
         }
         hold.current.repeats += 1;
@@ -200,13 +200,13 @@ export function usePlayerKeys({
       // a tap keeps the 600 ms window.
       hold.current = { key: null, repeats: 0, lastAt: 0, ignored: false };
     },
-    [live, seek, seekBy, showOverlay, entryGuarded, holdSeeks, focused, sheetOpenRef],
+    [latest, seek, seekBy, showOverlay, entryGuarded, canSeek, focused, sheetOpenRef],
   );
   useFocusEffect(useCallback(() => subscribeSeekKeys(onSeekKey), [onSeekKey]));
 
   const onTvEvent = useCallback(
     (event: HWEvent) => {
-      const { phase: current, isActive: active } = live.current;
+      const { phase: current, isActive: active } = latest.current;
       if (!active() || current !== 'playing' || Number(event.eventKeyAction) !== KEY_UP) {
         return;
       }
@@ -281,7 +281,7 @@ export function usePlayerKeys({
           return;
       }
     },
-    [live, seek, seekBy, showOverlay, togglePause, setPlaying, entryGuarded, exitPlayer, openSettings, focused, sheetOpenRef],
+    [latest, seek, seekBy, showOverlay, togglePause, setPlaying, entryGuarded, exitPlayer, openSettings, focused, sheetOpenRef],
   );
   useTVEventHandler(onTvEvent);
 
@@ -298,15 +298,15 @@ export function usePlayerKeys({
           seek.cancel();
           return true;
         }
-        if (live.current.overlay && live.current.phase === 'playing') {
-          setOverlay(false);
+        if (latest.current.overlay && latest.current.phase === 'playing') {
+          hideOverlay();
           return true;
         }
         exitPlayer();
         return true;
       });
       return () => sub.remove();
-    }, [live, seek, exitPlayer, sheetOpenRef, setOverlay]),
+    }, [latest, seek, exitPlayer, sheetOpenRef, hideOverlay]),
   );
 
   return { onSurfacePress };

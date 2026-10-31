@@ -39,16 +39,16 @@ export function usePlayerProgress({
   onBackground: () => void;
   onForeground: () => void;
 }): void {
-  const live = useLatestRef({ vodRef });
+  const latest = useLatestRef({ vodRef });
   const begun = useRef(false);
   useEffect(() => {
     const meta = readyProgressRef.current;
-    const ref = live.current.vodRef;
+    const ref = latest.current.vodRef;
     if (progress !== null && ref !== null && readyResolution !== null && meta !== null && !begun.current) {
       begun.current = true;
       progress.begin(ref, meta);
     }
-  }, [progress, readyResolution, readyProgressRef, live]);
+  }, [progress, readyResolution, readyProgressRef, latest]);
 
   const onBackgroundRef = useLatestRef(onBackground);
   useEffect(() => subscribeAppBackground(() => onBackgroundRef.current()), [onBackgroundRef]);

@@ -30,7 +30,7 @@ export function useOverlayTimers({
   seeking,
   sheetOpen,
   interaction,
-  setOverlay,
+  hideOverlay,
 }: {
   playing: boolean;
   buffering: boolean;
@@ -40,7 +40,7 @@ export function useOverlayTimers({
   sheetOpen: boolean;
   /** Bumped on every input that shows the overlay: restarts the auto-hide. */
   interaction: number;
-  setOverlay: (shown: boolean) => void;
+  hideOverlay: () => void;
 }): boolean {
   const [spinner, setSpinner] = useState(false);
   // Spinner only after 500 ms of buffering.
@@ -60,16 +60,16 @@ export function useOverlayTimers({
     if (!mayHide) {
       return;
     }
-    const timer = setTimeout(() => setOverlay(false), OVERLAY_HIDE_MS);
+    const timer = setTimeout(() => hideOverlay(), OVERLAY_HIDE_MS);
     return () => clearTimeout(timer);
-  }, [mayHide, interaction, setOverlay]);
+  }, [mayHide, interaction, hideOverlay]);
 
   // The overlay exists only while playing.
   useEffect(() => {
     if (!playing) {
-      setOverlay(false);
+      hideOverlay();
     }
-  }, [playing, setOverlay]);
+  }, [playing, hideOverlay]);
   return spinner;
 }
 

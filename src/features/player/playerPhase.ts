@@ -1,6 +1,6 @@
 import { t } from '../../shared/i18n';
 import type { MediaSourceState } from './mediaResolver';
-import type { PlaybackKind } from './playbackMode';
+import type { PlaybackMode } from './playbackMode';
 
 /** `ended` (Story 7.2): live only, the stream ended or is gone («Стрим завершён»). */
 export type Phase = 'loading' | 'playing' | 'recovering' | 'error' | 'locked' | 'unavailable' | 'ended';
@@ -34,25 +34,25 @@ export function isRecovering({
 
 /** The player's phase from the media state and the session's recovery state. */
 export function derivePhase({
-  kind,
+  mode,
   liveEnded,
   state,
   recovering,
   failed,
   everReady,
 }: {
-  kind: PlaybackKind;
-  /** Live only: the engine reported the end of the stream. */
+  /** The mode's phase rules (`streamEnds`, `noSourceLeaves`). */
+  mode: Pick<PlaybackMode, 'streamEnds' | 'noSourceLeaves'>;
+  /** The engine reported the end of the stream (only a mode with `streamEnds` sets it). */
   liveEnded: boolean;
   state: MediaSourceState;
   recovering: boolean;
   failed: boolean;
   everReady: boolean;
 }): Phase {
-  const live = kind === 'live';
-  return live && (liveEnded || state.kind === 'unavailable')
+  return mode.streamEnds && (liveEnded || state.kind === 'unavailable')
     ? 'ended'
-    : state.kind === 'loading' || (live && state.kind === 'noSource')
+    : state.kind === 'loading' || (mode.noSourceLeaves && state.kind === 'noSource')
       ? // Live and not playable here: the player leaves at once (the origin's QR).
         'loading'
       : recovering

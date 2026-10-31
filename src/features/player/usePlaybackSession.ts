@@ -44,6 +44,76 @@ export type PlaybackSessionInput = {
   onEnded: (() => void) | undefined;
 };
 
+type Report = (event: ProgressEvent, positionOverride?: number) => void;
+
+/** The engine view's props (spread onto `PlayerEngineView`; its `key` stays with the screen). */
+export type EngineProps = {
+  ref: RefObject<PlayerEngineHandle | null>;
+  paused: boolean;
+  onLoad: (event: { durationSec: number }) => void;
+  onProgress: (sec: number) => void;
+  onBuffering: (buffering: boolean) => void;
+  onSeekDone: (sec: number) => void;
+  onEnd: () => void;
+  onError: () => void;
+  onResolution: (height: number | null) => void;
+  onAudioFocusLost: () => void;
+};
+
+/** What the render and the presentation hooks read. */
+export type SessionView = {
+  paused: boolean;
+  positionSec: number;
+  durationSec: number;
+  buffering: boolean;
+  /** The adaptive source's track height as the engine reports it (Story 4.3); null before a report. */
+  autoHeight: number | null;
+  overlay: boolean;
+  /** Bumped on every input that shows the overlay: restarts the auto-hide. */
+  interaction: number;
+  seeking: boolean;
+  seekTarget: number | null;
+};
+
+/** The session's commands (every one stable unless noted). */
+export type SessionCommands = {
+  /** Shows the overlay and restarts its auto-hide. */
+  showOverlay: () => void;
+  hideOverlay: () => void;
+  /** A quality pick; the caller closes the sheet. */
+  pickQuality: (key: QualityKey) => void;
+  /** Changes with `media` on every render (as before the split). */
+  setPlaying: (play: boolean) => void;
+  /** Changes with `setPlaying`. */
+  togglePause: () => void;
+  /** OK on the timeline or play/pause: commit a pending seek, else toggle. */
+  onOk: () => void;
+  seekBy: (direction: SeekDirection) => void;
+  onSkip: (direction: SeekDirection) => void;
+  onRetry: () => void;
+  /**
+   * Story 4.6, background (device sleep included): a forced write (best
+   * effort; the app may be stopped), then the player pauses itself, so
+   * react-native-video's `onHostResume` does not restart playback; a pending
+   * seek target is dropped without seeking, `closeSheet(false)` closes the
+   * settings sheet, the overlay hides (the foreground's overlay is then a
+   * change: focus → the timeline). Every phase: a source still loading or
+   * recovering starts paused too.
+   */
+  background: (closeSheet: (restoreFocus: boolean) => void) => void;
+  /** Story 4.6, foreground: paused, the overlay shown (focus → the timeline). */
+  foreground: () => void;
+};
+
+/** The progress wiring (`usePlayerProgress`, `usePlayerAccessEnd`, the exit). */
+export type SessionProgress = {
+  /** One progress report, only once the start position was reached. */
+  report: Report;
+  reportRef: RefObject<Report>;
+  /** The latest ready source's progress meta (what `begin` gets). */
+  readyProgressRef: RefObject<ProgressMeta | null>;
+};
+
 export type PlaybackSession = {
   phase: Phase;
   state: MediaSourceState;
@@ -54,47 +124,11 @@ export type PlaybackSession = {
   everReady: RefObject<boolean>;
   readyResolution: number | null;
   playing: boolean;
-  paused: boolean;
-  positionSec: number;
-  durationSec: number;
-  buffering: boolean;
-  /** The adaptive source's track height as the engine reports it (Story 4.3); null before a report. */
-  autoHeight: number | null;
-  overlay: boolean;
-  setOverlay: (shown: boolean) => void;
-  /** Bumped on every input that shows the overlay: restarts the auto-hide. */
-  interaction: number;
-  /** Shows the overlay and restarts its auto-hide. */
-  showOverlay: () => void;
   seek: SeekController;
-  seeking: boolean;
-  seekTarget: number | null;
-  engine: RefObject<PlayerEngineHandle | null>;
-  /** The latest ready source's progress meta (what `begin` gets). */
-  readyProgressRef: RefObject<ProgressMeta | null>;
-  /** One progress report, only once the start position was reached. */
-  report: (event: ProgressEvent, positionOverride?: number) => void;
-  reportRef: RefObject<(event: ProgressEvent, positionOverride?: number) => void>;
-  /** The latest render's values, for event handlers. */
-  live: RefObject<{ phase: Phase; overlay: boolean; paused: boolean }>;
-  /** Story 4.6: background, sleep or an audio-focus loss pauses (nothing resumes by itself). */
-  pauseForLifecycle: () => void;
-  pickQuality: (key: QualityKey) => void;
-  setPlaying: (play: boolean) => void;
-  togglePause: () => void;
-  /** OK on the timeline or play/pause: commit a pending seek, else toggle. */
-  onOk: () => void;
-  seekBy: (direction: SeekDirection) => void;
-  onSkip: (direction: SeekDirection) => void;
-  onRetry: () => void;
-  onLoad: (event: { durationSec: number }) => void;
-  onProgress: (sec: number) => void;
-  onBuffering: (buffering: boolean) => void;
-  onSeekDone: (sec: number) => void;
-  onEnd: () => void;
-  onError: () => void;
-  onResolution: (height: number | null) => void;
-  onAudioFocusLost: () => void;
+  view: SessionView;
+  engineProps: EngineProps;
+  commands: SessionCommands;
+  progress: SessionProgress;
 };
 
 /**
@@ -130,7 +164,7 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
     everReady.current = true;
   }
   const recovering = isRecovering({ recovery, state, failed, everReady: everReady.current });
-  const phase = derivePhase({ kind: mode.kind, liveEnded, state, recovering, failed, everReady: everReady.current });
+  const phase = derivePhase({ mode, liveEnded, state, recovering, failed, everReady: everReady.current });
   const resolution = ready?.resolution ?? 0;
   const readyResolution = ready?.resolution ?? null;
 
@@ -260,17 +294,17 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
     setInteraction(n => n + 1);
   }, []);
 
-  const live = useLatestRef({ phase, overlay, paused, positionSec, durationSec, vodRef, ready });
+  const latest = useLatestRef({ phase, overlay, paused, positionSec, durationSec, vodRef, ready });
 
   const report = useCallback(
     (event: ProgressEvent, positionOverride?: number) => {
-      const { positionSec: position, durationSec: duration, vodRef: ref } = live.current;
+      const { positionSec: position, durationSec: duration, vodRef: ref } = latest.current;
       if (progress === null || ref === null || gate.current.kind !== 'started') {
         return;
       }
       progress.report(ref, positionOverride ?? position, event, duration > 0 ? duration : null);
     },
-    [progress, live],
+    [progress, latest],
   );
   const reportRef = useLatestRef(report);
   const readyProgressRef = useLatestRef(ready?.progress ?? null);
@@ -294,7 +328,7 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
    */
   const pickQuality = useCallback(
     (key: QualityKey) => {
-      const intent = mode.qualityIntent(live.current.ready, key);
+      const intent = mode.qualityIntent(latest.current.ready, key);
       switch (intent) {
         case 'liveSwitch':
           // Story 7.2 (owner decision 2026-10-30): the chosen live source
@@ -329,7 +363,7 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
         // Before the start position is reached, the pending start stays the
         // start (the resume point, or its in-flight seek); after it, the
         // current position or the pending seek target.
-        const target = startGate.kind === 'seek' ? startGate.target : (seek.target() ?? live.current.positionSec);
+        const target = startGate.kind === 'seek' ? startGate.target : (seek.target() ?? latest.current.positionSec);
         gate.current = { kind: 'load', target };
         setPositionSec(target);
       }
@@ -343,16 +377,16 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
       setBuffering(true);
       setAutoHeight(null);
     },
-    [mode, live, seek, setPreference, setKeepQuality],
+    [mode, latest, seek, setPreference, setKeepQuality],
   );
 
   /** Play or pause; playing after the end starts over from 0 (the ended engine never restarts by itself). */
   const setPlaying = useCallback(
     (play: boolean) => {
-      const current = live.current.ready;
+      const current = latest.current.ready;
       const intent = mode.playIntent({
         play,
-        paused: live.current.paused,
+        paused: latest.current.paused,
         sourceAgeMs: current === null ? null : Date.now() - resolvedAt.current,
       });
       switch (intent) {
@@ -375,15 +409,17 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
           if (current !== null) {
             logger.info('player', 'source is old; re-resolving before play');
             nextStart.current = {
-              target: mode.recoveryTarget(gate.current, seek.target, live.current.positionSec),
+              target: mode.recoveryTarget(gate.current, seek.target, latest.current.positionSec),
               paused: false,
             };
             seek.reset();
             setKeepQuality(qualityOf(current.source));
             setRecovery({ from: current.resolution });
             media.retry();
+            return;
           }
-          return;
+          // No ready source to refresh: play as it is (the plain path).
+          break;
         case 'plain':
           break;
       }
@@ -396,7 +432,7 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
         // visit writes nothing, owner decision 2026-10-28); reports wait for
         // the seek to 0, as for a new source.
         const meta = readyProgressRef.current;
-        const ref = live.current.vodRef;
+        const ref = latest.current.vodRef;
         if (progress !== null && ref !== null && meta !== null) {
           progress.begin(ref, meta);
           gate.current = { kind: 'seek', target: 0 };
@@ -404,16 +440,16 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
         engine.current?.seek(0);
         setPositionSec(0);
       }
-      if (!play && !live.current.paused) {
+      if (!play && !latest.current.paused) {
         // A user pause (never a hold-scrub pause: that one sets `paused` itself).
         report('pause');
       }
       setPaused(!play);
       showOverlay();
     },
-    [showOverlay, report, live, progress, readyProgressRef, seek, media, mode, bumpEpoch, setKeepQuality],
+    [showOverlay, report, latest, progress, readyProgressRef, seek, media, mode, bumpEpoch, setKeepQuality],
   );
-  const togglePause = useCallback(() => setPlaying(live.current.paused), [live, setPlaying]);
+  const togglePause = useCallback(() => setPlaying(latest.current.paused), [latest, setPlaying]);
   /**
    * OK on the timeline or play/pause (owner decision, Story 4.1 device
    * check): during a pending seek it commits the target at once and keeps
@@ -430,13 +466,13 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
   /** A seek press; ignored (overlay only) until the duration is known, and on a live stream. */
   const seekBy = useCallback(
     (direction: SeekDirection) => {
-      const { positionSec: position, durationSec: duration } = live.current;
+      const { positionSec: position, durationSec: duration } = latest.current;
       if (duration > 0 && mode.canSeek) {
         seek.press(direction, position, duration);
       }
       showOverlay();
     },
-    [live, seek, showOverlay, mode],
+    [latest, seek, showOverlay, mode],
   );
 
   /**
@@ -447,13 +483,13 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
    */
   const onSkip = useCallback(
     (direction: SeekDirection) => {
-      const { positionSec: position, durationSec: duration } = live.current;
+      const { positionSec: position, durationSec: duration } = latest.current;
       if (duration > 0 && mode.canSeek) {
         seek.press(direction, position, duration, SKIP_STEP_SEC);
       }
       showOverlay();
     },
-    [live, seek, showOverlay, mode],
+    [latest, seek, showOverlay, mode],
   );
 
   const recoveryRef = useLatestRef(recovery);
@@ -496,9 +532,9 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
           : typeof startAt === 'object'
             ? // A timestamp link (Story 6.3): that second, kept inside the video.
               Math.max(0, d > 0 ? Math.min(startAt.atSec, Math.max(0, d - 1)) : startAt.atSec)
-            : progress === null || live.current.vodRef === null || startAt === 'beginning'
+            : progress === null || latest.current.vodRef === null || startAt === 'beginning'
               ? 0
-              : progress.resumePoint(live.current.vodRef, d > 0 ? d : null);
+              : progress.resumePoint(latest.current.vodRef, d > 0 ? d : null);
       if (explicit === undefined) {
         startMode.current = 'resume';
       }
@@ -506,7 +542,7 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
         gate.current = { kind: 'seek', target };
         setPositionSec(target);
         engine.current?.seek(target);
-      } else if (live.current.paused) {
+      } else if (latest.current.paused) {
         // Starting at 0 while paused (a recovery or retry kept the pause):
         // no progress event comes, and there is no pre-seek t=0 to skip.
         startReached();
@@ -514,7 +550,7 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
         gate.current = { kind: 'first' };
       }
     },
-    [progress, live, startReached],
+    [progress, latest, startReached],
   );
   const onProgress = useCallback(
     (sec: number) => {
@@ -569,7 +605,7 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
     // The final position is written (finished). Story 4.5: then leave for
     // the origin (no autoplay); without `onEnded`, stay paused at the end
     // and a later play starts over from 0.
-    const { durationSec: d, positionSec: p } = live.current;
+    const { durationSec: d, positionSec: p } = latest.current;
     reportRef.current('end', Math.max(d, p));
     ended.current = true;
     setPaused(true);
@@ -579,7 +615,7 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
       return;
     }
     showOverlay();
-  }, [showOverlay, live, reportRef, onEndedRef, mode, markEnded]);
+  }, [showOverlay, latest, reportRef, onEndedRef, mode, markEnded]);
   /**
    * An engine error (Story 4.4: an expired signed URL, a CDN or decoder
    * failure, also before the first `onLoad`). With the budget left: the
@@ -591,11 +627,11 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
   const onError = useCallback(() => {
     // A switched source that failed before `onLoad` is never stored.
     pendingPreferenceWrite.current = null;
-    const current = live.current.ready;
+    const current = latest.current.ready;
     // Story 7.2: a live source always continues at the live edge (no position).
-    const target = mode.recoveryTarget(gate.current, seek.target, live.current.positionSec);
+    const target = mode.recoveryTarget(gate.current, seek.target, latest.current.positionSec);
     // Paused by the user at the error (a hold-scrub pause of a playing video is not).
-    const pausedAtError = live.current.paused && !(seek.isHeld() && scrubWasPlaying.current);
+    const pausedAtError = latest.current.paused && !(seek.isHeld() && scrubWasPlaying.current);
     seek.reset();
     setFailedResolution(resolution);
     if (current === null) {
@@ -612,7 +648,7 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
     setKeepQuality(failure.key);
     setRecovery({ from: resolution });
     media.retry();
-  }, [resolution, seek, live, media, mode, setKeepQuality]);
+  }, [resolution, seek, latest, media, mode, setKeepQuality]);
 
   /**
    * «Повторить» (one fresh E8). After a broken source it continues from
@@ -639,8 +675,8 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
 
   /** Story 4.6: another app took audio focus: a user pause (the 4.2 `pause` write). */
   const onAudioFocusLost = useCallback(() => {
-    const wasPlaying = live.current.phase === 'playing' && (!live.current.paused || scrubWasPlaying.current);
-    if (wasPlaying && !live.current.paused) {
+    const wasPlaying = latest.current.phase === 'playing' && (!latest.current.paused || scrubWasPlaying.current);
+    if (wasPlaying && !latest.current.paused) {
       // A user pause: the 4.2 `pause` write and the overlay.
       setPlaying(false);
     }
@@ -649,7 +685,24 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
     if (wasPlaying) {
       showOverlay();
     }
-  }, [live, setPlaying, pauseForLifecycle, showOverlay]);
+  }, [latest, setPlaying, pauseForLifecycle, showOverlay]);
+
+  const hideOverlay = useCallback(() => setOverlay(false), []);
+  const background = useCallback(
+    (closeSheet: (restoreFocus: boolean) => void) => {
+      reportRef.current('background');
+      pauseForLifecycle();
+      seek.reset();
+      closeSheet(false);
+      setOverlay(false);
+    },
+    [reportRef, pauseForLifecycle, seek],
+  );
+  const foreground = useCallback(() => {
+    if (latest.current.phase === 'playing') {
+      showOverlay();
+    }
+  }, [latest, showOverlay]);
 
   return {
     phase,
@@ -659,38 +712,33 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
     everReady,
     readyResolution,
     playing,
-    paused,
-    positionSec,
-    durationSec,
-    buffering,
-    autoHeight,
-    overlay,
-    setOverlay,
-    interaction,
-    showOverlay,
     seek,
-    seeking,
-    seekTarget,
-    engine,
-    readyProgressRef,
-    report,
-    reportRef,
-    live,
-    pauseForLifecycle,
-    pickQuality,
-    setPlaying,
-    togglePause,
-    onOk,
-    seekBy,
-    onSkip,
-    onRetry,
-    onLoad,
-    onProgress,
-    onBuffering: setBuffering,
-    onSeekDone,
-    onEnd,
-    onError,
-    onResolution: setAutoHeight,
-    onAudioFocusLost,
+    view: { paused, positionSec, durationSec, buffering, autoHeight, overlay, interaction, seeking, seekTarget },
+    engineProps: {
+      ref: engine,
+      paused,
+      onLoad,
+      onProgress,
+      onBuffering: setBuffering,
+      onSeekDone,
+      onEnd,
+      onError,
+      onResolution: setAutoHeight,
+      onAudioFocusLost,
+    },
+    commands: {
+      showOverlay,
+      hideOverlay,
+      pickQuality,
+      setPlaying,
+      togglePause,
+      onOk,
+      seekBy,
+      onSkip,
+      onRetry,
+      background,
+      foreground,
+    },
+    progress: { report, reportRef, readyProgressRef },
   };
 }

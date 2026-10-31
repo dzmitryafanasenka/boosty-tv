@@ -58,7 +58,7 @@ export function usePlayerSource(
     keep: keepQuality,
   });
   // Story 7.2: the live source, `liveEnded` and the live-edge epoch (useLivePlayback).
-  const { liveMedia, ...live } = useLivePlayback(http, liveRef, keepQuality);
+  const { liveMedia, ...livePlayback } = useLivePlayback(http, liveRef, keepQuality);
   const media = mode.pickMedia(vodMedia, liveMedia);
   // The local store is loaded before the engine starts, so the resume point
   // is known at `onLoad` (a cold start reads the persisted entry).
@@ -78,7 +78,7 @@ export function usePlayerSource(
     };
   }, [progress]);
   return {
-    ...live,
+    ...livePlayback,
     media,
     preferenceReady: preference !== undefined,
     setPreference,

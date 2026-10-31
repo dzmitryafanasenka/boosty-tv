@@ -1,7 +1,7 @@
 import type { ProgressRepository } from '../../shared/services/progress';
 import { pickSource, type MediaSourceState, type QualityKey } from './mediaResolver';
 import { recoveryTarget, type StartGate } from './recovery';
-import { liveQualitySwitch, liveSettingsShown } from './useLivePlayback';
+import { liveQualitySwitch, liveSettingsShown } from './livePolicy';
 
 /**
  * Story 4.6: a source older than this (client clock, since its E8) is
@@ -50,15 +50,35 @@ export type EndIntent = 'markEnded' | 'reportEnd';
  */
 export type PlaybackMode = {
   kind: PlaybackKind;
-  /** ← → , the media seek keys and ±10 s move a seek target (live: overlay only). */
+  /**
+   * The one seek gate (live: false): ← →, the media seek keys and ±10 s
+   * move a seek target, and a held ← → builds a pending target. Off, they
+   * only show the overlay. There is no mode that seeks but cannot hold.
+   */
   canSeek: boolean;
-  /** A held ← → builds a pending target (live: never). */
-  holdSeeks: boolean;
+  /**
+   * The stream can end (live): the engine's end (`liveEnded`) or E15 «no
+   * live stream» (`unavailable`) is the `ended` phase («Стрим завершён»),
+   * not «Видео недоступно».
+   */
+  streamEnds: boolean;
+  /**
+   * `noSource` means «not playable here» (live: no access or no live-edge
+   * URL): the `loading` phase while the player leaves for the origin's QR,
+   * not the error state.
+   */
+  noSourceLeaves: boolean;
   /** Story 7.3: the viewer heartbeat runs while playing (live only). */
   heartbeat: boolean;
   /** Where focus goes when the overlay shows (live: play/pause, no timeline). */
   overlayFocus: 'timeline' | 'playPause';
-  /** The ProgressRepository; null for live (no progress is ever written). */
+  /**
+   * The ProgressRepository, or null: no progress writes at all (no `begin`,
+   * report, `resumePoint` or `forget`). Null for live, and also for a VOD
+   * opened without a repository. The session's `progress === null` paths
+   * are keyed on this, not on liveness; code that means «is live» reads
+   * `kind` or a flag above.
+   */
   progress: ProgressRepository | null;
   /** The media hook whose source plays (both hooks always run). */
   pickMedia<T>(vod: T, live: T): T;
@@ -79,7 +99,8 @@ export function createVodMode(progress: ProgressRepository | null): PlaybackMode
   return {
     kind: 'vod',
     canSeek: true,
-    holdSeeks: true,
+    streamEnds: false,
+    noSourceLeaves: false,
     heartbeat: false,
     overlayFocus: 'timeline',
     progress,
@@ -102,7 +123,8 @@ export function createLiveMode(): PlaybackMode {
   return {
     kind: 'live',
     canSeek: false,
-    holdSeeks: false,
+    streamEnds: true,
+    noSourceLeaves: true,
     heartbeat: true,
     overlayFocus: 'playPause',
     progress: null,

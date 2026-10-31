@@ -99,7 +99,7 @@ export function usePlayerSettings({
   const closeSheetRef = useLatestRef(closeSheet);
   useEffect(() => () => closeSheetRef.current(false), [closeSheetRef]);
 
-  const live = useLatestRef({ phase, settingsShown });
+  const latest = useLatestRef({ phase, settingsShown });
   const onPickRef = useLatestRef((key: QualityKey) => {
     pickQuality(key);
     closeSheet(true);
@@ -107,7 +107,7 @@ export function usePlayerSettings({
   });
 
   const openSettings = useCallback(() => {
-    if (live.current.phase !== 'playing' || sheetOpenRef.current || !live.current.settingsShown) {
+    if (latest.current.phase !== 'playing' || sheetOpenRef.current || !latest.current.settingsShown) {
       return;
     }
     sheetOpenRef.current = true;
@@ -125,7 +125,7 @@ export function usePlayerSettings({
       settingsView,
       { placement: 'end' },
     );
-  }, [live, sheetOpenRef, setSheetOpen, showOverlay, modal, sheetModel, onPickRef]);
+  }, [latest, sheetOpenRef, setSheetOpen, showOverlay, modal, sheetModel, onPickRef]);
 
   return { openSettings, closeSheet, settingsView };
 }

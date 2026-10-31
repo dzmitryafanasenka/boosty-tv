@@ -23,6 +23,7 @@ import { focusRestoration } from '../src/shared/focus';
 import { t as translate } from '../src/shared/i18n';
 import { logger } from '../src/shared/services/logger';
 import { progressStore } from '../src/shared/services/progress';
+import { StreamRepository } from '../src/shared/entities/stream';
 import { QUALITY_PREFERENCE_KEY, debugBreakNextVideoSource, qualityPreference } from '../src/features/player';
 import { resetBreakSource } from '../src/features/player/debugBreakSource';
 import { playbackArbiter } from '../src/shared/platform/playbackArbiter';
@@ -3139,6 +3140,74 @@ describe('Story 7.2: watch a live stream (LiveRef)', () => {
     expect(visible(root, SETTINGS)).toBe(false);
     await key('menu');
     expect(visible(root, 'player/sheet')).toBe(false);
+    await unmount(root);
+  });
+
+  it('Quality pick (a live list with a real choice): the other quality replays at the edge; the playing one only closes the sheet', async () => {
+    // The E15 parser yields only adaptive live-edge candidates today («Авто»
+    // only, the test above), so the repository's result gets one extra 720p
+    // candidate here to reach the live pick path (PlaybackMode `liveSwitch`).
+    const LIVE_720 = 'https://example.invalid/live-720';
+    const realLiveSources = StreamRepository.liveSources;
+    jest.spyOn(StreamRepository, 'liveSources').mockImplementation(async (...args) => {
+      const result = await realLiveSources(...args);
+      return result.kind === 'ok'
+        ? { ...result, sources: [...result.sources, { format: 'progressive', type: 'live_720', height: 720, url: LIVE_720 }] }
+        : result;
+    });
+    const SHEET = 'player/sheet';
+    const QUALITY = 'player/sheet/quality';
+    const Q = (quality: string | number) => `${QUALITY}/${quality}`;
+    const device = () => createAsyncStorage('boostytv-device');
+    await qualityPreference.read();
+    const peekBefore = qualityPreference.peek();
+    expect(peekBefore).not.toBe(720);
+    const storedBefore = await device().getItem(QUALITY_PREFERENCE_KEY);
+    const root = await openLive();
+    expect(engine.props?.source).toEqual({ uri: LIVE_HLS, format: 'hls' });
+    const openSheet = async () => {
+      await key('up');
+      await focusOn(root, SETTINGS);
+      focusMock.mockClear();
+      await press(root, SETTINGS);
+      await advance(50);
+      expect(visible(root, SHEET)).toBe(true);
+      await press(root, QUALITY);
+    };
+    await openSheet();
+    engine.seek.mockClear();
+    focusMock.mockClear();
+    const mounts = engine.mounts;
+    await press(root, Q(720));
+    // A new engine with that candidate (the live edge): no seek, no new E15.
+    expect(engine.mounts).toBe(mounts + 1);
+    expect(engine.props?.source).toEqual({ uri: LIVE_720, format: 'progressive' });
+    expect(engine.seek).not.toHaveBeenCalled();
+    expect(e15Calls()).toHaveLength(1);
+    expect(visible(root, SHEET)).toBe(false);
+    expect(lastFocusTarget()).toBe(SETTINGS);
+    await advance(50);
+    expect(lastFocusTarget()).toBe(SETTINGS);
+    await fire('onLoad', { durationSec: 0 });
+    expect(engine.seek).not.toHaveBeenCalled();
+    // No stored preference for live (memory or device).
+    expect(qualityPreference.peek()).toBe(peekBefore);
+    expect(await device().getItem(QUALITY_PREFERENCE_KEY)).toBe(storedBefore);
+    // The playing quality: only the sheet closes.
+    await advance(6_000);
+    await openSheet();
+    const mountsAfter = engine.mounts;
+    focusMock.mockClear();
+    await press(root, Q(720));
+    expect(engine.mounts).toBe(mountsAfter);
+    expect(engine.props?.source).toEqual({ uri: LIVE_720, format: 'progressive' });
+    expect(visible(root, SHEET)).toBe(false);
+    expect(lastFocusTarget()).toBe(SETTINGS);
+    expect(engine.seek).not.toHaveBeenCalled();
+    expect(e15Calls()).toHaveLength(1);
+    expect(qualityPreference.peek()).toBe(peekBefore);
+    expect(await device().getItem(QUALITY_PREFERENCE_KEY)).toBe(storedBefore);
+    noProgress();
     await unmount(root);
   });
 

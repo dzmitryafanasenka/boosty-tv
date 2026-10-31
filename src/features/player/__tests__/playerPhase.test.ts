@@ -1,6 +1,7 @@
 import { t } from '../../../shared/i18n';
 import type { VideoSource } from '../../../shared/entities/post';
 import type { MediaSourceState } from '../mediaResolver';
+import { createLiveMode, createVodMode } from '../playbackMode';
 import { derivePhase, errorCopy, errorTarget, isRecovering, type Phase } from '../playerPhase';
 
 const source: VideoSource = { format: 'hls', type: 'hls', url: 'https://example.invalid/player' };
@@ -19,7 +20,7 @@ const base = { liveEnded: false, recovering: false, failed: false, everReady: fa
 
 describe('derivePhase (VOD)', () => {
   const phase = (state: MediaSourceState, extra: Partial<typeof base> = {}) =>
-    derivePhase({ kind: 'vod', state, ...base, ...extra });
+    derivePhase({ mode: createVodMode(null), state, ...base, ...extra });
 
   test('the media states', () => {
     expect(phase({ kind: 'loading' })).toBe('loading');
@@ -51,7 +52,7 @@ describe('derivePhase (VOD)', () => {
 
 describe('derivePhase (live)', () => {
   const phase = (state: MediaSourceState, extra: Partial<typeof base> = {}) =>
-    derivePhase({ kind: 'live', state, ...base, ...extra });
+    derivePhase({ mode: createLiveMode(), state, ...base, ...extra });
 
   test('the end of the stream, or no stream: «Стрим завершён»', () => {
     expect(phase(ready(1), { liveEnded: true })).toBe('ended');

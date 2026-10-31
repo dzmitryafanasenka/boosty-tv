@@ -905,13 +905,14 @@ Host tests: `src/shared/services/progress/__tests__/progressRepository.test.ts` 
 
 ### PlayerScreen live/VOD split before Epic 8, 2026-10-31
 
-**Status: behaviour-preserving refactor, host-tested only; no device run by the agent (the owner runs the device check).** `spec-player-live-vod-split.md`. `PlayerScreen.tsx` 1477 → 413 lines: `playbackMode.ts` (the live/VOD decisions), `playerPhase.ts`, `usePlaybackSession.ts`, `usePlayerSource.ts`, `usePlayerSettings.tsx`, `usePlayerFocus.ts`, `usePlayerKeys.ts`, `usePlayerProgress.ts`. The hook call order keeps the old effect order. Existing tests unchanged. New unit tests: `src/features/player/__tests__/playbackMode.test.ts` (the intent matrix for VOD and live) and `playerPhase.test.ts` (phase, recovering, error target and copy), 49 tests.
+**Status: behaviour-preserving refactor plus review patches, host-tested only; no device run by the agent (the owner runs the device check).** `spec-player-live-vod-split.md`. `PlayerScreen.tsx` 1477 → 389 lines: `playbackMode.ts` (the live/VOD decisions), `livePolicy.ts`, `playerPhase.ts`, `usePlaybackSession.ts`, `usePlayerSource.ts`, `usePlayerSettings.tsx`, `usePlayerFocus.ts`, `usePlayerKeys.ts`, `usePlayerProgress.ts`. The hook call order keeps the old effect order. Existing tests unchanged in meaning (`playerPhase.test.ts` is new in this change). New tests: `src/features/player/__tests__/playbackMode.test.ts` (the intent matrix for VOD and live), `playerPhase.test.ts` (phase, recovering, error target and copy), `entryGuard.test.ts` (the entry guard with a fake clock) and `playerFlow` «Story 7.2 › Quality pick (a live list with a real choice)» (the repository result gets an extra 720p candidate, since real E15 live candidates are «Авто» only). `jest.config.js` now ignores `.claude/worktrees/` (agent worktrees).
 
-Checks run:
-- Lint (`--max-warnings 0`), typecheck and `check:fixtures` (30): clean.
-- `npm test` ×3: 125 suites, 2791 tests passed in each run (2742 before + 49 new).
-- `playerFlow`, `authorFlow`, `postFlow`, `demoFlow` and `src/features/player/**` ×30: 0 failed runs, 662 tests passed in each.
-- Jest ran with `--modulePathIgnorePatterns '<rootDir>/.claude/worktrees/'` (and the same test path ignore), because untracked agent worktrees under `.claude/worktrees/` add duplicate suites and mocks to a plain `npm test`.
+Checks run after the review patches:
+- `npm run lint -- --max-warnings 0`, `npm run typecheck`, `npm run check:fixtures` (30): clean.
+- Plain `npm test` ×3: 126 suites, 2799 tests passed in each run.
+- `npx jest __tests__/playerFlow.test.tsx __tests__/authorFlow.test.tsx __tests__/postFlow.test.tsx __tests__/demoFlow.test.tsx src/features/player` ×30: 0 failed runs, 670 tests passed in each.
+
+Before the review: the same suites with CLI ignore flags for `.claude/worktrees/`; full run ×3: 125 suites, 2791 passed each; the touched files ×30: 0 failed runs, 662 each.
 
 Not checked:
 - Device rows (owner, release-like build on the Chromecast): open a video, play under 10 s, Back; open quality settings and close; no pause on the owner's content. Live cannot be checked (no subscribed blog is live).
