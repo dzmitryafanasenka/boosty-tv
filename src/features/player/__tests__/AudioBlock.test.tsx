@@ -8,6 +8,7 @@ import { AppState, DeviceEventEmitter } from 'react-native';
 import { createRoot, type Root } from 'test-renderer';
 import type { AudioSourceResult } from '../../../shared/entities/post';
 import { t } from '../../../shared/i18n';
+import { logger } from '../../../shared/services/logger';
 import { createPlaybackArbiter, playbackArbiter } from '../../../shared/platform/playbackArbiter';
 // eslint-disable-next-line boundaries/dependencies -- test-only mock
 import { engine } from '../../../test/playerEngineMock';
@@ -611,5 +612,15 @@ describe('errors (matrix «Engine error», «Play» errors)', () => {
     const logged = JSON.stringify([...warn.mock.calls, ...log.mock.calls]);
     expect(logged).not.toContain('example.invalid');
     expect(logged).not.toContain('REDACTED');
+  });
+
+  it('Story 8.3 review: the engine error is logged under `error`, the code unredacted', async () => {
+    logger.clear();
+    const root = await render({ resolveSource: okResolver() });
+    await playLoaded(root);
+    await engineEvent(() => engine.props!.onError?.('22004'));
+    const entry = logger.entries().find(e => e.scope === 'audio' && e.message === 'engine error');
+    expect(entry?.fields).toMatchObject({ error: '22004' });
+    expect(entry?.fields).not.toHaveProperty('code');
   });
 });

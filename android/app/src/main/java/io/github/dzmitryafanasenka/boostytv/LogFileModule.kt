@@ -1,5 +1,6 @@
 package io.github.dzmitryafanasenka.boostytv
 
+import android.os.Build
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
@@ -16,13 +17,18 @@ import java.util.concurrent.Executors
  * through `src/shared/platform/logFile.ts`; the lines it gets are already
  * redacted by the JS Logger.
  *
- * - The file is `getExternalFilesDir(null)/logs/boostytv.log` (app-specific
- *   external storage, no permission), so
- *   `adb pull /sdcard/Android/data/<applicationId>/files/logs/` works on a
- *   release build, which is not debuggable (owner decision 2026-10-31).
+ * - On API 29+ the file is `getExternalFilesDir(null)/logs/boostytv.log`
+ *   (app-specific external storage, no permission, not readable by other
+ *   apps), so `adb pull /sdcard/Android/data/<applicationId>/files/logs/`
+ *   works on a release build, which is not debuggable (owner decision
+ *   2026-10-31). Below API 29 that directory is shared storage readable by
+ *   any app with READ_EXTERNAL_STORAGE, so the file goes to the internal
+ *   `filesDir/logs` instead, and adb pull does not reach it on a release
+ *   build. `location()` reports the directory in use.
  * - It is capped at 256 KB: an append that would pass the cap first moves
  *   the file to `boostytv.log.1`, replacing the older copy (at most 512 KB
- *   in total).
+ *   in total). When the move fails, the current file is truncated instead,
+ *   so one failed rename never stops the log for good.
  * - Every call runs on one serial thread, in the order JS made it, so a
  *   `clear` sent after an `append` always runs after it and wins
  *   (AccountScope reset: no line of the previous account survives).
@@ -60,7 +66,7 @@ class LogFileModule(reactContext: ReactApplicationContext) :
     }
   }
 
-  /** The absolute path of the log directory, or null when there is no external files dir. */
+  /** The absolute path of the log directory in use (external on API 29+, internal below), or null. */
   @ReactMethod
   fun location(promise: Promise) {
     run(promise) { logDir()?.absolutePath }
@@ -87,8 +93,12 @@ class LogFileModule(reactContext: ReactApplicationContext) :
     }
   }
 
-  private fun logDir(): File? =
-    reactApplicationContext.getExternalFilesDir(null)?.let { File(it, DIR_NAME) }
+  private fun logDir(): File? {
+    val context = reactApplicationContext
+    val base =
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) context.getExternalFilesDir(null) else context.filesDir
+    return base?.let { File(it, DIR_NAME) }
+  }
 
   private fun appendBatch(batch: List<String>) {
     if (batch.isEmpty()) {
@@ -113,11 +123,10 @@ class LogFileModule(reactContext: ReactApplicationContext) :
 
   private fun rotate(dir: File, file: File) {
     val rotated = File(dir, ROTATED_NAME)
-    if (rotated.exists() && !rotated.delete()) {
-      throw IOException(NO_DELETE)
-    }
-    if (!file.renameTo(rotated)) {
-      throw IOException(NO_RENAME)
+    val freed = !rotated.exists() || rotated.delete()
+    if (!freed || !file.renameTo(rotated)) {
+      // Keep logging: start the current file over instead of failing every append.
+      FileOutputStream(file, false).use { }
     }
   }
 
@@ -142,6 +151,5 @@ class LogFileModule(reactContext: ReactApplicationContext) :
     private const val NO_STORAGE = "no external files dir"
     private const val NO_DIR = "mkdirs failed"
     private const val NO_DELETE = "delete failed"
-    private const val NO_RENAME = "rename failed"
   }
 }

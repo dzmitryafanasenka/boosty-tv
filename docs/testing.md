@@ -906,7 +906,7 @@ Host tests: `src/shared/services/progress/__tests__/progressRepository.test.ts` 
 
 ### Story 8.3 — Hidden diagnostics for testing, 2026-10-31
 
-**Status: implemented and host-tested; the release build compiles. Not run on a device or emulator (the rows below).** `spec-8-3-hidden-diagnostics.md`. Seven OK presses on Настройки' «Версия», each less than 2 s after the previous one, push the hidden `Diagnostics` route (phase flag `diagnostics`, on; the route ships in release, only the gesture reveals it). «Версия» stays an info row: no press scale, role `text`. The press handling is `useVersionPresses` (`src/features/settings/`); its `onFirstPress` hook is where Epic 9's single-press update check goes, and it runs once per series. Diagnostics has «Запись логов» (device-scoped `diagnostics.capture.v1` in `boostytv-device`, default off, the initial focus) and «Очистить логи», followed by the adb steps and the folder the app reports. Log lines are never shown. Back pops to Настройки with focus on «Версия».
+**Status: implemented, host-tested, and checked on the device by the agent over adb (below; the review patches host-tested only).** `spec-8-3-hidden-diagnostics.md`. Seven OK presses on Настройки' «Версия», each less than 2 s after the previous one, push the hidden `Diagnostics` route (phase flag `diagnostics`, on; the route ships in release, only the gesture reveals it). «Версия» stays an info row: no press scale, role `text`. The press handling is `useVersionPresses` (`src/features/settings/`); its `onFirstPress` hook is where Epic 9's single-press update check goes, and it runs once per series. Diagnostics has «Запись логов» (device-scoped `diagnostics.capture.v1` in `boostytv-device`, default off, the initial focus) and «Очистить логи», followed by the adb steps and the folder the app reports. Log lines are never shown. Back pops to Настройки with focus on «Версия».
 
 While capture is on, `logFileSink` (`src/shared/services/logFileSink.ts`) first writes the Logger ring and then every new entry. Entries are already redacted by the Logger. The sink formats each as one line and appends batches (≤ 20 lines, or 1 s after the first) through the LogFile port (`src/shared/platform/logFile.ts` → `LogFileModule.kt`). The native side writes `getExternalFilesDir(null)/logs/boostytv.log` on one serial thread, rotates it to `boostytv.log.1` at 256 KB (≤ 512 KB in total), and needs no permission. A stored «on» resumes capture at app start. A failed append logs one warning, to the ring only, and capture stays on.
 
@@ -940,7 +940,23 @@ Checks run:
 - `./gradlew assembleRelease -PreactNativeArchitectures=armeabi-v7a` with `JAVA_HOME=/opt/homebrew/opt/openjdk@17` and `ANDROID_HOME=/opt/homebrew/share/android-commandlinetools`: BUILD SUCCESSFUL.
 - Not run: any device or emulator check. The rotation at 256 KB and the native call order are covered only by code and the source guard.
 
-Retrieving the logs (release or debug build, no `run-as` needed):
+Review patches (2026-10-31, `fix: review patches for Story 8.3 hidden diagnostics`):
+- `logPath` (http log lines) keeps only the fixed API words; the blog slug after `/v1/blog/` is `<blog>`, every other variable segment `<seg>` (`/v1/feed/post/`, `/v1/user/current` unchanged). Test: `src/shared/api/__tests__/logPath.test.ts`.
+- `LogFileModule.kt`: below API 29 the file is in the internal `filesDir/logs` (external files are shared storage there), so **adb pull works only on API 29+** (the pinned device is API 34); `location()` reports the directory in use. A failed rotation rename truncates the current file instead of failing every later append.
+- `logFileSink`: the waiting batch is written when the app goes to the background (subscribed only while capture is on). Turning capture off drops the queue and deletes `boostytv.log` / `.1` (not the ring); the on-screen step 4 says to pull before that.
+- Logger: `isSecretFieldKey` matches the secret words inside the compact lowercased key (`accesstoken`, `smscode`, `phonenumber`, `sessioncookie`; `decoder` now matches too, accepted) and `sig` / `signature` keys; the query and JSON rules accept a `<prefix>_` (`id_token=`, `csrf_token=`, `api_sig=`).
+- Diagnostics: a rejected capture read shows «Выкл».
+- New tests: the toggle stored «on» resumes capture at a cold start without opening Diagnostics (`diagnosticsFlow`, fresh modules); a rejecting native clear shows «Не удалось очистить логи» with focus kept; an info row with `onPress` never animates to the pressed scale (`shellPrimitives`); AudioBlock logs the engine code under `error`, unredacted.
+
+Device (agent over adb, Chromecast with Google TV API 34, release-like build from `3250ed4`, the owner's session):
+- One OK on «Версия» did nothing; 7 OK 0.5 s apart opened «Диагностика» with focus on «Запись логов».
+- OK → «Вкл», and `boostytv.log` appeared in `/sdcard/Android/data/io.github.dzmitryafanasenka.boostytv/files/logs/`. Back → Настройки with focus on «Версия».
+- After `am force-stop` and a relaunch capture continued (the toggle still «Вкл», 12 lines). `adb pull` worked on the release build.
+- A scan of the pulled file found no URL query, `Bearer`, 7+ digit run, 32+ character opaque run or secret `key=value`.
+- OK → «Выкл», then «Очистить логи» → «Логи очищены» and the folder empty.
+- Not checked on the device: the rotation at 256 KB, the sign-out reset (the owner's session must stay signed in), and the review patches above (host-tested only).
+
+Retrieving the logs (release or debug build on API 29+, no `run-as` needed):
 
 ```sh
 # On the TV: Настройки → seven quick OK on «Версия» → «Запись логов» → «Вкл»; reproduce the problem.
@@ -952,7 +968,7 @@ adb pull /sdcard/Android/data/io.github.dzmitryafanasenka.boostytv/files/logs/ .
 Device rows to run (owner or a later agent pass, Chromecast with Google TV):
 - Seven quick OK on «Версия» open Diagnostics with focus on «Запись логов»; a single press and slow presses (≥ 2 s apart) do nothing visible; Back returns to Настройки on «Версия».
 - Capture on, browse and play a video, then the `adb pull` above. The file exists; no line contains a URL query, a token, a cookie, the phone or a code.
-- «Очистить логи» → the pulled folder is empty. Sign-out → the folder is empty; the toggle is still «Вкл» after the next sign-in.
+- «Очистить логи» → the pulled folder is empty. «Запись логов» → «Выкл» → the folder is empty. Sign-out → the folder is empty; the toggle is still «Вкл» after the next sign-in.
 - Capture on across `am force-stop` and a relaunch: new lines appear without touching the toggle.
 - Rotation: enough activity (or a temporary low cap in a local build) gives `boostytv.log.1`, with neither file above 256 KB.
 

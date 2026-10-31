@@ -1,3 +1,4 @@
+import { AppState } from 'react-native';
 import { accountScope as appAccountScope, defineAccountScoped, type AccountScope } from '../account';
 import { asyncKeyValueStore } from '../platform/asyncKeyValueStore';
 import type { KeyValueStore } from '../platform/keyValueStore';
@@ -25,6 +26,10 @@ import { logger as appLogger, type LogEntry, type Logger } from './logger';
  *   sent before the generation bump, so it wins.
  * - A failed append logs one warning per `enable()`, to the ring only
  *   (never into the file it could not write); capture stays on.
+ * - While on, the app going to the background writes the waiting batch at
+ *   once (Story 8.3 review: a kill in the background lost up to 1 s).
+ * - `disable()` drops the queue and deletes the file (the ring stays), so
+ *   no log file outlives «Запись логов» (Story 8.3 review).
  * - `clear()` (Diagnostics «Очистить логи») empties the ring, the queue and
  *   the file.
  */
@@ -51,8 +56,11 @@ export function formatLogLine(entry: LogEntry): string {
 export type LogFileSink = {
   /** Queue the ring, then stream new entries. A second call does nothing. */
   enable(): void;
-  /** Stop streaming; lines queued while on are still written. */
-  disable(): void;
+  /**
+   * Stop streaming; the queued lines are dropped and the file deleted (the
+   * ring stays). Rejects when the native clear failed.
+   */
+  disable(): Promise<void>;
   isEnabled(): boolean;
   /** Write the queued lines now (tests, `disable`). */
   flush(): void;
@@ -69,6 +77,12 @@ export type LogFileSinkOptions = {
   scope?: Pick<AccountScope, 'guard'>;
   batchSize?: number;
   batchMs?: number;
+  /** The app-state source (React Native's `AppState`). */
+  appState?: AppStateSource;
+};
+
+export type AppStateSource = {
+  addEventListener(type: 'change', listener: (state: string) => void): { remove(): void };
 };
 
 type Batch = { lines: string[]; commit: (lines: string[]) => Promise<boolean> };
@@ -79,6 +93,7 @@ export function createLogFileSink({
   scope = appAccountScope,
   batchSize = LOG_FILE_BATCH_SIZE,
   batchMs = LOG_FILE_BATCH_MS,
+  appState = AppState,
 }: LogFileSinkOptions = {}): LogFileSink {
   let enabled = false;
   let warned = false;
@@ -86,6 +101,7 @@ export function createLogFileSink({
   let quiet = false;
   let batch: Batch | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
+  let appStateSub: { remove(): void } | null = null;
 
   const cancelTimer = () => {
     if (timer !== null) {
@@ -157,14 +173,20 @@ export function createLogFileSink({
         queue(formatLogLine(entry));
       }
       logger.setSink(sink);
+      appStateSub = appState.addEventListener('change', state => {
+        if (state === 'background') {
+          flush();
+        }
+      });
     },
     disable() {
-      if (!enabled) {
-        return;
-      }
       enabled = false;
       logger.setSink(null);
-      flush();
+      appStateSub?.remove();
+      appStateSub = null;
+      drop();
+      // Also when it was off: a file left by an earlier run goes too.
+      return file.clear();
     },
     isEnabled: () => enabled,
     flush,
@@ -202,7 +224,10 @@ export type DiagnosticsCapture = {
   peek(): boolean | undefined;
   /** Read once (off when none or unreadable) and apply it to the sink. */
   read(): Promise<boolean>;
-  /** Memory and the sink at once, the store in the background (a failed write is only logged). */
+  /**
+   * Memory and the sink at once, the store in the background (a failed write
+   * is only logged). Off deletes the log file (a failed delete is logged).
+   */
   set(on: boolean): void;
   /** «Очистить логи»: the ring and the file. Resolves false when the file was not cleared. */
   clearLogs(): Promise<boolean>;
@@ -225,7 +250,13 @@ export function createDiagnosticsCapture(
 ): DiagnosticsCapture {
   let value: boolean | undefined;
   let reading: Promise<boolean> | null = null;
-  const apply = (on: boolean) => (on ? sink.enable() : sink.disable());
+  const apply = (on: boolean) => {
+    if (on) {
+      sink.enable();
+    } else {
+      sink.disable().catch(() => logger.warn('diagnostics', 'log file not cleared'));
+    }
+  };
   return {
     peek: () => value,
     read() {

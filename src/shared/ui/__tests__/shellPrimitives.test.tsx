@@ -1,5 +1,5 @@
 import { act } from 'react';
-import { StyleSheet } from 'react-native';
+import { AccessibilityInfo, Animated, StyleSheet } from 'react-native';
 import { createRoot, type Root } from 'test-renderer';
 import { NavItem } from '../NavItem';
 import { SettingRow } from '../SettingRow';
@@ -108,6 +108,31 @@ describe('SettingRow', () => {
       host(root).props.onClick({ nativeEvent: {} });
     });
     expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
+  it('Story 8.3 review: an info row with onPress never animates to the pressed scale', async () => {
+    jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(false);
+    jest
+      .spyOn(AccessibilityInfo, 'addEventListener')
+      .mockReturnValue({ remove: () => {} } as ReturnType<typeof AccessibilityInfo.addEventListener>);
+    const timing = jest.spyOn(Animated, 'timing');
+    try {
+      const evt = { nativeEvent: {}, persist: () => {} };
+      const root = await render(<SettingRow testID={ID} kind="info" label="Версия" value="1.0" onPress={() => {}} />);
+      await act(async () => host(root).props.onFocus(evt));
+      await act(async () => host(root).props.onPressIn(evt));
+      const pressedTo = timing.mock.calls.map(([, config]) => config.toValue);
+      expect(pressedTo).not.toContain(focus['pressed-scale']);
+
+      // Control: a nav row does animate to it.
+      timing.mockClear();
+      const nav = await render(<SettingRow testID={ID} kind="nav" label="Выйти" onPress={() => {}} />);
+      await act(async () => host(nav).props.onFocus(evt));
+      await act(async () => host(nav).props.onPressIn(evt));
+      expect(timing.mock.calls.map(([, config]) => config.toValue)).toContain(focus['pressed-scale']);
+    } finally {
+      jest.restoreAllMocks();
+    }
   });
 
   it('nav: OK calls onPress', async () => {

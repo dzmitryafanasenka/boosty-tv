@@ -2,7 +2,7 @@
 title: 'Story 8.3: Hidden diagnostics for testing'
 type: 'feature'
 created: '2026-10-31'
-status: 'in-progress'
+status: 'in-review'
 baseline_commit: '61440e97e3530152ff8e0b587061fee4a71f4140'
 route: 'dispatch'
 review_loop_iteration: 0
@@ -84,6 +84,40 @@ context:
 **Acceptance Criteria:**
 - Given the flag off, when «Версия» is pressed any number of times, then nothing opens.
 - Given capture on and a sign-out, when the next account logs, then the file holds no line from the previous account.
+
+## Spec Change Log
+
+## Review Triage Log
+
+Pass 1 (Blind Hunter B, Edge Case Hunter E, Verification Gap V):
+
+| # | Finding | Verdict | Evidence / route |
+|---|---------|---------|------------------|
+| 1 | B2: http paths carry blog slugs and post ids (viewing history) into the file | high | `transport.ts` `logPath` strips host and query only; E3/E4/E8 paths name the author and post. CLAUDE.md: redact personal data from diagnostics. patch (mask path segments) |
+| 2 | B1: API 24-28 external files dir readable by apps with READ_EXTERNAL_STORAGE | medium | minSdk 24; scoped storage starts at API 29. patch (internal `filesDir` below API 29, documented) |
+| 3 | B3/E6: batched lines lost on background or kill | medium | 1 s timer, no AppState flush. patch (flush on background) |
+| 4 | B4: turning capture off leaves the file on disk | medium | No delete on disable; the copy only says to turn it off. patch (disable clears the file; copy says so) |
+| 5 | B5/E3/E13/E1: field keys sig/signature and compact keys (accesstoken, smscode, phonenumber); prefixed query keys (id_token=, api_sig=) | low | `isSecretFieldKey` word-split only; `\b` before keys. Direct regex fixes. patch |
+| 6 | B6: the `code` key rule hides statusCode etc. | false | The spec mandates any-case `code`; current callers checked (only AudioBlock, renamed) |
+| 7 | B7: no on-screen sign that writes fail | low | Rare; one warning in the ring. rejected |
+| 8 | E8/B8: one rename failure stops the file for good | low | `rotate` throws on every append after. Direct fix (truncate on rename failure). patch |
+| 9 | B9: clear status never resets / no live region | low | Cosmetic. rejected |
+| 10 | B10: application id typed into the adb command copy | low | No flavors or suffix exist. rejected |
+| 11 | B11: press counter uses Date.now and survives blur | low | Clock jumps mid-gesture are negligible. rejected |
+| 12 | B12: info row role text / JSDoc wrap | low | Cosmetic; TalkBack not a release path. rejected |
+| 13 | E2: JSON array or escaped quote under a secret key | low | No caller logs such shapes. rejected |
+| 14 | E4: line cut inside a surrogate pair | low | Cosmetic replacement char. rejected |
+| 15 | E5: `warned` never resets after recovery | low | Diagnostics-only. rejected |
+| 16 | E7: clear with no external storage reports success | low | No storage means no file to leak. rejected |
+| 17 | E9: per-instance executor across a bridge reload | low | Release builds do not reload. rejected |
+| 18 | E10: DiagnosticsScreen `read()` rejection unhandled | low | Direct fix (catch → off). patch |
+| 19 | E11: flag off leaves an old file | low | The flag is on; turning it off is a future build decision. rejected |
+| 20 | E12: old-account in-flight logs after reset | maybe-false | Entries after the reset carry the new generation; would need caller-level guards. rejected (low if true) |
+| 21 | V1: startup resume of capture untested | medium | Device run proved it works; no host test. patch (test) |
+| 22 | V2: info row press scale untested | low | patch (test) |
+| 23 | V3: clear-failed UI untested | low | patch (test) |
+| 24 | V4: native rotation/order guarded only by source text | medium | No JVM test infra. defer |
+| 25 | V5: AudioBlock `code`→`error` rename unpinned | low | patch (test) |
 
 ## Verification
 

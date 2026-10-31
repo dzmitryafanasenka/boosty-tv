@@ -74,12 +74,26 @@ async function flushPromises() {
   }
 }
 
+/** A fake AppState: `emit(state)` calls the live listeners. */
+function fakeAppState() {
+  const listeners = new Set<(state: string) => void>();
+  return {
+    listeners,
+    emit: (state: string) => [...listeners].forEach(listener => listener(state)),
+    addEventListener: (_type: 'change', listener: (state: string) => void) => {
+      listeners.add(listener);
+      return { remove: () => listeners.delete(listener) };
+    },
+  };
+}
+
 function setup() {
   const logger: Logger = createLogger({ now: () => Date.UTC(2026, 9, 31, 12, 0, 0) });
   const scope = createAccountScope({ logger: () => logger });
   const file = fakeFile();
-  const sink = createLogFileSink({ logger, file: file.port, scope });
-  return { logger, scope, file, sink };
+  const appState = fakeAppState();
+  const sink = createLogFileSink({ logger, file: file.port, scope, appState });
+  return { logger, scope, file, sink, appState };
 }
 
 beforeEach(() => {
@@ -162,17 +176,41 @@ describe('createLogFileSink (Story 8.3)', () => {
     expect(file.state.lines).toHaveLength(3);
   });
 
-  it('disable: queued lines are still written; nothing after', async () => {
+  it('disable (review): drops the queue and deletes the file; the ring stays; nothing after', async () => {
     const { logger, file, sink } = setup();
     sink.enable();
-    logger.info('t', 'while on');
-    sink.disable();
+    logger.info('t', 'written');
+    sink.flush();
+    logger.info('t', 'queued');
+    await sink.disable();
     logger.info('t', 'while off');
     jest.advanceTimersByTime(LOG_FILE_BATCH_MS * 2);
     await flushPromises();
-    expect(file.state.lines).toHaveLength(1);
-    expect(file.state.lines[0]).toContain('while on');
+    expect(file.state.ops).toEqual(['append:1', 'clear']);
+    expect(file.state.lines).toEqual([]);
+    expect(logger.entries().map(e => e.message)).toEqual(['written', 'queued', 'while off']);
     expect(sink.isEnabled()).toBe(false);
+  });
+
+  it('disable rejects when the native clear failed', async () => {
+    const { file, sink } = setup();
+    file.state.failClear = true;
+    await expect(sink.disable()).rejects.toThrow('log file: clear failed');
+  });
+
+  it('review: going to the background writes the waiting batch at once; the listener goes with disable', async () => {
+    const { logger, file, sink, appState } = setup();
+    sink.enable();
+    expect(appState.listeners.size).toBe(1);
+    logger.info('t', 'waiting');
+    appState.emit('inactive');
+    expect(file.port.append).not.toHaveBeenCalled();
+    appState.emit('background');
+    expect(file.port.append).toHaveBeenCalledTimes(1);
+    await flushPromises();
+    expect(file.state.lines[0]).toContain('waiting');
+    await sink.disable();
+    expect(appState.listeners.size).toBe(0);
   });
 
   it('a failed append logs one warning to the ring only; capture stays on', async () => {
@@ -299,6 +337,26 @@ describe('createDiagnosticsCapture (Story 8.3)', () => {
     expect(sink.isEnabled()).toBe(false);
     await flushPromises();
     expect(kv.data.get(DIAGNOSTICS_CAPTURE_KEY)).toBe('off');
+  });
+
+  it('review: off deletes the log file; a failed delete is logged', async () => {
+    const { sink, logger, file } = setup();
+    const capture = createDiagnosticsCapture(() => memoryKv(), sink, logger);
+    capture.set(true);
+    logger.info('t', 'line');
+    sink.flush();
+    await flushPromises();
+    expect(file.state.lines).toHaveLength(1);
+    capture.set(false);
+    await flushPromises();
+    expect(file.state.lines).toEqual([]);
+    expect(file.state.ops[file.state.ops.length - 1]).toBe('clear');
+
+    file.state.failClear = true;
+    capture.set(true);
+    capture.set(false);
+    await flushPromises();
+    expect(logger.entries().map(e => e.message)).toContain('log file not cleared');
   });
 
   it('an unreadable or junk value is off; a failed write is only logged', async () => {

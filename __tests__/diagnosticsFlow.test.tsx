@@ -127,7 +127,7 @@ beforeEach(async () => {
   installLogFile();
   logFileCalls.length = 0;
   appended.length = 0;
-  logFileSink.disable();
+  await logFileSink.disable().catch(() => {});
   logFileCalls.length = 0;
   appended.length = 0;
   await device().clear();
@@ -143,7 +143,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  logFileSink.disable();
+  await logFileSink.disable().catch(() => {});
   await resetQueryCache();
   clearNativeModules();
   focusRestoration.clear();
@@ -314,5 +314,59 @@ describe('Diagnostics (Story 8.3)', () => {
     expect(logger.entries().map(e => e.message)).not.toContain('account A line');
     expect(logFileSink.isEnabled()).toBe(true);
     await unmount(root);
+  });
+
+  it('review: a rejecting native clear shows «Не удалось очистить логи», not «Логи очищены»; focus stays on «Очистить логи»', async () => {
+    installNativeModules({
+      LogFile: {
+        append: jest.fn(() => Promise.resolve(true)),
+        clear: jest.fn(() => Promise.reject(new Error('io'))),
+        location: jest.fn(() => Promise.resolve(LOG_DIR)),
+      },
+    });
+    const root = await openDiagnostics();
+    focusMock.mockClear();
+    await press(root, CLEAR);
+    expect(text(root)).toContain(t('settings.diagnostics.clear.failed'));
+    expect(text(root)).not.toContain(t('settings.diagnostics.clear.done'));
+    expect(focusMock).not.toHaveBeenCalled();
+    expect(currentRoute()).toBe('Diagnostics');
+    await unmount(root);
+  });
+});
+
+describe('cold start with «Запись логов» stored on (Story 8.3 review)', () => {
+  it('capture resumes at startup without opening Diagnostics: the ring, then a new line, reach the file', async () => {
+    const lines: string[] = [];
+    await jest.isolateModulesAsync(async () => {
+      // Fresh modules: the async-storage mock, NativeModules and the app's singletons.
+      const storage = require('@react-native-async-storage/async-storage');
+      await storage.createAsyncStorage('boostytv-device').setItem(DIAGNOSTICS_CAPTURE_KEY, 'on');
+      const rn = require('react-native');
+      rn.NativeModules.LogFile = {
+        append: jest.fn((batch: string[]) => {
+          lines.push(...batch);
+          return Promise.resolve(true);
+        }),
+        clear: jest.fn(() => Promise.resolve(true)),
+        location: jest.fn(() => Promise.resolve(null)),
+      };
+      const fresh = require('../src/shared/services/logger');
+      fresh.logger.info('boot', 'before the app modules');
+      require('../src/app/App');
+      const sink = require('../src/shared/services/logFileSink');
+      // The startup read (src/app/session.ts) finishes.
+      for (let i = 0; i < 10; i += 1) {
+        await Promise.resolve();
+      }
+      expect(sink.logFileSink.isEnabled()).toBe(true);
+      fresh.logger.info('boot', 'after startup');
+      jest.advanceTimersByTime(1000);
+      await Promise.resolve();
+      await sink.logFileSink.disable();
+      delete rn.NativeModules.LogFile;
+    });
+    expect(lines.some(line => line.includes('before the app modules'))).toBe(true);
+    expect(lines.some(line => line.includes('after startup'))).toBe(true);
   });
 });

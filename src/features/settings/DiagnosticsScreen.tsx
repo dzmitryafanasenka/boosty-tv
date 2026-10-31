@@ -23,7 +23,8 @@ type ClearState = 'idle' | 'clearing' | 'done' | 'failed';
  *
  * - «Запись логов» (toggle, device-scoped `diagnostics.capture.v1`, default
  *   off): on writes the Logger's ring, then every new redacted entry, to the
- *   capped log file; OK flips it at once. The initial focus.
+ *   capped log file; off deletes the file. OK flips it at once. The initial
+ *   focus. A failed read shows «Выкл».
  * - «Очистить логи»: empties the ring and the file; a status line says
  *   whether it worked.
  * - The adb steps to pull the file (`adb pull …/files/logs/`) and, when the
@@ -42,11 +43,14 @@ export function DiagnosticsScreen({ testID = 'settings/diagnostics' }: Diagnosti
   useEffect(() => {
     alive.current = true;
     if (on === undefined) {
-      diagnosticsCapture.read().then(value => {
-        if (alive.current) {
-          setOn(value);
-        }
-      });
+      diagnosticsCapture
+        .read()
+        .catch(() => false)
+        .then(value => {
+          if (alive.current) {
+            setOn(value);
+          }
+        });
     }
     logFileLocation().then(path => {
       if (alive.current) {

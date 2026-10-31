@@ -37,6 +37,13 @@ describe('redact', () => {
     ['bare query with expires=', 'src ?expires=1735&acl=/v/*&hmac=ab12 next', 'hmac=ab12'],
     ['bare query with sig=', 'path /v/1.m3u8?sig=zz9&x=1', 'zz9'],
     ['bare query without ?', 'expires=1735&sig=q1w2', 'q1w2'],
+    // Story 8.3 review: prefixed keys.
+    ['id_token= value', 'got id_token=idt-1&x=1', 'idt-1'],
+    ['csrf_token= value', 'csrf_token=cs-2', 'cs-2'],
+    ['api_sig= value', 'api_sig=as-3', 'as-3'],
+    ['JSON id_token key', '{"id_token":"idt-json"}', 'idt-json'],
+    ['JSON csrf_token key', '{"csrf_token": "cs-json"}', 'cs-json'],
+    ['JSON api_sig key', '{"api_sig":"as-json"}', 'as-json'],
   ])('removes %s', (_name, input, secret) => {
     const out = redact(input);
     expect(out).not.toContain(secret);
@@ -79,11 +86,14 @@ describe('isSecretFieldKey (Story 8.3)', () => {
     'signedQuery', 'signedquery', 'SIGNED_QUERY',
     'phone', 'Phone', 'phoneNumber', 'user.phone',
     'code', 'Code', 'sms_code', 'smsCode', 'statusCode',
+    // Story 8.3 review: signatures and compact keys.
+    'sig', 'SIG', 'api_sig', 'signature', 'urlSignature',
+    'accesstoken', 'ACCESSTOKEN', 'smscode', 'phonenumber', 'sessioncookie', 'xauthorization', 'decoder',
   ])('%s is secret', key => {
     expect(isSecretFieldKey(key)).toBe(true);
   });
 
-  it.each(['status', 'decoder', 'encoded', 'store', 'outcome', 'tokenizer', 'url', 'error'])('%s is not', key => {
+  it.each(['status', 'store', 'outcome', 'url', 'error', 'design', 'single', 'attempt'])('%s is not', key => {
     expect(isSecretFieldKey(key)).toBe(false);
   });
 });

@@ -2,7 +2,7 @@
  * Story 8.3: source-level guard for the native diagnostics log file
  * (`LogFileModule.kt`). No JVM unit tests run here, so this pins the
  * properties the JS side relies on: registration, app-specific external
- * storage (adb-pullable on a release build), the 256 KB cap with one
+ * storage on API 29+ (adb-pullable on a release build; internal below 29), the 256 KB cap with one
  * rotated copy, one serial thread, and no logging or readback of the content.
  * The rotation itself is a device check (docs/testing.md Story 8.3).
  */
@@ -36,6 +36,16 @@ describe('LogFileModule (Story 8.3)', () => {
     expect(module_).toContain('ROTATED_NAME = "boostytv.log.1"');
     expect(module_).toContain('MAX_BYTES = 256L * 1024L');
     expect(module_).toMatch(/size \+ bytes\.size > MAX_BYTES\) \{\s*rotate\(dir, file\)/);
+  });
+
+  it('review: below API 29 the internal filesDir (external files are shared storage there)', () => {
+    expect(module_).toMatch(/Build\.VERSION\.SDK_INT >= Build\.VERSION_CODES\.Q\) context\.getExternalFilesDir\(null\) else context\.filesDir/);
+  });
+
+  it('review: a failed rename truncates the current file instead of throwing', () => {
+    const rotate = module_.slice(module_.indexOf('private fun rotate'), module_.indexOf('private fun clearFiles'));
+    expect(rotate).toContain('FileOutputStream(file, false)');
+    expect(rotate).not.toContain('throw');
   });
 
   it('runs every call on one serial thread', () => {

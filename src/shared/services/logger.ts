@@ -63,9 +63,11 @@ const SIGNED_QUERY_RUN = /[^\s"'<>]*\b(?:expires|sig)=[^\s"'<>]*/gi;
 /** Secret parameter and JSON key names (Story 8.3 added the token, signature, cookie and authorization keys). */
 const SECRET_KEYS =
   'sms_code|code|phone|access_token|refresh_token|token|signedQuery|sig|signature|authorization|set-cookie|cookie';
-const SECRET_PARAM = new RegExp(`\\b(${SECRET_KEYS})=[^&\\s"'<>]*`, 'gi');
+/** A secret key, also with a prefix (`id_token`, `csrf_token`, `api_sig`). */
+const SECRET_KEY = `(?:\\w*_)?(?:${SECRET_KEYS})`;
+const SECRET_PARAM = new RegExp(`\\b(${SECRET_KEY})=[^&\\s"'<>]*`, 'gi');
 /** A string value, or a bare one (number, literal) up to `,` `}` `]` or a space. */
-const SECRET_JSON = new RegExp(`"(${SECRET_KEYS})"\\s*:\\s*(?:"[^"]*"|[^,}\\]\\s]+)`, 'gi');
+const SECRET_JSON = new RegExp(`"(${SECRET_KEY})"\\s*:\\s*(?:"[^"]*"|[^,}\\]\\s]+)`, 'gi');
 /** `+` and at least 7 digits, up to two separators (space, dash, dot, brackets) between digits. */
 const E164_LIKE = /\+\s?\d(?:[\s().-]{0,2}\d){6,}/g;
 const DIGIT_RUN = /\d{7,}/g;
@@ -94,35 +96,27 @@ export function redact(text: string): string {
     .replace(OPAQUE_RUN, '<redacted>');
 }
 
-/** The secret words a field key is checked for (Story 8.3); `signedQuery` is matched whole. */
-const SECRET_KEY_WORDS: ReadonlySet<string> = new Set([
-  'token',
-  'tokens',
-  'cookie',
-  'cookies',
-  'authorization',
-  'phone',
-  'code',
-]);
+/**
+ * The secret words a field key is checked for (Story 8.3), inside the key
+ * with separators removed and lowercased.
+ */
+const SECRET_KEY_PARTS = ['token', 'cookie', 'authorization', 'signedquery', 'phone', 'code'] as const;
+/** Signature words, matched as a whole word or at the end of the compact key (`sig`, `apiSig`, `signature`). */
+const SIGNATURE_KEY = /(?:^|[^a-z])sig(?:nature)?(?:$|[^a-z])|sig(?:nature)?$/;
 
 /**
- * Story 8.3: a field key that names a secret (any case): one of its words
- * (camelCase, snake_case, kebab-case or dotted) is token, cookie,
- * authorization, phone or code, or the key is `signedQuery`. So
- * `accessToken`, `refresh_token`, `Set-Cookie`, `sms_code` and `phoneNumber`
- * match; `decoder` or `status` do not.
+ * Story 8.3: a field key that names a secret (any case): the key, with
+ * separators removed and lowercased, contains token, cookie,
+ * authorization, signedquery, phone or code (so `accessToken`,
+ * `accesstoken`, `refresh_token`, `Set-Cookie`, `sessioncookie`,
+ * `sms_code`, `smscode`, `phoneNumber`), or it is or ends with `sig` /
+ * `signature` (`sig`, `api_sig`, `urlSignature`). Over-matching (`decoder`)
+ * is accepted: a lost value is better than a leaked one.
  */
 export function isSecretFieldKey(key: string): boolean {
-  const compact = key.replace(/[^A-Za-z0-9]/g, '').toLowerCase();
-  if (compact === 'signedquery' || compact === 'authorization') {
-    return true;
-  }
-  const words = key
-    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-    .split(/[^A-Za-z0-9]+/)
-    .map(word => word.toLowerCase())
-    .filter(Boolean);
-  return words.some(word => SECRET_KEY_WORDS.has(word));
+  const lower = key.toLowerCase();
+  const compact = lower.replace(/[^a-z0-9]/g, '');
+  return SECRET_KEY_PARTS.some(part => compact.includes(part)) || SIGNATURE_KEY.test(lower) || SIGNATURE_KEY.test(compact);
 }
 
 /** The marker that replaces the value of a secret field key. */
