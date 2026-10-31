@@ -52,9 +52,9 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `src/test/playerFlowHarness.tsx` -- the shared harness.
-- [ ] The seven test files -- the describes moved verbatim.
-- [ ] Docs -- references updated.
+- [x] `src/test/playerFlowHarness.tsx` -- the shared harness.
+- [x] The seven test files -- the describes moved verbatim.
+- [x] Docs -- references updated.
 
 **Acceptance Criteria:**
 - Given the split, when `npx jest` runs the seven files, then exactly the 192 tests listed in the before file pass with identical full names.

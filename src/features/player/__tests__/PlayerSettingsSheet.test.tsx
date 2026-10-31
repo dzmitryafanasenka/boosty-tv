@@ -1,7 +1,8 @@
 /**
  * Story 8.1 review: the settings sheet's levels when its data changes under
  * an open submenu. The full sheet flows (open, Back order, picks) are in
- * `__tests__/playerFlow.test.tsx` «quality (Story 4.3)» and «Story 8.1».
+ * `__tests__/playerQualityFlow.test.tsx` «quality (Story 4.3)» and
+ * `__tests__/playerSpeedFlow.test.tsx` «Story 8.1».
  */
 import { act } from 'react';
 import { createRoot, type Root } from 'test-renderer';

@@ -403,7 +403,7 @@ Raw keys (`useTVEventHandler`, key up, §1.1). Seek steps: overlay hidden or tim
 | G Live (G9–G10) | Play/pause | ← → between controls; no seeking | As labeled; resume jumps to the live edge | Hide the overlay → exit | — |
 | G Stream ended (G11) | «Назад» (as built: `player/error/back`) | — | Exit | Exit | D Автор: the first post (where the live card was) |
 
-Implementation notes (Story 7.2, G9–G11; host-tested in `__tests__/playerFlow.test.tsx` «Story 7.2», device rows in `docs/testing.md` «Story 7.2»):
+Implementation notes (Story 7.2, G9–G11; host-tested in `__tests__/liveFlow.test.tsx` «Story 7.2», device rows in `docs/testing.md` «Story 7.2»):
 - The Player route takes `ref: MediaRef | LiveRef`; a `LiveRef {kind: 'live', blogUrl}` puts `PlayerScreen` in live mode. Same screen wrapper, PlaybackArbiter claim, lifecycle pause and Back order (sheet → overlay → exit).
 - Surface: OK pauses and shows the overlay. Raw ← → (also held, natively), FF/Next and Rew/Prev only show the overlay; no seek and no pending target ever. ↑ ↓ show the overlay.
 - Overlay: focus on play/pause when it shows (not the timeline, which is absent); ← → move natively between the controls (play/pause, and the gear only with a real quality choice: live candidates give «Авто» only, so as built the gear is hidden and Menu/Info do nothing). Auto-hide as for a video.
