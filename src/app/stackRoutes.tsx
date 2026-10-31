@@ -519,6 +519,7 @@ export function PlayerRoute({ navigation, route }: StackScreenProps<RootStackPar
           isActive={isActive}
           onExit={onExit}
           onLiveUnplayable={onLiveUnplayable}
+          speedEnabled={phaseFlags.speed}
         />
       ) : (
         <PlayerScreen

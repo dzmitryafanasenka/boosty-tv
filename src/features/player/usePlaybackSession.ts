@@ -392,18 +392,20 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
    * A speed pick (Story 8.1): the engine's `rate` changes from the current
    * position (no remount, no seek, no E8) and the pick is the global
    * preference for the next videos (memory at once; a failed store write is
-   * only logged). Ignored where the mode has no speed (live).
+   * only logged). Ignored where the mode has no speed (live) and for the
+   * current speed (no log, no write; the caller still closes the sheet).
    */
+  const speedRef = useLatestRef(source.speed);
   const pickSpeed = useCallback(
     (next: PlaybackSpeed) => {
-      if (!mode.speedShown) {
+      if (!mode.speedShown || next === speedRef.current) {
         return;
       }
       logger.info('player', 'playback speed changed', { speed: next });
       setSpeed(next);
       speedPreference.write(next);
     },
-    [mode, setSpeed],
+    [mode, setSpeed, speedRef],
   );
 
   /** Play or pause; playing after the end starts over from 0 (the ended engine never restarts by itself). */

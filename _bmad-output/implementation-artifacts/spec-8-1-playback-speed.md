@@ -2,7 +2,7 @@
 title: 'Story 8.1: Playback speed'
 type: 'feature'
 created: '2026-10-31'
-status: 'in-progress'
+status: 'in-review'
 route: 'dispatch'
 review_loop_iteration: 0
 baseline_commit: '990c62aeb67e1eab3ef05b062185bd3e57fcbed7'
@@ -84,8 +84,8 @@ context:
 
 **What changed (2026-10-31):**
 - `speedPreference.ts` (new): `PLAYBACK_SPEEDS`, `parseSpeed` (only the exact preset strings; anything else → null → 1×), `serializeSpeed`, `speedLabel` («N×» via `t()`), a store with `peek` / `read` / `write` / `forget` (no `remember`: a speed pick is stored at once, unlike a quality pick that waits for `onLoad`), the device-scoped `asyncKeyValueStore('device')` key `player.speed.v1`, and `setSpeedPreferenceKeyValueStore` for the demo (wired in `src/app/session.ts`, like quality).
-- `playbackMode.ts`: `speedShown` and `rate(stored)`. `createVodMode(progress, { speed })` takes the phase flag; live: `speedShown: false`, `rate: () => 1`. The flag reaches the mode through a new `PlayerScreen` prop `speedEnabled` (default off), set from `phaseFlags.speed` by `PlayerRoute` (features cannot import `app`).
-- `usePlayerSource.ts`: reads the stored speed beside the quality preference; `preferenceReady` now waits for both, so the first engine already has the stored rate.
+- `playbackMode.ts`: `speedShown` and `rate(stored)`. `createVodMode(progress, { speed })` takes the phase flag; live: `speedShown: false`, `rate: () => 1`. The flag reaches the mode through a new required `PlayerScreen` prop `speedEnabled` (review: no silent default), set from `phaseFlags.speed` by both `PlayerRoute` branches (live ignores it) (features cannot import `app`).
+- `usePlayerSource.ts`: reads the stored speed beside the quality preference; `preferenceReady` waits for it only when `mode.speedShown` (review: live and the flag off neither read nor wait), so the first recording engine already has the stored rate.
 - `usePlaybackSession.ts`: `rate = mode.rate(source.speed)` in `view` and `engineProps`; `commands.pickSpeed` (ignored without `speedShown`; logs `playback speed changed {speed}`; sets the state; writes the store). The engine `key` is unchanged, so a rate change never remounts; a quality switch or a recovery remounts with the same `rate` prop.
 - `PlayerSettingsSheet.tsx` / `usePlayerSettings.tsx`: `SettingsSheetData.speed` (null: no row), the `speed` level submenu, `onPickSpeed`; the sheet level remembers which submenu Back came from (`sheetRow`) and focuses that row. The pick closes the sheet with focus on «Настройки» and shows the overlay, like quality.
 - `PlayerOverlay.tsx`: optional `rate`; `player/speed` «N×» right of the elapsed time when not 1 (not on live, which has no times row).
@@ -99,9 +99,31 @@ context:
 
 ## Review Triage Log
 
+Coordinator review, 2026-10-31 (Blind Hunter, Edge Case Hunter, Verification Gap). Patches are in the commit `fix: review patches for Story 8.1 playback speed`.
+
+| # | Finding | Verdict | Evidence | Route |
+|---|---------|---------|----------|-------|
+| 1 | The adapter's `rate` forwarding was untested (medium, VG) | patched | `src/shared/platform/__tests__/PlayerEngineView.test.tsx`: omitted → `rate` 1; 1.5 → 1.5; re-render with 2 → 2; the mocked Video mounted once. | test |
+| 2 | The speed row turning null with its submenu open fell through to the quality submenu (low, ECH+BH) | patched | `PlayerSettingsSheet` derives the shown level (the sheet when the speed row is gone), resets the level and the return row in an effect, and focuses «Качество». New `src/features/player/__tests__/PlayerSettingsSheet.test.tsx`; red against the unpatched sheet. | code + test |
+| 3 | Picking the current speed logged and wrote (low, ECH+BH) | patched | `pickSpeed` returns early for the current speed (no log, no write, no state change); the sheet still closes with focus on «Настройки». `playerFlow` «Story 8.1 › picking the current speed». | code + test |
+| 4 | `preferenceReady` waited for an unused speed read (low, ECH+BH) | patched | `usePlayerSource` reads and waits only when `mode.speedShown`. `playerFlow` «Story 8.1 › live»: a `read` that never resolves is not called and the live engine mounts; the flag-off test also asserts no read. | code + test |
+| 5 | A synchronous throw from `kv()` escaped `read()` / `write()` (low, ECH) | patched | `speedPreference` and, per the patch-every-copy rule, `qualityPreference`: the `get` throw becomes a rejection (→ 1× / null, logged), the `set` throw is logged; memory kept. One new unit test in each store's suite. | code + test |
+| 6 | The overlay built its own label from `rate?: number` (low, BH) | patched | `PlayerOverlay` takes `rate?: PlaybackSpeed` and renders `speedLabel(rate)`, the sheet's label function. | code |
+| 7 | The «Quality change / recovery» test proved nothing about writes (low, BH) | patched | The test spies on `speedPreference.write` (not called) and checks that no «playback speed changed» entry was logged. | test |
+| 8 | No test for a pick while paused (low, BH) | patched | `playerFlow` «Story 8.1 › a pick while paused»: rate 2, `paused` stays true, «2×» shown. | test |
+| 9 | No flag-off test; `speedEnabled` defaulted to false silently (low, BH) | patched | `speedEnabled` is required; both route branches pass `phaseFlags.speed`. `playerFlow` «Story 8.1 › the `speed` phase flag off» (`jest.replaceProperty`): stored `2` → rate 1, no row, no label, no read. | code + test |
+| 10 | «The first engine starts at the stored rate» was not pinned (low, VG) | patched | `playerFlow` «Story 8.1 › the first engine starts at the stored rate»: the speed read is held with a deferred; no engine before it resolves, then one mount at rate 2. | test |
+| 11 | No demo check for the preference stores (low, VG) | patched | `demoFlow` «Story 8.1 review»: a speed and a quality write in demo mode read back from the demo's memory stores; the seeded `boostytv-device` values stay. Demo videos have no `playerUrls`, so the player's sheet is unreachable in the demo: the test writes through the same stores the sheet's picks use, not through the UI. | test |
+| 12 | Docs did not say which rules are media time; Menu/Info in the speed submenu undocumented (low, BH) | patched | PLAY-07, `docs/testing.md` «Story 8.1» and these notes list the E9 cadence, the short visit, the resume point / `'end'`, the recovery budget, «Осталось N мин» and the overlay times as media time. `docs/focus-map.md` §4 G: while the speed submenu is open the player ignores every remote key (Menu/Info included; `usePlayerKeys` returns early on `sheetOpenRef`, and `openSettings` is a no-op while open), as for quality. | docs |
+| 13 | «1.5×» uses a dot, not the Russian «1,5×» | accepted | The owner approved the label written «1.5×» (Q1 a). | — |
+| 14 | No runtime check that the engine supports rate changes | accepted | ExoPlayer / Media3 supports playback speed; the owner's device run is the check (recorded as its purpose in PLAY-07 and `docs/testing.md`). | — |
+| 15 | At 2–3× E9 ticks fire every ~3–5 s of wall time | deferred | Bounded (one E9 in flight); a wall-clock floor in ProgressRepository would change progress rules the frozen block keeps unchanged. Entry in `deferred-work.md`. | deferred-work |
+
 ## Verification
 
 **Run (2026-10-31):** lint `--max-warnings 0`, typecheck, `check:fixtures` (30) clean; `npm test` ×3: 128 suites, 2851 passed each; touched files ×30: 0 failed runs, 729 tests passed in each. Device: not run (owner).
+
+**Review-patch verification (2026-10-31):** lint `--max-warnings 0`, typecheck, `check:fixtures` (30) clean; `npm test` ×3: 129 suites, 2860 passed each (2851 + 9 new); `playerFlow`, `authorFlow`, `postFlow`, `demoFlow`, `src/features/player` (incl. `qualityPreference` / `speedPreference` / `PlayerSettingsSheet`), `PlayerEngineView.test.tsx`, `phaseFlags.test.ts` ×30: 0 failed runs, 749 passed each. Device: not run (owner).
 
 **Commands:**
 - `npm run lint -- --max-warnings 0`, `npm run typecheck`, `npm run check:fixtures` -- clean.

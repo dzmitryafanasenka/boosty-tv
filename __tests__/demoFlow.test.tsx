@@ -10,6 +10,12 @@ import App, { navigationRef } from '../src/app/App';
 import { engine } from '../src/test/playerEngineMock';
 import { resetQueryCache } from '../src/app/queryClient';
 import { session } from '../src/app/session';
+import {
+  QUALITY_PREFERENCE_KEY,
+  SPEED_PREFERENCE_KEY,
+  qualityPreference,
+  speedPreference,
+} from '../src/features/player';
 import { focusRestoration } from '../src/shared/focus';
 import { DEFAULT_FILTER, filtersStore, formatDayKey, periodBounds } from '../src/shared/filters';
 import { PostRepository } from '../src/shared/entities/post';
@@ -737,4 +743,30 @@ test('Story 4.2: demo progress stays in memory; a demo sign-out never clears the
   await act(async () => {
     root.unmount();
   });
+});
+
+test('Story 8.1 review: a demo speed or quality pick stays in memory; the real `boostytv-device` values are untouched', async () => {
+  // Demo videos have no `playerUrls` (the player cannot play them, so its
+  // sheet is unreachable): the picks go through the same preference stores
+  // the sheet's picks write, which the demo replaced (src/app/session.ts).
+  const real = createAsyncStorage('boostytv-device');
+  await real.setItem(SPEED_PREFERENCE_KEY, '3');
+  await real.setItem(QUALITY_PREFERENCE_KEY, '480');
+  try {
+    await act(async () => {
+      speedPreference.write(1.5);
+      qualityPreference.write(720);
+    });
+    speedPreference.forget();
+    qualityPreference.forget();
+    // Read back from the demo's in-memory stores, not the owner's database.
+    await expect(speedPreference.read()).resolves.toBe(1.5);
+    await expect(qualityPreference.read()).resolves.toBe(720);
+    expect(await real.getItem(SPEED_PREFERENCE_KEY)).toBe('3');
+    expect(await real.getItem(QUALITY_PREFERENCE_KEY)).toBe('480');
+  } finally {
+    speedPreference.forget();
+    qualityPreference.forget();
+    await real.clear();
+  }
 });

@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { isGenericVideoTitle } from '../../shared/entities/post';
 import { tf, t } from '../../shared/i18n';
 import { formatDuration } from '../../shared/i18n/format';
+import { speedLabel, type PlaybackSpeed } from './speedPreference';
 import {
   AuthorAvatar,
   FocusableSurface,
@@ -308,7 +309,7 @@ export type PlayerOverlayProps = {
    * Story 8.1 (owner decision Q1 a, our improvement): the engine's rate; not
    * 1 → a small «1.5×» label next to the elapsed time. Default 1 (none).
    */
-  rate?: number;
+  rate?: PlaybackSpeed;
   onTogglePause: () => void;
   onTimelineFocus: () => void;
   onPlayPauseFocus: () => void;
@@ -419,7 +420,7 @@ export function PlayerOverlay({
                 </Text>
                 {rate !== 1 ? (
                   <Text testID="player/speed" variant="meta" color="text-secondary" style={[styles.tabular, styles.speed]}>
-                    {tf('player.speed.value', { speed: String(rate) })}
+                    {speedLabel(rate)}
                   </Text>
                 ) : null}
               </View>

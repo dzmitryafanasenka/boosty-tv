@@ -119,4 +119,17 @@ describe('createSpeedPreferenceStore', () => {
     expect(store.peek()).toBeUndefined();
     await expect(store.read()).resolves.toBe(2);
   });
+
+  it('a store that throws synchronously (review): read → 1×, write → logged, memory kept; nothing escapes', async () => {
+    const store = createSpeedPreferenceStore(() => {
+      throw new Error('no native module');
+    });
+    await expect(store.read()).resolves.toBe(1);
+    store.forget();
+    expect(() => store.write(2)).not.toThrow();
+    expect(store.peek()).toBe(2);
+    const messages = logger.entries().map(entry => entry.message);
+    expect(messages).toContain('speed preference not read');
+    expect(messages).toContain('speed preference not stored');
+  });
 });

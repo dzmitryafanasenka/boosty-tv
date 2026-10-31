@@ -6,6 +6,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'test-renderer';
 import { PlayerOverlay } from '../PlayerOverlay';
+import type { PlaybackSpeed } from '../speedPreference';
 
 const noop = () => {};
 const meta = { authorName: 'Автор', authorAvatarUrl: null, postTitle: 'Пост', videoTitle: '' };
@@ -25,7 +26,7 @@ afterEach(async () => {
   jest.useRealTimers();
 });
 
-async function render(props: { rate?: number; live?: { startTime: number | null } | null }) {
+async function render(props: { rate?: PlaybackSpeed; live?: { startTime: number | null } | null }) {
   root = createRoot();
   const current = root;
   await act(async () => {
@@ -67,7 +68,7 @@ describe('the overlay speed label', () => {
     expect(has(byDefault, 'player/speed')).toBe(false);
   });
 
-  it.each([
+  it.each<[PlaybackSpeed, string]>([
     [1.5, '1.5×'],
     [0.75, '0.75×'],
     [3, '3×'],

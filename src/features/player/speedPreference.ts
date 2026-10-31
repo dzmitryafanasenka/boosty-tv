@@ -54,6 +54,15 @@ export type SpeedPreferenceStore = {
   forget(): void;
 };
 
+/** `kv().get`, with a synchronous throw (opening the store) turned into a rejection. */
+function getStored(kv: () => KeyValueStore): Promise<string | null> {
+  try {
+    return kv().get(SPEED_PREFERENCE_KEY);
+  } catch (error) {
+    return Promise.reject(error);
+  }
+}
+
 export function createSpeedPreferenceStore(kv: () => KeyValueStore): SpeedPreferenceStore {
   let value: PlaybackSpeed | undefined;
   let reading: Promise<PlaybackSpeed> | null = null;
@@ -64,8 +73,7 @@ export function createSpeedPreferenceStore(kv: () => KeyValueStore): SpeedPrefer
         return Promise.resolve(value);
       }
       if (reading === null) {
-        reading = kv()
-          .get(SPEED_PREFERENCE_KEY)
+        reading = getStored(kv)
           .then(
             raw => parseSpeed(raw) ?? DEFAULT_SPEED,
             () => {
@@ -86,9 +94,14 @@ export function createSpeedPreferenceStore(kv: () => KeyValueStore): SpeedPrefer
     },
     write(next) {
       value = next;
-      kv()
-        .set(SPEED_PREFERENCE_KEY, serializeSpeed(next))
-        .catch(() => logger.warn('player', 'speed preference not stored'));
+      try {
+        kv()
+          .set(SPEED_PREFERENCE_KEY, serializeSpeed(next))
+          .catch(() => logger.warn('player', 'speed preference not stored'));
+      } catch {
+        // The store itself threw (not only its promise): the same outcome.
+        logger.warn('player', 'speed preference not stored');
+      }
     },
     forget() {
       value = undefined;

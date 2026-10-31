@@ -11,7 +11,7 @@ import { useLivePlayback, type LivePlayback } from './useLivePlayback';
 export type PlayerSource = Omit<LivePlayback, 'liveMedia'> & {
   /** The playing media (`PlaybackMode.pickMedia`: the VOD or the live hook). */
   media: MediaSource;
-  /** The device's quality and speed preferences are read (the engine waits for both). */
+  /** The device's quality preference is read, and the speed one where the mode uses it (the engine waits). */
   preferenceReady: boolean;
   setPreference: (key: QualityKey) => void;
   /** Story 8.1: the stored speed (1× until read, when none or unknown); `PlaybackMode.rate` decides whether it applies. */
@@ -53,10 +53,12 @@ export function usePlayerSource(
     };
   }, [preference]);
   // Story 8.1: the device's speed preference, read like the quality one, so
-  // the first engine starts at the stored speed.
+  // the first engine starts at the stored speed. Only where the mode uses it
+  // (live and the flag off neither read nor wait for it).
+  const speedUsed = mode.speedShown;
   const [speed, setSpeed] = useState<PlaybackSpeed | undefined>(() => speedPreference.peek());
   useEffect(() => {
-    if (speed !== undefined) {
+    if (speed !== undefined || !speedUsed) {
       return;
     }
     let alive = true;
@@ -68,7 +70,7 @@ export function usePlayerSource(
     return () => {
       alive = false;
     };
-  }, [speed]);
+  }, [speed, speedUsed]);
   /**
    * The quality a recovery or a retry keeps (Story 4.4): the broken source's
    * key, picked instead of the preference while the video has it. Cleared by
@@ -101,7 +103,7 @@ export function usePlayerSource(
   return {
     ...livePlayback,
     media,
-    preferenceReady: preference !== undefined && speed !== undefined,
+    preferenceReady: preference !== undefined && (speed !== undefined || !speedUsed),
     setPreference,
     speed: speed ?? DEFAULT_SPEED,
     setSpeed,

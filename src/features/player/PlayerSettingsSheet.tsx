@@ -96,8 +96,12 @@ export function PlayerSettingsSheet({ model, onPick, onPickSpeed, onClosed }: Pl
   const [level, setLevel] = useState<'sheet' | 'quality' | 'speed'>('sheet');
   /** The sheet row focused on the sheet level: the submenu Back came from. */
   const [sheetRow, setSheetRow] = useState<'quality' | 'speed'>('quality');
-  const levelRef = useRef(level);
-  levelRef.current = level;
+  const speedRow = data.speed !== null;
+  // The speed row went away while its submenu was open (review): show the
+  // sheet with focus on its first row, never the quality submenu.
+  const shown = level === 'speed' && !speedRow ? 'sheet' : level;
+  const levelRef = useRef(shown);
+  levelRef.current = shown;
   const qualityView = useRef<HostView | null>(null);
   const speedView = useRef<HostView | null>(null);
   const selectedView = useRef<HostView | null>(null);
@@ -105,6 +109,13 @@ export function PlayerSettingsSheet({ model, onPick, onPickSpeed, onClosed }: Pl
   onClosedRef.current = onClosed;
 
   useEffect(() => () => onClosedRef.current(), []);
+
+  useEffect(() => {
+    if (level === 'speed' && !speedRow) {
+      setSheetRow('quality');
+      setLevel('sheet');
+    }
+  }, [level, speedRow]);
 
   // The submenu is the deepest Back layer: Back there returns to the sheet.
   useEffect(() => {
@@ -125,14 +136,13 @@ export function PlayerSettingsSheet({ model, onPick, onPickSpeed, onClosed }: Pl
   // submenu's Back came from), the selected row in a submenu. Repeated two
   // frames later (the modal host's device lesson: a request in the same
   // commit as an unmount can be lost).
-  const speedRow = data.speed !== null;
   const backToSpeed = sheetRow === 'speed' && speedRow;
   useEffect(() => {
-    const view = level !== 'sheet' ? selectedView : backToSpeed ? speedView : qualityView;
+    const view = shown !== 'sheet' ? selectedView : backToSpeed ? speedView : qualityView;
     return focusSoon(() => view.current);
-  }, [level, backToSpeed]);
+  }, [shown, backToSpeed]);
 
-  if (level === 'sheet') {
+  if (shown === 'sheet') {
     return (
       <SideSheet testID={PLAYER_SHEET_ID} variant="player" title={t('player.settings')}>
         <SettingRow
@@ -158,7 +168,7 @@ export function PlayerSettingsSheet({ model, onPick, onPickSpeed, onClosed }: Pl
       </SideSheet>
     );
   }
-  if (level === 'speed' && data.speed !== null) {
+  if (shown === 'speed' && data.speed !== null) {
     const current = data.speed;
     return (
       <SideSheet testID={`${PLAYER_SHEET_SPEED_ID}/menu`} variant="player" title={t('player.speed.title')}>

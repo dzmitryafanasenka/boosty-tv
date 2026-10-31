@@ -14,6 +14,7 @@ import { act } from 'react';
 import { AppState, DeviceEventEmitter, StyleSheet } from 'react-native';
 import { StackActions } from '@react-navigation/native';
 import App, { navigationRef } from '../src/app/App';
+import { phaseFlags } from '../src/app/phaseFlags';
 import { progress } from '../src/app/progress';
 import { queryClient, resetQueryCache } from '../src/app/queryClient';
 import { queryKeys } from '../src/shared/api';
@@ -3868,9 +3869,10 @@ describe('Story 8.1: playback speed (PLAY-07, SET-04)', () => {
     await unmount(root);
   });
 
-  it('matrix «Quality change / recovery»: at 1.25× a quality switch and an engine recovery keep 1.25×', async () => {
+  it('matrix «Quality change / recovery»: at 1.25× a quality switch and an engine recovery keep 1.25× and never write the speed', async () => {
     await device().setItem(SPEED_PREFERENCE_KEY, '1.25');
     withData([okVideo('v1', MIXED)]);
+    const write = jest.spyOn(speedPreference, 'write');
     const root = await openPlayer();
     expect(engine.props?.rate).toBe(1.25);
     await ticks(0, 60);
@@ -3889,9 +3891,74 @@ describe('Story 8.1: playback speed (PLAY-07, SET-04)', () => {
     await fire('onError', 'decoder');
     expect(engine.mounts).toBe(mounts + 2);
     expect(engine.props?.rate).toBe(1.25);
-    // Speed is never stored by these paths.
+    // Speed is never stored (or logged as changed) by these paths.
+    expect(write).not.toHaveBeenCalled();
+    expect(logger.entries().filter(entry => entry.message === 'playback speed changed')).toHaveLength(0);
     expect(await device().getItem(SPEED_PREFERENCE_KEY)).toBe('1.25');
     await unmount(root);
+  });
+
+  it('picking the current speed (review): the sheet closes, focus «Настройки»; no log, no store write, no change', async () => {
+    withData([okVideo('v1', MIXED)]);
+    const write = jest.spyOn(speedPreference, 'write');
+    const root = await openPlayer();
+    await openSpeedMenu(root);
+    focusMock.mockClear();
+    await press(root, S(1));
+    expect(visible(root, SHEET)).toBe(false);
+    expect(lastFocusTarget()).toBe(SETTINGS);
+    expect(engine.props?.rate).toBe(1);
+    expect(write).not.toHaveBeenCalled();
+    expect(logger.entries().filter(entry => entry.message === 'playback speed changed')).toHaveLength(0);
+    expect(await device().getItem(SPEED_PREFERENCE_KEY)).toBeNull();
+    await unmount(root);
+  });
+
+  it('a pick while paused (review): the rate changes, the player stays paused', async () => {
+    withData([okVideo('v1', MIXED)]);
+    const root = await openPlayer();
+    await key('playPause');
+    expect(engine.props?.paused).toBe(true);
+    await openSpeedMenu(root);
+    await press(root, S(2));
+    expect(engine.props?.rate).toBe(2);
+    expect(engine.props?.paused).toBe(true);
+    expect(speedBadge(root)).toContain('2×');
+    await unmount(root);
+  });
+
+  it('the first engine starts at the stored rate (review): no engine until the speed read resolves, then one mount at 2×', async () => {
+    const held = deferred<'2'>();
+    jest.spyOn(speedPreference, 'read').mockReturnValue(held.promise.then(() => 2 as const));
+    withData([okVideo('v1', MIXED)]);
+    const root = await openPlayer(VIDEO('v1'), { load: false });
+    expect(engine.mounts).toBe(0);
+    await act(async () => held.resolve('2'));
+    await settle();
+    expect(engine.mounts).toBe(1);
+    expect(engine.props?.rate).toBe(2);
+    await unmount(root);
+  });
+
+  it('the `speed` phase flag off (review): stored `2` → 1×, no «Скорость» row, no label, the speed never read', async () => {
+    const flag = jest.replaceProperty(phaseFlags, 'speed', false as never);
+    try {
+      await device().setItem(SPEED_PREFERENCE_KEY, '2');
+      const read = jest.spyOn(speedPreference, 'read');
+      withData([okVideo('v1', MIXED)]);
+      const root = await openPlayer();
+      expect(engine.props?.rate).toBe(1);
+      expect(read).not.toHaveBeenCalled();
+      await key('up');
+      expect(speedBadge(root)).toBeNull();
+      await openSheet(root);
+      expect(byTestId(root, 'modal/content')[0].queryAll(n => n.props.focusable === true).map(n => n.props.testID)).toEqual([
+        QUALITY,
+      ]);
+      await unmount(root);
+    } finally {
+      flag.restore();
+    }
   });
 
   it('an account reset (sign-out) keeps the stored speed (device scope, not in the wipe)', async () => {
@@ -3937,6 +4004,9 @@ describe('Story 8.1: playback speed (PLAY-07, SET-04)', () => {
 
     it('matrix «Live»: stored `2` → the stream plays at 1×; no «Скорость» row, no «N×» label', async () => {
       await device().setItem(SPEED_PREFERENCE_KEY, '2');
+      // Review: live neither reads nor waits for the speed (a read that never
+      // resolves does not hold the engine back).
+      const read = jest.spyOn(speedPreference, 'read').mockReturnValue(new Promise(() => {}));
       const root = await render(<App />);
       await focusOn(root, FEED_CARD);
       const routeKey = navigationRef.getCurrentRoute()?.key ?? '';
@@ -3951,6 +4021,8 @@ describe('Story 8.1: playback speed (PLAY-07, SET-04)', () => {
       await settle();
       expect(currentRoute()).toBe('Player');
       await focusOn(root, SURFACE);
+      expect(engine.mounts).toBe(1);
+      expect(read).not.toHaveBeenCalled();
       await fire('onLoad', { durationSec: 0 });
       await fire('onBuffering', false);
       await advance(600);

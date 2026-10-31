@@ -60,8 +60,8 @@ export type PlayerScreenProps = {
    * origin shows the stream page's QR. Default: `onExit`.
    */
   onLiveUnplayable?: () => void;
-  /** Story 8.1: `phaseFlags.speed` (from the route): the «Скорость» row for recordings. Default off. */
-  speedEnabled?: boolean;
+  /** Story 8.1: `phaseFlags.speed` (from the route): the «Скорость» row for recordings (live ignores it). */
+  speedEnabled: boolean;
 };
 
 /**
@@ -135,7 +135,7 @@ export function PlayerScreen({
   onEnded,
   start = 'resume',
   onLiveUnplayable,
-  speedEnabled = false,
+  speedEnabled,
 }: PlayerScreenProps) {
   // Story 7.2: the ref kind is fixed for a mounted player (route params).
   const { liveRef, vodRef } = splitMediaRef(mediaRef);
