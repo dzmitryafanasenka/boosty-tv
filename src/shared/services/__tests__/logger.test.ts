@@ -85,15 +85,22 @@ describe('isSecretFieldKey (Story 8.3)', () => {
     'authorization', 'Authorization', 'AUTHORIZATION', 'proxyAuthorization',
     'signedQuery', 'signedquery', 'SIGNED_QUERY',
     'phone', 'Phone', 'phoneNumber', 'user.phone',
-    'code', 'Code', 'sms_code', 'smsCode', 'statusCode',
+    'code', 'Code', 'CODE', 'codes', 'sms_code', 'smsCode', 'otpCode', 'otpCodes', 'verification_code', 'authCode', 'userSmsCode',
+    'codeVerifier', 'code_verifier', 'codeValue', 'deviceCode', 'mfaCode', 'twoFactorCode', '2faCode', 'recoveryCode',
+    'backupCode', 'resetCode', 'activationCode', 'emailCode', 'params.code', 'user.code',
+    'challenge', 'challengeId', 'Challenge',
     // Story 8.3 review: signatures and compact keys.
     'sig', 'SIG', 'api_sig', 'signature', 'urlSignature',
-    'accesstoken', 'ACCESSTOKEN', 'smscode', 'phonenumber', 'sessioncookie', 'xauthorization', 'decoder',
+    'accesstoken', 'ACCESSTOKEN', 'smscode', 'phonenumber', 'sessioncookie', 'xauthorization',
   ])('%s is secret', key => {
     expect(isSecretFieldKey(key)).toBe(true);
   });
 
-  it.each(['status', 'store', 'outcome', 'url', 'error', 'design', 'single', 'attempt'])('%s is not', key => {
+  it.each([
+    'status', 'store', 'outcome', 'url', 'error', 'design', 'single', 'attempt',
+    // Epic 8 retro A1: `code` only as a one-time or access code.
+    'versionCode', 'latestVersionCode', 'version_code', 'errorCode', 'statusCode', 'countryCode', 'languageCode', 'codec', 'decoder', 'encoded',
+  ])('%s is not', key => {
     expect(isSecretFieldKey(key)).toBe(false);
   });
 });

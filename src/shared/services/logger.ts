@@ -100,23 +100,46 @@ export function redact(text: string): string {
  * The secret words a field key is checked for (Story 8.3), inside the key
  * with separators removed and lowercased.
  */
-const SECRET_KEY_PARTS = ['token', 'cookie', 'authorization', 'signedquery', 'phone', 'code'] as const;
+const SECRET_KEY_PARTS = ['token', 'cookie', 'authorization', 'signedquery', 'phone', 'challenge'] as const;
+/** Words that make a following `code` a one-time or access code (Epic 8 retro A1). */
+const CODE_QUALIFIERS = [
+  'sms', 'otp', 'auth', 'verification', 'confirm', 'confirmation', 'onetime', 'pin', 'pass', 'access',
+  'security', 'login', 'device', 'mfa', '2fa', 'twofactor', 'recovery', 'backup', 'reset', 'activation', 'email',
+];
+/**
+ * A one-time or access code (Epic 8 retro A1), checked on the compact key
+ * and on its last dotted segment (`user.code`): `code` or `codes`, `code`
+ * followed by verifier/value (`codeVerifier`), or a qualifier followed by
+ * `code(s)` at the end (`smsCode`, `sms_code`, `otpCodes`, `recoveryCode`).
+ * `versionCode`, `errorCode`, `statusCode`, `countryCode`, `codec` and
+ * `decoder` are not secrets. A suffix match also catches the rare
+ * `bypassCode` (`pass`): over-redaction there is accepted.
+ */
+const SECRET_CODE_KEY = new RegExp(`^codes?(?:verifier|value)?$|(?:${CODE_QUALIFIERS.join('|')})codes?$`);
 /** Signature words, matched as a whole word or at the end of the compact key (`sig`, `apiSig`, `signature`). */
 const SIGNATURE_KEY = /(?:^|[^a-z])sig(?:nature)?(?:$|[^a-z])|sig(?:nature)?$/;
 
 /**
  * Story 8.3: a field key that names a secret (any case): the key, with
  * separators removed and lowercased, contains token, cookie,
- * authorization, signedquery, phone or code (so `accessToken`,
+ * authorization, signedquery, phone or challenge (so `accessToken`,
  * `accesstoken`, `refresh_token`, `Set-Cookie`, `sessioncookie`,
- * `sms_code`, `smscode`, `phoneNumber`), or it is or ends with `sig` /
- * `signature` (`sig`, `api_sig`, `urlSignature`). Over-matching (`decoder`)
- * is accepted: a lost value is better than a leaked one.
+ * `phoneNumber`, `challengeId`), is a one-time or access code (`code`,
+ * `sms_code`, `smscode`, `user.code`; see `SECRET_CODE_KEY`), or it is or
+ * ends with `sig` / `signature` (`sig`, `api_sig`, `urlSignature`).
+ * `__tests__/loggerFieldKeys.test.js` checks the logger field keys in `src`.
  */
 export function isSecretFieldKey(key: string): boolean {
   const lower = key.toLowerCase();
   const compact = lower.replace(/[^a-z0-9]/g, '');
-  return SECRET_KEY_PARTS.some(part => compact.includes(part)) || SIGNATURE_KEY.test(lower) || SIGNATURE_KEY.test(compact);
+  const lastSegment = (lower.split('.').pop() ?? lower).replace(/[^a-z0-9]/g, '');
+  return (
+    SECRET_KEY_PARTS.some(part => compact.includes(part)) ||
+    SECRET_CODE_KEY.test(compact) ||
+    SECRET_CODE_KEY.test(lastSegment) ||
+    SIGNATURE_KEY.test(lower) ||
+    SIGNATURE_KEY.test(compact)
+  );
 }
 
 /** The marker that replaces the value of a secret field key. */

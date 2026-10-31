@@ -916,7 +916,7 @@ Logger redaction (`logger.ts`) adds:
 - `Cookie:` / `Set-Cookie:` and any `Authorization:` value (to the end of the line);
 - bare query strings with `expires=` / `sig=`;
 - `access_token`, `refresh_token`, `token`, `signedQuery`, `sig`, `signature` (also `authorization`, `cookie`, `set-cookie`) as query or JSON keys, string or bare values;
-- field keys naming token / cookie / authorization / signedQuery / phone / code in any case (`isSecretFieldKey`), whose values are always `<redacted>`.
+- field keys naming token / cookie / authorization / signedQuery / phone / code in any case (`isSecretFieldKey`), whose values are always `<redacted>`. Epic 8 retro A1 (2026-10-31): `code` counts only as a one-time or access code (`SECRET_CODE_KEY` in `logger.ts`): `code` / `codes`, `codeVerifier` / `codeValue`, a qualifier (sms, otp, auth, verification, confirm(ation), onetime, pin, pass, access, security, login, device, mfa, 2fa, twofactor, recovery, backup, reset, activation, email) followed by `code(s)`, also as the last dotted segment (`user.code`); `challenge` joined the contains-words. So `versionCode`, `errorCode`, `statusCode`, `countryCode`, `codec` and `decoder` stay readable, and bare `code` is still secret (AudioBlock keeps its `error` key). `__tests__/loggerFieldKeys.test.js` parses every non-test `.ts`/`.tsx` file under `src` with the TypeScript compiler, including the `secureStore` `log(...)` wrapper, and fails on a field key that would be silently redacted or on a fields argument it cannot read (a variable, a foreign spread, a computed key). Checks: lint and typecheck clean; `npm test` ×3: 3080 passed.
 
 `AudioBlock`'s engine-error field was renamed from `code` to `error`, so it is not redacted.
 
