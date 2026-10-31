@@ -1,0 +1,101 @@
+__tests__/authorFlow.test.tsx
+  s_7477a2e6c69ec6::t_a5e4050ec6810e 131
+__tests__/codeFlow.test.tsx
+  s_7477a2e6c69ec6::t_8a032f196ba340 81
+__tests__/homeFeedFlow.test.tsx
+  s_7477a2e6c69ec6::t_4ec1e1e5f72cd4 111
+__tests__/playerFlow.test.tsx
+  s_7477a2e6c69ec6::t_b11ce925a646c7 84
+__tests__/postFlow.test.tsx
+  s_7477a2e6c69ec6::t_33774d55f409a5 75,1034,2942,3100,3146,3213
+src/features/author/__tests__/useAuthorLiveActions.test.tsx
+  s_7477a2e6c69ec6::t_c86700cfd6d9e6 9-10,78
+src/features/player/AudioBlock.tsx
+  s_7477a2e6c69ec6::t_866cbb194ff6ff 4,111,385-386
+src/features/polls/index.ts
+  s_7477a2e6c69ec6::t_3591a27482cbd3 8-14
+src/features/post/PostScreen.tsx
+  s_7477a2e6c69ec6::t_6c2d2aed628f80 38,63,258-259,315-318,321,586-587,592,601,625-627,629
+src/features/post/body/LinkChips.tsx
+  s_7477a2e6c69ec6::t_d63e4954eeae47 1-159
+src/features/post/body/blockStyles.ts
+  s_7477a2e6c69ec6::t_ae57d07368321d 1-38
+src/shared/focus/__tests__/focusSoon.test.ts
+  s_7477a2e6c69ec6::t_3f17574f6ce794 4-5,16,112,158
+src/shared/focus/__tests__/useOutcomeFocus.test.tsx
+  s_7477a2e6c69ec6::t_1a6f5c7b175b55 5-6,49,104,107,160,163,168,170,177,179,185,189
+src/shared/focus/index.ts
+  s_7477a2e6c69ec6::t_ff79fecccb7717 26-35
+docs/focus-map.md
+  s_25768f3485a5a1::t_b2529ff07f2731 88,332
+src/features/polls/MultipleChoicePoll.tsx
+  s_25768f3485a5a1::t_e5b831dc5fc420 1-290
+src/features/polls/PollDisplay.tsx
+  s_25768f3485a5a1::t_d361008c96c8d3 1-58
+src/features/polls/PollParts.tsx
+  s_25768f3485a5a1::t_b879546257e22a 1-87
+src/features/polls/PollStops.tsx
+  s_25768f3485a5a1::t_f6865813fe1675 1-319
+src/features/polls/PollWidget.tsx
+  s_25768f3485a5a1::t_5e4f3015d9486b 1,3-14,41,43-47,65,81
+src/features/polls/SingleChoicePoll.tsx
+  s_25768f3485a5a1::t_49407066f30f37 1-121
+src/features/polls/__tests__/pollFocus.test.ts
+  s_25768f3485a5a1::t_afb5516bcb2848 1-65
+src/features/polls/pollFocus.ts
+  s_25768f3485a5a1::t_ac7d7ed463479c 1-62
+src/features/polls/pollLabels.ts
+  s_25768f3485a5a1::t_e8f05647bbd5c9 1-104
+src/features/polls/pollStyles.ts
+  s_25768f3485a5a1::t_834c1908a2e16e 1-139
+src/features/post/PostBody.tsx
+  s_25768f3485a5a1::t_4cd4de9c038644 1,5-23,29-30,68-71,97
+src/features/post/body/ExternalVideoChip.tsx
+  s_25768f3485a5a1::t_016766d541e1e3 1-110
+src/features/post/body/FileChip.tsx
+  s_25768f3485a5a1::t_89f8eb10c0c9d1 1-143
+src/features/post/body/ImageBlocks.tsx
+  s_25768f3485a5a1::t_0f8db8f4823065 1-218
+src/features/post/body/PostBodySkeleton.tsx
+  s_25768f3485a5a1::t_2aa6f8dcaf4fe6 1-33
+src/features/post/body/TextBlocks.tsx
+  s_25768f3485a5a1::t_120043805d5334 1-194
+src/features/post/body/VideoActions.tsx
+  s_25768f3485a5a1::t_c536d48789793c 1-213
+src/features/post/body/chipParts.tsx
+  s_25768f3485a5a1::t_caca61f81239ac 1-106
+src/shared/focus/__tests__/usePendingConfirm.test.tsx
+  s_25768f3485a5a1::t_2f44d8172f5c36 1-75
+src/shared/focus/useColumnStop.ts
+  s_25768f3485a5a1::t_e3696a220a1d2f 1-37
+src/shared/focus/usePendingConfirm.ts
+  s_25768f3485a5a1::t_cc9fb6134dc415 1-48
+src/test/flow.tsx
+  s_25768f3485a5a1::t_43c65448e79c45 14-17,33,358-376,379-380
+src/test/frames.ts
+  s_25768f3485a5a1::t_8eb02c0bb7e240 1-55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "79d8a5998ee5b61d560ef80fd791205046346ff8",
+  "prompts": {},
+  "sessions": {
+    "s_25768f3485a5a1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a18609a68914e3a98",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_7477a2e6c69ec6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d998e7e2-636f-4943-a058-23b274887697",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
