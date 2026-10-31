@@ -2,7 +2,7 @@
 title: 'Story 8.2: System video player option'
 type: 'feature'
 created: '2026-10-31'
-status: 'in-review'
+status: 'done'
 baseline_commit: 'ddaa4b9dfa8272eaae28fc7c9b8713f1792c6069'
 route: 'dispatch'
 review_loop_iteration: 0
