@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 10-25-2026 14:34
-last_updated: 10-31-2026 13:39
+last_updated: 10-31-2026 13:40
 project: Boosty TV
 project_key: NOKEY
 tracking_system: file-system
@@ -206,7 +206,7 @@ action_items:
     action: "Tests: resume while Пост covers Главная; resume with nested stacks; Главная
       never shows the pin badge"
     owner: "dev"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-10-27.md"
   - id: "epic-3-retro-item-14-live-check-of-hasaccess-true-with-empty"
     epic: 3
@@ -314,7 +314,7 @@ action_items:
       extract usePendingConfirm and a guarded focusSoon into shared/focus, move poll
       focus ids out of PostScreen, move test frame/key helpers into src/test"
     owner: "architect"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-6-retro-2026-10-30.md"
   - id: "epic-6-retro-item-29-boundary-tests-and-docs-audio-across-a-v"
     epic: 6
@@ -322,7 +322,7 @@ action_items:
       after a vote restores feed focus, audio under the QR dialog in focus-map, applyPoll
       list-page limit comment"
     owner: "dev"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-6-retro-2026-10-30.md"
   - id: "epic-6-retro-item-30-reconcile-epics-md-experience-md-design"
     epic: 6
@@ -375,7 +375,7 @@ action_items:
     action: "Boundary tests: Events → Автор with a scheduled or just-ended stream,
       resume request count, like cancels only a running poll (or document F3)"
     owner: "dev"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-7-retro-2026-10-30.md"
   - id: "epic-7-retro-item-37-device-pass-when-a-subscribed-blog-is-li"
     epic: 7
