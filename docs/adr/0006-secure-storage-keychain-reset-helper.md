@@ -21,7 +21,7 @@ Story 1.2 checked react-native-keychain 10.0.0 on the Chromecast with Google TV 
 `getSecurityLevel()` reports `SECURE_SOFTWARE` on this device.
 
 ## Decision
-Keep react-native-keychain behind the `SecureStore` port. Add a small native helper in `android/` that deletes the library's DataStore file. The helper is exposed through the `shared/platform/android` SecureStore adapter and does nothing else.
+Keep react-native-keychain behind the `SecureStore` port. Add a small native helper in `android/` that deletes the library's DataStore file. The helper is exposed through the `shared/platform/android` SecureStore adapter and does nothing else. *As built: the adapter is the flat `src/shared/platform/secureStore.ts` (there is no `shared/platform/android`; ARCHITECTURE-SPINE AD-2).*
 
 When any keychain call rejects with a storage/parse error (`CorruptionException`), the adapter:
 1. calls the helper to delete the storage file;

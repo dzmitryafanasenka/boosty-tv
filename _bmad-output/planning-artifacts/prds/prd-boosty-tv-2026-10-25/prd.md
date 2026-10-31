@@ -344,7 +344,7 @@ On a player error, the app re-fetches the post (or stream), matches the Media by
 - No autoplay of the next item (PLAY-14 out of scope).
 
 #### FR-50: External system player [P2]
-With «Системный видеоплеер» on, the user picks a quality and the video opens in an external Android player via the chooser (PLAY-13).
+With «Системный видеоплеер» on, the user picks a quality and the video opens in an external Android player via the chooser (PLAY-13). *As built (Story 8.2): one real player opens directly; 2+ get the chooser.*
 - Progress is not tracked in this mode, and the setting says so.
 - If no player is installed, the built-in player is used.
 

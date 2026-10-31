@@ -45,7 +45,7 @@ Close the remaining BoostBuddy player and settings parity (PLAY-07, PLAY-13, SET
 ## Technical Decisions
 
 - **Ports (AD-2):**
-  - The external player goes through the `ExternalPlayer` port in `shared/platform`, with its adapter in `shared/platform/android`. No feature calls a native module or an intent API directly.
+  - The external player goes through the `ExternalPlayer` port in `shared/platform`, with its adapter in `shared/platform/android`. No feature calls a native module or an intent API directly. *As built: see «As built» below (flat `shared/platform/externalPlayer.ts`).*
   - The playback rate goes through the `PlayerEngine` port (react-native-video 6.19.x).
 - **Storage scopes (AD-4):**
   - Device-scoped: preferred quality and preferred speed.
@@ -53,8 +53,8 @@ Close the remaining BoostBuddy player and settings parity (PLAY-07, PLAY-13, SET
   - Account-scoped: the diagnostics log buffer. It is registered with AccountScope at bootstrap; lazy registration is not allowed.
   - Async log writes started under an old generation must not land in the new account's file.
 - **Logger (AD-14):**
-  - The existing `shared/services/logger.ts` already holds the redacting in-memory ring (200 entries) and its account-store registration.
-  - Story 8.3 adds the capped file in internal storage and the adb export. Redaction is the safety net, not the policy: callers still never log bodies, the phone, the challenge or the code.
+  - The existing `shared/services/logger.ts` already holds the redacting in-memory ring (200 entries) and its account-store registration. *As built: the file is in app-specific external storage, see «As built» below.*
+  - Story 8.3 adds the capped file in internal storage and the adb export. Redaction is the safety net, not the policy: callers still never log bodies, the phone, the challenge or the code. *As built: external files dir (internal below API 29), see «As built» below.*
   - `allowBackup=false` stays in the manifest.
 - **Phase gating (AD-20):** the speed row, the system-player row and Diagnostics are entry points rendered only when their flag in `app/phaseFlags.ts` is on. No screen hard-codes the phase.
 - **Progress (AD-9):** ProgressRepository stays the only E9 writer. The external path must simply never call `begin`/`report`.
@@ -80,3 +80,10 @@ Close the remaining BoostBuddy player and settings parity (PLAY-07, PLAY-13, SET
 - 8.3 extends the Epic 2 Logger. Its account-scope reset must cover the new file.
 - Epic 9 (update check) also binds «Версия»: one OK press checks at most once per 60 s, and the seven-press gesture must never trigger more than one check or be interrupted by a notice. Leave the press handling ready for that.
 - The owner idea of post timestamps as chapter marks on the timeline (deferred work) was flagged to plan with Epic 8. It is not a story in this epic and needs an owner decision before any work.
+
+## As built (Epic 8 retro A2, 2026-10-31)
+
+- 8.1: speed through `PlaybackMode` (`speedShown`, `rate()`); no runtime rate capability check (accepted in the 8.1 triage); the rate was measured by the agent over adb on a release-like build (≈ 1.57× at 1.5×); live at 1× and the physical remote were not checked.
+- 8.2: the hand-off is a route-level `PlayerEntry` around `PlayerScreen` (`stackRoutes.tsx`), not inside `PlaybackMode`. One real player opens directly; 2+ get the chooser with explicit intents (owner decision after the device run). The external player starts at 0:00 (owner decision). The adapter is the flat `src/shared/platform/externalPlayer.ts` (there is no `shared/platform/android`).
+- 8.3: the log file is in app-specific external storage (internal below API 29), owner decision; turning capture off deletes it; HTTP paths are masked; the capture toggle is device-scoped (`diagnostics.capture.v1`). Device (agent over adb): gesture, capture, `adb pull`, masking, clear and delete checked; rotation, the sign-out reset, the background flush and API < 29 not checked. The ExternalPlayer port is two steps (`prepare`, then `launch` after the route pops). Epic 8 retro A1 narrowed the `code` field-key rule so `versionCode` (Epic 9) stays readable.
+
