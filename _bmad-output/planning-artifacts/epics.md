@@ -93,7 +93,7 @@ The full text and testable consequences are in `prd.md` §4.
 - FR47 [P2]: Speed presets 0.5–3× for VOD, stored globally.
 - FR48 [P1]: Expired-URL recovery: re-fetch, match by media id, keep the same quality and position. One automatic attempt, then «Повторить/Назад».
 - FR49 [P1]: Finished = ≥ 95 % or < 30 s left. A finished item is marked and removed from the Continue history without interrupting playback. At the actual end, write the progress and return to the origin. No autoplay.
-- FR50 [P2]: «Системный видеоплеер» opens a quality pick, then the Android chooser. No progress is tracked in this mode. Falls back to the built-in player.
+- FR50 [P2]: «Системный видеоплеер» opens a quality pick, then the Android chooser. No progress is tracked in this mode. Falls back to the built-in player. *As built (Story 8.2, owner decision 2026-10-31): one real player opens directly; two or more get the chooser listing them as explicit intents. On the pinned Google TV `queryIntentActivities` with `MATCH_DEFAULT_ONLY` returned only the framework stub, and the plain system chooser listed no targets.*
 - FR51 [P1]: Lifecycle: on sleep or background, pause and write progress. On return, show the paused overlay and re-resolve the URL if needed. Release resources on exit.
 - FR52 [P2, gated]: Events list after E18 is verified. «Начался эфир» opens the Author with the live card focused. *As built (Story 7.5): E18 was verified live, and the gate is on.*
 - FR53 [P1 minimal / P2 full]: Настройки. P1: version and «Выйти из аккаунта». P2: «Системный видеоплеер».
@@ -1589,6 +1589,8 @@ So that I can use a player I prefer for specific cases.
 **When** I start a video
 **Then** the quality list opens first, then the `ExternalPlayer` port launches the Android chooser with the chosen URL and the title. No progress is written.
 
+*As built (`spec-8-2-system-video-player.md`, owner decision after the device run): one real player opens directly with an explicit intent, two or more get the chooser with explicit intents; the stub `com.android.tv.frameworkpackagestubs` and this app are dropped (on the pinned Google TV `MATCH_DEFAULT_ONLY` returned only the stub, and the plain chooser listed no targets). The port is two steps: `prepare` (resolves the players, `'ready'` or `'none'`), then the route pops to the origin and `launch` runs about 300 ms later (`'opened'` or `'none'`; a failure after the pop is only logged). The external player starts at 0:00 (owner decision). The device setting is `player.external.v1`.*
+
 **Given** no external player is installed
 **When** the chooser cannot resolve
 **Then** the built-in player is used, with the hint «Внешний плеер не найден».
@@ -1608,6 +1610,8 @@ So that I can debug problems on the TV without exposing secrets.
 **Given** Diagnostics
 **When** I enable log capture
 **Then** `Logger` writes to the in-memory ring and to a capped file in internal storage. The screen explains how to retrieve the file over adb.
+
+*As built (`spec-8-3-hidden-diagnostics.md`, owner decision 2026-10-31): the file is in app-specific external storage (`getExternalFilesDir(null)/logs`) so `adb pull` works on a release build (release builds are not debuggable, `run-as` fails); below API 29 it stays in internal `filesDir`. Turning capture off deletes the file. HTTP log paths keep only fixed API words: the blog slug becomes `<blog>`, any other variable segment `<seg>` (`/v1/blog/<blog>/post/<seg>`). Field keys with `code` are redacted only as one-time or access codes (Epic 8 retro A1).*
 
 **Given** captured logs
 **When** a test feeds the Logger with tokens, cookies, Authorization headers, phone numbers, codes, signed URLs and `signedQuery`

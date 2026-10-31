@@ -48,7 +48,7 @@ flowchart TD
     UI[ui · focus · i18n]
     PORT[platform ports]
   end
-  ADP[shared/platform/android adapters]
+  ADP[shared/platform adapters]
   App --> S
   H --> ENT
   H --> SVC
@@ -92,6 +92,7 @@ Arrows mean "may import". `shared` never imports `features` or `app`. Features n
     - `QrRenderer`.
   - The implementations live in `shared/platform/android`.
   - No feature imports an adapter or a native module directly.
+  - *As built (Epic 8 retro A2; superseding the two lines above):* there is no `shared/platform/android`. Ports and adapters are flat files in `src/shared/platform`. Some share one file (`appInfo.ts`, `deviceId.ts`, `externalPlayer.ts`, `logFile.ts`, `seekKeys.ts`, `secureStore.ts`, `qrRenderer.tsx`, `playbackArbiter.ts`); some are split (`keyValueStore.ts` / `asyncKeyValueStore.ts`, `playerEngine.ts` / `PlayerEngineView.tsx`); `appLifecycle.ts` wraps `AppState`. Only `shared/platform` touches `NativeModules` (`appInfo`, `deviceId`, `externalPlayer`, `logFile`, `seekKeys`, `secureStore`). Features import these platform modules directly (the preference stores use `asyncKeyValueStore`; `PlayerScreen` and `AudioBlock` use `PlayerEngineView`; `SettingsScreen` `getVersionName`; `usePlayerKeys` and `AudioBlock` `seekKeys`; `ExternalHandoff` the ExternalPlayer port; `DiagnosticsScreen` `logFileLocation`), so the effective rule is: no feature touches `NativeModules`, intents or `AppState` directly. One known exception: `src/shared/services/logFileSink.ts` subscribes to `AppState` itself (Epic 8 retro A5 moves it to `appLifecycle`). Error contracts are per port and documented in each file. `externalPlayer` maps every failure to an outcome: `prepare` → `'ready' | 'none'`, `launch` → `'opened' | 'none'`. `logFile`'s `append` rejects (also when the module is missing); `clear` rejects on a failed delete and resolves when the module is missing; `location()` never rejects (null when there is no module or storage).
 
 ### AD-3 — Session ownership
 
@@ -117,6 +118,7 @@ Arrows mean "may import". `shared` never imports `features` or `app`. Features n
   - Every account-scoped store registers with `AccountScope` **at bootstrap** in `app/bootstrap.ts`. Lazy registration is not allowed.
   - **Account-scoped data:** the query cache, the Continue history, Filters, the stored phone, the account id and the diagnostics log buffer.
   - **Device-scoped data:** `device_id`, preferred quality and preferred speed.
+  - *As built (Epic 8):* the device-scoped keys in `boostytv-device` are `player.quality.v1`, `player.speed.v1` (Story 8.1), `player.external.v1` («Системный видеоплеер», Story 8.2) and `diagnostics.capture.v1` (Story 8.3). None is registered with AccountScope. The diagnostics log file is account-scoped (`logFile` store, right after `logger`); only when a log file exists and its delete fails, the reset reports the store as failed and `accountSwitchHook` throws, so the new sign-in fails as spent and nothing of the new account is stored (fail-closed on purpose: the file may hold the old account's lines). Sign-out does not fail on it. The store is registered whatever `phaseFlags.diagnostics` says.
   - `AccountScope.reset()` is the only cleanup path, used on sign-out and on account switch. It increments a **generation**. Any async write (E9, history, cache set) captures the generation when it starts and is **dropped** if the generation has changed.
   - On account switch (`E1.id` differs), the reset happens **before** the new phone and account id are written.
   - *As built (Epics 5–7):* the registered stores also include FocusRestoration, the sign-in draft, the Поиск query (`searchQuery`, Story 5.6) and the События read marks (`eventReadMarks`, Story 7.5) (`src/app/bootstrap.ts`).
@@ -285,6 +287,7 @@ Arrows mean "may import". `shared` never imports `features` or `app`. Features n
     - phone numbers and codes;
     - signed URLs and `signedQuery`.
   - The buffer is an in-memory ring plus one capped file in internal storage. It is account-scoped and exportable only via adb.
+  - *As built (Story 8.3, owner decision):* the file is in app-specific external storage (`getExternalFilesDir(null)/logs/boostytv.log`, 256 KB plus one rotated copy) so `adb pull` works on a release build; internal `filesDir` below API 29. Free-text redaction (`redact()`) also covers any `Authorization:` value, `Cookie:` / `Set-Cookie:`, bare `expires=`/`sig=` queries and secret query/JSON keys; it still blanks `code=`, `*_code=` (for example `version_code=1`) and `"code":` in message text, so a version code must go in a field, not the message. Field keys (`isSecretFieldKey`): token, cookie, authorization, signedquery, phone and challenge anywhere in the compact key; `code` only as a one-time or access code since Epic 8 retro A1; `challenge` is a field-key rule only (in free text a challenge is caught only by the 32+ character opaque-run rule). HTTP log paths (`logPath`, `src/shared/api/transport.ts`) drop the host, query and fragment, turn the segment after `/v1/blog/` into `<blog>` and every segment not in `API_WORDS` into `<seg>`. `__tests__/loggerFieldKeys.test.js` checks every logger call site's field keys.
   - Fixtures are sanitized, and a CI script checks them.
   - The Android manifest sets `allowBackup=false` and disables cleartext traffic.
   - Default TLS validation is never disabled.

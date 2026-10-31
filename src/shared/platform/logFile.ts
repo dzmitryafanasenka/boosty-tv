@@ -4,7 +4,8 @@ import { NativeModules } from 'react-native';
  * The LogFile port (Story 8.3, SET-05, AD-2): the capped diagnostics log
  * file written by `android/.../LogFileModule.kt` in app-specific external
  * storage (`files/logs/boostytv.log`, rotated `boostytv.log.1`, 256 KB
- * each), pulled over adb. Only `src/shared/services/logFileSink.ts` uses it.
+ * each), pulled over adb. `src/shared/services/logFileSink.ts` writes and
+ * clears through it; `DiagnosticsScreen` reads `logFileLocation()` only.
  *
  * The native side runs every call on one serial thread in call order, so a
  * `clear` made after an `append` wins. The native method is called
