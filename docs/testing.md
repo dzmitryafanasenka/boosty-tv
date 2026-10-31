@@ -907,6 +907,44 @@ Host tests: `src/shared/services/progress/__tests__/progressRepository.test.ts` 
 
 Device: Chromecast with Google TV, the release-like build from `48b1a22` over adb. Window and transition animation scales set to 0 and animator duration to 0 for the check, then restored (1.0, 1.0, unset). Пост (opened from Главная) → Left → sidebar «Подписки» → OK: the Подписки section opened with the tab selected and focus on the first author card. Автор (opened from Подписки) → Left → sidebar «События» → OK: the События section opened (empty state) with focus on «Обновить»; Back moved focus to the sidebar and did not bring Автор back. No stuck or doubled screen, so the `pendingShellSection` unmount timing holds with animations off. Not checked with the physical remote.
 
+### Retro follow-ups: PostBody / PollWidget split and boundary tests, 2026-10-31
+
+**Status: host-tested only; no device run (no adb in this change).** `spec-retro-post-split-and-boundary-tests.md`. It covers `epic-6-retro-item-28` (A3), `epic-6-retro-item-29` (A4), `epic-7-retro-item-36` (A4) and `epic-3-retro-item-13` (A5).
+
+Commit 1 is a behaviour-preserving refactor:
+- the `PostBody` / `PollWidget` split;
+- the shared `usePendingConfirm` and `useColumnStop`;
+- `polls/pollFocus.ts`;
+- `src/test/frames.ts` and `createFlow` `advance` / `key`.
+
+Its new unit tests are `src/shared/focus/__tests__/usePendingConfirm.test.tsx` (5 tests in commit 1) and `src/features/polls/__tests__/pollFocus.test.ts` (6).
+
+Commit 2:
+- `authorFlow` «Story 7.4»: 4 tests «F3: …» for the fix (OK on «Нравится» cancels only a running E15 poll);
+- `eventsFlow`: 4 tests: F6 scheduled, F6 ended, and «resume with nested stacks» ×2 (F5 and V2);
+- `homeFeedFlow`: 2 tests, «Epic 3 retro V1» and «V3»;
+- `postFlow` «Story 6.6 › Epic 6 retro A4»: 3 tests, R4 ×2 and R6;
+- the R5 line in `focus-map.md` and the R3 comment in `applyPoll.ts`;
+- the timestamp-proof log checks in `playerFlow` «Expired URL» and `eventsFlow` «Malformed».
+
+Commit 3 (review patches):
+- `authorFlow` «Story 7.4»: 2 more F3 tests (an invalidation's E15 running at E17 200 is cancelled and sent again; the first E15 landing mid-E17, then an E17 failure rolls back to the landed value), 6 F3 tests in all;
+- `postFlow`: R5 (audio under the QrDialog, ← → do not seek there, Back → the chip; the file now mocks TVEventHandler), 4 tests in that describe;
+- `useColumnStop.test.tsx` (new, 4 tests); `usePendingConfirm.test.tsx`: 3 more (8 in all);
+- a stricter nested-stack Back check and V3 label check;
+- `createFlow().key()` throws when no TVEventHandler listener is subscribed.
+
+Checks run (after commit 3):
+- Lint (`--max-warnings 0`), typecheck and `check:fixtures` (30): clean.
+- `npm test` ×3: 123 suites, 2742 tests passed in each run.
+- The touched and new test files ×30: 0 failed runs, 843 tests passed in each. The files: `authorFlow`, `codeFlow`, `homeFeedFlow`, `playerFlow`, `postFlow`, `eventsFlow`, `useAuthorLiveActions`, `focusSoon`, `useOutcomeFocus`, `usePendingConfirm`, `useColumnStop`, `pollFocus`, `PollWidget`, `linkChip`, `teaser`, `AudioBlock`.
+
+Before the review (commits 1–2): `npm test` ×3: 122 suites, 2732 passed each; the touched files ×30: 0 failed runs, 833 tests each.
+
+Not checked:
+- Device rows (the poll and audio focus after the split, the F3 like on a real stream).
+- The physical remote and TalkBack.
+
 ### Fix — PostCard placeholder for posts without a preview, 2026-10-30
 
 **Status: implemented, host-tested; the avatar plate checked on the pinned device (Chromecast with Google TV 4K) by the agent over adb (release-like build, the owner's session, injected D-pad keys only, no OK; not the physical remote).** `spec-post-card-no-preview-placeholder.md`. A card with no preview, or with a preview that failed, now shows the author's avatar (half the thumb height) on a `surface-raised` plate instead of the `skeleton` box; without an avatar, or when it fails, a post-type icon (new SVG glyphs `VideoIcon`, `VideosIcon`, `AudioIcon`, `TextPhotoIcon`, `PollIcon`, `FileIcon`) in `text-secondary`. The loading skeleton is unchanged. A locked card dims the plate avatar and keeps the lock glyph on top (no type icon). No new tokens.

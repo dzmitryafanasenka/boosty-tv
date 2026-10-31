@@ -21,13 +21,13 @@ import {
 import {
   focusSoonRun,
   mayTakeScreenFocus,
+  useColumnStop,
   useLatestRef,
   useModal,
   usePhaseChange,
   useZoneItem,
 } from '../../shared/focus';
 import { t } from '../../shared/i18n';
-import { isMultipleVotable, isVotablePoll } from '../../shared/entities/poll';
 import {
   progressStatus,
   useProgress,
@@ -36,6 +36,7 @@ import {
   type ProgressStatus,
 } from '../../shared/services/progress';
 import { QrDialog, StateView, requestHostFocus, spacing, type HostView } from '../../shared/ui';
+import { pollFallbackOrder, pollFirstStopId, pollFocusIds } from '../polls';
 import {
   PostBody,
   PostBodySkeleton,
@@ -60,14 +61,6 @@ export const postBlockId = (postId: string, blockKey: string) =>
 export const postVideoPrefix = (postId: string) => `post/${postId}/video/`;
 export const postVideoId = (postId: string, mediaId: string) =>
   `${postVideoPrefix(postId)}${mediaId}`;
-/** Story 6.6: an open single-choice poll's option stops (focus-map §1.5). */
-export const postPollPrefix = (postId: string) => `post/${postId}/poll/`;
-export const postPollOptionPrefix = (postId: string) => `${postPollPrefix(postId)}option/`;
-export const postPollOptionId = (postId: string, optionId: string) =>
-  `${postPollOptionPrefix(postId)}${optionId}`;
-/** Story 6.7: an open multiple-choice poll's «Проголосовать» and «Отозвать голос». */
-export const postPollSubmitId = (postId: string) => `${postPollPrefix(postId)}submit`;
-export const postPollRetractId = (postId: string) => `${postPollPrefix(postId)}retract`;
 /** «Смотреть» / «Продолжить» under the header (Story 4.1, 4.2). */
 export const postPrimaryId = (postId: string) => `post/${postId}/primary`;
 /** «С начала», to the right of the primary (Story 4.2, owner decision 2026-10-28). */
@@ -262,7 +255,8 @@ export function PostScreen({
   const contentPrefix = postIdPrefix(postId);
   const primaryId = postPrimaryId(postId);
   const restartId = postRestartId(postId);
-  const pollPrefix = postPollPrefix(postId);
+  // Stories 6.6–6.7: the poll's stops, `post/<postId>/poll/…` (`features/polls`).
+  const pollIds = useMemo(() => pollFocusIds(contentPrefix), [contentPrefix]);
 
   // The MediaRows (an accessible post's videos with an id, deduped) and the
   // body: the other blocks of an accessible post, the teaser of a locked one
@@ -318,19 +312,13 @@ export function PostScreen({
       return `${videoPrefix}${rows[0].ref.mediaId}`;
     }
     const first = items.find(isFocusStop);
-    if (first?.kind === 'poll' && isVotablePoll(first.poll)) {
-      // Story 6.6: a votable poll's first option (a stray OK only reaches pending).
-      return postPollOptionId(postId, first.poll.options[0].id);
-    }
-    if (first?.kind === 'poll' && isMultipleVotable(first.poll)) {
-      // Story 6.7: an open multiple-choice poll's first option (OK only
-      // toggles a check), or «Отозвать голос» once voted (its only stop).
-      return first.poll.answer.length > 0
-        ? postPollRetractId(postId)
-        : postPollOptionId(postId, first.poll.options[0].id);
+    // Stories 6.6–6.7: an open poll's own first stop (`pollFirstStopId`).
+    const pollStop = first?.kind === 'poll' ? pollFirstStopId(first.poll, pollIds) : null;
+    if (pollStop !== null) {
+      return pollStop;
     }
     return first ? `${blockPrefix}${first.key}` : null;
-  }, [showPrimary, primaryId, rows, items, videoPrefix, blockPrefix, postId]);
+  }, [showPrimary, primaryId, rows, items, videoPrefix, blockPrefix, pollIds]);
   // The column's measured viewport and content height (the ScrollView's
   // layout and content size).
   const [viewport, setViewport] = useState<{ width: number; height: number } | null>(null);
@@ -414,19 +402,15 @@ export function PostScreen({
     [refreshColumnTarget],
   );
 
-  const authorZone = useZoneItem(authorId);
-  const authorRef = useCallback(
-    (view: HostView | null) => {
-      authorZone.ref?.(view);
-      onStopView(authorId, view);
+  // The author row is a column stop too; its view also refreshes the column guide's target.
+  const onAuthorView = useCallback(
+    (id: string, view: HostView | null) => {
+      onStopView(id, view);
       refreshColumnTarget();
     },
-    [authorZone, authorId, onStopView, refreshColumnTarget],
+    [onStopView, refreshColumnTarget],
   );
-  const onAuthorFocus = useCallback(() => {
-    authorZone.onFocus();
-    onStopFocus(authorId);
-  }, [authorZone, authorId, onStopFocus]);
+  const { ref: authorRef, handleFocus: onAuthorFocus } = useColumnStop(authorId, onAuthorView, onStopFocus);
   useEffect(() => {
     refreshColumnTarget();
   }, [rows, items, showPrimary, showRestart, initialId, refreshColumnTarget]);
@@ -587,7 +571,7 @@ export function PostScreen({
       current !== null &&
       (current.startsWith(blockPrefix) ||
         current.startsWith(videoPrefix) ||
-        current.startsWith(pollPrefix) ||
+        current.startsWith(pollIds.prefix) ||
         current === primaryId ||
         current === restartId) &&
       !views.current.has(current)
@@ -595,22 +579,13 @@ export function PostScreen({
       if (lastFocused.current === current) {
         lastFocused.current = null;
       }
-      // Story 6.6: a vanished poll option (the poll became finished or
-      // multiple, or the option was dropped) → a nearby stop of the same
-      // poll: another mounted option, else the poll's block stop.
-      // Story 6.7 (multiple choice): «Проголосовать» gone after a vote →
-      // «Отозвать голос»; «Отозвать голос» gone after a retract → the first
-      // option; otherwise the options, «Отозвать голос», the block stop.
-      if (current.startsWith(pollPrefix)) {
+      // Stories 6.6–6.7: a vanished poll stop → a nearby stop of the same
+      // poll, in `pollFallbackOrder`, once laid out.
+      if (current.startsWith(pollIds.prefix)) {
         const pollItem = items.find(item => item.kind === 'poll');
-        const retractId = postPollRetractId(postId);
-        const optionIds =
-          pollItem?.kind === 'poll' ? pollItem.poll.options.map(option => postPollOptionId(postId, option.id)) : [];
         const candidates =
           pollItem?.kind === 'poll'
-            ? current === postPollSubmitId(postId)
-              ? [retractId, ...optionIds, postBlockId(postId, pollItem.key)]
-              : [...optionIds, retractId, postBlockId(postId, pollItem.key)]
+            ? pollFallbackOrder(pollItem.poll, pollIds, postBlockId(postId, pollItem.key), current)
             : [];
         if (candidates.some(id => views.current.has(id))) {
           focusLaidOut(current, candidates);
@@ -619,7 +594,7 @@ export function PostScreen({
       }
       focusAfterUnmount(current, focusInitial);
     }
-  }, [rows, items, showPrimary, showRestart, blockPrefix, videoPrefix, pollPrefix, primaryId, restartId, focusInitial, focusAfterUnmount, focusLaidOut, phaseRef, postId]);
+  }, [rows, items, showPrimary, showRestart, blockPrefix, videoPrefix, pollIds, primaryId, restartId, focusInitial, focusAfterUnmount, focusLaidOut, phaseRef, postId]);
 
   // Story 6.3: OK on a link, file or external-video chip → the QrDialog in
   // the modal host (focus trapped; «Закрыть» or Back returns it to the chip).
@@ -643,11 +618,11 @@ export function PostScreen({
       http,
       blogUrl,
       postId,
-      optionIdPrefix: postPollOptionPrefix(postId),
-      submitId: postPollSubmitId(postId),
-      retractId: postPollRetractId(postId),
+      optionIdPrefix: pollIds.optionIdPrefix,
+      submitId: pollIds.submitId,
+      retractId: pollIds.retractId,
     }),
-    [http, blogUrl, postId],
+    [http, blogUrl, postId, pollIds],
   );
   // Story 6.4: an AudioBlock's source (a fresh E8 on play). A playing track
   // pauses while Пост is not the focused route (the Player or another Пост

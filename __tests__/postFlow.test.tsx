@@ -72,6 +72,7 @@ import {
   unmount,
   visible,
 } from '../src/test/flow';
+import { frames, installFrameQueue } from '../src/test/frames';
 
 jest.mock('react-native-keychain');
 jest.mock('../src/shared/ui/requestHostFocus', () => ({
@@ -86,6 +87,8 @@ jest.mock('react-native/Libraries/Components/TV/TVFocusGuideView', () =>
 );
 /** Story 6.4: the AudioBlock's (and the Player's) engine (`src/test/playerEngineMock`). */
 jest.mock('../src/shared/platform/PlayerEngineView', () => require('../src/test/playerEngineMock'));
+/** Remote keys for the AudioBlock's ← → (`key()`). */
+jest.mock('react-native/Libraries/Components/TV/TVEventHandler', () => require('../src/test/tvEventMock'));
 
 /** The real FlashList behind the recorder `lists` (`src/test/flow`; `onEndReached` held back). */
 jest.mock('@shopify/flash-list', () => require('../src/test/flow').recordingFlashListModule());
@@ -122,45 +125,13 @@ jest.mock('../src/shared/platform/qrRenderer', () => ({
 const focusMock = requestHostFocus as jest.Mock;
 
 /** As authorFlow: 30 rounds, no timers unless a row needs the AD-6 backoff or a transition. */
-const { settle, render, one, focusOn, press, back } = createFlow({
+const { settle, render, one, focusOn, press, back, key: remoteKey } = createFlow({
   settle: { rounds: 30, timerRounds: 0 },
   one: 'focusable',
   pressFocuses: true,
   submitSettles: false,
 });
 const WITH_TIMERS = { timerRounds: 30 };
-/**
- * A manual animation-frame queue for the poll focus deferrals (Stories
- * 6.6, 6.7). The RN Jest preset's `requestAnimationFrame` is a 0 ms timeout,
- * and a fake-timer advance runs a chain of them in one go, so the tests that
- * count frames queue them here instead: `frames(n)` runs n frames, each only
- * the callbacks queued before it.
- */
-let frameQueue: Array<{ id: number; callback: (t: number) => void }> = [];
-function queueFrames() {
-  frameQueue = [];
-  let next = 1;
-  jest.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((callback: (t: number) => void) => {
-    const id = next++;
-    frameQueue.push({ id, callback });
-    return id;
-  });
-  jest.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation((id?: number | null) => {
-    frameQueue = frameQueue.filter(entry => entry.id !== id);
-  });
-}
-async function frames(n: number) {
-  for (let i = 0; i < n; i += 1) {
-    const due = frameQueue;
-    frameQueue = [];
-    await act(async () => {
-      for (const entry of due) {
-        entry.callback(Date.now());
-      }
-      await Promise.resolve();
-    });
-  }
-}
 
 const STORED = JSON.stringify({
   v: 1,
@@ -1062,7 +1033,7 @@ describe('focus (focus-map §4 F)', () => {
     ['focus still tracked on the vanished paragraph → a second request two frames later', false, 2],
     ['the user focused another stop meanwhile → no second request', true, 1],
   ] as const)('a refetch that drops the focused paragraph (`focusAfterUnmount`): %s', async (_name, movedAway, requests) => {
-    queueFrames();
+    installFrameQueue();
     const root = await openFromHome();
     const id = FEED_ID(0);
     await focusOn(root, BLOCK(id, 'text@2'));
@@ -2970,7 +2941,7 @@ describe('Story 6.6: vote and retract in a single-choice poll', () => {
     ['Android moved focus to the author', 'author', true],
     ['the user moved to another stop', 'other', false],
   ] as const)('E10 returns the poll finished: the focused option is gone → two frames later focus goes to the poll`s block stop (not the top) — %s', async (_name, moved, expected) => {
-    queueFrames();
+    installFrameQueue();
     const root = await openFromHome();
     const id = FEED_ID(0);
     pollReply = req =>
@@ -3015,6 +2986,163 @@ describe('Story 6.6: vote and retract in a single-choice poll', () => {
     expect(isPending(root, id, '1')).toBe(true);
     expect(pollCalls()).toEqual([]);
     await unmount(root);
+  });
+
+  describe('Epic 6 retro A4: story boundaries', () => {
+    const SIGNED = '?user_id=1001&content_id=1002&expire_time=1700003600&sign=SECRETSIGNATURE';
+    const AUDIO_URL = 'https://example.invalid/audio/track';
+    const AUDIO = { type: 'audio_file', id: 'a1', title: 'Метроном', duration: 192, url: AUDIO_URL };
+
+    beforeEach(() => {
+      engine.reset();
+      mockPlayerFlag.on = true;
+      e8 = (_req, blogUrl, postId) => ({
+        status: 200,
+        body: postDetail(blogUrl, postId, [...paragraph('До'), AUDIO, ...paragraph('После')], {
+          poll: e8Poll,
+          signedQuery: SIGNED,
+        }),
+      });
+    });
+    afterEach(() => {
+      mockPlayerFlag.on = false;
+    });
+
+    /** Пост with the poll and the audio; the audio plays (one fresh E8, one engine). */
+    async function playingPost() {
+      const root = await openFromHome();
+      const id = FEED_ID(0);
+      const audio = BLOCK(id, 'audio_file:a1');
+      await press(root, audio);
+      expect(engine.mounts).toBe(1);
+      expect(engine.props?.paused).toBe(false);
+      expect(engine.props?.source.uri).toBe(`${AUDIO_URL}${SIGNED}`);
+      return { root, id, audio };
+    }
+
+    it('R4: audio keeps playing across a vote (E11 + E10 → applyPoll re-renders the post): same engine, not paused, no new audio E8', async () => {
+      const { root, id, audio } = await playingPost();
+      const e8Before = e8Calls().length;
+      pollReply = req =>
+        req.method === 'GET' ? { status: 200, body: { data: { poll: apiPoll([2], [10, 9, 3]) } } } : { status: 200, body: {} };
+      await press(root, OPTION(id, '2'));
+      await press(root, OPTION(id, '2'));
+      expect(pollCalls()).toEqual([
+        ['POST', VOTE, { answer: '2' }],
+        ['GET', E10, null],
+      ]);
+      expect(chosen(root, id, '2')).toBe(true);
+      expect(engine.mounts).toBe(1);
+      expect(engine.unmounts).toBe(0);
+      expect(engine.props?.paused).toBe(false);
+      expect(engine.props?.source.uri).toBe(`${AUDIO_URL}${SIGNED}`);
+      expect(e8Calls()).toHaveLength(e8Before);
+      expect(visible(root, `${audio}/pause`)).toBe(true);
+      await unmount(root);
+    });
+
+    it('R4: audio keeps playing across the E8 fallback (E10 fails → the post\'s E8 again re-renders it): same engine, not paused', async () => {
+      const { root, id, audio } = await playingPost();
+      const e8Before = e8Calls().length;
+      pollReply = req => (req.method === 'GET' ? { status: 404, body: { error: 'not_found' } } : { status: 200 });
+      e8Poll = apiPoll([2], [10, 9, 3]);
+      await press(root, OPTION(id, '2'));
+      await press(root, OPTION(id, '2'));
+      expect(e8Calls()).toHaveLength(e8Before + 1);
+      expect(chosen(root, id, '2')).toBe(true);
+      expect(engine.mounts).toBe(1);
+      expect(engine.unmounts).toBe(0);
+      expect(engine.props?.paused).toBe(false);
+      expect(visible(root, `${audio}/pause`)).toBe(true);
+      await unmount(root);
+    });
+
+    it('R5: audio keeps playing under a chip\'s QrDialog; ← → do not seek it there; Back closes the dialog with focus on the chip', async () => {
+      e8 = (_req, blogUrl, postId) => ({
+        status: 200,
+        body: postDetail(
+          blogUrl,
+          postId,
+          [
+            textBlock('См. '),
+            { type: 'link', content: JSON.stringify(['страница', 'unstyled', []]), url: 'https://example.invalid/page' },
+            blockEnd(),
+            AUDIO,
+          ],
+          { signedQuery: SIGNED },
+        ),
+      });
+      const root = await openFromHome();
+      const id = FEED_ID(0);
+      const audio = BLOCK(id, 'audio_file:a1');
+      const chip = BLOCK(id, 'text@0/link/0');
+      await press(root, audio);
+      expect(engine.props?.paused).toBe(false);
+      await act(async () => {
+        engine.props?.onLoad?.({ durationSec: 192 });
+      });
+      // Control: while the block has focus, → seeks (the first key after focus is the entry guard).
+      await remoteKey('right');
+      await remoteKey('right');
+      expect(engine.seek).toHaveBeenCalled();
+      engine.seek.mockClear();
+      // Native focus leaves the block for the chip, then OK opens the QR dialog.
+      await act(async () => {
+        one(root, audio).props.onBlur({ nativeEvent: {} });
+      });
+      await press(root, chip);
+      expect(visible(root, 'dialog/qr')).toBe(true);
+      expect(routeNames()).toEqual(['Shell', 'Post']);
+      expect(engine.props?.paused).toBe(false);
+      await remoteKey('right');
+      await remoteKey('left');
+      expect(engine.seek).not.toHaveBeenCalled();
+      expect(engine.props?.paused).toBe(false);
+      expect(engine.unmounts).toBe(0);
+      focusMock.mockClear();
+      await back();
+      expect(visible(root, 'dialog/qr')).toBe(false);
+      expect(lastFocusTarget()).toBe(chip);
+      expect(engine.props?.paused).toBe(false);
+      await unmount(root);
+    });
+
+    it('R6: Back after a vote returns focus to the same feed card by content id, while applyPoll rewrote that card in the feed cache', async () => {
+      mockPlayerFlag.on = false;
+      const feed = syntheticFeed({ total: 9 });
+      // Feed post 2 carries the same poll, so applyPoll rewrites the list page too.
+      const feedWithPoll = (req: FixtureRequest): FixtureReply => {
+        const reply = feed(req) as { status: number; body: { data: { posts: Array<Record<string, unknown>> } } };
+        reply.body.data.posts = reply.body.data.posts.map(p => (p.id === FEED_ID(2) ? { ...p, poll: apiPoll(null) } : p));
+        return reply as FixtureReply;
+      };
+      pollReply = req =>
+        req.method === 'GET' ? { status: 200, body: { data: { poll: apiPoll([2], [10, 9, 3]) } } } : { status: 200, body: {} };
+      transport = installFixtureTransport(req =>
+        req.path === E5_PATH ? feedWithPoll(req) : req.path === VOTE || req.path === E10 ? pollReply(req) : fullHandler(req),
+      );
+      const root = await openFromHome(2);
+      const id = FEED_ID(2);
+      type Feed = { pages: Array<{ posts: Post[] }> };
+      const feedPollAnswer = () =>
+        queryClient
+          .getQueriesData<Feed>({ queryKey: ['feed'] })
+          .flatMap(([, data]) => data?.pages.flatMap(page => page.posts) ?? [])
+          .find(p => p.id === id)?.poll?.answer;
+      expect(feedPollAnswer()).toEqual([]);
+      await press(root, OPTION(id, '2'));
+      await press(root, OPTION(id, '2'));
+      expect(pollCalls()).toEqual([
+        ['POST', VOTE, { answer: '2' }],
+        ['GET', E10, null],
+      ]);
+      expect(feedPollAnswer()).toEqual(['2']);
+      focusMock.mockClear();
+      await back();
+      expect(routeNames()).toEqual(['Shell']);
+      expect(lastFocusTarget()).toBe(FEED_CARD(2));
+      await unmount(root);
+    });
   });
 
   it('matrix «Finished / multiple»: one stop, OK inert, nothing sent', async () => {
@@ -3128,7 +3256,7 @@ describe('Story 6.7: multiple-choice poll', () => {
   });
 
   it('matrix «Vote»: 1 and 3 checked, OK on «Проголосовать» → E11 `answer=1,3`, then E10; results with the checks; focus stays on the same control, now «Отозвать голос»', async () => {
-    queueFrames();
+    installFrameQueue();
     const root = await openFromHome();
     const id = FEED_ID(0);
     pollReply = req =>
@@ -3174,7 +3302,7 @@ describe('Story 6.7: multiple-choice poll', () => {
 
   it('matrix «Retract»: answer [1, 3]; «Отозвать голос» is the only stop; OK → pending hint; OK → E12, then E10; no checks; focus on the first option', async () => {
     e8Poll = apiPoll([1, 3], [11, 8, 4]);
-    queueFrames();
+    installFrameQueue();
     const root = await openFromHome();
     const id = FEED_ID(0);
     pollReply = req => (req.method === 'GET' ? { status: 200, body: { data: { poll: apiPoll(null) } } } : { status: 200 });
@@ -3241,7 +3369,7 @@ describe('Story 6.7: multiple-choice poll', () => {
   });
 
   it('E10 fails after the vote: the post`s E8 brings the voted poll; focus stays on the same control, now «Отозвать голос»; no error', async () => {
-    queueFrames();
+    installFrameQueue();
     const root = await openFromHome();
     const id = FEED_ID(0);
     pollReply = req => (req.method === 'GET' ? { status: 404, body: { error: 'not_found' } } : { status: 200 });

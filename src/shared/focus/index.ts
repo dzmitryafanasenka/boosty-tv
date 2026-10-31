@@ -24,6 +24,16 @@ export {
 export { focusSoon, focusSoonRun, type FocusSoonOptions } from './focusSoon';
 export { Screen, type ScreenProps } from './Screen';
 export {
+  useColumnStop,
+  type StopFocusHandler,
+  type StopViewHandler,
+} from './useColumnStop';
+export {
+  usePendingConfirm,
+  type PendingConfirm,
+  type PendingPress,
+} from './usePendingConfirm';
+export {
   mayTakeScreenFocus,
   restoreElseFirst,
   useLatestRef,

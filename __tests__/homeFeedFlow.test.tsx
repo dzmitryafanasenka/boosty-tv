@@ -108,7 +108,7 @@ const focusMock = requestHostFocus as jest.Mock;
  * need the AD-6 backoff pass `WITH_TIMERS`. TanStack's notifications are
  * moved from a 0 ms timer to a microtask (below), so no timer is needed.
  */
-const { settle, render, one, focusOn, press, back } = createFlow({
+const { settle, render, one, focusOn, press, back, advance } = createFlow({
   settle: { rounds: 30, timerRounds: 0 },
   one: 'focusable',
   pressFocuses: true,
@@ -1314,6 +1314,45 @@ describe('refresh on resume (spec-feed-refresh-on-resume, AD-7)', () => {
     await unmount(root);
   });
 
+  it('Epic 3 retro V1: stale resume while Пост covers Главная: the covered feed is merged but takes no focus; Back → the same card at its new index', async () => {
+    const root = await deepInTheFeed();
+    const e8Re = /^\/v1\/blog\/([^/]+)\/post\/([^/]+)$/;
+    other = req => {
+      const single = e8Re.exec(req.path);
+      return single
+        ? { status: 200, body: postDetail(decodeURIComponent(single[1]), decodeURIComponent(single[2]), paragraph('Text')) }
+        : undefined;
+    };
+    await press(root, 'home/feed/feed-post-13');
+    expect(navigationRef.getCurrentRoute()?.name).toBe('Post');
+    const e8Calls = () => transport.calls.filter(c => e8Re.test(c.path));
+    expect(e8Calls()).toHaveLength(1);
+    focusMock.mockClear();
+    lists.scrollToIndex.mockClear();
+    head = () => headPage([newPost(0), newPost(1), ...Array.from({ length: 8 }, (_, i) => feedPost(i))], 8);
+    await backgroundFor(QUERY_STALE_TIME_MS + 1_000);
+    // One E5 page 1 for the covered feed; the Пост is not fetched again.
+    expect(feedCalls()).toHaveLength(3);
+    expect(cursorOf(feedCalls()[2].url)).toBeNull();
+    expect(e8Calls()).toHaveLength(1);
+    const ids = gridPosts(root).map(p => p.id);
+    expect(ids.slice(0, 3)).toEqual(['new-0', 'new-1', 'feed-post-0']);
+    expect(ids.indexOf('feed-post-13')).toBe(15);
+    // Covered: Главная neither focuses nor scrolls; Пост keeps the route.
+    expect(navigationRef.getCurrentRoute()?.name).toBe('Post');
+    expect(focusTargets().filter(id => id?.startsWith('home/'))).toEqual([]);
+    expect(lists.scrollToIndex).not.toHaveBeenCalled();
+    focusMock.mockClear();
+    await back();
+    expect(navigationRef.getCurrentRoute()?.name).toBe('Shell');
+    // Back: the same card by id, scrolled to its new row 5 (index 15).
+    expect(lastFocusTarget()).toBe('home/feed/feed-post-13');
+    expect(lists.scrollToIndex).toHaveBeenCalledWith(expect.objectContaining({ index: 5, animated: false }));
+    expect(e8Calls()).toHaveLength(1);
+    expect(feedCalls()).toHaveLength(3);
+    await unmount(root);
+  });
+
   it('stale return, nothing new: no visible change, focus unchanged', async () => {
     const root = await deepInTheFeed();
     const before = gridPosts(root).map(p => p.id);
@@ -2086,12 +2125,6 @@ describe('Story 4.7: «Продолжить просмотр» on Главная
       const handler = engine.props?.[name] as ((...a: unknown[]) => void) | undefined;
       expect(handler).toBeDefined();
       handler?.(...args);
-    });
-    await settle();
-  }
-  async function advance(ms: number) {
-    await act(async () => {
-      jest.advanceTimersByTime(ms);
     });
     await settle();
   }
@@ -3665,6 +3698,26 @@ describe('Story 5.5: filter by tags', () => {
     const style = StyleSheet.flatten(listOf().props.style);
     expect(style.height).toBe(480);
     expect(style.flex).toBeUndefined();
+    await unmount(root);
+  });
+});
+
+describe('Epic 3 retro V3: no pin badge on Главная', () => {
+  it('a pinned post (E5 isPinned) shows no pin badge and no «Закреплено» label (only Автор passes `showPinned`)', async () => {
+    feed = () => ({
+      status: 200,
+      body: {
+        data: { posts: [feedPost(0, { isPinned: true }), feedPost(1), feedPost(2)], blogs: [], counters: {} },
+        extra: { offset: cursorFor(3), isLast: true },
+      },
+    });
+    const root = await renderApp();
+    expect(cardIds(root)).toEqual(['home/feed/feed-post-0', 'home/feed/feed-post-1', 'home/feed/feed-post-2']);
+    expect(visible(root, 'home/feed/feed-post-0/pin')).toBe(false);
+    const label = one(root, 'home/feed/feed-post-0').props.accessibilityLabel as string;
+    expect(label).not.toContain(tf('postCard.a11yPinned', { label: '' }).trim());
+    expect(label).not.toContain(t('postCard.pinned'));
+    expect(text(root)).not.toContain(t('postCard.pinned'));
     await unmount(root);
   });
 });

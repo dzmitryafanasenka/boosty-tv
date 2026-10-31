@@ -2,20 +2,13 @@ import { act } from 'react';
 import { createRoot } from 'test-renderer';
 import { QueryClient, type QueryKey } from '@tanstack/react-query';
 import { OUTCOME_FRAME_TRIES, useOutcomeFocus, type OutcomeFocus } from '../useOutcomeFocus';
+// eslint-disable-next-line boundaries/dependencies -- test-only helpers
+import { frame, installFrameQueue, queuedFrames } from '../../../test/frames';
 
 type Phase = 'hint' | 'loading' | 'empty' | 'results';
 
 const KEY_A: QueryKey = ['search', 'a'];
 const KEY_B: QueryKey = ['search', 'b'];
-
-// A manual frame queue: each `frame()` runs the callbacks requested before it.
-let queue: Map<number, (t: number) => void>;
-let nextFrameId: number;
-function frame() {
-  const callbacks = [...queue.values()];
-  queue.clear();
-  callbacks.forEach(callback => callback(0));
-}
 
 let client: QueryClient;
 let outcomes: Phase[];
@@ -52,18 +45,7 @@ async function render(props: ProbeProps) {
 }
 
 beforeEach(() => {
-  queue = new Map();
-  nextFrameId = 1;
-  jest.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((callback: (t: number) => void) => {
-    const id = nextFrameId++;
-    queue.set(id, callback);
-    return id;
-  });
-  jest.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation((id?: number | null) => {
-    if (id !== undefined && id !== null) {
-      queue.delete(id);
-    }
-  });
+  installFrameQueue();
   client = new QueryClient();
   outcomes = [];
   mayTake = true;
@@ -118,10 +100,10 @@ describe('useOutcomeFocus', () => {
     await render({ phase: 'results', isFetching: true });
     api.awaitOutcome(KEY_A);
     for (let i = 0; i < OUTCOME_FRAME_TRIES; i += 1) {
-      expect(queue.size).toBe(1);
+      expect(queuedFrames()).toBe(1);
       frame();
     }
-    expect(queue.size).toBe(0);
+    expect(queuedFrames()).toBe(0);
     expect(outcomes).toEqual([]);
     // Still pending: a phase change settles it.
     await render({ phase: 'empty', isFetching: true });
@@ -174,36 +156,36 @@ describe('useOutcomeFocus', () => {
     await render({ phase: 'results', isFetching: true });
     api.awaitOutcome(KEY_A);
     frame();
-    expect(queue.size).toBe(1);
+    expect(queuedFrames()).toBe(1);
     api.awaitOutcome(KEY_B);
     // Only the second loop is scheduled.
-    expect(queue.size).toBe(1);
+    expect(queuedFrames()).toBe(1);
     for (let i = 0; i < OUTCOME_FRAME_TRIES - 1; i += 1) {
       frame();
     }
     // The first loop would have stopped by now; the second still runs.
-    expect(queue.size).toBe(1);
+    expect(queuedFrames()).toBe(1);
     frame();
-    expect(queue.size).toBe(0);
+    expect(queuedFrames()).toBe(0);
     expect(outcomes).toEqual([]);
   });
 
   it('cancel() also cancels a scheduled frame', async () => {
     await render({ phase: 'results', isFetching: true });
     api.awaitOutcome(KEY_A);
-    expect(queue.size).toBe(1);
+    expect(queuedFrames()).toBe(1);
     api.cancel();
-    expect(queue.size).toBe(0);
+    expect(queuedFrames()).toBe(0);
   });
 
   it('unmount cancels the frame', async () => {
     await render({ phase: 'results', isFetching: true });
     api.awaitOutcome(KEY_A);
-    expect(queue.size).toBe(1);
+    expect(queuedFrames()).toBe(1);
     await act(async () => {
       root.unmount();
     });
-    expect(queue.size).toBe(0);
+    expect(queuedFrames()).toBe(0);
     root = createRoot();
   });
 });

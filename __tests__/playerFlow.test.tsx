@@ -81,7 +81,7 @@ jest.mock('../src/shared/platform/PlayerEngineView', () => require('../src/test/
 
 const focusMock = requestHostFocus as jest.Mock;
 
-const { settle, render, one, focusOn, press, back } = createFlow({
+const { settle, render, one, focusOn, press, back, advance, key } = createFlow({
   settle: { rounds: 30, timerRounds: 0 },
   one: 'focusable',
   pressFocuses: true,
@@ -230,22 +230,6 @@ const currentRoute = () => navigationRef.getCurrentRoute()?.name;
 const routeNames = () => navigationRef.getRootState()?.routes.map(r => r.name);
 const e8Calls = () => transport.calls.filter(c => E8_RE.test(c.path));
 const playerText = (root: Root) => text(byTestId(root, 'player/page')[0]);
-
-/** Advance fake time (timers and `Date.now`), then settle. */
-async function advance(ms: number) {
-  await act(async () => {
-    jest.advanceTimersByTime(ms);
-  });
-  await settle();
-}
-
-/** A raw remote key (key up unless `action` says otherwise). */
-async function key(eventType: string, action = 1) {
-  await act(async () => {
-    tvEvents.emit({ eventType, eventKeyAction: action });
-  });
-  await settle();
-}
 
 /** Engine events through the mocked port. */
 async function fire<
@@ -2385,7 +2369,9 @@ describe('recovery (Story 4.4)', () => {
     // The player's recovery logs carry no URL, id or position.
     const playerLogs = logger.entries().filter(entry => entry.scope === 'player');
     expect(playerLogs.map(entry => entry.message)).toContain('playback failed; recovering');
-    expect(JSON.stringify(playerLogs)).not.toMatch(/example\.invalid|312|v1/);
+    // Every field but the wall-clock `time`, which can contain «312» by chance.
+    const logged = playerLogs.map(({ level, scope, message, fields }) => ({ level, scope, message, fields }));
+    expect(JSON.stringify(logged)).not.toMatch(/example\.invalid|312|v1/);
     expect(JSON.stringify(logger.entries())).not.toContain('example.invalid');
     await unmount(root);
   });

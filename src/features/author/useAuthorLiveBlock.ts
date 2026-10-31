@@ -57,7 +57,7 @@ export function useAuthorLiveBlock({
   const shareButton = useAuthorLiveCard(shareId);
   const { stream: queriedStream, answered: liveAnswered } = useAuthorLiveStream(http, blogUrl, liveEnabled);
   // Story 7.4: the shown stream carries the optimistic like over the query.
-  const like = useLiveLike(http, blogUrl, queriedStream);
+  const like = useLiveLike(http, blogUrl, queriedStream, liveAnswered);
   const stream = like.stream;
   return {
     liveId,
