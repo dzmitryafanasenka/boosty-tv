@@ -3,7 +3,7 @@
  * in-memory KeyValueStore and a fake session (no network). Every row of the
  * spec's I/O matrix that the repository owns; the player-side rows (no
  * pre-seek t=0, hold-scrub) and the Post-side rows (multi-video) are also in
- * `__tests__/playerFlow.test.tsx` and `__tests__/postFlow.test.tsx`.
+ * `__tests__/playerProgressFlow.test.tsx` and `__tests__/postFlow.test.tsx`.
  */
 import { AppError } from '../../../api/appError';
 import type { HttpClient, HttpRequest, HttpResponse, SessionStatus } from '../../../api';
