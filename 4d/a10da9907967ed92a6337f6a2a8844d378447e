@@ -1,0 +1,23 @@
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_7477a2e6c69ec6::t_cf7ab9ec784a7f 348
+_bmad-output/implementation-artifacts/spec-player-live-vod-split.md
+  s_7477a2e6c69ec6::t_7a3662b704498f 5
+docs/testing.md
+  s_7477a2e6c69ec6::t_5feeccb674b203 908,917-918,920-921
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "4da10da9907967ed92a6337f6a2a8844d378447e",
+  "prompts": {},
+  "sessions": {
+    "s_7477a2e6c69ec6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d998e7e2-636f-4943-a058-23b274887697",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
