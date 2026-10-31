@@ -1,0 +1,55 @@
+__tests__/diagnosticsFlow.test.tsx
+  s_7477a2e6c69ec6::t_7e96bca5c495f1 130,146,318-371
+__tests__/logFileModule.test.js
+  s_7477a2e6c69ec6::t_10861950c09171 5,41-50
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_7477a2e6c69ec6::t_883fdd12f7bed2 352-355
+_bmad-output/implementation-artifacts/spec-8-3-hidden-diagnostics.md
+  s_7477a2e6c69ec6::t_f8d967c9a793a1 5,88-121
+_bmad-output/planning-artifacts/ux-designs/ux-boosty-tv-2026-10-25/EXPERIENCE.md
+  s_7477a2e6c69ec6::t_645dd8f93a63ab 94
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/LogFileModule.kt
+  s_7477a2e6c69ec6::t_5208d2d4912f01 3,20-27,30-31,69,96-101,126-129
+docs/feature-parity.md
+  s_7477a2e6c69ec6::t_8d7ddc8adb1d53 148
+docs/focus-map.md
+  s_7477a2e6c69ec6::t_477642acee99d7 483
+docs/testing.md
+  s_7477a2e6c69ec6::t_4d68cb969cae59 909,943-959,971
+src/features/player/__tests__/AudioBlock.test.tsx
+  s_7477a2e6c69ec6::t_46243e7aec70d7 11,616-625
+src/features/settings/DiagnosticsScreen.tsx
+  s_7477a2e6c69ec6::t_daf12f214f6fbd 26-27,46-53
+src/shared/api/__tests__/logPath.test.ts
+  s_7477a2e6c69ec6::t_5ccffd4352883a 1-21
+src/shared/api/transport.ts
+  s_7477a2e6c69ec6::t_3213c5bbd1f058 36-70,72-84
+src/shared/i18n/ru.ts
+  s_7477a2e6c69ec6::t_872af0d15ccd65 647
+src/shared/services/__tests__/logFileSink.test.ts
+  s_7477a2e6c69ec6::t_a7643bb96ccb9b 77-89,94-96,179,182-185,189-191,195-215,342-361
+src/shared/services/__tests__/logger.test.ts
+  s_7477a2e6c69ec6::t_1a9a7739c4787d 40-46,89-91,96
+src/shared/services/logFileSink.ts
+  s_7477a2e6c69ec6::t_568f26ea9a9a80 1,29-32,59-63,80-85,96,104,176-180,185-189,227-230,253-259
+src/shared/services/logger.ts
+  s_7477a2e6c69ec6::t_a289c32ebf50b5 66-68,70,99-105,108-114,117-119
+src/shared/ui/__tests__/shellPrimitives.test.tsx
+  s_7477a2e6c69ec6::t_b3662a1f04c776 2,113-137
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "bb85d8e2b5ad21a5fd44df9d3943f3c03d0ff470",
+  "prompts": {},
+  "sessions": {
+    "s_7477a2e6c69ec6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d998e7e2-636f-4943-a058-23b274887697",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
