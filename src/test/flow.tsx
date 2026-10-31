@@ -365,9 +365,17 @@ export function createFlow(profile: FlowProfile) {
 
   /**
    * A raw remote key through the TVEventHandler mock (key up, `action` 1,
-   * unless said otherwise), then settles. Needs the `./tvEventMock` mock.
+   * unless said otherwise), then settles. Needs the `./tvEventMock` mock;
+   * throws when no listener is subscribed.
    */
   async function key(eventType: string, action = 1) {
+    if (tvEvents.count() === 0) {
+      // Nothing listens: the file lacks the TVEventHandler mock (or nothing
+      // that handles keys is mounted), so the key would be a silent no-op.
+      throw new Error(
+        "key(): no TVEventHandler listener; mock 'react-native/Libraries/Components/TV/TVEventHandler' with src/test/tvEventMock",
+      );
+    }
     await act(async () => {
       tvEvents.emit({ eventType, eventKeyAction: action });
     });

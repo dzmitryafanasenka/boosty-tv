@@ -69,10 +69,22 @@ function dropSettled(blogUrl: string) {
  * invalidation's refetch: the Player exit, a resume). Only a query state
  * tells them apart: an invalidated query stays `isInvalidated` until its
  * refetch succeeds.
+ *
+ * Known imprecision (accepted, see the spec's Review Triage Log): TanStack
+ * also sets `isInvalidated` after a failed fetch (the stream query has
+ * `retry: false`), so after a failed E15 the following polls count as
+ * `other` until one succeeds: such a poll is not cancelled at OK (the
+ * overlay covers it while E17 runs) and may be sent once more after the
+ * write. Nothing visible changes; at most one extra E15.
+ *
+ * `paused` counts as running too. It does not happen today: no
+ * `onlineManager` is wired (no NetInfo, ADR 0010) and React Native fires no
+ * `online` / `offline` window events, so TanStack always sees the app as
+ * online and a fetch is never paused.
  */
 function runningFetch(client: QueryClient, queryKey: QueryKey, pageAnswered: boolean): 'poll' | 'other' | null {
   const query = client.getQueryCache().find({ queryKey, exact: true });
-  if (query?.state.fetchStatus !== 'fetching') {
+  if (query === undefined || query.state.fetchStatus === 'idle') {
     return null;
   }
   return pageAnswered && !query.state.isInvalidated ? 'poll' : 'other';
@@ -197,42 +209,49 @@ export function useLiveLike(
       }
       return true;
     };
+    /** The overlay after E17: kept and written (success), or rolled back. */
+    const settle = (ok: boolean) => {
+      if (overlays.getAt(key) !== entry) {
+        return;
+      }
+      if (ok && sameAccount()) {
+        // Keep the state; the next poll reconciles. Relative to the cached
+        // value (a newer poll count is kept), and only for the same stream.
+        const before = client.getQueryData<Stream | null>(queryKey);
+        // The page already shows the target from the cache when a poll
+        // meanwhile carried it (or the cached stream is another one, or
+        // gone): checked on values, not on the object identity.
+        const nothingToSee = !before || before.id !== streamId || before.isLiked === isLiked;
+        client.setQueryData<Stream | null>(queryKey, data =>
+          data && data.id === streamId
+            ? {
+                ...data,
+                isLiked,
+                likes: data.isLiked === isLiked ? data.likes : Math.max(0, data.likes + (isLiked ? 1 : -1)),
+              }
+            : data,
+        );
+        if (nothingToSee) {
+          // The write changes nothing the page would see, so no later
+          // stream change would drop the overlay: it goes at once (Epic 7
+          // retro F1).
+          overlays.delete(key);
+        } else {
+          overlays.set(key, { ...entry, settled: true });
+        }
+      } else {
+        // The rollback (or an old account's entry, which nothing shows).
+        overlays.delete(key);
+      }
+    };
     run()
       .then(ok => {
-        if (overlays.getAt(key) !== entry) {
-          return;
-        }
-        if (ok && sameAccount()) {
-          // Keep the state; the next poll reconciles. Relative to the cached
-          // value (a newer poll count is kept), and only for the same stream.
-          const before = client.getQueryData<Stream | null>(queryKey);
-          // The page already shows the target from the cache when a poll
-          // meanwhile carried it (or the cached stream is another one, or
-          // gone): checked on values, not on the object identity.
-          const nothingToSee = !before || before.id !== streamId || before.isLiked === isLiked;
-          client.setQueryData<Stream | null>(queryKey, data =>
-            data && data.id === streamId
-              ? {
-                  ...data,
-                  isLiked,
-                  likes: data.isLiked === isLiked ? data.likes : Math.max(0, data.likes + (isLiked ? 1 : -1)),
-                }
-              : data,
-          );
-          if (nothingToSee) {
-            // The write changes nothing the page would see, so no later
-            // stream change would drop the overlay: it goes at once (Epic 7
-            // retro F1).
-            overlays.delete(key);
-          } else {
-            overlays.set(key, { ...entry, settled: true });
-          }
-          if (fetchAgain) {
-            client.invalidateQueries({ queryKey, exact: true }).catch(() => {});
-          }
-        } else {
-          // The rollback (or an old account's entry, which nothing shows).
-          overlays.delete(key);
+        settle(ok);
+        // A non-poll E15 cancelled at success is sent again (after the
+        // write, when there is one), also when the entry was replaced
+        // meanwhile; never for another account.
+        if (ok && fetchAgain && sameAccount()) {
+          client.invalidateQueries({ queryKey, exact: true }).catch(() => {});
         }
       })
       .catch(() => {});

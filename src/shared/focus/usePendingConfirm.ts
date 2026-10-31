@@ -36,13 +36,22 @@ export function usePendingConfirm<K extends string>(): PendingConfirm<K> {
       if (latest.current === key) {
         return 'confirm';
       }
+      // Armed at once: a second press in the same tick (before the
+      // re-render) already confirms. The next render writes the same value.
+      latest.current = key;
       setPending(key);
       return 'armed';
     },
     [latest],
   );
-  const cancel = useCallback((key?: K) => {
-    setPending(prev => (key === undefined || prev === key ? null : prev));
-  }, []);
+  const cancel = useCallback(
+    (key?: K) => {
+      if (key === undefined || latest.current === key) {
+        latest.current = null;
+      }
+      setPending(prev => (key === undefined || prev === key ? null : prev));
+    },
+    [latest],
+  );
   return { pending, press, cancel };
 }

@@ -916,20 +916,29 @@ Commit 1 is a behaviour-preserving refactor:
 - `polls/pollFocus.ts`;
 - `src/test/frames.ts` and `createFlow` `advance` / `key`.
 
-Its new unit tests are `src/shared/focus/__tests__/usePendingConfirm.test.tsx` and `src/features/polls/__tests__/pollFocus.test.ts`.
+Its new unit tests are `src/shared/focus/__tests__/usePendingConfirm.test.tsx` (5 tests in commit 1) and `src/features/polls/__tests__/pollFocus.test.ts` (6).
 
 Commit 2:
-- the F3 fix: OK on «Нравится» cancels only a running E15 poll (`authorFlow` «Story 7.4» «F3: …», 4 tests);
-- `eventsFlow`: F6 scheduled and F6 ended, plus «resume with nested stacks», F5 and V2, 2 tests;
-- `homeFeedFlow`: «Epic 3 retro V1» and «V3»;
-- `postFlow` «Story 6.6 › Epic 6 retro A4»: R4 ×2 and R6;
+- `authorFlow` «Story 7.4»: 4 tests «F3: …» for the fix (OK on «Нравится» cancels only a running E15 poll);
+- `eventsFlow`: 4 tests: F6 scheduled, F6 ended, and «resume with nested stacks» ×2 (F5 and V2);
+- `homeFeedFlow`: 2 tests, «Epic 3 retro V1» and «V3»;
+- `postFlow` «Story 6.6 › Epic 6 retro A4»: 3 tests, R4 ×2 and R6;
 - the R5 line in `focus-map.md` and the R3 comment in `applyPoll.ts`;
 - the timestamp-proof log checks in `playerFlow` «Expired URL» and `eventsFlow` «Malformed».
 
-Checks run:
+Commit 3 (review patches):
+- `authorFlow` «Story 7.4»: 2 more F3 tests (an invalidation's E15 running at E17 200 is cancelled and sent again; the first E15 landing mid-E17, then an E17 failure rolls back to the landed value), 6 F3 tests in all;
+- `postFlow`: R5 (audio under the QrDialog, ← → do not seek there, Back → the chip; the file now mocks TVEventHandler), 4 tests in that describe;
+- `useColumnStop.test.tsx` (new, 4 tests); `usePendingConfirm.test.tsx`: 3 more (8 in all);
+- a stricter nested-stack Back check and V3 label check;
+- `createFlow().key()` throws when no TVEventHandler listener is subscribed.
+
+Checks run (after commit 3):
 - Lint (`--max-warnings 0`), typecheck and `check:fixtures` (30): clean.
-- `npm test` ×3: 122 suites, 2732 tests passed in each run.
-- The touched and new test files ×30: 0 failed runs, 833 tests passed in each. The files: `authorFlow`, `codeFlow`, `homeFeedFlow`, `playerFlow`, `postFlow`, `eventsFlow`, `useAuthorLiveActions`, `focusSoon`, `useOutcomeFocus`, `usePendingConfirm`, `pollFocus`, `PollWidget`, `linkChip`, `teaser`, `AudioBlock`.
+- `npm test` ×3: 123 suites, 2742 tests passed in each run.
+- The touched and new test files ×30: 0 failed runs, 843 tests passed in each. The files: `authorFlow`, `codeFlow`, `homeFeedFlow`, `playerFlow`, `postFlow`, `eventsFlow`, `useAuthorLiveActions`, `focusSoon`, `useOutcomeFocus`, `usePendingConfirm`, `useColumnStop`, `pollFocus`, `PollWidget`, `linkChip`, `teaser`, `AudioBlock`.
+
+Before the review (commits 1–2): `npm test` ×3: 122 suites, 2732 passed each; the touched files ×30: 0 failed runs, 833 tests each.
 
 Not checked:
 - Device rows (the poll and audio focus after the split, the F3 like on a real stream).

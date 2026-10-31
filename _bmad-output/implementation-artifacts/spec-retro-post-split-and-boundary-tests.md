@@ -65,7 +65,7 @@ context:
 - `src/shared/focus/usePendingConfirm.ts`: `press(key) → 'armed' | 'confirm'` and `cancel(key?)`. Both copies use it:
   - single choice: `cancel(optionId)` on blur;
   - multiple choice: `cancel()` on blur and during render on a mode change.
-- `src/shared/focus/useColumnStop.ts`: the zone item plus `onView` / `onFocus` wiring with a `viewRef`. It replaces the copies in every post block stop, the poll stops and `AudioBlock`, which is in scope by the patch-every-copy rule.
+- `src/shared/focus/useColumnStop.ts`: the zone item plus `onView` / `onFocus` wiring with a `viewRef`. It replaces the copies in every post block stop, the poll stops and `AudioBlock`, which is in scope by the patch-every-copy rule. After review, `PostScreen`'s author row uses it too: its `onView` wraps `onStopView` plus `refreshColumnTarget`, so the call order is unchanged (zone, then screen, then the guide refresh).
 - Tests:
   - `src/test/frames.ts` (`installFrameQueue`, `frame`, `frames(n)`, `queuedFrames`) replaces the frame queues in `postFlow`, `useAuthorLiveActions`, `useOutcomeFocus` and `focusSoon`.
   - `createFlow` gains `advance(ms)` and `key(eventType, action)`. They replace the copies in `playerFlow` (`advance`, `key`), `codeFlow`, `authorFlow` (×3) and `homeFeedFlow`.
@@ -99,6 +99,10 @@ The largest new files are `PollStops.tsx` (319), `MultipleChoicePoll.tsx` (290),
   - a poll is still cancelled.
 
   The first three fail on the old code.
+- After review:
+  - the re-send runs on every same-account success path where the cancel ran, also when the overlay entry was replaced meanwhile (before, the entry check returned first);
+  - `runningFetch` treats `paused` as running. A query cannot be paused today: no `onlineManager` is wired, and React Native fires no `online` / `offline` window events, so TanStack always counts the app as online;
+  - known imprecision (accepted): TanStack also sets `isInvalidated` after a failed fetch (`retry: false`), so after a failed E15 the next polls count as `other` until one succeeds. Such a poll is not cancelled at OK and may be sent once more after the write. Nothing visible changes; at most one extra E15. Recorded in the `runningFetch` comment and in `docs/api-contract.md`.
 - `docs/api-contract.md` E17 updated.
 
 **Tests added:**
@@ -133,3 +137,24 @@ Both now stringify every field except `time`, so the leak check still covers lev
 ## Spec Change Log
 
 ## Review Triage Log
+
+Coordinator review, 2026-10-31 (Blind Hunter, Edge Case Hunter, Verification Gap). All applied in commit 3 (`fix: review patches for the retro post split and boundary tests`).
+
+| # | Finding | Verdict | Evidence | Route |
+|---|---------|---------|----------|-------|
+| 1 | F3: no test for an invalidation's E15 still running at E17 200 | real | The new `authorFlow` test fails when the success branch re-sends only the first E15 (`fetchAgain = !answeredRef.current`): no third E15, the card stays | patch |
+| 2 | No test for an uncancelled first E15 landing mid-E17, then a failed E17 | real (gap) | New test: «Вам нравится, 358» holds while the landed `likes: 400` is cached; a 400 on E17 rolls back to «Нравится, 400» | patch |
+| 3 | `runningFetch` reads `isInvalidated`, which a failed fetch also sets | real, harmless | query-core's `error` reducer sets `isInvalidated: true`; the stream query has `retry: false`. The next polls count as `other`: not cancelled at OK, at most one extra E15 after the write. No small, clean way to tag a fetch's origin (TanStack gives no per-fetch meta for `refetchInterval`), so documented in the code comment, `docs/api-contract.md` and this spec | accept |
+| 4 | The re-send is skipped when the overlay entry was replaced | real | The early return in the success `.then` ran before `fetchAgain`; the invalidate now runs on every same-account `ok` path where the cancel ran | patch |
+| 5 | `runningFetch` ignores `fetchStatus === 'paused'` | not reachable today | No `onlineManager` is wired (no NetInfo, ADR 0010), and RN fires no window `online` / `offline` events, so a query is never paused. `paused` now counts as running anyway (only `idle` is «none»), as a guard | patch |
+| 6 | `usePendingConfirm.press`: two presses in one tick both arm | real | `latest.current` updated only on render; now set in `press` (and cleared in `cancel`). Tests: a double press in one act confirms; cancel + press in one act re-arms; a render-phase `cancel()` on a prop flip resets with bounded renders | patch |
+| 7 | No unit test for `useColumnStop` | gap | New `useColumnStop.test.tsx`: mount, an id change (old id `null` first, then the new id), unmount, `handleFocus` order (zone, then screen) | patch |
+| 8 | `PostScreen`'s author row hand-wires a column stop | real | Migrated to `useColumnStop` with an `onView` wrapper that calls `refreshColumnTarget`; same call order; `postFlow` passes | patch |
+| 9 | R5 (audio under the QrDialog) only documented | gap | New `postFlow` test: the engine stays unpaused under the dialog, ← → do not seek there (a control seek before), Back → the chip; the file now mocks TVEventHandler | patch |
+| 10 | Nested-stack Back checks only non-GET requests | weak | Now `transport.calls` length is unchanged after the three pops | patch |
+| 11 | V3 label check anchored at the start | weak | Now `not.toContain` «Закреплено.» and the pin glyph anywhere in the label | patch |
+| 12 | `createFlow().key()` is a silent no-op without the TVEventHandler mock | real | It throws a clear error when no listener is subscribed; every suite passes | patch |
+| 13 | Orphan doc comments and double blank lines from the extraction | real | Removed (`authorFlow`, `PostScreen`; blank lines in `playerFlow`, `codeFlow`, `authorFlow`, `focusSoon.test`, `useAuthorLiveActions.test`, `useOutcomeFocus.test`); the blank lines that existed on main are left alone | patch |
+| 14 | `docs/testing.md` lacks per-file counts | real | Per-file counts added for every commit (eventsFlow: 4) | patch |
+| 15 | `PostScreen` keeps a redundant `pollPrefix` alias | real | Removed; the effect reads `pollIds.prefix` and depends on `pollIds` only | patch |
+| 16 | `frames.ts`: callbacks get `Date.now()`, the old copies passed 0 | real | Noted in the doc comment; no app code reads the timestamp | patch |

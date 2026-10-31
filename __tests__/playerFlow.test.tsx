@@ -231,8 +231,6 @@ const routeNames = () => navigationRef.getRootState()?.routes.map(r => r.name);
 const e8Calls = () => transport.calls.filter(c => E8_RE.test(c.path));
 const playerText = (root: Root) => text(byTestId(root, 'player/page')[0]);
 
-
-
 /** Engine events through the mocked port. */
 async function fire<
   K extends 'onLoad' | 'onProgress' | 'onBuffering' | 'onSeekDone' | 'onEnd' | 'onError' | 'onResolution' | 'onAudioFocusLost',

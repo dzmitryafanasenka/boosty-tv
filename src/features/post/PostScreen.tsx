@@ -21,6 +21,7 @@ import {
 import {
   focusSoonRun,
   mayTakeScreenFocus,
+  useColumnStop,
   useLatestRef,
   useModal,
   usePhaseChange,
@@ -60,7 +61,6 @@ export const postBlockId = (postId: string, blockKey: string) =>
 export const postVideoPrefix = (postId: string) => `post/${postId}/video/`;
 export const postVideoId = (postId: string, mediaId: string) =>
   `${postVideoPrefix(postId)}${mediaId}`;
-/** Stories 6.6–6.7: the poll's stops, `post/<postId>/poll/…` (`features/polls` `pollFocusIds`). */
 /** «Смотреть» / «Продолжить» under the header (Story 4.1, 4.2). */
 export const postPrimaryId = (postId: string) => `post/${postId}/primary`;
 /** «С начала», to the right of the primary (Story 4.2, owner decision 2026-10-28). */
@@ -255,8 +255,8 @@ export function PostScreen({
   const contentPrefix = postIdPrefix(postId);
   const primaryId = postPrimaryId(postId);
   const restartId = postRestartId(postId);
+  // Stories 6.6–6.7: the poll's stops, `post/<postId>/poll/…` (`features/polls`).
   const pollIds = useMemo(() => pollFocusIds(contentPrefix), [contentPrefix]);
-  const pollPrefix = pollIds.prefix;
 
   // The MediaRows (an accessible post's videos with an id, deduped) and the
   // body: the other blocks of an accessible post, the teaser of a locked one
@@ -402,19 +402,15 @@ export function PostScreen({
     [refreshColumnTarget],
   );
 
-  const authorZone = useZoneItem(authorId);
-  const authorRef = useCallback(
-    (view: HostView | null) => {
-      authorZone.ref?.(view);
-      onStopView(authorId, view);
+  // The author row is a column stop too; its view also refreshes the column guide's target.
+  const onAuthorView = useCallback(
+    (id: string, view: HostView | null) => {
+      onStopView(id, view);
       refreshColumnTarget();
     },
-    [authorZone, authorId, onStopView, refreshColumnTarget],
+    [onStopView, refreshColumnTarget],
   );
-  const onAuthorFocus = useCallback(() => {
-    authorZone.onFocus();
-    onStopFocus(authorId);
-  }, [authorZone, authorId, onStopFocus]);
+  const { ref: authorRef, handleFocus: onAuthorFocus } = useColumnStop(authorId, onAuthorView, onStopFocus);
   useEffect(() => {
     refreshColumnTarget();
   }, [rows, items, showPrimary, showRestart, initialId, refreshColumnTarget]);
@@ -575,7 +571,7 @@ export function PostScreen({
       current !== null &&
       (current.startsWith(blockPrefix) ||
         current.startsWith(videoPrefix) ||
-        current.startsWith(pollPrefix) ||
+        current.startsWith(pollIds.prefix) ||
         current === primaryId ||
         current === restartId) &&
       !views.current.has(current)
@@ -585,7 +581,7 @@ export function PostScreen({
       }
       // Stories 6.6–6.7: a vanished poll stop → a nearby stop of the same
       // poll, in `pollFallbackOrder`, once laid out.
-      if (current.startsWith(pollPrefix)) {
+      if (current.startsWith(pollIds.prefix)) {
         const pollItem = items.find(item => item.kind === 'poll');
         const candidates =
           pollItem?.kind === 'poll'
@@ -598,7 +594,7 @@ export function PostScreen({
       }
       focusAfterUnmount(current, focusInitial);
     }
-  }, [rows, items, showPrimary, showRestart, blockPrefix, videoPrefix, pollPrefix, primaryId, restartId, focusInitial, focusAfterUnmount, focusLaidOut, phaseRef, postId, pollIds]);
+  }, [rows, items, showPrimary, showRestart, blockPrefix, videoPrefix, pollIds, primaryId, restartId, focusInitial, focusAfterUnmount, focusLaidOut, phaseRef, postId]);
 
   // Story 6.3: OK on a link, file or external-video chip → the QrDialog in
   // the modal host (focus trapped; «Закрыть» or Back returns it to the chip).

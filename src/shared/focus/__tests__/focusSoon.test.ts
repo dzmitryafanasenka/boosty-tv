@@ -7,7 +7,6 @@ import { frame, installFrameQueue, queuedFrames } from '../../../test/frames';
 jest.mock('../../ui/requestHostFocus', () => ({ requestHostFocus: jest.fn() }));
 const focusMock = requestHostFocus as jest.Mock;
 
-
 const viewA = { name: 'a' } as unknown as HostView;
 const viewB = { name: 'b' } as unknown as HostView;
 

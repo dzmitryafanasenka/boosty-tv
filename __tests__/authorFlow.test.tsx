@@ -2157,7 +2157,6 @@ describe('Story 7.1: the live stream card on the author page', () => {
     pressFocuses: true,
     submitSettles: true,
   });
-  /** The 30 s poll (fake timers), then settle. */
 
   beforeEach(() => {
     e4 = syntheticBlogPosts({ blogUrl: BLOG, total: 12 });
@@ -2585,7 +2584,6 @@ describe('Story 7.2: OK on the live card (watch, or the QR)', () => {
     engine.reset();
     e4 = syntheticBlogPosts({ blogUrl: BLOG, total: 12 });
   });
-
 
   it('a live card with access and a live-edge URL: OK → the Player with `LiveRef` (ids only); it plays the HLS URL', async () => {
     e15 = () => e15Stream('live', PLAYABLE);
@@ -3110,6 +3108,62 @@ describe('Story 7.4: like and share a live stream', () => {
     await settle();
     expect(streamCalls()).toHaveLength(2);
     expect(visible(root, LIVE)).toBe(false);
+    await unmount(root);
+  });
+
+  it('F3: an invalidation\'s E15 still running at E17 200 is cancelled and sent again after the write; its late reply is never written', async () => {
+    e15 = () => e15Stream('live', LIVE_357);
+    const root = await openAuthor();
+    const refetch = deferred();
+    e15 = () => refetch.promise;
+    await act(async () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.stream(BLOG) }).catch(() => {});
+    });
+    await settle();
+    expect(streamCalls()).toHaveLength(2);
+    const like = deferred();
+    e17 = () => like.promise;
+    await press(root, LIKE);
+    expect(likeLabel(root)).toBe('Вам нравится, 358');
+    // The stream ended meanwhile: the re-sent E15 says so.
+    e15 = () => e15None();
+    await act(async () => {
+      like.resolve({ status: 200 });
+    });
+    await settle();
+    expect(streamCalls()).toHaveLength(3);
+    expect(visible(root, LIVE)).toBe(false);
+    // The held reply (pre-like, still live) answers late: never written.
+    await act(async () => {
+      refetch.resolve(e15Stream('live', LIVE_357));
+    });
+    await settle();
+    expect(visible(root, LIVE)).toBe(false);
+    expect(queryClient.getQueryData(queryKeys.stream(BLOG))).toBeNull();
+    expect(streamCalls()).toHaveLength(3);
+    await unmount(root);
+  });
+
+  it('F3: the first E15 landing mid-E17 with the pre-like value keeps «Вам нравится»; an E17 failure then rolls back to that landed value', async () => {
+    const { root, first } = await reopenWithHeldFirstE15();
+    const like = deferred();
+    e17 = () => like.promise;
+    await press(root, LIKE);
+    expect(likeLabel(root)).toBe('Вам нравится, 358');
+    // Not cancelled: it lands while E17 runs, with a newer count, not liked.
+    await act(async () => {
+      first.resolve(e15Stream('live', { count: { viewers: 10, likes: 400 } }));
+    });
+    await settle();
+    expect(likeLabel(root)).toBe('Вам нравится, 358');
+    await act(async () => {
+      like.resolve({ status: 400, body: { error: 'bad_request' } });
+    });
+    await settle();
+    // The rollback shows the landed value, not the cached one from before.
+    expect(likeLabel(root)).toBe('Нравится, 400');
+    expect(e17Calls()).toHaveLength(1);
+    expect(streamCalls()).toHaveLength(2);
     await unmount(root);
   });
 

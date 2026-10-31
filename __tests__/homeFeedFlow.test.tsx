@@ -3714,7 +3714,9 @@ describe('Epic 3 retro V3: no pin badge on Главная', () => {
     const root = await renderApp();
     expect(cardIds(root)).toEqual(['home/feed/feed-post-0', 'home/feed/feed-post-1', 'home/feed/feed-post-2']);
     expect(visible(root, 'home/feed/feed-post-0/pin')).toBe(false);
-    expect(one(root, 'home/feed/feed-post-0').props.accessibilityLabel).not.toMatch(/^Закреплено/);
+    const label = one(root, 'home/feed/feed-post-0').props.accessibilityLabel as string;
+    expect(label).not.toContain(tf('postCard.a11yPinned', { label: '' }).trim());
+    expect(label).not.toContain(t('postCard.pinned'));
     expect(text(root)).not.toContain(t('postCard.pinned'));
     await unmount(root);
   });

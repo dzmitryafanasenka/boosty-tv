@@ -17,7 +17,6 @@ const LIVE = `author/${BLOG}/live`;
 const LIKE = `author/${BLOG}/live/like`;
 const SHARE = `author/${BLOG}/live/share`;
 
-
 const view = (name: string) => ({ name }) as unknown as HostView;
 function card(id: string, mounted: boolean): AuthorLiveCard {
   const current = mounted ? view(id) : null;

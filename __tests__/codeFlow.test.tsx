@@ -140,7 +140,6 @@ afterEach(async () => {
   jest.restoreAllMocks();
 });
 
-
 function topScreen(root: Root): string | undefined {
   return topScreenOf(root, ['auth/welcome', 'auth/phone', 'auth/code', 'shell']);
 }

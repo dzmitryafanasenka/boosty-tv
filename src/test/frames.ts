@@ -7,7 +7,9 @@
  *
  * Call `installFrameQueue()` in a test or `beforeEach`; it spies on
  * `requestAnimationFrame` / `cancelAnimationFrame`, so the file's
- * `jest.restoreAllMocks()` removes it. Test-only (eslint `boundaries`).
+ * `jest.restoreAllMocks()` removes it. Each callback gets `Date.now()` as
+ * its timestamp (the per-file copies this replaces passed 0; no app code
+ * reads it). Test-only (eslint `boundaries`).
  */
 import { act } from 'react';
 

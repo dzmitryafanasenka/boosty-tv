@@ -10,7 +10,6 @@ type Phase = 'hint' | 'loading' | 'empty' | 'results';
 const KEY_A: QueryKey = ['search', 'a'];
 const KEY_B: QueryKey = ['search', 'b'];
 
-
 let client: QueryClient;
 let outcomes: Phase[];
 let api: OutcomeFocus;

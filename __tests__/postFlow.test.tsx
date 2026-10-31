@@ -87,6 +87,8 @@ jest.mock('react-native/Libraries/Components/TV/TVFocusGuideView', () =>
 );
 /** Story 6.4: the AudioBlock's (and the Player's) engine (`src/test/playerEngineMock`). */
 jest.mock('../src/shared/platform/PlayerEngineView', () => require('../src/test/playerEngineMock'));
+/** Remote keys for the AudioBlock's ← → (`key()`). */
+jest.mock('react-native/Libraries/Components/TV/TVEventHandler', () => require('../src/test/tvEventMock'));
 
 /** The real FlashList behind the recorder `lists` (`src/test/flow`; `onEndReached` held back). */
 jest.mock('@shopify/flash-list', () => require('../src/test/flow').recordingFlashListModule());
@@ -123,7 +125,7 @@ jest.mock('../src/shared/platform/qrRenderer', () => ({
 const focusMock = requestHostFocus as jest.Mock;
 
 /** As authorFlow: 30 rounds, no timers unless a row needs the AD-6 backoff or a transition. */
-const { settle, render, one, focusOn, press, back } = createFlow({
+const { settle, render, one, focusOn, press, back, key: remoteKey } = createFlow({
   settle: { rounds: 30, timerRounds: 0 },
   one: 'focusable',
   pressFocuses: true,
@@ -3052,6 +3054,56 @@ describe('Story 6.6: vote and retract in a single-choice poll', () => {
       expect(engine.unmounts).toBe(0);
       expect(engine.props?.paused).toBe(false);
       expect(visible(root, `${audio}/pause`)).toBe(true);
+      await unmount(root);
+    });
+
+    it('R5: audio keeps playing under a chip\'s QrDialog; ← → do not seek it there; Back closes the dialog with focus on the chip', async () => {
+      e8 = (_req, blogUrl, postId) => ({
+        status: 200,
+        body: postDetail(
+          blogUrl,
+          postId,
+          [
+            textBlock('См. '),
+            { type: 'link', content: JSON.stringify(['страница', 'unstyled', []]), url: 'https://example.invalid/page' },
+            blockEnd(),
+            AUDIO,
+          ],
+          { signedQuery: SIGNED },
+        ),
+      });
+      const root = await openFromHome();
+      const id = FEED_ID(0);
+      const audio = BLOCK(id, 'audio_file:a1');
+      const chip = BLOCK(id, 'text@0/link/0');
+      await press(root, audio);
+      expect(engine.props?.paused).toBe(false);
+      await act(async () => {
+        engine.props?.onLoad?.({ durationSec: 192 });
+      });
+      // Control: while the block has focus, → seeks (the first key after focus is the entry guard).
+      await remoteKey('right');
+      await remoteKey('right');
+      expect(engine.seek).toHaveBeenCalled();
+      engine.seek.mockClear();
+      // Native focus leaves the block for the chip, then OK opens the QR dialog.
+      await act(async () => {
+        one(root, audio).props.onBlur({ nativeEvent: {} });
+      });
+      await press(root, chip);
+      expect(visible(root, 'dialog/qr')).toBe(true);
+      expect(routeNames()).toEqual(['Shell', 'Post']);
+      expect(engine.props?.paused).toBe(false);
+      await remoteKey('right');
+      await remoteKey('left');
+      expect(engine.seek).not.toHaveBeenCalled();
+      expect(engine.props?.paused).toBe(false);
+      expect(engine.unmounts).toBe(0);
+      focusMock.mockClear();
+      await back();
+      expect(visible(root, 'dialog/qr')).toBe(false);
+      expect(lastFocusTarget()).toBe(chip);
+      expect(engine.props?.paused).toBe(false);
       await unmount(root);
     });
 

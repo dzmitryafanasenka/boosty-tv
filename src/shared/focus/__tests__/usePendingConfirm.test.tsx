@@ -1,4 +1,4 @@
-import { act } from 'react';
+import { act, useState } from 'react';
 import { createRoot, type Root } from 'test-renderer';
 import { usePendingConfirm, type PendingConfirm } from '../usePendingConfirm';
 
@@ -66,10 +66,65 @@ describe('usePendingConfirm', () => {
     expect(renders).toBe(before);
   });
 
+  it('two presses on the same key in one tick: armed, then confirm (no re-render between them)', async () => {
+    const results: string[] = [];
+    await act(async () => {
+      results.push(api.press('a'), api.press('a'));
+    });
+    expect(results).toEqual(['armed', 'confirm']);
+    expect(api.pending).toBe('a');
+  });
+
+  it('a cancel then a press in one tick arms again instead of confirming', async () => {
+    await run(() => api.press('a'));
+    const results: string[] = [];
+    await act(async () => {
+      api.cancel();
+      results.push(api.press('a'));
+    });
+    expect(results).toEqual(['armed']);
+    expect(api.pending).toBe('a');
+  });
+
   it('press and cancel are stable across renders', async () => {
     const { press, cancel } = api;
     await run(() => api.press('a'));
     expect(api.press).toBe(press);
     expect(api.cancel).toBe(cancel);
+  });
+});
+
+describe('usePendingConfirm: a render-phase cancel on a mode change (as MultipleChoicePoll)', () => {
+  let modeApi: PendingConfirm<'retract'>;
+  let modeRenders = 0;
+  function ModeProbe({ voted }: { voted: boolean }) {
+    modeApi = usePendingConfirm<'retract'>();
+    const [shown, setShown] = useState(voted);
+    if (shown !== voted) {
+      setShown(voted);
+      modeApi.cancel();
+    }
+    modeRenders += 1;
+    return null;
+  }
+
+  it('the prop flips: pending resets in the same update, a bounded number of renders, and a later press arms again', async () => {
+    const modeRoot = createRoot();
+    await act(async () => modeRoot.render(<ModeProbe voted />));
+    await act(async () => {
+      modeApi.press('retract');
+    });
+    expect(modeApi.pending).toBe('retract');
+    modeRenders = 0;
+    await act(async () => modeRoot.render(<ModeProbe voted={false} />));
+    expect(modeApi.pending).toBeNull();
+    // The render with the old state, then one re-render for the reset.
+    expect(modeRenders).toBeLessThanOrEqual(3);
+    let result = '';
+    await act(async () => {
+      result = modeApi.press('retract');
+    });
+    expect(result).toBe('armed');
+    await act(async () => modeRoot.unmount());
   });
 });

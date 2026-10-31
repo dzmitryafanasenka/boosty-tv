@@ -791,6 +791,7 @@ describe('resume with nested stacks (Epic 3 retro V2, Epic 7 retro F5)', () => {
     await changeAppState('background');
     jest.setSystemTime(Date.now() + QUERY_STALE_TIME_MS + 1_000);
     await changeAppState('active');
+    const sentBefore = transport.calls.length;
     focusMock.mockClear();
     await back();
     expect(routeNames()).toEqual(['Shell', 'Author', 'Post']);
@@ -803,8 +804,8 @@ describe('resume with nested stacks (Epic 3 retro V2, Epic 7 retro F5)', () => {
     await back();
     expect(routeNames()).toEqual(['Shell']);
     expect(lastFocusTarget()).toBe(ROW(5003));
-    // Nothing more was sent by the pops.
-    expect(transport.calls.filter(c => c.method !== 'GET')).toEqual([]);
+    // Nothing at all was sent by the three pops.
+    expect(transport.calls).toHaveLength(sentBefore);
     await unmount(root);
   });
 });
