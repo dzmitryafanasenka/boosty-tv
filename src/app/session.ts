@@ -1,13 +1,9 @@
 import { createSessionManager, type SessionManager } from '../shared/api';
 import { defineAccountScoped } from '../shared/account';
-import {
-  externalPlayerPreference,
-  setExternalPlayerPreferenceKeyValueStore,
-  setQualityPreferenceKeyValueStore,
-  setSpeedPreferenceKeyValueStore,
-} from '../features/player';
-import { diagnosticsCapture, setDiagnosticsCaptureKeyValueStore } from '../shared/services/logFileSink';
+import { externalPlayerPreference } from '../features/player';
+import { diagnosticsCapture } from '../shared/services/diagnosticsCapture';
 import { setProgressKeyValueStore } from '../shared/services/progress';
+import { setDevicePreferenceKeyValueStore } from '../shared/storage/devicePreference';
 import { DEMO_MODE } from './appConfig';
 import { phaseFlags } from './phaseFlags';
 import type * as DemoModule from './dev/demo';
@@ -37,17 +33,14 @@ export const session: SessionManager = demo
   ? demo.createDemoSessionManager()
   : createSessionManager();
 
-// The demo keeps its progress (Story 4.2 review), its quality preference
-// (Story 4.3), its speed (Story 8.1) and its «Системный видеоплеер» toggle
-// (Story 8.2) and its «Запись логов» toggle (Story 8.3) in memory: the
-// owner's real `boostytv-account` and `boostytv-device` databases are
-// never read, written or cleared.
+// The demo keeps its progress (Story 4.2 review) and every device
+// preference (quality, speed, «Системный видеоплеер», «Запись логов»; one
+// device store, Epic 8 retro A3) in memory: the owner's real
+// `boostytv-account` and `boostytv-device` databases are never read,
+// written or cleared.
 if (demo) {
   setProgressKeyValueStore(demo.createDemoKeyValueStore());
-  setQualityPreferenceKeyValueStore(demo.createDemoKeyValueStore());
-  setSpeedPreferenceKeyValueStore(demo.createDemoKeyValueStore());
-  setExternalPlayerPreferenceKeyValueStore(demo.createDemoKeyValueStore());
-  setDiagnosticsCaptureKeyValueStore(demo.createDemoKeyValueStore());
+  setDevicePreferenceKeyValueStore(demo.createDemoKeyValueStore());
 }
 
 // Story 8.2 review: warm the «Системный видеоплеер» value (after the demo

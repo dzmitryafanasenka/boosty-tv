@@ -1,7 +1,6 @@
 import { tf } from '../../shared/i18n';
-import { asyncKeyValueStore } from '../../shared/platform/asyncKeyValueStore';
 import type { KeyValueStore } from '../../shared/platform/keyValueStore';
-import { logger } from '../../shared/services/logger';
+import { createDevicePreference, type DevicePreference } from '../../shared/storage/devicePreference';
 
 /**
  * The playback speed preference (Story 8.1, PLAY-07, SET-04): one global
@@ -9,10 +8,9 @@ import { logger } from '../../shared/services/logger';
  * and is not part of the AccountScope wipe), one KeyValueStore key holding
  * one of the presets as a string (`1.5`).
  *
- * Read once per app run, then kept in memory; a pick updates memory at once
- * and stores it in the background (a failed write is only logged). A value
- * that cannot be read or is not a preset means 1×. The speed is not
- * personal data: the player may log the number.
+ * A `createDevicePreference` definition (read once, a pick wins, failures
+ * only logged). A value that cannot be read or is not a preset means 1×.
+ * The speed is not personal data: the player may log the number.
  */
 
 export const SPEED_PREFERENCE_KEY = 'player.speed.v1';
@@ -43,84 +41,19 @@ export function speedLabel(value: PlaybackSpeed): string {
   return tf('player.speed.value', { speed: serializeSpeed(value) });
 }
 
-export type SpeedPreferenceStore = {
-  /** The speed in memory; `undefined` until the first read finished. */
-  peek(): PlaybackSpeed | undefined;
-  /** The speed (read from the store once; 1× when none or unreadable). */
-  read(): Promise<PlaybackSpeed>;
-  /** Store a pick: memory at once, the store in the background (a failed write is only logged). */
-  write(value: PlaybackSpeed): void;
-  /** Tests: forget the memory copy (the store is untouched). */
-  forget(): void;
-};
+export type SpeedPreferenceStore = DevicePreference<PlaybackSpeed>;
 
-/** `kv().get`, with a synchronous throw (opening the store) turned into a rejection. */
-function getStored(kv: () => KeyValueStore): Promise<string | null> {
-  try {
-    return kv().get(SPEED_PREFERENCE_KEY);
-  } catch (error) {
-    return Promise.reject(error);
-  }
+export function createSpeedPreferenceStore(kv?: () => KeyValueStore): SpeedPreferenceStore {
+  return createDevicePreference({
+    key: SPEED_PREFERENCE_KEY,
+    parse: parseSpeed,
+    serialize: serializeSpeed,
+    fallback: DEFAULT_SPEED,
+    scope: 'player',
+    label: 'speed preference',
+    kv,
+  });
 }
 
-export function createSpeedPreferenceStore(kv: () => KeyValueStore): SpeedPreferenceStore {
-  let value: PlaybackSpeed | undefined;
-  let reading: Promise<PlaybackSpeed> | null = null;
-  return {
-    peek: () => value,
-    read() {
-      if (value !== undefined) {
-        return Promise.resolve(value);
-      }
-      if (reading === null) {
-        reading = getStored(kv)
-          .then(
-            raw => parseSpeed(raw) ?? DEFAULT_SPEED,
-            () => {
-              logger.warn('player', 'speed preference not read');
-              return DEFAULT_SPEED;
-            },
-          )
-          .then(parsed => {
-            // A pick while the read ran wins.
-            if (value === undefined) {
-              value = parsed;
-            }
-            reading = null;
-            return value;
-          });
-      }
-      return reading;
-    },
-    write(next) {
-      value = next;
-      try {
-        kv()
-          .set(SPEED_PREFERENCE_KEY, serializeSpeed(next))
-          .catch(() => logger.warn('player', 'speed preference not stored'));
-      } catch {
-        // The store itself threw (not only its promise): the same outcome.
-        logger.warn('player', 'speed preference not stored');
-      }
-    },
-    forget() {
-      value = undefined;
-      reading = null;
-    },
-  };
-}
-
-/** Where the app's speed persists: the `device` KeyValueStore, unless the app replaced it. */
-let appKeyValueStore: () => KeyValueStore = () => asyncKeyValueStore('device');
-
-/**
- * Replaces the speed's KeyValueStore before first use. Only the debug-only
- * demo calls it (`src/app/session.ts`): its speed stays in memory and never
- * touches the owner's real `boostytv-device` database.
- */
-export function setSpeedPreferenceKeyValueStore(kv: KeyValueStore): void {
-  appKeyValueStore = () => kv;
-}
-
-/** The app's speed preference. */
-export const speedPreference: SpeedPreferenceStore = createSpeedPreferenceStore(() => appKeyValueStore());
+/** The app's speed preference (the device store, `setDevicePreferenceKeyValueStore`). */
+export const speedPreference: SpeedPreferenceStore = createSpeedPreferenceStore();
