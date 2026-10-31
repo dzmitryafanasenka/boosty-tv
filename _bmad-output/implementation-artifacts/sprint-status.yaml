@@ -285,7 +285,7 @@ action_items:
     action: "When a review patches a pattern another screen copies, patch or extract
       every copy in the same change"
     owner: "agent"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-10-29.md"
   - id: "epic-5-retro-item-25-owner-physical-remote-pass-of-поиск-and"
     epic: 5
