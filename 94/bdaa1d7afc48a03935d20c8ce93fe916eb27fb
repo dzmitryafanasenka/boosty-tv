@@ -1,0 +1,23 @@
+_bmad-output/implementation-artifacts/spec-8-2-system-video-player.md
+  s_7477a2e6c69ec6::t_6a172cdff90113 5
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_7477a2e6c69ec6::t_8996a03b537dc4 32,109
+docs/testing.md
+  s_7477a2e6c69ec6::t_619403d649d88f 909,932-939
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "94bdaa1d7afc48a03935d20c8ce93fe916eb27fb",
+  "prompts": {},
+  "sessions": {
+    "s_7477a2e6c69ec6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d998e7e2-636f-4943-a058-23b274887697",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
