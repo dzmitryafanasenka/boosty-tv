@@ -1,6 +1,9 @@
 module.exports = {
   preset: '@react-native/jest-preset',
-  testPathIgnorePatterns: ['/node_modules/', '<rootDir>/__tests__/fixtures/'],
+  // Agent worktrees under .claude/worktrees/ hold full repo copies (their
+  // own suites and __mocks__), which would run twice and clash in haste.
+  testPathIgnorePatterns: ['/node_modules/', '<rootDir>/__tests__/fixtures/', '<rootDir>/.claude/worktrees/'],
+  modulePathIgnorePatterns: ['<rootDir>/.claude/worktrees/'],
   // ESM-only packages (React Navigation, RNGH, screens, safe-area) are
   // transformed like react-native itself; so is react-native-tvos's nested
   // @react-native-tvos/virtualized-lists (FlatList, Story 2.4); so is

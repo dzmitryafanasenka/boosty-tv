@@ -903,6 +903,23 @@ Review fixes (2026-10-28, host-tested only): short visits write nothing (owner d
 
 Host tests: `src/shared/services/progress/__tests__/progressRepository.test.ts` (29: the finished rule and status, resume precedence, the 10 s cadence, one write in flight with the latest position, forced events, start over, seeks as movement, failure gating ≥ 10 s and the bounded automatic retry, expired hold/flush/drop, sign-out wipe, a late write after a reset, the debounced/forced disk write, cold-start load, corrupt disk, the 200-entry cap, the stale disk write undone, a load after a reset dropped, stable snapshots); `__tests__/playerFlow.test.tsx` «progress and resume (Story 4.2)» (10: server only with no pre-seek t=0 and the E9 request shape, local wins, finished, multi-video + start over, hold-scrub, background and end, the vanished «С начала» fallback, failure retry, cold start from the persisted entry, log hygiene); `__tests__/postFlow.test.tsx` (status and «Продолжить» only while the player is on); `__tests__/accountScopeRegistry.test.js` (`progress` registered); `demoFlow` (the row label now ends with the status). Lint (`--max-warnings 0`), typecheck, `check:fixtures` clean; `npm test` ×3: 1494 passed each; `playerFlow` + `postFlow` + the progress suite 30/30 (187 tests each run).
 
+### PlayerScreen live/VOD split before Epic 8, 2026-10-31
+
+**Status: behaviour-preserving refactor plus review patches; host-tested, plus a short agent device run (below).** `spec-player-live-vod-split.md`. `PlayerScreen.tsx` 1477 → 389 lines: `playbackMode.ts` (the live/VOD decisions), `livePolicy.ts`, `playerPhase.ts`, `usePlaybackSession.ts`, `usePlayerSource.ts`, `usePlayerSettings.tsx`, `usePlayerFocus.ts`, `usePlayerKeys.ts`, `usePlayerProgress.ts`. The hook call order keeps the old effect order. Existing tests unchanged in meaning (`playerPhase.test.ts` is new in this change). New tests: `src/features/player/__tests__/playbackMode.test.ts` (the intent matrix for VOD and live), `playerPhase.test.ts` (phase, recovering, error target and copy), `entryGuard.test.ts` (the entry guard with a fake clock) and `playerFlow` «Story 7.2 › Quality pick (a live list with a real choice)» (the repository result gets an extra 720p candidate, since real E15 live candidates are «Авто» only). `jest.config.js` now ignores `.claude/worktrees/` (agent worktrees).
+
+Checks run after the review patches:
+- `npm run lint -- --max-warnings 0`, `npm run typecheck`, `npm run check:fixtures` (30): clean.
+- Plain `npm test` ×3: 126 suites, 2799 tests passed in each run.
+- `npx jest __tests__/playerFlow.test.tsx __tests__/authorFlow.test.tsx __tests__/postFlow.test.tsx __tests__/demoFlow.test.tsx src/features/player` ×30: 0 failed runs, 670 tests passed in each.
+
+Before the review: the same suites with CLI ignore flags for `.claude/worktrees/`; full run ×3: 125 suites, 2791 passed each; the touched files ×30: 0 failed runs, 662 each.
+
+Device (agent over adb, Chromecast with Google TV, release-like build from `8bd3669`, `adb install -r`): the Continue-row card → OK opened the player at the saved position (2:11) and it played about 2 s with no pause; Menu opened «Настройки» with focus on «Качество 1440p»; Back closed the sheet and focus returned to the gear; two more Back returned to the same Continue card, still «Осталось 108 мин» (no progress write). The whole run took under 10 s.
+
+Not checked:
+- Seeks, hold-to-seek, the ±10 s skip, sleep/resume, audio-focus loss and «Повторить» on the device (a seek on the owner's content would count as movement and write progress); host-tested only.
+- Live (no subscribed blog is live), the physical remote and TalkBack.
+
 ### Epic 3 retro A4 — sidebar OK from Автор/Пост with animations off, 2026-10-31
 
 Device: Chromecast with Google TV, the release-like build from `48b1a22` over adb. Window and transition animation scales set to 0 and animator duration to 0 for the check, then restored (1.0, 1.0, unset). Пост (opened from Главная) → Left → sidebar «Подписки» → OK: the Подписки section opened with the tab selected and focus on the first author card. Автор (opened from Подписки) → Left → sidebar «События» → OK: the События section opened (empty state) with focus on «Обновить»; Back moved focus to the sidebar and did not bring Автор back. No stuck or doubled screen, so the `pendingShellSection` unmount timing holds with animations off. Not checked with the physical remote.
