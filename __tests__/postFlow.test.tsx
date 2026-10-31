@@ -2986,6 +2986,113 @@ describe('Story 6.6: vote and retract in a single-choice poll', () => {
     await unmount(root);
   });
 
+  describe('Epic 6 retro A4: story boundaries', () => {
+    const SIGNED = '?user_id=1001&content_id=1002&expire_time=1700003600&sign=SECRETSIGNATURE';
+    const AUDIO_URL = 'https://example.invalid/audio/track';
+    const AUDIO = { type: 'audio_file', id: 'a1', title: 'Метроном', duration: 192, url: AUDIO_URL };
+
+    beforeEach(() => {
+      engine.reset();
+      mockPlayerFlag.on = true;
+      e8 = (_req, blogUrl, postId) => ({
+        status: 200,
+        body: postDetail(blogUrl, postId, [...paragraph('До'), AUDIO, ...paragraph('После')], {
+          poll: e8Poll,
+          signedQuery: SIGNED,
+        }),
+      });
+    });
+    afterEach(() => {
+      mockPlayerFlag.on = false;
+    });
+
+    /** Пост with the poll and the audio; the audio plays (one fresh E8, one engine). */
+    async function playingPost() {
+      const root = await openFromHome();
+      const id = FEED_ID(0);
+      const audio = BLOCK(id, 'audio_file:a1');
+      await press(root, audio);
+      expect(engine.mounts).toBe(1);
+      expect(engine.props?.paused).toBe(false);
+      expect(engine.props?.source.uri).toBe(`${AUDIO_URL}${SIGNED}`);
+      return { root, id, audio };
+    }
+
+    it('R4: audio keeps playing across a vote (E11 + E10 → applyPoll re-renders the post): same engine, not paused, no new audio E8', async () => {
+      const { root, id, audio } = await playingPost();
+      const e8Before = e8Calls().length;
+      pollReply = req =>
+        req.method === 'GET' ? { status: 200, body: { data: { poll: apiPoll([2], [10, 9, 3]) } } } : { status: 200, body: {} };
+      await press(root, OPTION(id, '2'));
+      await press(root, OPTION(id, '2'));
+      expect(pollCalls()).toEqual([
+        ['POST', VOTE, { answer: '2' }],
+        ['GET', E10, null],
+      ]);
+      expect(chosen(root, id, '2')).toBe(true);
+      expect(engine.mounts).toBe(1);
+      expect(engine.unmounts).toBe(0);
+      expect(engine.props?.paused).toBe(false);
+      expect(engine.props?.source.uri).toBe(`${AUDIO_URL}${SIGNED}`);
+      expect(e8Calls()).toHaveLength(e8Before);
+      expect(visible(root, `${audio}/pause`)).toBe(true);
+      await unmount(root);
+    });
+
+    it('R4: audio keeps playing across the E8 fallback (E10 fails → the post\'s E8 again re-renders it): same engine, not paused', async () => {
+      const { root, id, audio } = await playingPost();
+      const e8Before = e8Calls().length;
+      pollReply = req => (req.method === 'GET' ? { status: 404, body: { error: 'not_found' } } : { status: 200 });
+      e8Poll = apiPoll([2], [10, 9, 3]);
+      await press(root, OPTION(id, '2'));
+      await press(root, OPTION(id, '2'));
+      expect(e8Calls()).toHaveLength(e8Before + 1);
+      expect(chosen(root, id, '2')).toBe(true);
+      expect(engine.mounts).toBe(1);
+      expect(engine.unmounts).toBe(0);
+      expect(engine.props?.paused).toBe(false);
+      expect(visible(root, `${audio}/pause`)).toBe(true);
+      await unmount(root);
+    });
+
+    it('R6: Back after a vote returns focus to the same feed card by content id, while applyPoll rewrote that card in the feed cache', async () => {
+      mockPlayerFlag.on = false;
+      const feed = syntheticFeed({ total: 9 });
+      // Feed post 2 carries the same poll, so applyPoll rewrites the list page too.
+      const feedWithPoll = (req: FixtureRequest): FixtureReply => {
+        const reply = feed(req) as { status: number; body: { data: { posts: Array<Record<string, unknown>> } } };
+        reply.body.data.posts = reply.body.data.posts.map(p => (p.id === FEED_ID(2) ? { ...p, poll: apiPoll(null) } : p));
+        return reply as FixtureReply;
+      };
+      pollReply = req =>
+        req.method === 'GET' ? { status: 200, body: { data: { poll: apiPoll([2], [10, 9, 3]) } } } : { status: 200, body: {} };
+      transport = installFixtureTransport(req =>
+        req.path === E5_PATH ? feedWithPoll(req) : req.path === VOTE || req.path === E10 ? pollReply(req) : fullHandler(req),
+      );
+      const root = await openFromHome(2);
+      const id = FEED_ID(2);
+      type Feed = { pages: Array<{ posts: Post[] }> };
+      const feedPollAnswer = () =>
+        queryClient
+          .getQueriesData<Feed>({ queryKey: ['feed'] })
+          .flatMap(([, data]) => data?.pages.flatMap(page => page.posts) ?? [])
+          .find(p => p.id === id)?.poll?.answer;
+      expect(feedPollAnswer()).toEqual([]);
+      await press(root, OPTION(id, '2'));
+      await press(root, OPTION(id, '2'));
+      expect(pollCalls()).toEqual([
+        ['POST', VOTE, { answer: '2' }],
+        ['GET', E10, null],
+      ]);
+      expect(feedPollAnswer()).toEqual(['2']);
+      focusMock.mockClear();
+      await back();
+      expect(routeNames()).toEqual(['Shell']);
+      expect(lastFocusTarget()).toBe(FEED_CARD(2));
+      await unmount(root);
+    });
+  });
+
   it('matrix «Finished / multiple»: one stop, OK inert, nothing sent', async () => {
     // Story 6.7: an open multiple-choice poll takes votes now; a finished one stays inert.
     for (const overrides of [{ isFinished: true }, { isMultiple: true, isFinished: true }]) {

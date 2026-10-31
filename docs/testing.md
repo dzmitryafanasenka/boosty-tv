@@ -906,6 +906,34 @@ Host tests: `src/shared/services/progress/__tests__/progressRepository.test.ts` 
 ### Epic 3 retro A4 — sidebar OK from Автор/Пост with animations off, 2026-10-31
 
 Device: Chromecast with Google TV, the release-like build from `48b1a22` over adb. Window and transition animation scales set to 0 and animator duration to 0 for the check, then restored (1.0, 1.0, unset). Пост (opened from Главная) → Left → sidebar «Подписки» → OK: the Подписки section opened with the tab selected and focus on the first author card. Автор (opened from Подписки) → Left → sidebar «События» → OK: the События section opened (empty state) with focus on «Обновить»; Back moved focus to the sidebar and did not bring Автор back. No stuck or doubled screen, so the `pendingShellSection` unmount timing holds with animations off. Not checked with the physical remote.
+### Retro follow-ups: PostBody / PollWidget split and boundary tests, 2026-10-31
+
+**Status: host-tested only; no device run (no adb in this change).** `spec-retro-post-split-and-boundary-tests.md`. It covers `epic-6-retro-item-28` (A3), `epic-6-retro-item-29` (A4), `epic-7-retro-item-36` (A4) and `epic-3-retro-item-13` (A5).
+
+Commit 1 is a behaviour-preserving refactor:
+- the `PostBody` / `PollWidget` split;
+- the shared `usePendingConfirm` and `useColumnStop`;
+- `polls/pollFocus.ts`;
+- `src/test/frames.ts` and `createFlow` `advance` / `key`.
+
+Its new unit tests are `src/shared/focus/__tests__/usePendingConfirm.test.tsx` and `src/features/polls/__tests__/pollFocus.test.ts`.
+
+Commit 2:
+- the F3 fix: OK on «Нравится» cancels only a running E15 poll (`authorFlow` «Story 7.4» «F3: …», 4 tests);
+- `eventsFlow`: F6 scheduled and F6 ended, plus «resume with nested stacks», F5 and V2, 2 tests;
+- `homeFeedFlow`: «Epic 3 retro V1» and «V3»;
+- `postFlow` «Story 6.6 › Epic 6 retro A4»: R4 ×2 and R6;
+- the R5 line in `focus-map.md` and the R3 comment in `applyPoll.ts`;
+- the timestamp-proof log checks in `playerFlow` «Expired URL» and `eventsFlow` «Malformed».
+
+Checks run:
+- Lint (`--max-warnings 0`), typecheck and `check:fixtures` (30): clean.
+- `npm test` ×3: 122 suites, 2732 tests passed in each run.
+- The touched and new test files ×30: 0 failed runs, 833 tests passed in each. The files: `authorFlow`, `codeFlow`, `homeFeedFlow`, `playerFlow`, `postFlow`, `eventsFlow`, `useAuthorLiveActions`, `focusSoon`, `useOutcomeFocus`, `usePendingConfirm`, `pollFocus`, `PollWidget`, `linkChip`, `teaser`, `AudioBlock`.
+
+Not checked:
+- Device rows (the poll and audio focus after the split, the F3 like on a real stream).
+- The physical remote and TalkBack.
 
 ### Fix — PostCard placeholder for posts without a preview, 2026-10-30
 

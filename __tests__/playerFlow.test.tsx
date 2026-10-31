@@ -2371,7 +2371,9 @@ describe('recovery (Story 4.4)', () => {
     // The player's recovery logs carry no URL, id or position.
     const playerLogs = logger.entries().filter(entry => entry.scope === 'player');
     expect(playerLogs.map(entry => entry.message)).toContain('playback failed; recovering');
-    expect(JSON.stringify(playerLogs)).not.toMatch(/example\.invalid|312|v1/);
+    // Every field but the wall-clock `time`, which can contain «312» by chance.
+    const logged = playerLogs.map(({ level, scope, message, fields }) => ({ level, scope, message, fields }));
+    expect(JSON.stringify(logged)).not.toMatch(/example\.invalid|312|v1/);
     expect(JSON.stringify(logger.entries())).not.toContain('example.invalid');
     await unmount(root);
   });

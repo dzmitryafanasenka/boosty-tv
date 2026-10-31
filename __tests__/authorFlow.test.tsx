@@ -3023,6 +3023,116 @@ describe('Story 7.4: like and share a live stream', () => {
     await unmount(root);
   });
 
+  /** Автор once (the stream cached), Back, then a reopen whose own first E15 is held. */
+  async function reopenWithHeldFirstE15() {
+    e15 = () => e15Stream('live', LIVE_357);
+    const root = await openAuthor();
+    await back();
+    expect(currentRoute()).toBe('Shell');
+    const first = deferred();
+    e15 = () => first.promise;
+    await press(root, TILE(1));
+    expect(currentRoute()).toBe('Author');
+    // The cached card shows while the page's own first E15 runs.
+    expect(streamCalls()).toHaveLength(2);
+    expect(visible(root, LIKE)).toBe(true);
+    return { root, first };
+  }
+
+  it('F3: OK while the page\'s own first E15 runs does not cancel it; the stream ended → the card goes when it lands', async () => {
+    const { root, first } = await reopenWithHeldFirstE15();
+    const like = deferred();
+    e17 = () => like.promise;
+    await press(root, LIKE);
+    expect(e17Calls()).toHaveLength(1);
+    await act(async () => {
+      first.resolve(e15None());
+    });
+    await settle();
+    // Not 30 s later: the first answer lands now.
+    expect(visible(root, LIVE)).toBe(false);
+    expect(visible(root, LIKE)).toBe(false);
+    await act(async () => {
+      like.resolve({ status: 200 });
+    });
+    await settle();
+    // Nothing ran at success: no E15 again, nothing written.
+    expect(streamCalls()).toHaveLength(2);
+    expect(queryClient.getQueryData(queryKeys.stream(BLOG))).toBeNull();
+    expect(visible(root, LIVE)).toBe(false);
+    await unmount(root);
+  });
+
+  it('F3: the first E15 still running at E17 200 is cancelled (it may carry the pre-like value) and sent once again after the write', async () => {
+    const { root, first } = await reopenWithHeldFirstE15();
+    const like = deferred();
+    e17 = () => like.promise;
+    await press(root, LIKE);
+    expect(likeLabel(root)).toBe('Вам нравится, 358');
+    e15 = () => e15Stream('live', { isLiked: true, count: { viewers: 10, likes: 360 } });
+    await act(async () => {
+      like.resolve({ status: 200 });
+    });
+    await settle();
+    expect(streamCalls()).toHaveLength(3);
+    // The held pre-like reply answers late: never written.
+    await act(async () => {
+      first.resolve(e15Stream('live', LIVE_357));
+    });
+    await settle();
+    expect(likeLabel(root)).toBe('Вам нравится, 360');
+    expect(queryClient.getQueryData(queryKeys.stream(BLOG))).toMatchObject({ isLiked: true, likes: 360 });
+    expect(e17Calls()).toHaveLength(1);
+    await unmount(root);
+  });
+
+  it('F3: an invalidation\'s E15 (the Player exit, a resume) running at OK is not cancelled; the stream ended → the card goes when it lands', async () => {
+    e15 = () => e15Stream('live', LIVE_357);
+    const root = await openAuthor();
+    const refetch = deferred();
+    e15 = () => refetch.promise;
+    await act(async () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.stream(BLOG) }).catch(() => {});
+    });
+    await settle();
+    expect(streamCalls()).toHaveLength(2);
+    const like = deferred();
+    e17 = () => like.promise;
+    await press(root, LIKE);
+    await act(async () => {
+      refetch.resolve(e15None());
+    });
+    await settle();
+    expect(visible(root, LIVE)).toBe(false);
+    await act(async () => {
+      like.resolve({ status: 200 });
+    });
+    await settle();
+    expect(streamCalls()).toHaveLength(2);
+    expect(visible(root, LIVE)).toBe(false);
+    await unmount(root);
+  });
+
+  it('F3: a poll running at OK is still cancelled (no E15 again after success)', async () => {
+    e15 = () => e15Stream('live', LIVE_357);
+    const root = await openAuthor();
+    const poll = deferred();
+    e15 = () => poll.promise;
+    await pollNow();
+    expect(streamCalls()).toHaveLength(2);
+    await press(root, LIKE);
+    await settle();
+    await act(async () => {
+      poll.resolve(e15None());
+    });
+    await settle();
+    // The cancelled poll's «none» is never written; no E15 is sent again.
+    expect(visible(root, LIVE)).toBe(true);
+    expect(likeLabel(root)).toBe('Вам нравится, 358');
+    expect(streamCalls()).toHaveLength(2);
+    await unmount(root);
+  });
+
   it('Success: the write is relative to the cached value (a newer poll count is kept)', async () => {
     e15 = () => e15Stream('live', LIVE_357);
     const root = await openAuthor();

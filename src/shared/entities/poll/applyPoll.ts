@@ -14,6 +14,12 @@ import type { Poll } from './types';
  *   query with no match is never written.
  * - Each written query keeps its `dataUpdatedAt`: a vote never makes a list
  *   look fresh, so it never delays the feed-head refresh on resume.
+ * - Limit (accepted, Epic 6 retro R3): a list page append or a head refresh
+ *   that started before this write and lands after it replaces the page
+ *   with the poll it fetched, so the list may keep the pre-vote poll until
+ *   its next refetch. Nothing visible depends on it (list cards show no poll
+ *   results); the Пост reads its own `post` query, which E10 wrote (and
+ *   whose E8 is re-sent when E10 fails).
  */
 
 /** The query-cache roots whose data can hold a Post (queryKeys). */

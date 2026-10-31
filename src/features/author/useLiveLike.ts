@@ -1,4 +1,4 @@
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, type QueryClient, type QueryKey } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { accountScope, captureGeneration, createGenerationKeyedStore } from '../../shared/account';
 import { isAppError, queryKeys, type AppErrorKind, type HttpClient } from '../../shared/api';
@@ -16,10 +16,16 @@ import { useLatestRef } from '../../shared/focus';
  *   it runs, OK is ignored (no second request, no flip).
  * - The optimistic state is an overlay over the `['stream', blogUrl]` query,
  *   tied to the stream's id (a new stream on the same blog never shows or
- *   receives it): before it is set, a running E15 of that key is cancelled,
- *   and a poll that lands while E17 runs never undoes it (the overlay holds
- *   until E17 settles).
- * - Success: a poll started meanwhile is cancelled, then the target state is
+ *   receives it): before it is set, a running E15 poll of that key is
+ *   cancelled, and an E15 that lands while E17 runs never undoes it (the
+ *   overlay holds until E17 settles).
+ * - Only a poll (the 30 s refetch) is cancelled at OK. Any other running
+ *   E15 (the page's own first E15, the Player-exit or resume invalidation)
+ *   runs on, so an ended stream's card still goes when it lands (Epic 7
+ *   retro F3; before, it could stay up to 30 s).
+ * - Success: a poll started meanwhile is cancelled; another running E15 is
+ *   cancelled too (it may carry the pre-like value) and sent again once the
+ *   write is done. Then the target state is
  *   written into the query relative to its current value (`isLiked` set;
  *   `likes` ± 1 only when the cached `isLiked` differs, clamped at ≥ 0) and
  *   kept; the next poll reconciles. The overlay is dropped once the page
@@ -57,6 +63,21 @@ function dropSettled(blogUrl: string) {
   }
 }
 
+/**
+ * The running E15 of `queryKey`, if any: `poll` for the 30 s refetch, else
+ * `other` (the page's own first E15, before `pageAnswered`, or an
+ * invalidation's refetch: the Player exit, a resume). Only a query state
+ * tells them apart: an invalidated query stays `isInvalidated` until its
+ * refetch succeeds.
+ */
+function runningFetch(client: QueryClient, queryKey: QueryKey, pageAnswered: boolean): 'poll' | 'other' | null {
+  const query = client.getQueryCache().find({ queryKey, exact: true });
+  if (query?.state.fetchStatus !== 'fetching') {
+    return null;
+  }
+  return pageAnswered && !query.state.isInvalidated ? 'poll' : 'other';
+}
+
 /** Test-only: forget every like request and overlay. */
 export function resetLiveLikesForTests() {
   overlays.reset();
@@ -80,8 +101,15 @@ export type LiveLike = {
 
 type LikeError = { kind: AppErrorKind; generation: number; streamId: string };
 
-export function useLiveLike(http: HttpClient, blogUrl: string, stream: Stream | null): LiveLike {
+/** `pageAnswered`: the page's own first E15 answered (`AuthorLiveStream.answered`). */
+export function useLiveLike(
+  http: HttpClient,
+  blogUrl: string,
+  stream: Stream | null,
+  pageAnswered: boolean,
+): LiveLike {
   const client = useQueryClient();
+  const answeredRef = useLatestRef(pageAnswered);
   const [error, setError] = useState<LikeError | null>(null);
   const mounted = useRef(true);
   useEffect(() => {
@@ -138,11 +166,16 @@ export function useLiveLike(http: HttpClient, blogUrl: string, stream: Stream | 
     const likes = Math.max(0, current.likes + (isLiked ? 1 : -1));
     const queryKey = queryKeys.stream(blogUrl);
     // A poll running now would land over the optimistic state: cancel it
-    // first (TanStack reverts it; the next poll runs on schedule).
-    client.cancelQueries({ queryKey, exact: true }).catch(() => {});
+    // first (TanStack reverts it; the next poll runs on schedule). Any other
+    // E15 runs on (F3): the overlay covers it while E17 runs.
+    if (runningFetch(client, queryKey, answeredRef.current) === 'poll') {
+      client.cancelQueries({ queryKey, exact: true }).catch(() => {});
+    }
     const entry: Overlay = { streamId, isLiked, likes, settled: false };
     overlays.set(key, entry);
     setError(null);
+    /** A non-poll E15 was cancelled at success: it is sent again after the write. */
+    let fetchAgain = false;
     const run = async () => {
       try {
         await StreamRepository.like(http, blogUrl, isLiked);
@@ -153,9 +186,14 @@ export function useLiveLike(http: HttpClient, blogUrl: string, stream: Stream | 
         return false;
       }
       if (sameAccount()) {
-        // A poll started while E17 ran carries the pre-like value: cancel it
-        // before the write, so it cannot land after it.
-        await client.cancelQueries({ queryKey, exact: true }).catch(() => {});
+        // An E15 started while E17 ran carries the pre-like value: cancel it
+        // before the write, so it cannot land after it. A non-poll one (the
+        // first E15, an invalidation) is sent again after the write (F3).
+        const inFlight = runningFetch(client, queryKey, answeredRef.current);
+        if (inFlight !== null) {
+          fetchAgain = inFlight === 'other';
+          await client.cancelQueries({ queryKey, exact: true }).catch(() => {});
+        }
       }
       return true;
     };
@@ -189,6 +227,9 @@ export function useLiveLike(http: HttpClient, blogUrl: string, stream: Stream | 
           } else {
             overlays.set(key, { ...entry, settled: true });
           }
+          if (fetchAgain) {
+            client.invalidateQueries({ queryKey, exact: true }).catch(() => {});
+          }
         } else {
           // The rollback (or an old account's entry, which nothing shows).
           overlays.delete(key);
@@ -196,7 +237,7 @@ export function useLiveLike(http: HttpClient, blogUrl: string, stream: Stream | 
       })
       .catch(() => {});
     return true;
-  }, [client, http, blogUrl, shownRef]);
+  }, [client, http, blogUrl, shownRef, answeredRef]);
 
   const shownError =
     error !== null &&

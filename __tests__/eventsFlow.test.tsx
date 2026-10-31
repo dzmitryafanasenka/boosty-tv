@@ -11,7 +11,7 @@ import { notifyManager } from '@tanstack/react-query';
 import { act } from 'react';
 import { AppState, StyleSheet } from 'react-native';
 import App, { navigationRef } from '../src/app/App';
-import { queryClient, resetQueryCache } from '../src/app/queryClient';
+import { QUERY_STALE_TIME_MS, queryClient, resetQueryCache } from '../src/app/queryClient';
 import { eventReadMarksStore } from '../src/features/events';
 import { accountScope } from '../src/shared/account';
 import { type FixtureReply, type FixtureRequest, type FixtureTransport } from '../src/shared/api/fixtureTransport';
@@ -22,7 +22,9 @@ import { colors } from '../src/shared/ui';
 import { requestHostFocus } from '../src/shared/ui/requestHostFocus';
 import backHandler from '../src/test/backHandlerMock';
 import { E5_PATH, e5Page } from '../src/test/feedFixtures';
-import { e3Body, e15None, e15Stream, syntheticBlogPosts } from '../src/test/authorFixtures';
+import { e3Body, e4Path, e15None, e15Path, e15Stream, syntheticBlogPosts } from '../src/test/authorFixtures';
+import { cursorOf } from '../src/test/feedFixtures';
+import { paragraph, postDetail } from '../src/test/postFixtures';
 import { E2_PATH, blogUrlOf, e1NoBlogBody, subscriptionsBody } from '../src/test/subscriptionFixtures';
 import e18Live from '../src/test/fixtures/boosty/e18-events.json';
 import e18Synthetic from '../src/test/fixtures/boosty/e18-events-synthetic.json';
@@ -124,6 +126,9 @@ const e18Body = (events: unknown[]): Json => ({
 
 let e18: (req: FixtureRequest) => Reply;
 let e15: (req: FixtureRequest) => Reply;
+/** E8 (a single post), for the nested-stack resume test. */
+let e8: (blogUrl: string, postId: string) => Reply;
+const E8_RE = /^\/v1\/blog\/([^/]+)\/post\/([^/]+)$/;
 let transport: FixtureTransport;
 
 beforeAll(() => {
@@ -150,6 +155,7 @@ beforeEach(() => {
   mockEventsFlag.on = true;
   e18 = () => ({ status: 200, body: e18Body([event(3, { type: 'video_stream_start', isRead: false, blog: { blogUrl: LIVE_BLOG } }), event(2), event(1, { type: 'promo_new' })]) });
   e15 = () => e15None();
+  e8 = (blogUrl, postId) => ({ status: 200, body: postDetail(blogUrl, postId, paragraph('Text')) });
   transport = installFixtureTransport(req => {
     if (req.path === E18) {
       return e18(req);
@@ -168,6 +174,10 @@ beforeEach(() => {
     }
     if (req.path === E2_PATH) {
       return { status: 200, body: subscriptionsBody(3) };
+    }
+    const single = E8_RE.exec(req.path);
+    if (single) {
+      return e8(decodeURIComponent(single[1]), decodeURIComponent(single[2]));
     }
     const posts = /^\/v1\/blog\/([^/]+)\/post\/$/.exec(req.path);
     if (posts) {
@@ -399,7 +409,9 @@ describe('matrix: event types', () => {
     expect(rowIds(root)).toEqual([ROW(1184), ROW(1189), ROW(1191)]);
     const dropped = logger.entries().filter(e => e.scope === 'event' && e.message === 'dropped');
     expect(dropped).toEqual([expect.objectContaining({ level: 'warn', fields: { count: '2' } })]);
-    expect(JSON.stringify(logger.entries())).not.toMatch(/synthetic-blog|example\.invalid|1184|post_comment|video_stream/);
+    // Every field but the wall-clock `time`, which can contain «1184» by chance.
+    const logged = logger.entries().map(({ level, scope, message, fields }) => ({ level, scope, message, fields }));
+    expect(JSON.stringify(logged)).not.toMatch(/synthetic-blog|example\.invalid|1184|post_comment|video_stream/);
     await unmount(root);
   });
 });
@@ -438,6 +450,48 @@ describe('matrix «OK», «OK, no blog», «Back»', () => {
     await press(root, ROW(5002));
     expect(currentRoute()?.params).toEqual({ blogUrl: BLOG2, section: 'events' });
     expect(focusTargets().filter(Boolean).pop()).toBe(`author/${BLOG2}/post/blog-post-0`);
+    await unmount(root);
+  });
+
+  it('OK on a stream row whose author\'s stream is scheduled (Epic 7 retro F6): the «Запланирован» card, focus on the first post; Back → the row', async () => {
+    e15 = () => e15Stream('scheduled', { startTime: 1_790_100_000 });
+    const root = await openEvents();
+    focusMock.mockClear();
+    await press(root, ROW(5003));
+    expect(currentRoute()?.params).toEqual({ blogUrl: LIVE_BLOG, section: 'events' });
+    const live = `author/${LIVE_BLOG}/live`;
+    expect(visible(root, live)).toBe(true);
+    expect(text(byTestId(root, `${live}/badge`)[0])).toContain(t('author.live.badgeScheduled'));
+    // The 7.1 rule: a scheduled card never takes the initial focus.
+    const targets = focusTargets().filter(Boolean);
+    expect(targets[targets.length - 1]).toBe(`author/${LIVE_BLOG}/post/blog-post-0`);
+    expect(targets).not.toContain(live);
+    expect(transport.callsTo(`/v1/blog/${LIVE_BLOG}/video_stream`)).toHaveLength(1);
+    expect(routeNamesIncludePlayer()).toBe(false);
+    focusMock.mockClear();
+    await back();
+    expect(currentRoute()?.name).toBe('Shell');
+    expect(lastFocusTarget()).toBe(ROW(5003));
+    await unmount(root);
+  });
+
+  it('OK on a stream row whose stream ended between E18 and E15 (Epic 7 retro F6): no card, focus on the first post; Back → the row, read', async () => {
+    // E18 still says «Начался эфир», E15 answers 204 (no stream).
+    e15 = () => e15None();
+    const root = await openEvents();
+    expect(rowText(root, 5003)).toContain(t('events.text.streamStart'));
+    focusMock.mockClear();
+    await press(root, ROW(5003));
+    expect(currentRoute()?.params).toEqual({ blogUrl: LIVE_BLOG, section: 'events' });
+    expect(visible(root, `author/${LIVE_BLOG}/live`)).toBe(false);
+    expect(focusTargets().filter(Boolean).pop()).toBe(`author/${LIVE_BLOG}/post/blog-post-0`);
+    expect(transport.callsTo(`/v1/blog/${LIVE_BLOG}/video_stream`)).toHaveLength(1);
+    expect(routeNamesIncludePlayer()).toBe(false);
+    expect(eventReadMarksStore.getState().ids.has('5003')).toBe(true);
+    focusMock.mockClear();
+    await back();
+    expect(lastFocusTarget()).toBe(ROW(5003));
+    expect(visible(root, `${ROW(5003)}/dot`)).toBe(false);
     await unmount(root);
   });
 
@@ -664,6 +718,93 @@ describe('matrix «Empty» and «Error»', () => {
     await settle();
     expect(rowIds(root)).toHaveLength(1);
     expect(focusTargets()).toEqual([]);
+    await unmount(root);
+  });
+});
+
+describe('resume with nested stacks (Epic 3 retro V2, Epic 7 retro F5)', () => {
+  let handlers: Array<(state: string) => void> = [];
+  beforeEach(() => {
+    handlers = [];
+    jest.spyOn(AppState, 'addEventListener').mockImplementation(((_type: string, listener: (state: string) => void) => {
+      handlers.push(listener);
+      return { remove: () => { handlers = handlers.filter(h => h !== listener); } };
+    }) as unknown as typeof AppState.addEventListener);
+  });
+  async function changeAppState(state: string) {
+    await act(async () => {
+      for (const h of [...handlers]) {
+        h(state);
+      }
+    });
+    await settle();
+  }
+  const routeNames = () => navigationRef.getRootState()?.routes.map(r => r.name);
+  const POST_ID = 'blog-post-0';
+
+  /** События → OK on the stream row → Автор (LIVE_BLOG) → its first post → the post's author row → Автор (BLOG2). */
+  async function nestedStack() {
+    // Synthetic: the post's author row points to another blog, so the two
+    // Автор routes observe distinct E4 and E15 keys (one request per key).
+    e8 = (_blogUrl, postId) => ({ status: 200, body: postDetail(BLOG2, postId, paragraph('Text')) });
+    const root = await openEvents();
+    await press(root, ROW(5003));
+    await press(root, `author/${LIVE_BLOG}/post/${POST_ID}`);
+    expect(currentRoute()?.name).toBe('Post');
+    await press(root, `post/${POST_ID}/author`);
+    expect(routeNames()).toEqual(['Shell', 'Author', 'Post', 'Author']);
+    expect(currentRoute()?.params).toEqual(expect.objectContaining({ blogUrl: BLOG2 }));
+    return root;
+  }
+
+  it('one stale resume sends E1, then E5 + E4×2 + E15×2 + E18 at once (one per observed key, covered routes included) and nothing else', async () => {
+    const root = await nestedStack();
+    const before = transport.calls.length;
+    focusMock.mockClear();
+    await changeAppState('background');
+    jest.setSystemTime(Date.now() + QUERY_STALE_TIME_MS + 1_000);
+    await changeAppState('active');
+    const sent = transport.calls.slice(before);
+    const count = (path: string, pageOne = false) =>
+      sent.filter(c => c.path === path && (!pageOne || cursorOf(c.url) === null)).length;
+    expect(count(E1)).toBe(1);
+    expect(count(E5_PATH, true)).toBe(1);
+    expect(count(e4Path(LIVE_BLOG), true)).toBe(1);
+    expect(count(e4Path(BLOG2), true)).toBe(1);
+    expect(count(e15Path(LIVE_BLOG))).toBe(1);
+    expect(count(e15Path(BLOG2))).toBe(1);
+    expect(count(E18)).toBe(1);
+    // The combined count: E1 + E5 + E4×N + E15×N + E18 with N = 2.
+    expect(sent).toHaveLength(1 + 1 + 2 + 2 + 1);
+    // No Пост E8, no E3, no page append.
+    expect(sent.filter(c => E8_RE.test(c.path))).toEqual([]);
+    // The covered routes (Shell, Автор A, Пост) take no focus; the top Автор keeps the route.
+    expect(routeNames()).toEqual(['Shell', 'Author', 'Post', 'Author']);
+    const targets = focusTargets().filter(Boolean) as string[];
+    expect(targets.filter(id => id.startsWith('events/') || id.startsWith('home/') || id.startsWith('post/'))).toEqual([]);
+    expect(targets.filter(id => id.startsWith(`author/${LIVE_BLOG}`))).toEqual([]);
+    await unmount(root);
+  });
+
+  it('after the resume, Back per layer: Автор B → Пост (its author row) → Автор A (the post card) → События (the row)', async () => {
+    const root = await nestedStack();
+    await changeAppState('background');
+    jest.setSystemTime(Date.now() + QUERY_STALE_TIME_MS + 1_000);
+    await changeAppState('active');
+    focusMock.mockClear();
+    await back();
+    expect(routeNames()).toEqual(['Shell', 'Author', 'Post']);
+    expect(lastFocusTarget()).toBe(`post/${POST_ID}/author`);
+    focusMock.mockClear();
+    await back();
+    expect(routeNames()).toEqual(['Shell', 'Author']);
+    expect(lastFocusTarget()).toBe(`author/${LIVE_BLOG}/post/${POST_ID}`);
+    focusMock.mockClear();
+    await back();
+    expect(routeNames()).toEqual(['Shell']);
+    expect(lastFocusTarget()).toBe(ROW(5003));
+    // Nothing more was sent by the pops.
+    expect(transport.calls.filter(c => c.method !== 'GET')).toEqual([]);
     await unmount(root);
   });
 });
