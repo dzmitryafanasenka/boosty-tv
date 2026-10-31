@@ -1,0 +1,49 @@
+__tests__/homeFeedFlow.test.tsx
+  s_7477a2e6c69ec6::t_087c20f4625343 1317-1355,3704-3721
+__tests__/playerFlow.test.tsx
+  s_7477a2e6c69ec6::t_a0a38e06e6e5c8 2374-2376
+docs/api-contract.md
+  s_7477a2e6c69ec6::t_ea6e8a40bf5b3e 483-484
+docs/focus-map.md
+  s_7477a2e6c69ec6::t_2b56d681b55736 382-383
+docs/testing.md
+  s_7477a2e6c69ec6::t_7fc9a8850440e5 906-934
+src/features/author/useAuthorLiveBlock.ts
+  s_7477a2e6c69ec6::t_92b50064681918 60
+src/features/author/useLiveLike.ts
+  s_7477a2e6c69ec6::t_6e4867aa156441 1,19-28,66-80,104-110,112,169-173,177-178,189-196,230-232,240
+__tests__/authorFlow.test.tsx
+  s_25768f3485a5a1::t_7481725424ea1b 3026-3135
+__tests__/postFlow.test.tsx
+  s_25768f3485a5a1::t_fcb34ceae32c00 2989-3095
+src/shared/entities/poll/applyPoll.ts
+  s_25768f3485a5a1::t_0ecf4f2a695c80 17-22
+__tests__/eventsFlow.test.tsx
+  s_25768f3485a5a1::t_b34c9e7e8a90f9 14,25-27,129-131,158,178-181,412-414,456-497,725-811
+_bmad-output/implementation-artifacts/spec-retro-post-split-and-boundary-tests.md
+  s_25768f3485a5a1::t_a235cc24c66284 1-135
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "a7cd3dea401c647386b47f7003f6cdf5285b1345",
+  "prompts": {},
+  "sessions": {
+    "s_25768f3485a5a1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a18609a68914e3a98",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_7477a2e6c69ec6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d998e7e2-636f-4943-a058-23b274887697",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
