@@ -1,0 +1,27 @@
+__tests__/loggerFieldKeys.test.js
+  s_7477a2e6c69ec6::t_d82585a61f0ad8 1-137
+_bmad-output/implementation-artifacts/spec-epic-8-retro-a1-logger-code-keys.md
+  s_7477a2e6c69ec6::t_7c0b85f28c384f 1-45
+docs/testing.md
+  s_7477a2e6c69ec6::t_983ab7c85b42bf 919
+src/shared/services/__tests__/logger.test.ts
+  s_7477a2e6c69ec6::t_f84db3e793ff22 88-91,94,99-103
+src/shared/services/logger.ts
+  s_7477a2e6c69ec6::t_009f0a76a7316b 103-118,125,127-130,135-142
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "fea72bf3dbc891b97bf118b7a373df613964b74e",
+  "prompts": {},
+  "sessions": {
+    "s_7477a2e6c69ec6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d998e7e2-636f-4943-a058-23b274887697",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
