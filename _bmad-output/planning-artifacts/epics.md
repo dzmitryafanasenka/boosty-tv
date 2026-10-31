@@ -35,6 +35,8 @@ Production implementation does not start before P0 passes.
 
 Apple TV (tvOS) is out of scope (owner decision 2026-10-27).
 
+**As-built reconciliation (2026-10-31, Epic 7 retro A3 and Epic 3 retro A9; `_bmad-output/implementation-artifacts/spec-epic-7-retro-a3-planning-reconcile.md`).** Epics 3, 5, 6 and 7 are done. Where a later owner decision changed a story, the original text stays and an **As built** note follows it. Each note names its evidence: a story spec in `_bmad-output/implementation-artifacts/`, an ADR in `docs/adr/` or the code. The story specs, `docs/focus-map.md` and `docs/feature-parity.md` are the detailed record.
+
 ## Requirements Inventory
 
 ### Functional Requirements
@@ -49,33 +51,33 @@ The full text and testable consequences are in `prd.md` §4.
 - FR6 [P1]: The last phone number is stored in secure storage to prefill re-login. It is wiped on sign-out or account switch.
 - FR7 [P1]: Account switch (a different E1.id) wipes history, cache, filters and the stored phone before showing Главная.
 - FR8 [P1]: Sign-out goes through a confirm dialog («Отмена» is the default focus) and clears every account-scoped item. There is no server revoke.
-- FR9 [P1]: Sidebar sections open on OK only. Current and focused states are distinct. Only the sections for the current phase are shown, and События is hidden until E18 is verified.
+- FR9 [P1]: Sidebar sections open on OK only. Current and focused states are distinct. Only the sections for the current phase are shown, and События is hidden until E18 is verified. *As built: E18 was verified live in Story 7.5 and События is shown (`phaseFlags.events` on).*
 - FR10 [P1]: Back hierarchy: layers (keyboard, dialog, sheet, overlay) first, then content → sidebar → Главная → exit. Errors appear as inline or screen states, not missable toasts.
 - FR11 [P1]: Focus and scroll are restored by id after returning from a post or the player, with a documented fallback chain. Refetch never moves focus.
 - FR12 [P1]: Initial focus is deterministic. Dialogs and sheets trap focus and return it to the initiator. There is no wrap-around.
 - FR13 [P1]: The subscription feed uses opaque cursor pagination, dedups by post.id and shows an inline load-more retry. Smooth with hundreds of items.
 - FR14 [P1]: Post-type cards show a type badge, a 2-line title, author, date, and duration/progress when known. No comment counts.
 - FR15 [P1]: The «Продолжить просмотр» row: at most 20 entries, one per media id, newest first. An entry is removed when finished, on sign-out or on account switch. Labelled «на этом устройстве».
-- FR16 [P2]: «Обновить» reloads the feed and subscriptions and keeps focus.
+- FR16 [P2]: «Обновить» reloads the feed and subscriptions and keeps focus. *As built (Story 5.1, ADR 0010): a forced head refresh. One E5 page 1 is merged into the cached feed, and the subscriptions query is invalidated. The infinite query is never refetched.*
 - FR17 [P2]: The feed can be filtered by access, period and tags.
 - FR18 [P1]: Subscription grid that opens an Author. The empty state has no CTA. A «Показаны первые 30» note appears when needed.
 - FR19 [P2]: «Мой блог» appears first if the account owns an Author with at least one post.
 - FR20 [P1]: Author page with header (title, owner, avatar) and paginated posts.
-- FR21 [P2]: Live stream card: live, scheduled (refreshed every 30 s) or needs a level (name only, no price). 204 means no card.
+- FR21 [P2]: Live stream card: live, scheduled (refreshed every 30 s) or needs a level (name only, no price). 204 means no card. *As built (Story 7.1, Q1 a): E15 is polled every 30 s for a live card and for a scheduled one, while the Author route is focused and the app is in the foreground.*
 - FR22 [P2]: Watch a live stream: no seek, pause resumes at the live edge, 1× speed, «Стрим завершён». A QR is shown if the stream is not playable.
 - FR23 [P2]: Live viewer heartbeat every 30 s, plus stop=true on exit.
-- FR24 [P2]: Like or unlike a live stream optimistically, with rollback. One request in flight, no replay.
+- FR24 [P2]: Like or unlike a live stream optimistically, with rollback. One request in flight, no replay. *As built (Story 7.4, Q2 a): «Нравится» is shown only on a live card with access. «Поделиться» (FR25) is shown on every card.*
 - FR25 [P2]: Share a live stream via QR.
 - FR26 [P2]: Search in subscriptions with the system keyboard and the «по подпискам» label. The query and focus are restored.
 - FR27 [P2]: Search within an Author.
-- FR28 [P2]: Access filter: «Доступные мне» (default), «Все посты» or «Только купленные».
+- FR28 [P2]: Access filter: «Доступные мне» (default), «Все посты» or «Только купленные». *As built (Story 5.7, A a): Автор offers only «Доступные мне» and «Все посты», because E4 ignores `only_bought=true` (live).*
 - FR29 [P2]: Period filter: presets, or a custom period set with D-pad steppers. Local day bounds become from_ts/to_ts.
 - FR30 [P2]: Tag filter, multi-select. Feed tags are paginated (E13); Author tags come from E14.
 - FR31 [P2]: Filters apply immediately. «Сбросить» resets them. The filter chip shows the active count.
 - FR32 [P1]: Post screen: author (opens the Author), title, date, read-only likes, «Смотреть/Продолжить», and «С начала» when progress is > 0. Fetched with E8 and comments_limit=0.
 - FR33 [P1]: Multiple Media per post, each with its own row, progress and status. The primary action targets the first unfinished Media.
-- FR34 [P2]: Rich text (bold, italic, underline) and inline emoji. Long text collapses; expanded paragraphs are focus stops.
-- FR35 [P2]: Links, external video and files appear as chips that open a QR. Signed URLs are never logged.
+- FR34 [P2]: Rich text (bold, italic, underline) and inline emoji. Long text collapses; expanded paragraphs are focus stops. *As built (Story 6.1, owner decision 2026-10-29 Q1 a): there is no collapse. Every paragraph is a focus stop, and a long paragraph is split into stops of at most 600 characters.*
+- FR35 [P2]: Links, external video and files appear as chips that open a QR. Signed URLs are never logged. *As built (Story 6.3, owner decisions 2026-10-29; our improvements): a link to another Boosty post opens that post in the app («· Открыть»). A timestamp link to a video of the current post opens the player at that second («· Смотреть»).*
 - FR36 [P2]: Images render inline as focus stops, with a placeholder on failure.
 - FR37 [P1]: Locked post: teaser plus no-access copy (level name only). No price, payment or subscribe UI.
 - FR38 [P1]: Unknown or malformed blocks show a placeholder or are skipped. They never crash a screen.
@@ -93,7 +95,7 @@ The full text and testable consequences are in `prd.md` §4.
 - FR49 [P1]: Finished = ≥ 95 % or < 30 s left. A finished item is marked and removed from the Continue history without interrupting playback. At the actual end, write the progress and return to the origin. No autoplay.
 - FR50 [P2]: «Системный видеоплеер» opens a quality pick, then the Android chooser. No progress is tracked in this mode. Falls back to the built-in player.
 - FR51 [P1]: Lifecycle: on sleep or background, pause and write progress. On return, show the paused overlay and re-resolve the URL if needed. Release resources on exit.
-- FR52 [P2, gated]: Events list after E18 is verified. «Начался эфир» opens the Author with the live card focused.
+- FR52 [P2, gated]: Events list after E18 is verified. «Начался эфир» opens the Author with the live card focused. *As built (Story 7.5): E18 was verified live, and the gate is on.*
 - FR53 [P1 minimal / P2 full]: Настройки. P1: version and «Выйти из аккаунта». P2: «Системный видеоплеер».
 - FR54 [P2]: Diagnostics opens after 7 OK presses on «Версия». Redacted log capture, retrieved via adb.
 - FR55 [P3]: A signed release APK installs on Google TV with banner and launcher entry. It is published in a GitHub Release of the public repo. The key stays outside the repo.
@@ -122,13 +124,13 @@ From the architecture spine, ADRs, spike plan and testing.md:
 - **SessionManager** (AD-3): sole token owner with single-flight refresh. `expired` only when refresh is rejected. Recovery from SecureStore corruption.
 - **AccountScope** (AD-4): eager registration in `app/bootstrap.ts`, a generation counter that drops stale async writes, and a device vs account scope split.
 - **Errors and retries:** the AppError and AuthError taxonomies (AD-5) and the retry table (AD-6).
-- **Server state** (AD-7): TanStack Query with the queryKeys factory, the poll single source through applyPoll, the stream key, staleTime 60 s, gcTime 10 min, and resume invalidation.
+- **Server state** (AD-7): TanStack Query with the queryKeys factory, the poll single source through applyPoll, the stream key, staleTime 60 s, gcTime 10 min, and resume invalidation. *As built (ADR 0010, Stories 7.1, 7.5): on resume, paged lists get a head refresh and are never invalidated. The stream and events queries use `staleTime: 0` and are invalidated on resume. E15 is polled every 30 s.*
 - **Shared entities** (AD-8): repositories and one mapper per DTO for Post, Media, Author, Poll and Stream. Zod 4 lives at the boundary only. Domain types never expose timeCode.
 - **Media references** (AD-9): MediaRef and LiveRef. Signed URLs never go into routes or storage.
 - **ProgressRepository** (AD-10): begin with meta, report, resumePoint (local wins), finished computation and the useProgress hook.
 - **MediaResolver** (AD-11): one automatic recovery. Auth headers go to api.boosty.to only.
 - **FocusRestoration** (AD-12): keyed by route and section, with a setReturnFocus API. An English `docs/focus-map.md` is written **before the first UI story**.
-- **Navigation model** (AD-13): a root native-stack plus a Shell with in-place sections, and one modal host.
+- **Navigation model** (AD-13): a root native-stack plus a Shell with in-place sections, and one modal host. *As built: a JS stack (`@react-navigation/stack`, ADR 0007, after the Story 1.2 native-stack defect), as the spine's AD-13 already says. Автор and Пост keep the Shell sidebar (ADR 0012).*
 - **Logger and hardening** (AD-14): Logger with redaction and a ring buffer plus a capped file. A fixture sanitization check runs in CI.
 - **FixtureTransport** (AD-15): serves the debug demo mode («ДЕМО» badge) and integration tests. A release build fails if the flag is on.
 - **Release and CI** (AD-16): CI runs lint, typecheck, tests and a debug build only. Local release signing. Tag `v{versionName}`.
@@ -137,7 +139,7 @@ From the architecture spine, ADRs, spike plan and testing.md:
 - **PlaybackArbiter** (AD-19): a single playback slot.
 - **Phase flags** (AD-20): `app/phaseFlags.ts` gates sections and entry points.
 - **i18n:** a typed ru catalog and a hand-written ru plural selector (Hermes has no Intl.PluralRules).
-- **Lists and images:** FlatList with getItemLayout and RN Image. FlashList is only considered in P3.
+- **Lists and images:** FlatList with getItemLayout and RN Image. FlashList is only considered in P3. *As built (ADR 0011, owner decision 2026-10-26, from device profiling in Story 3.1): the post grids (Главная, Автор, Поиск), Подписки and События use FlashList 2.3.3. These are rows of 3 cards with a fixed row height; FlashList v2 has no `getItemLayout`. The tag list in the filter sheet stays a FlatList.*
 - **Tests:** Jest with @react-native/jest-preset, plus RNTL 14 and test-renderer. Mapper fixture tests.
 - **Device:** Chromecast with Google TV 4K. Record the OS, patch and WebView versions and the reported dp in docs/testing.md.
 
@@ -152,9 +154,9 @@ From DESIGN.md and EXPERIENCE.md:
 - **UX-DR5:** TextField for phone, code and search: border-only focus with no scale; error state; an editable country code for phone.
 - **UX-DR6:** PostCard with all type badges, the locked variant, optional duration and progress, a 2-line title and meta.
 - **UX-DR7:** AuthorCard with the optional «Мой блог» label.
-- **UX-DR8:** LiveCard in three states (live, scheduled, needs level), with «Нравится» and «Поделиться».
+- **UX-DR8:** LiveCard in three states (live, scheduled, needs level), with «Нравится» and «Поделиться». *As built (Story 7.4, Q1 a, Q2 a): the buttons sit in a column to the right of the card. «Нравится» is a heart plus the count, shown only on a live card with access. «Поделиться» is shown on every card.*
 - **UX-DR9:** MediaRow with status («Не начато», «Осталось N мин», «Просмотрено») and progress.
-- **UX-DR10:** Post layout: a left column (author, title, date · likes, buttons) and a right column (media rows, blocks), scrolling independently.
+- **UX-DR10:** Post layout: a left column (author, title, date · likes, buttons) and a right column (media rows, blocks), scrolling independently. *Superseded (owner decision 2026-10-27, `spec-post-header-layout.md`): one vertically scrolling column. The header comes first (author row, title, date · likes, then the buttons or the locked copy) and scrolls away with the content. Then come the media rows at full content width, then the body, with text capped at `text-measure` (600 dp).*
 - **UX-DR11:** Blocks: ParagraphStop, ImageBlock (max height 300, placeholder), LinkChip (QR), LikeCount (not focusable), and an unsupported-block placeholder.
 - **UX-DR12:** AudioBlock as a single focus target: OK plays or pauses, ←/→ seek 10 s.
 - **UX-DR13:** PollOption states: default, chosen, pending («Нажмите OK ещё раз»), sending, finished, inline error.
@@ -750,6 +752,11 @@ So that I see what's new as soon as I open the app.
 **When** the page is parsed
 **Then** the bad item is dropped and logged, the rest render, and unknown blocks map to `Block.Unknown` (FR38).
 
+**As built** (`spec-3-1-subscription-feed-on-the-home-screen.md`, ADR 0010, ADR 0011):
+- The grid has **3 columns**, not 4 (owner device review 2026-10-26). Cards are 221 dp wide.
+- The list is a **FlashList 2.3.3** (owner decision 2026-10-26), not a FlatList with `getItemLayout`. Its items are rows of 3 cards keyed by the first post id. A trailing partial row is held back while more pages may come. Cards stay keyed by `post.id` for focus and restoration.
+- **Resume head refresh** (owner decision 2026-10-26, `spec-feed-refresh-on-resume.md`; extended by `spec-epic-3-retro-a3-home-head-refresh.md`): after a resume E1 `ok`, a feed at least 60 s old gets one E5 page-1 request, merged into the cached head. The feed query is never refetched in full.
+
 ### Story 3.2: Subscriptions grid
 
 As a family member,
@@ -774,6 +781,8 @@ So that I can go straight to a favourite author.
 **When** I scroll
 **Then** the grid is virtualized and focus is keyed by `blogUrl`.
 
+**As built** (`spec-3-2-subscriptions-grid.md`, `spec-pin-icon-and-author-name-first.md`): the grid is a FlashList of 3-tile rows (ADR 0011). The tile's main line is the owner's name and the second line is the blog title (owner decision 2026-10-27: the title is usually a tagline).
+
 ### Story 3.3: Author page
 
 As a family member,
@@ -793,6 +802,13 @@ So that I can catch up on one creator.
 **Given** an author with no posts
 **When** the page loads
 **Then** «Публикаций нет» is shown.
+
+**As built** (`spec-3-3-author-page.md`, ADR 0010, ADR 0012, `spec-author-posts-refresh.md`, `spec-pinned-post-label.md`, `spec-pin-icon-and-author-name-first.md`):
+- The post grid has 3 columns, as on Главная (owner decision 2026-10-26). It is the shared PostGrid, a FlashList.
+- **Sidebar on stack screens** (owner decision 2026-10-27, option A; ADR 0012): Автор shows the Shell sidebar, with the origin section as the current item. OK on another section pops to the Shell and opens that section. Back pops.
+- **Head refresh** (owner decision 2026-10-27): reopening Автор with posts at least 60 s old, or a resume while Автор is in the stack, sends one E4 page-1 request, merged into the cached head.
+- **Pinned post** (owner decisions 2026-10-27): Boosty's order is kept. A pinned card on Автор shows a 📌 badge at the top right of its preview, and its accessibility label starts with «Закреплено.». Главная shows no mark.
+- **Name first** (owner decision 2026-10-27): the header's main line is the owner's name, and the blog title is the second line.
 
 ### Story 3.4: Post screen
 
@@ -821,6 +837,12 @@ So that I can see what the author published.
 **Given** the post screen
 **When** I press Back
 **Then** I return to the origin, with focus restored.
+
+**As built** (`spec-3-4-post-screen.md`, `spec-post-header-layout.md`, ADR 0012):
+- **Header on top** (owner decision 2026-10-27; this supersedes «the two-column layout» above and UX-DR10): one vertically scrolling column. The header comes first (author row → Автор, title, date · likes) and is not pinned. Then come the media rows, then the body, with text capped at about 600 dp.
+- **Sidebar** (owner decision 2026-10-27, ADR 0012): Пост shows the Shell sidebar, with the origin section as the current item.
+- **Paragraph stops** (owner decision 2026-10-27, option A): every paragraph is a focus stop (ParagraphStop), with no collapse.
+- **Inline links** (owner decision 2026-10-27): a link's text stays in its paragraph as plain text, with no placeholder. Story 6.3 added the chips.
 
 ### Story 3.5: Media rows in a post
 
@@ -857,6 +879,8 @@ So that I'm not confused or nudged toward payments.
 **Given** I open a locked post
 **When** it renders
 **Then** its teaser blocks and the no-access copy (subscription level name if known) are shown with initial focus on the author. There is no price, payment or subscribe button (FR37).
+
+**As built** (`spec-3-6-locked-posts.md`, owner decisions 2026-10-27): a teaser `image` block renders as a non-focusable image under the copy, with no auth headers. It uses the loaded image's real aspect ratio, and its height is capped so that the header, the copy and one teaser image fit on screen. With no URL, or when loading fails, it shows the «Изображение» placeholder.
 
 ## Epic 4: Watch and resume (P1)
 
@@ -1071,6 +1095,11 @@ So that I can pull in brand-new posts without restarting.
 **When** it happens
 **Then** the existing items stay visible and an inline error is shown, with no full-screen error.
 
+**As built** (`spec-5-1-refresh-the-feed.md`, ADR 0010; owner decision 2026-10-28):
+- «Обновить» sits in the feed's title row, to the right of «Новое в подписках».
+- OK runs a forced head refresh: one E5 page-1 request, merged into the cached feed, with loaded pages and positions kept. It also invalidates the subscriptions query (one E2). The infinite query is not refetched.
+- Single-flight: a running resume refresh is joined. A failure shows «Не удалось обновить» next to the button.
+
 ### Story 5.2: My-blog tile in Subscriptions
 
 As the owner,
@@ -1086,6 +1115,8 @@ So that I can check my published posts on the TV.
 **Given** no blog, or a blog with no posts
 **When** Подписки loads
 **Then** no «Мой блог» tile appears.
+
+**As built** (`spec-5-2-my-blog-tile-in-subscriptions.md`): E3 and E4 reuse the Author page's queries (E4 page 1 with `limit=20`, not `limit=1`), so opening «Мой блог» needs no new request. Owner decision 2026-10-28: the first Подписки load waits for the check, so the tile arrives first and takes the initial focus. Any failure means no tile and no error.
 
 ### Story 5.3: Filter the feed by access
 
@@ -1114,6 +1145,8 @@ So that I see exactly the kind of content I want.
 **Given** a filter that yields no posts
 **When** the feed loads
 **Then** «Ничего не найдено» is shown with a «Сбросить фильтры» action.
+
+**As built** (`spec-5-3-filter-the-feed-by-access.md`; owner decisions 2026-10-28): the chip sits between «Новое в подписках» and «Обновить». «Доступные мне» is the default, so locked posts leave Главная by default. The all-locked session check runs only under «Доступные мне».
 
 ### Story 5.4: Filter by period
 
@@ -1179,6 +1212,11 @@ So that I can find a specific video by name.
 **When** their query keys are compared
 **Then** they never collide (AD-7).
 
+**As built** (`spec-5-6-search-in-subscriptions.md`; owner decisions 2026-10-29):
+- The search runs on «Готово» only, never per keystroke. This is our improvement over the reference's 1 s debounce. The query is trimmed, and a blank query sends nothing.
+- The submitted query is kept in an in-memory, account-scoped store (Q1 a).
+- Results get no background or resume head refresh (Q2 a). Pressing «Готово» on the same query refetches page 1.
+
 ### Story 5.7: Search and filters inside an author
 
 As a family member,
@@ -1198,6 +1236,13 @@ So that I can dig through a large archive.
 **Given** filters set on one author
 **When** I open another author or Главная
 **Then** their filters are unaffected.
+
+**As built** (`spec-5-7-search-and-filters-inside-an-author.md`; owner decisions 2026-10-29):
+- **Scope per route** (Q3 b; this supersedes `author:<blogUrl>` above): the scope is `author:<routeKey>`. A fresh Author route starts with the default Filter and no query, and the Filter is dropped when the route unmounts. Two Author routes of one blog never share a Filter.
+- **Default access** (Q2 a): «Доступные мне», as on Главная. Locked posts no longer show on Автор by default; «Все посты» shows them.
+- **No «Только купленные»** (A a): Автор offers only «Доступные мне» and «Все посты», because E4 ignores `only_bought=true` (live). E4 and E7 always send `only_bought=false`.
+- **Client-side drop** (B a): E7 ignores the access params (live), so blog search under «Доступные мне» drops `hasAccess: false` results on the client.
+- Search follows Story 5.6: on «Готово» only, trimmed, and no head refresh of results.
 
 ## Epic 6: The complete post (P2)
 
@@ -1223,6 +1268,8 @@ So that long posts are pleasant to read on the TV.
 **When** the post opens
 **Then** the text is collapsed with an expand action. Once expanded, every paragraph is a focus stop (ParagraphStop with accent bar), so ↓ scrolls through it (UX-DR11).
 
+**As built** (`spec-6-1-rich-text-emoji-and-long-posts.md`; owner decision 2026-10-29 Q1 a): there is no collapse and no expand action. Every paragraph is a focus stop from the start, and a paragraph longer than 600 characters is split into several stops. Style ranges count from the paragraph start (verified live).
+
 ### Story 6.2: Images in posts
 
 As a family member,
@@ -1238,6 +1285,8 @@ So that I see the post as the author intended.
 **Given** the image fails to load
 **When** it errors
 **Then** the placeholder «Изображение недоступно» is shown, and the rest of the post is unaffected.
+
+**As built** (`spec-6-2-images-in-posts.md`; owner decision 2026-10-27, one-column Post): «full right-column width» reads as the one column's width, capped at `text-measure` (600 dp) and 300 dp tall. A focused image gets the ring with no scale, because a scaled 600 dp image would overlap the text. OK does nothing.
 
 ### Story 6.3: Links, files and external videos via QR
 
@@ -1258,6 +1307,12 @@ So that nothing in a post is a dead end on the TV.
 **Given** OK on any chip
 **When** the QrDialog opens
 **Then** the QR is generated on the device from a URL built by `externalUrls` (file URL + `signedQuery`), with the title and «Откроется на телефоне». The full URL is never printed or logged. Focus is trapped, and «Закрыть» or Back returns focus to the chip (UX-DR16).
+
+**As built** (`spec-6-3-links-files-and-external-videos-via-qr.md`; owner decisions 2026-10-29, our improvements). Not every chip opens a QR:
+- A link to another Boosty post reads «<text> · Открыть». OK opens that Пост in the app, and Back returns to the chip.
+- A timestamp link to a video of the current post reads «<text> · Смотреть». OK opens the player at that second.
+- `header` blocks render as bold, non-focusable headings (Q1 b).
+- A file opens its QR from a fresh E8.
 
 ### Story 6.4: Inline audio
 
@@ -1283,6 +1338,8 @@ So that I can listen to podcasts and music posts on the TV.
 **When** I leave the post, or another app takes audio focus
 **Then** audio stops or pauses. The audio position is not persisted.
 
+**As built** (`docs/feature-parity.md` POST-06, `deferred-work.md`; owner decision 2026-10-29): the screen also stays on while a track is paused with its source kept. This is react-native-video's keep-screen-on; the owner chose to keep it for now, and it is in the backlog.
+
 ### Story 6.5: Poll display
 
 As a family member,
@@ -1298,6 +1355,8 @@ So that I know what's being asked and how others voted.
 **Given** a finished poll
 **When** it renders
 **Then** «Опрос завершен» and the results are shown. The options are not focusable, and the poll is one focus stop.
+
+**As built** (`spec-6-5-poll-display.md`): each option also shows its vote count next to the percent. An option without `id`, `counter` or `fraction` is dropped on its own (owner decision 2026-10-29, option a). Only a poll with no usable option becomes the «Опрос» placeholder.
 
 ### Story 6.6: Vote and retract in a single-choice poll
 
@@ -1322,6 +1381,11 @@ So that a stray OK while scrolling doesn't cast a vote.
 **Given** the request fails
 **When** it errors
 **Then** an inline error is shown and the previous state is kept. It is never retried automatically, and only one request per poll can be in flight (AD-6).
+
+**As built** (`spec-6-6-vote-and-retract-in-a-single-choice-poll.md`, `src/features/polls/usePollVote.ts`):
+- After a vote, two OK presses on a different option change the vote (owner decision 2026-10-29 Q1 a, reference parity).
+- The two-OK confirmation is our improvement; the reference votes on one click.
+- The inline error is one line per mutation (`vote` or `retract`) whatever the `AppErrorKind`. This was accepted in the Epic 6 retro and is recorded in AD-5.
 
 ### Story 6.7: Multiple-choice poll
 
@@ -1370,6 +1434,14 @@ So that I don't miss live broadcasts.
 **When** the next refresh shows no stream
 **Then** the card disappears, and focus falls back to the first post.
 
+**As built** (`spec-7-1-live-stream-card-on-the-author-page.md`, `src/features/author/useAuthorLive.tsx`, `src/app/App.tsx`; owner decisions 2026-10-30):
+- **Polling** (Q1 a): E15 is fetched again every 30 s for a **live and a scheduled** card, not only a scheduled one. Polling runs only while the Author route is focused, the app is in the foreground and a card is shown.
+- **Fresh on open:** the query uses `staleTime: 0`, so every Author open sends one E15, and a cached card is never trusted for the initial focus.
+- **Resume:** a resume invalidates every observed stream query.
+- **Failures:** a failed first E15 shows no card and no error, and is not retried. A failed poll keeps the last card.
+- **Flag:** the `live` flag ships on (Q3 a).
+- **No posts:** when the card goes away and there are no posts, focus goes to the nearest action above.
+
 ### Story 7.2: Watch a live stream
 
 As a family member,
@@ -1397,6 +1469,11 @@ So that I can follow a broadcast on the TV.
 **Given** a live stream is playing
 **When** I check progress
 **Then** no progress is written.
+
+**As built** (`spec-7-2-watch-a-live-stream.md`, `src/app/stackRoutes.tsx`):
+- **Quality rule** (owner decision 2026-10-30): the settings gear is shown in the live player only when the live quality list has a real choice, that is more than one entry. A single adaptive «Авто» means no gear. Every live candidate is adaptive today, so the gear never shows. The live pick path, which replays the chosen source at the live edge, exists but cannot be reached.
+- **Exit:** leaving the live player by any path, not only at the end, invalidates `['stream', blogUrl]`.
+- **Playable card:** OK opens the player only when the card is live, has access and E15 listed a live-edge URL. Every other card shows the stream page's QR.
 
 ### Story 7.3: Live viewer heartbeat
 
@@ -1434,6 +1511,13 @@ So that I can support the author and send the stream to others.
 **When** I press OK
 **Then** a QrDialog shows `https://boosty.to/{blog}/streams/video_stream` (built via `externalUrls`), and focus returns to «Поделиться» on close (FR25).
 
+**As built** (`spec-7-4-like-and-share-a-live-stream.md`, `src/features/author/LiveCard.tsx`, `useLiveLike.ts`; owner decisions 2026-10-30):
+- **Visibility** (Q2 a): «Нравится» is shown **only on a live card with access**. «Поделиться» is shown on every card: live, scheduled and needs level. Without the like, «Поделиться» is the only button.
+- **Look** (Q1 a): «Нравится» is a heart icon plus the count («♡ 357» / «♥ 358», accent when liked).
+- **Details line:** where the like shows, the card's details line drops its likes figure (the viewer count alone). A scheduled card keeps «N лайков».
+- **Focus:** both buttons sit in a column to the right of the card. → from the card goes to the first button, ↓ from «Нравится» goes to «Поделиться», ↓ from «Поделиться» goes to the grid, and ← goes back to the card.
+- **Errors:** a like failure keeps its `AppErrorKind`.
+
 ### Story 7.5: Events list
 
 As a family member,
@@ -1457,6 +1541,13 @@ So that I learn about streams without visiting each author.
 **Given** empty or error responses
 **When** they occur
 **Then** «Событий нет», or an error with «Повторить», is shown.
+
+**As built** (`spec-7-5-events-list.md`, `src/features/events/useEvents.ts`; owner decisions 2026-10-30):
+- **Flag** (Q1 a): the live probe confirmed E18's documented shape, with no cursor, so `phaseFlags.events` is on. Only the first page is shown, with no load-more.
+- **Empty state** (Q2 a): «Событий нет» comes with «Обновить» (focused; it refetches).
+- **Hidden types** (Q3 a): blog-owner event types are hidden (donations, new subscribers, stat reports, purchases, referrals, support tickets, level limits, `target_new`), and comment types are never shown. Shown: `video_stream_start` («Начался эфир»), `post_new` and `promo_new` with their own text, and unknown types with generic text.
+- **Refetch:** the query uses `staleTime: 0`, so every open of the section fetches again, and a resume invalidates it.
+- **Read marks:** OK marks a row read locally for the session. No read mutation is sent.
 
 ## Epic 8: Viewing preferences and diagnostics (P2)
 
@@ -1597,6 +1688,8 @@ So that the app is pleasant every evening.
 **Given** FlatList cannot meet the target
 **When** profiling confirms it
 **Then** FlashList 2.x is adopted for that list only, with an ADR.
+
+*Note (2026-10-31): this already happened in Story 3.1. FlashList 2.3.3 was adopted for the grids after device profiling (ADR 0011), and later lists (Подписки, События) reuse it.*
 
 **Given** a 1-hour session of browsing and watching
 **When** memory is observed

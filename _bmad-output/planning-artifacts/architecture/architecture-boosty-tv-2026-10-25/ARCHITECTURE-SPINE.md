@@ -7,7 +7,7 @@ paradigm: 'feature-sliced layered app with ports & adapters at the platform edge
 scope: 'Boosty TV Android TV app (React Native TV), phases 0–3; Apple TV (tvOS) is out of scope (owner decision 2026-10-27)'
 status: final
 created: '2026-10-25'
-updated: '2026-10-25'
+updated: '2026-10-31'
 binds: [FR-1..FR-57, NFR-1..NFR-9]
 sources:
   - ../../prds/prd-boosty-tv-2026-10-25/prd.md
@@ -119,6 +119,11 @@ Arrows mean "may import". `shared` never imports `features` or `app`. Features n
   - **Device-scoped data:** `device_id`, preferred quality and preferred speed.
   - `AccountScope.reset()` is the only cleanup path, used on sign-out and on account switch. It increments a **generation**. Any async write (E9, history, cache set) captures the generation when it starts and is **dropped** if the generation has changed.
   - On account switch (`E1.id` differs), the reset happens **before** the new phone and account id are written.
+  - *As built (Epics 5–7):* the registered stores also include FocusRestoration, the sign-in draft, the Поиск query (`searchQuery`, Story 5.6) and the События read marks (`eventReadMarks`, Story 7.5) (`src/app/bootstrap.ts`).
+  - **Exception: generation-keyed module state** (Epic 6 retro A5, Epic 7 retro A2/A3). Two single-flight and optimistic stores are module-level and are **not** registered with AccountScope: `usePollVote`'s in-flight entries (Story 6.6) and `useLiveLike`'s optimistic overlays (Story 7.4). Both use `createGenerationKeyedStore` (`src/shared/account/generationKeyed.ts`).
+    - Every entry is keyed `<generation>:<id>`, so after a reset the next account never sees or waits on an old entry.
+    - A late result of the old account can only touch its own entry, and it writes nothing to the cache.
+    - New module-level state of this kind uses the same helper, never an ad-hoc map.
 
 ### AD-5 — Error taxonomy
 
@@ -152,6 +157,7 @@ Arrows mean "may import". `shared` never imports `features` or `app`. Features n
 
   - Only response shapes verified in `api-contract.md` map to specific kinds. Everything else maps to `Client`, `Server` or `Unknown`.
   - Screens choose state and copy (`error.<kind>`) by kind only, never by HTTP status.
+  - *Accepted exception (Epic 6 retro A5):* a failed poll vote or retract shows one inline line per mutation (`vote` / `retract`), whatever its `AppErrorKind` (`src/features/polls/usePollVote.ts`). A live failure was never provoked. The live like (Story 7.4) keeps the kind.
 
 ### AD-6 — Retry and mutation policy
 
@@ -178,7 +184,17 @@ Arrows mean "may import". `shared` never imports `features` or `app`. Features n
   - **Lists:** `useInfiniteQuery` with the opaque `offset`; pages are deduplicated by id.
   - **Polls** have a single source: the `poll` inside cached Posts. After a vote, the E10 result is written by one helper, `entities/poll.applyPoll(pollId, poll)`, into every cached post and page containing that poll. There is no separate poll key.
   - **Live stream:** `['stream', blogUrl]`, owned by `entities/stream`. The player invalidates it when a stream ends.
+    - *As built (Stories 7.1–7.2):* the Author page reads it with `staleTime: 0`, so every open sends one E15, and with `retry: false`.
+    - **E15 polling:** it is refetched every 30 s while the Author route is focused, the app is in the foreground and a live or scheduled card is shown (`LIVE_POLL_INTERVAL_MS`, `src/features/author/useAuthorLive.tsx`; owner decision 2026-10-30 Q1 a).
+    - Leaving the live player by any path invalidates it (`src/app/stackRoutes.tsx`).
+    - Signed live URLs live under their own key root, with no structural sharing and a short `gcTime`. They are never refetched by a resume.
+  - **Events:** `['events']` (Story 7.5), one E18 request with `staleTime: 0`.
   - **Defaults:** `staleTime` 60 s, `gcTime` 10 min, and no focus-based refetch. `AppLifecycle` resume invalidates the visible list silently (focus is kept).
+    - *As built (ADR 0010, `src/app/App.tsx`):* resume never invalidates a paged list, because a refetch of an infinite query reloads every loaded page. Instead, after the resume E1 succeeds:
+      - Главная's feed and every observed `authorPosts` query get a **head refresh**: one page-1 request when the list is at least 60 s old, merged into the head (`refreshPostsHead`).
+      - `allStreams()` and `events()` are **invalidated**, so only observed queries refetch.
+    - Подписки, Поиск results and Пост are not refreshed on resume.
+    - The feed query sets `refetchOnMount: false`. «Обновить» (Story 5.1) is a forced head refresh plus an E2 invalidation.
 
 ### AD-8 — Boundary parsing and shared entities
 
@@ -189,6 +205,11 @@ Arrows mean "may import". `shared` never imports `features` or `app`. Features n
   - Post, Media, Author, Poll and Stream are fetched only through the `shared/entities` repositories (E3–E8, E10, E15). Features add hooks, never their own copy of these calls.
   - Unknown blocks become `Block.Unknown`. A malformed item is dropped and logged, never failing the whole page.
   - Domain types carry no raw DTO fields and do **not** expose `timeCode`. Progress is read only via AD-10.
+  - *As built:* mappers are named after their entity (`mapPost.ts`, `mapAuthor.ts`, `mapPoll.ts`, `mapStream.ts`, `mapEvents.ts`), not `mapper.ts`.
+  - **Entity → entity edges (as built):**
+    - `entities/post` → `entities/poll`: a Post carries its Poll, and `mapPost` uses `mapPoll` (Story 6.5).
+    - `entities/stream` → `entities/post/videoSources` (Epic 7 retro, accepted): `liveSources.ts` and `streamRepository.ts` pick live-edge `playerUrls` with the same rules as VOD.
+    - Both are one-way. Neither poll nor post imports stream, and poll does not import post. A new edge between entities is recorded here.
 
 ### AD-9 — Identity and references
 
@@ -233,6 +254,10 @@ Arrows mean "may import". `shared` never imports `features` or `app`. Features n
   - Only FocusRestoration decides the return focus. Other code may only call `setReturnFocus(routeKey, focusId)` — for example, the player after FR-49, pointing at the next unfinished media row.
   - Native focus only. D-pad handlers are allowed only in the player, the period stepper and the audio block.
   - **`docs/focus-map.md`** (English) must exist before the first UI story starts.
+  - *As built (Epic 3 retro, accepted):*
+    - On stack screens the screen segment carries the route's entity (`author/<blogUrl>/post/<postId>`, `post/<postId>/…`). `docs/focus-map.md` §1 lists every id.
+    - `setReturnFocus` is a Shell section callback, used by Главная and Подписки (ADR 0012), not `setReturnFocus(routeKey, focusId)`. The player writes its return target through `focusRestoration.remember`.
+    - Пост keeps its own column focus memory, a deliberate deviation explained in `docs/focus-map.md` §1.6.
 
 ### AD-13 — Navigation model
 
@@ -292,6 +317,7 @@ Arrows mean "may import". `shared` never imports `features` or `app`. Features n
     - `Player {ref: MediaRef | LiveRef, origin: {routeKey, focusId}}`;
     - `Author {blogUrl}`.
   - Features navigate only through these typed routes.
+  - *As built:* `Author` and `Post` also take `section`, the origin Shell section that is the sidebar's current item (ADR 0012). It is an id, not a ref. The stack screens Автор and Пост keep the Shell sidebar through `StackSidebarRoute` (`src/app/stackRoutes.tsx`).
   - Embeddable widgets (PollWidget, AudioBlock) are exported from their feature's `index.ts` and used only along the AD-1 allowlist.
 
 ### AD-18 — Filter model
@@ -304,6 +330,11 @@ Arrows mean "may import". `shared` never imports `features` or `app`. Features n
   - One Zustand `filtersStore` in `shared/filters` holds a Filter per scope: `feed`, `search` or `author:<blogUrl>`.
   - The store is in memory and account-scoped. It survives re-login of the same account but not an app restart.
   - The filter panel UI lives in `shared/filters`.
+  - *As built (Stories 5.5, 5.7; `src/shared/filters/filter.ts`):*
+    - Tags are `tags: readonly {id, title}[]` in selection order. Keys and `tags_ids` use the sorted ids only.
+    - **The Author scope is per route:** `author:<routeKey>`, not `author:<blogUrl>` (owner decision 2026-10-29 Q3 b). A fresh Author route starts at the default, and the scope is reset when the route unmounts, so two Author routes of one blog never share a Filter.
+    - The Author access values are only `allowed` (the default, Q2 a) and `all`, because E4 ignores `only_bought=true` (A a).
+    - Blog search under `allowed` drops `hasAccess: false` results on the client, because E7 ignores the access params (B a).
 
 ### AD-19 — Single active playback
 
@@ -337,7 +368,7 @@ Arrows mean "may import". `shared` never imports `features` or `app`. Features n
 | i18n | Typed `ru` catalog. A hand-written Russian plural selector (Hermes has no `Intl.PluralRules`). No literals in components. |
 | External URLs | `shared/entities/externalUrls.ts` builds every QR target (stream page, file, link, release page). |
 | Design | DESIGN.md tokens in `shared/ui/tokens.ts`. No raw colors or sizes in components. |
-| Lists and images | `FlatList` with `getItemLayout` and React Native `Image` for v1. FlashList is considered only if P3 measurements need it. |
+| Lists and images | `FlatList` with `getItemLayout` and React Native `Image` for v1. FlashList is considered only if P3 measurements need it. *As built (ADR 0011, owner decision 2026-10-26, Story 3.1 device profiling):* `@shopify/flash-list` 2.3.3 for the post grids (`PostGrid`: Главная, Автор, Поиск), Подписки and События. Grids are rows of 3, with a fixed row height and no `getItemLayout` in v2. The filter tag list stays a `FlatList`. |
 | Tests | Jest with `@react-native/jest-preset`, plus @testing-library/react-native and its `test-renderer` peer. Integration tests use FixtureTransport. Each mapper has fixture tests. |
 | Android | New Architecture only (RN ≥ 0.82). Variants: `debug` (demo allowed) and `release`. TV manifest: `LEANBACK_LAUNCHER`, banner, `touchscreen required=false`. `minSdk` as set by the 0.87.1 template. |
 
@@ -359,7 +390,8 @@ Arrows mean "may import". `shared` never imports `features` or `app`. Features n
 | @tanstack/react-query | 5.104.x |
 | zod | 4.6.x (Hermes release build verified in Story 1.2; JIT works, jitless not needed; needs `@babel/plugin-transform-export-namespace-from` in `babel.config.js`) |
 | zustand | 5.0.x |
-| react-native-qrcode-svg / react-native-svg | 6.3.x / 15.16.x |
+| react-native-qrcode-svg / react-native-svg | 6.3.x / 15.16.x (as built: pinned 6.3.26 / 15.15.5, `package.json`; ADR 0013, ADR 0014) |
+| @shopify/flash-list | 2.3.3 (ADR 0011; added in Story 3.1) |
 | eslint-plugin-boundaries | 7.3.x (ESLint version as set by the template) |
 | Package manager / runtime | npm with package-lock.json; Node 24 |
 | Font | Golos Text (bundled) |
@@ -439,6 +471,6 @@ flowchart LR
   - Zod jitless mode.
 - **Exact refresh-rejection status (AD-3)** and the **CDN expired-URL signal (AD-11)**: spikes S4 and S7.
 - **Server `timeCode` round-trip:** spike S8. AD-10 already covers both outcomes.
-- **Virtualization tuning and FlashList:** measured in P3.
-- **Events paging:** after E18 is verified.
+- **Virtualization tuning and FlashList:** measured in P3. *FlashList itself was adopted early in Story 3.1 (ADR 0011). The P3 tuning stays deferred.*
+- **Events paging:** after E18 is verified. *E18 was verified in Story 7.5. Its body has no cursor-like field, so only the first page is shown, and paging stays deferred.*
 - **Crash reporting:** none in v1 (no telemetry). It needs owner approval.

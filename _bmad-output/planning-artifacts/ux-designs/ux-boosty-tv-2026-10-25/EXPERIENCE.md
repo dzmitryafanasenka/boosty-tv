@@ -3,7 +3,7 @@ name: Boosty TV
 title: "Boosty TV — Experience"
 status: final
 created: 2026-10-25
-updated: 2026-10-25
+updated: 2026-10-31
 sources:
   - ../../briefs/brief-boosty-tv-2026-10-25/brief.md
   - ../../../../docs/feature-parity.md
@@ -27,7 +27,7 @@ sources:
 
 ## Information Architecture
 
-The sidebar is visible everywhere except in the player and on the sign-in screens. → Composition reference: `Boosty TV - A B C.dc.html`, `Boosty TV - D-L.dc.html`.
+The sidebar is visible everywhere except in the player and on the sign-in screens. This includes the stack screens Автор and Пост, where the current item is the origin section and OK on another section pops to the Shell and opens it (owner decision 2026-10-27, ADR 0012). → Composition reference: `Boosty TV - A B C.dc.html`, `Boosty TV - D-L.dc.html`.
 
 | Surface | Screens | Reached from | Purpose | Features |
 |---|---|---|---|---|
@@ -39,7 +39,7 @@ The sidebar is visible everywhere except in the player and on the sign-in screen
 | Поиск | E1–E10 | Sidebar | Search «по подпискам» (feed scope) with filters | FEED-04, SEARCH-SCOPES, FILTER-01..04 |
 | Пост | F1–F8 | Post card, search result, «Продолжить» (via player exit) | Media rows, text, images, audio, files and links (QR), poll, read-only likes | POST-01..11, POLL-01..05 |
 | Плеер | G1–G12 | Media row, «Продолжить» card, live card | VOD and live playback | PLAY-01..08, PLAY-10..13 (**not** PLAY-09 download), LIVE-02, LIVE-03 |
-| События | J1–J3 | Sidebar; hidden until E18 (EVT-01) is verified | Events, e.g. «Начался эфир» → author | EVT-01 (client improvement) |
+| События | J1–J3 | Sidebar; hidden until E18 (EVT-01) is verified (verified live and shown since Story 7.5, `events` flag on) | Events, e.g. «Начался эфир» → author | EVT-01 (client improvement) |
 | Настройки | K1–K4 | Sidebar | System player, version, diagnostics (hidden), sign out | SET-01, SET-02, SET-05, SET-06, AUTH-07 (**not** SET-03 light theme) |
 
 Overlays: the filter SideSheet (from Главная, Автор, Поиск), the player-settings SideSheet, QrDialog, the sign-out Dialog and the system keyboard.
@@ -62,26 +62,26 @@ This section is behavior only; visual specs are in `DESIGN.md › Components`. �
 |---|---|
 | **Sidebar / NavItem** | ↑↓ moves between items. → returns to the last content focus. A section opens only on OK, never when the item is merely focused. **Back stack:** content → sidebar (current item) → Главная (from any other section) → exit app (from the sidebar on Главная). |
 | **Button** | OK activates it. While an action runs, the button shows a spinner and keeps focus; a second OK is ignored. |
-| **«Обновить» (FEED-03)** | Reloads the feed and subscriptions. Focus stays on the same card (by id). While loading the label reads «Обновляем…». |
+| **«Обновить» (FEED-03)** | Reloads the feed and subscriptions. Focus stays on the same card (by id). While loading the label reads «Обновляем…». As built (Story 5.1, ADR 0010): a forced head refresh, so one E5 page 1 is merged into the cached feed and loaded pages are kept; the subscriptions query is invalidated. Focus stays on the button. A failure keeps every card and shows «Не удалось обновить» next to it. |
 | **PostCard** | Feed card → OK opens the post. «Продолжить» card → OK opens the player at the saved position. Identity is `post.id`, plus `video.id` for «Продолжить». |
 | **AuthorCard** | OK opens the author page. Identity is `blogUrl`. |
-| **LiveCard** | OK when the stream is live and `hasAccess` is true → live player. Otherwise → a QR to the stream page. → moves to «Нравится»: optimistic toggle, rolled back on failure, no double-send while a request is in flight. ↓ moves to «Поделиться» (QR). |
-| **FilterChip → filter SideSheet** | The sheet opens with focus on the selected «Доступ» value. Every change applies immediately (there is no Apply button), and the list behind refetches while focus stays in the sheet. «Сбросить» appears only when a filter is non-default. The chip shows the active-filter count. Back closes the sheet, and focus returns to the chip. |
+| **LiveCard** | OK when the stream is live, `hasAccess` is true and E15 lists a live-edge URL → live player. Otherwise → a QR to the stream page. → moves to «Нравится»: optimistic toggle, rolled back on failure, no double-send while a request is in flight. ↓ moves to «Поделиться» (QR). As built (Story 7.4, owner decisions 2026-10-30 Q1 a, Q2 a): «Нравится» (heart plus count) is shown only on a live card with access. «Поделиться» is shown on every card. Without the like, → from the card reaches «Поделиться». ↓ from «Поделиться» → the grid; ← → the card. |
+| **FilterChip → filter SideSheet** | The sheet opens with focus on the selected «Доступ» value. Every change applies immediately (there is no Apply button), and the list behind refetches while focus stays in the sheet. «Сбросить» appears only when a filter is non-default. The chip shows the active-filter count. Back closes the sheet, and focus returns to the chip. As built (Story 5.7, owner decisions 2026-10-29): on Автор the «Доступ» section has only «Доступные мне» (default) and «Все посты». The Author Filter belongs to the route: it starts at the default and is dropped when the route closes. |
 | **PeriodStepper** | Presets: «За всё время», «Последние 7 дней», «Последние 30 дней», «Последние 3 месяца», «Свой период…» (copy taken verbatim from the design). In «Свой период», ↑↓ changes the value and ←→ moves between day, month and year. «Готово» returns to the sheet. Days are normalized to the local start and end of day. |
 | **TagRow** | Multi-select check. «Загрузить ещё» loads the next page of feed tags. «Сбросить» clears tags only. |
 | **TextField** | OK opens the system keyboard. While the keyboard is open the app does not intercept arrows. Phone field: the country code is editable, defaults to `+7` and is sent as E.164. The owner uses `+375`. |
 | **Primary «Смотреть / Продолжить» + «С начала»** | «Продолжить» resumes from the server `timeCode`. «С начала» appears only when progress > 0. In a multi-video post the primary button targets the first media that is **not finished** (see Ended), and its sub-label names that media. |
 | **MediaRow** | OK plays exactly this media. Each video has its own progress. When playback ends, focus returns to the next unfinished MediaRow. |
 | **ImageBlock** | Is a focus stop, so tall images can be scrolled into view. OK does nothing. |
-| **ParagraphStop** | Each paragraph of expanded long text is a focus stop. |
-| **LinkChip** | OK opens a QR. Used for inline links, files and external video (YouTube). |
+| **ParagraphStop** | Each paragraph of expanded long text is a focus stop. As built (owner decision 2026-10-29, Story 6.1 Q1 a): there is no collapse. Every paragraph is a stop, and a paragraph longer than 600 characters is split into several. A `header` block is a bold heading and is not a stop. |
+| **LinkChip** | OK opens a QR. Used for inline links, files and external video (YouTube). As built (Story 6.3, owner decisions 2026-10-29; our improvements): a link to another Boosty post reads «… · Открыть» and opens that post in the app. A timestamp link to a video of this post reads «… · Смотреть» and opens the player at that second. |
 | **LikeCount** | Read-only, not focusable. |
 | **AudioBlock** | A single focus target. OK toggles play/pause; ←→ seeks 10 s. Only one track plays in the whole app. Leaving the post stops audio. On audio-focus loss, audio pauses. Position is not persisted. |
-| **PollOption — single choice** | **Vote:** the first OK sets the option to pending, and a second OK on the same option sends the vote. **Retract:** the first OK on the chosen option shows pending with «Нажмите OK ещё раз, чтобы отозвать», and the second OK sends the retract. Moving focus cancels pending. After every response the poll is re-fetched and focus stays on the option. On failure an inline error appears, the previous state is kept, and nothing is retried automatically. |
+| **PollOption — single choice** | **Vote:** the first OK sets the option to pending, and a second OK on the same option sends the vote. **Retract:** the first OK on the chosen option shows pending with «Нажмите OK ещё раз, чтобы отозвать», and the second OK sends the retract. Moving focus cancels pending. After every response the poll is re-fetched and focus stays on the option. On failure an inline error appears, the previous state is kept, and nothing is retried automatically. As built (Story 6.6): after a vote, two OK presses on another option change the vote (owner decision 2026-10-29 Q1 a). The inline error is one line per action (vote or retract), whatever the error kind. |
 | **PollOption — multiple** | OK toggles a check. «Проголосовать» is focusable only when at least one option is checked; it sends the vote with no extra confirmation, since the checks are the deliberate step. After voting, results are shown with «Отозвать голос», which needs two OK presses (pending, then confirm). |
 | **Finished poll** | Results only. Options are not focusable; the whole poll is one focus stop. |
 | **SettingRow** | nav → opens a submenu or sheet; toggle → flips immediately; radio → selects and closes the submenu; check → toggles; info → not activatable. |
-| **QualityOption** | Lists only the variants present for this media. Adaptive streams (HLS or DASH) are one «Авто» row. OK reloads at the same position, stores the preference and closes the sheet. If no quality can be picked automatically (PLAY-02), the quality list opens before playback starts. |
+| **QualityOption** | Lists only the variants present for this media. Adaptive streams (HLS or DASH) are one «Авто» row. OK reloads at the same position, stores the preference and closes the sheet. If no quality can be picked automatically (PLAY-02), the quality list opens before playback starts. Live (Story 7.2, owner decision 2026-10-30): the gear and the sheet are shown only when the live list has more than one entry. A single «Авто» means no gear, which is the as-built case for every live stream so far. |
 | **Speed** | Presets 0.5–3×, recordings only, stored globally. Hidden for live streams. |
 | **PlayerControl** | OK activates. Focus moves with ←→ along the control row; ↑ goes back to the Timeline. |
 | **Timeline** | See Interaction Primitives › Player overlay. ←→ seeks 5 s, accelerating while held. The bubble commits after `{motion.seek-commit}`. |
@@ -90,7 +90,7 @@ This section is behavior only; visual specs are in `DESIGN.md › Components`. �
 | **Sign-out Dialog** | Initial focus is «Отмена». Confirming clears secure storage (tokens, stored phone), the query cache, the continue-watching history and filters, then shows Welcome. Cancel returns focus to «Выйти из аккаунта». |
 | **QrDialog** | Traps focus. The only action is «Закрыть»; Back also closes it. Focus returns to the initiator. The QR is generated on the device and the URL is never logged. |
 | **StateView** | The single action gets the initial focus. ← moves to the sidebar. |
-| **EventRow** *(conditional)* | OK opens the author page; for a live event the page is focused on the LiveCard. |
+| **EventRow** *(conditional; shown since Story 7.5)* | OK opens the author page; for a live event the page is focused on the LiveCard. OK also marks the row read locally; no read request is sent. A row without a valid blog does nothing on OK. |
 | **Diagnostics** | Revealed by 7 OK presses on «Версия». Toggles log capture and explains log retrieval (adb). Logs are redacted: no tokens, cookies, phone, code or signed URLs. |
 | **«Системный видеоплеер»** | A toggle. When on, the user picks a quality, then the Android chooser opens. The row description says progress is not tracked in this mode. If no external player is installed, the built-in player is used and the hint «Внешний плеер не найден» is shown. |
 
@@ -110,7 +110,7 @@ Global rules:
 | Content unavailable | 404 / deleted post | «Пост недоступен» + «Назад». No «Повторить». |
 | Network error | Request failed | Error + «Повторить». GETs get a bounded automatic retry first. |
 | Cold start offline | No network, session stored | Главная StateView «Нет подключения к интернету» + «Повторить». The session is kept; this is not A11. |
-| Resume from sleep | App returns to the foreground | The player stays paused with the overlay shown. The next play re-resolves the media URL if needed (PLAY-10 path). Lists refetch silently and keep focus. |
+| Resume from sleep | App returns to the foreground | The player stays paused with the overlay shown. The next play re-resolves the media URL if needed (PLAY-10 path). Lists refetch silently and keep focus. *As built (ADR 0010, `src/app/App.tsx`; this supersedes «lists refetch»): only after the resume E1 succeeds, and focus is kept. Главная's feed and every Автор route in the stack get a **head refresh**: one page-1 request each, sent only when the cached list is at least 60 s old and merged into the head. Paged lists are never refetched in full. Every observed live stream (E15) and an observed События list (E18) are fetched again. Подписки, Поиск results and an open Пост are not refreshed on resume.* |
 
 Error classes stay distinct (CLAUDE.md): session expired ≠ no access ≠ media URL expired ≠ content unavailable ≠ rate limit ≠ network.
 
@@ -121,11 +121,11 @@ Error classes stay distinct (CLAUDE.md): session expired ≠ no access ≠ media
 | Sign-in | Button spinner; the field is disabled | — | Invalid number (A4). Wrong code (A7). Expired code (A8, focus on «Выслать новый код»). Too many attempts (A9; a timer only if the server gives one). Captcha / extra verification (A10): blocking, one retry, otherwise a release blocker. | — | Resend countdown 60 s (A5/A6) |
 | Главная | Skeleton rows (B6) | No subscriptions → explanation that points to Подписки. Filter with no results → «Ничего не найдено» + «Сбросить фильтры». | Full error; load-more error as an inline row (B5) | — | «Продолжить» row hidden when the history is empty; no progress bar without a duration |
 | Подписки | Skeleton grid | C3 «Подписок пока нет» + explanation; no CTA | Error + «Повторить» | — | More than 30 subscriptions → «Показаны первые 30» until pagination is verified (overrides the «28 из 55» counter in the design) |
-| Автор | Skeleton header + grid | «Публикаций нет» / «Ничего не найдено» | Error + «Повторить» | — | Live: live / scheduled (refresh every 30 s) / needs level / ended (focus → first post) |
+| Автор | Skeleton header + grid | «Публикаций нет» / «Ничего не найдено» | Error + «Повторить» | — | Live: live / scheduled / needs level / ended (focus → first post). As built (Story 7.1 Q1 a): E15 is polled every 30 s for a live and a scheduled card, while the route is focused and the app is in the foreground. A failed E15 shows no card and no error. |
 | Поиск | Results skeleton | Hint before a query; «Ничего не найдено» + «Сбросить фильтры» | Error + «Повторить» | — | Keyboard open / closed |
-| Пост | Skeleton | — | Error + «Повторить»; 404 → unavailable | Locked: teaser + no-access copy; focus on the author | Unsupported-block placeholder; long text collapsed / expanded |
+| Пост | Skeleton | — | Error + «Повторить»; 404 → unavailable | Locked: teaser + no-access copy; focus on the author | Unsupported-block placeholder; long text collapsed / expanded (as built: no collapse, every paragraph a stop; Story 6.1 Q1 a) |
 | Плеер | Spinner after `{motion.buffer-delay}` | — | Recovering (one automatic re-resolve, PLAY-10) → hard error «Повторить» / «Назад» | Media not entitled → exit with a no-access message | Paused, seeking, live, stream ended, **Ended** (below) |
-| События | Skeleton list | «Событий нет» | Error + «Повторить» | — | Unknown types shown generically |
+| События | Skeleton list | «Событий нет» + «Обновить» (focused; refetches; Story 7.5 Q2 a) | Error + «Повторить» | — | Unknown types shown generically. Blog-owner types (donations, subscribers, stats, purchases, referrals, support, level limits, `target_new`) are hidden (Story 7.5 Q3 a); comment types are never shown. First E18 page only, no load-more. |
 | Настройки | — | — | — | — | Diagnostics hidden / visible |
 
 ### Ended (recordings)
@@ -171,7 +171,7 @@ Error classes stay distinct (CLAUDE.md): session expired ≠ no access ≠ media
 - **Back in the player.** Settings submenu → settings sheet → overlay → exit (E9 write, restore the originating card or row).
 - **Progress writes.** Throttled to every ≥ 10 s of movement, plus on pause, on background, on Stop or exit and at the end. The identity is `video.id`, never the URL.
 - **Live player.**
-  - No seeking. Pause is allowed, and resume jumps to the live edge. Speed is fixed at 1×.
+  - No seeking. Pause is allowed, and resume jumps to the live edge. Speed is fixed at 1×. The quality gear appears only with a real choice (see QualityOption).
   - Heartbeat every 30 s, and a stop heartbeat on exit.
   - Audio-focus loss pauses playback.
 - **Motion.** Only the `DESIGN.md › motion` tokens are used: `{motion.focus}`, `{motion.scroll}`, `{motion.panel}`. With the system "reduce motion" setting, the focus scale stays and scrolling becomes instant.
@@ -287,6 +287,11 @@ Error classes stay distinct (CLAUDE.md): session expired ≠ no access ≠ media
 - The phone country code is editable.
 - On A2 after A11, the initial focus is «Получить код».
 - For more than 30 subscriptions, show «Показаны первые 30» instead of «28 из 55».
+- **Superseded mock layouts (as built, 2026-10-31 reconcile):**
+  - The post grids (Главная, Автор, Поиск) have **3 columns**, not the mocks' 4 (owner decision 2026-10-26; `Home Feed.dc.html`, `Boosty TV - D-L.dc.html` D3, the 1280×720 notes in `Boosty TV - A B C.dc.html`).
+  - Пост is **one column with the header on top**, not two columns (owner decision 2026-10-27; `Post Screen.dc.html`, F screens in `Boosty TV - D-L.dc.html`).
+  - Автор and Пост show the Shell sidebar (ADR 0012).
+  - The order of the post's elements is unchanged. See `DESIGN.md › Layout & Spacing`.
 
 ## Open items
 

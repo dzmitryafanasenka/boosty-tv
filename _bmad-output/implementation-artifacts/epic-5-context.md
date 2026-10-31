@@ -88,3 +88,15 @@ The family can pull fresh posts into Главная with «Обновить», t
 - Story 5.7 reuses 5.6's search patterns with blog search and the `author:<blogUrl>` scope, and must verify the blog access and period params live.
 - Each new scope must keep the resume head refresh, the trim-on-change rule, focus restoration and the head-follow latch working with its active Filter.
 - `filtersStore` is already registered in AccountScope. New scopes inherit the wipe on sign-out and account switch.
+
+## As-built reconciliation (2026-10-31)
+
+Epic 5 is done. Where this context differs from the as-built, the as-built wins. Sources: Epic 5 retro A5, closed by Epic 7 retro A3 (`spec-epic-7-retro-a3-planning-reconcile.md`).
+
+- **Author Filter scope:** the scope is `author:<routeKey>` (per route), not `author:<blogUrl>` (Story 5.7, owner decision 2026-10-29 Q3 b). It is reset when the route unmounts.
+- **Author access:**
+  - The Author default is «Доступные мне» (Q2 a).
+  - «Только купленные» is not offered on Автор (A a). Live, E4 honours `is_only_allowed`, the period and `tags_ids`, but ignores `only_bought=true`.
+  - E7 ignores both access params, so blog search under «Доступные мне» drops locked results on the client (B a).
+- **Search trigger:** both searches run on «Готово» only, with no debounce (Story 5.6). Results get no background head refresh (Q2 a).
+- **«Мой блог»:** the check reuses the Author page's E3 and E4 page 1 (`limit=20`), and the first Подписки load waits for it (Story 5.2).
