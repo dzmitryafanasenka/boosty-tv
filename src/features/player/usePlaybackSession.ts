@@ -11,6 +11,7 @@ import { derivePhase, isRecovering, type Phase } from './playerPhase';
 import { qualityPreference } from './qualityPreference';
 import { countPlayback, createRecoveryBudget, takeRecovery, type StartGate } from './recovery';
 import { createSeekController, type SeekController, type SeekDirection } from './seekController';
+import { speedPreference, type PlaybackSpeed } from './speedPreference';
 import type { PlayerSource } from './usePlayerSource';
 
 /** The ±10 s controls' step (Story 4.3 owner decision). */
@@ -50,6 +51,8 @@ type Report = (event: ProgressEvent, positionOverride?: number) => void;
 export type EngineProps = {
   ref: RefObject<PlayerEngineHandle | null>;
   paused: boolean;
+  /** Story 8.1: `PlaybackMode.rate` of the stored speed; a change never remounts the engine. */
+  rate: PlaybackSpeed;
   onLoad: (event: { durationSec: number }) => void;
   onProgress: (sec: number) => void;
   onBuffering: (buffering: boolean) => void;
@@ -73,6 +76,8 @@ export type SessionView = {
   interaction: number;
   seeking: boolean;
   seekTarget: number | null;
+  /** Story 8.1: the engine's rate (the overlay's «N×» label while it is not 1). */
+  rate: PlaybackSpeed;
 };
 
 /** The session's commands (every one stable unless noted). */
@@ -82,6 +87,8 @@ export type SessionCommands = {
   hideOverlay: () => void;
   /** A quality pick; the caller closes the sheet. */
   pickQuality: (key: QualityKey) => void;
+  /** Story 8.1: a speed pick (applies at once, stored device-scoped); the caller closes the sheet. */
+  pickSpeed: (speed: PlaybackSpeed) => void;
   /** Changes with `media` on every render (as before the split). */
   setPlaying: (play: boolean) => void;
   /** Changes with `setPlaying`. */
@@ -144,7 +151,7 @@ export type PlaybackSession = {
  * calls it right after `usePlayerSource` (effect order).
  */
 export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: PlaybackSessionInput): PlaybackSession {
-  const { media, markEnded, bumpEpoch, setPreference, setKeepQuality, liveEnded } = source;
+  const { media, markEnded, bumpEpoch, setPreference, setKeepQuality, liveEnded, setSpeed } = source;
   const progress = mode.progress;
   const { state } = media;
   const ready = state.kind === 'ready' ? state : null;
@@ -294,6 +301,7 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
     setInteraction(n => n + 1);
   }, []);
 
+  const rate = mode.rate(source.speed);
   const latest = useLatestRef({ phase, overlay, paused, positionSec, durationSec, vodRef, ready });
 
   const report = useCallback(
@@ -378,6 +386,26 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
       setAutoHeight(null);
     },
     [mode, latest, seek, setPreference, setKeepQuality],
+  );
+
+  /**
+   * A speed pick (Story 8.1): the engine's `rate` changes from the current
+   * position (no remount, no seek, no E8) and the pick is the global
+   * preference for the next videos (memory at once; a failed store write is
+   * only logged). Ignored where the mode has no speed (live) and for the
+   * current speed (no log, no write; the caller still closes the sheet).
+   */
+  const speedRef = useLatestRef(source.speed);
+  const pickSpeed = useCallback(
+    (next: PlaybackSpeed) => {
+      if (!mode.speedShown || next === speedRef.current) {
+        return;
+      }
+      logger.info('player', 'playback speed changed', { speed: next });
+      setSpeed(next);
+      speedPreference.write(next);
+    },
+    [mode, setSpeed, speedRef],
   );
 
   /** Play or pause; playing after the end starts over from 0 (the ended engine never restarts by itself). */
@@ -713,10 +741,11 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
     readyResolution,
     playing,
     seek,
-    view: { paused, positionSec, durationSec, buffering, autoHeight, overlay, interaction, seeking, seekTarget },
+    view: { paused, positionSec, durationSec, buffering, autoHeight, overlay, interaction, seeking, seekTarget, rate },
     engineProps: {
       ref: engine,
       paused,
+      rate,
       onLoad,
       onProgress,
       onBuffering: setBuffering,
@@ -730,6 +759,7 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
       showOverlay,
       hideOverlay,
       pickQuality,
+      pickSpeed,
       setPlaying,
       togglePause,
       onOk,

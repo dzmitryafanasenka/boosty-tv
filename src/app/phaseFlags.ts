@@ -27,6 +27,10 @@
  * 2026-10-30 (Q1 a): on after the live probe found E18 in the documented
  * shape (first page only, no load-more). While it is off, there is no
  * sidebar item and no E18.
+ *
+ * `speed` (Story 8.1) is the player settings sheet's «Скорость» row for
+ * recordings. While it is off, there is no row and every video plays at 1×
+ * (the stored speed is not applied).
  */
 export const phaseFlags = {
   home: true,
@@ -38,6 +42,7 @@ export const phaseFlags = {
   myBlog: true,
   filters: true,
   live: true,
+  speed: true,
 } as const satisfies Record<string, boolean>;
 
 export type Capability = keyof typeof phaseFlags;

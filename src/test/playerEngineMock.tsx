@@ -9,7 +9,8 @@
  *   );
  *
  * Tests drive the engine's events through `engine.props` (`onLoad`,
- * `onProgress`, `onBuffering`, `onSeekDone`, `onEnd`, `onError`).
+ * `onProgress`, `onBuffering`, `onSeekDone`, `onEnd`, `onError`) and read
+ * what the player asks of it there (`source`, `paused`, Story 8.1 `rate`).
  */
 import { useImperativeHandle, useLayoutEffect } from 'react';
 import { View } from 'react-native';

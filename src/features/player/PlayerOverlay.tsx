@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { isGenericVideoTitle } from '../../shared/entities/post';
 import { tf, t } from '../../shared/i18n';
 import { formatDuration } from '../../shared/i18n/format';
+import { speedLabel, type PlaybackSpeed } from './speedPreference';
 import {
   AuthorAvatar,
   FocusableSurface,
@@ -304,6 +305,11 @@ export type PlayerOverlayProps = {
   positionSec: number;
   durationSec: number;
   seekTargetSec: number | null;
+  /**
+   * Story 8.1 (owner decision Q1 a, our improvement): the engine's rate; not
+   * 1 → a small «1.5×» label next to the elapsed time. Default 1 (none).
+   */
+  rate?: PlaybackSpeed;
   onTogglePause: () => void;
   onTimelineFocus: () => void;
   onPlayPauseFocus: () => void;
@@ -333,7 +339,8 @@ export type PlayerOverlayProps = {
 /**
  * DESIGN.md Player overlay. Top band: avatar · author, the post title
  * (`player-title`, ≤ 2 lines), the video title when it differs. Bottom band:
- * the timeline, elapsed / remaining (tabular), then the controls row:
+ * the timeline, elapsed (Story 8.1: then «N×» while the rate is not 1) /
+ * remaining (tabular), then the controls row:
  * «−10 с» · play/pause · «+10 с» centered, the ⚙ «Настройки» at its right
  * end (Story 4.3 owner decision 2026-10-28). Both bands sit on a darkening
  * gradient. Focus: the timeline; ↓ → play/pause; ← → across −10 · play/pause
@@ -349,6 +356,7 @@ export function PlayerOverlay({
   positionSec,
   durationSec,
   seekTargetSec,
+  rate = 1,
   onTogglePause,
   onTimelineFocus,
   onPlayPauseFocus,
@@ -406,9 +414,16 @@ export function PlayerOverlay({
               onFocus={onTimelineFocus}
             />
             <View style={styles.times}>
-              <Text testID="player/elapsed" variant="meta" color="text-secondary" style={styles.tabular}>
-                {time(positionSec)}
-              </Text>
+              <View style={styles.elapsedRow}>
+                <Text testID="player/elapsed" variant="meta" color="text-secondary" style={styles.tabular}>
+                  {time(positionSec)}
+                </Text>
+                {rate !== 1 ? (
+                  <Text testID="player/speed" variant="meta" color="text-secondary" style={[styles.tabular, styles.speed]}>
+                    {speedLabel(rate)}
+                  </Text>
+                ) : null}
+              </View>
               {durationSec > 0 ? (
                 <Text testID="player/remaining" variant="meta" color="text-secondary" style={styles.tabular}>
                   {tf('player.remaining', { remaining: time(Math.max(0, durationSec - positionSec)) })}
@@ -553,6 +568,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: spacing['2'],
+  },
+  elapsedRow: {
+    flexDirection: 'row',
+  },
+  // Story 8.1: the «N×» label after the elapsed time.
+  speed: {
+    marginLeft: spacing['4'],
   },
   // Centered under the timeline (owner decision, Story 4.1 device check).
   // The row spans the band: −10 · play/pause · +10 centered, ⚙ at the right

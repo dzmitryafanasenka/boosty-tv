@@ -428,6 +428,12 @@ export const ru = {
       autoAt: 'Авто · {height}p',
       height: '{height}p',
     },
+    // Story 8.1 (PLAY-07): the speed row and its presets. `{speed}` is the
+    // preset as a plain number («1.5»); 1× is «1×» too (owner decision Q2 a).
+    speed: {
+      title: 'Скорость',
+      value: '{speed}×',
+    },
     // Story 7.2 (LIVE-02, focus-map G9–G11): the live player. `{elapsed}`
     // is `formatDuration` of the time since the stream started. The QR
     // (not-playable stream) opens the stream page on a phone.

@@ -8,9 +8,10 @@ import { createRoot, type Root } from 'test-renderer';
 import type { PlayerEngineHandle } from '../playerEngine';
 import { PlayerEngineView } from '../PlayerEngineView';
 
-const mockVideo: { props: Record<string, any> | null; seek: jest.Mock } = {
+const mockVideo: { props: Record<string, any> | null; seek: jest.Mock; mounts: number } = {
   props: null,
   seek: jest.fn(),
+  mounts: 0,
 };
 
 jest.mock('react-native-video', () => {
@@ -18,6 +19,9 @@ jest.mock('react-native-video', () => {
   function Video(props: Record<string, any>) {
     mockVideo.props = props;
     React.useImperativeHandle(props.ref, () => ({ seek: mockVideo.seek }), []);
+    React.useEffect(() => {
+      mockVideo.mounts += 1;
+    }, []);
     return null;
   }
   return { __esModule: true, default: Video };
@@ -49,6 +53,7 @@ async function load() {
 beforeEach(() => {
   mockVideo.props = null;
   mockVideo.seek.mockClear();
+  mockVideo.mounts = 0;
 });
 
 describe('PlayerEngineView (react-native-video adapter)', () => {
@@ -142,5 +147,21 @@ describe('PlayerEngineView (react-native-video adapter)', () => {
     await act(async () => {
       root.unmount();
     });
+  });
+
+  it('Story 8.1: `rate` is forwarded (default 1); a change updates the mounted Video without a remount', async () => {
+    const source = { uri: URL, format: 'hls' as const };
+    let root!: Root;
+    await act(async () => {
+      root = createRoot();
+      root.render(<PlayerEngineView source={source} paused={false} />);
+    });
+    expect(mockVideo.props?.rate).toBe(1);
+    await act(async () => root.render(<PlayerEngineView source={source} paused={false} rate={1.5} />));
+    expect(mockVideo.props?.rate).toBe(1.5);
+    await act(async () => root.render(<PlayerEngineView source={source} paused={false} rate={2} />));
+    expect(mockVideo.props?.rate).toBe(2);
+    expect(mockVideo.mounts).toBe(1);
+    await act(async () => root.unmount());
   });
 });

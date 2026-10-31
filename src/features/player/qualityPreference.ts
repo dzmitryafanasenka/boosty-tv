@@ -49,6 +49,15 @@ export type QualityPreferenceStore = {
   forget(): void;
 };
 
+/** `kv().get`, with a synchronous throw (opening the store) turned into a rejection. */
+function getStored(kv: () => KeyValueStore): Promise<string | null> {
+  try {
+    return kv().get(QUALITY_PREFERENCE_KEY);
+  } catch (error) {
+    return Promise.reject(error);
+  }
+}
+
 export function createQualityPreferenceStore(kv: () => KeyValueStore): QualityPreferenceStore {
   let value: QualityKey | null | undefined;
   let reading: Promise<QualityKey | null> | null = null;
@@ -59,8 +68,7 @@ export function createQualityPreferenceStore(kv: () => KeyValueStore): QualityPr
         return Promise.resolve(value);
       }
       if (reading === null) {
-        const pending = kv()
-          .get(QUALITY_PREFERENCE_KEY)
+        const pending = getStored(kv)
           .then(
             raw => parseQualityPreference(raw),
             () => {
@@ -85,9 +93,14 @@ export function createQualityPreferenceStore(kv: () => KeyValueStore): QualityPr
     },
     write(next) {
       value = next;
-      kv()
-        .set(QUALITY_PREFERENCE_KEY, serializeQualityPreference(next))
-        .catch(() => logger.warn('player', 'quality preference not stored'));
+      try {
+        kv()
+          .set(QUALITY_PREFERENCE_KEY, serializeQualityPreference(next))
+          .catch(() => logger.warn('player', 'quality preference not stored'));
+      } catch {
+        // The store itself threw (not only its promise): the same outcome.
+        logger.warn('player', 'quality preference not stored');
+      }
     },
     forget() {
       value = undefined;

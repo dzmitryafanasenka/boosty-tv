@@ -1,6 +1,6 @@
 import { createSessionManager, type SessionManager } from '../shared/api';
 import { defineAccountScoped } from '../shared/account';
-import { setQualityPreferenceKeyValueStore } from '../features/player';
+import { setQualityPreferenceKeyValueStore, setSpeedPreferenceKeyValueStore } from '../features/player';
 import { setProgressKeyValueStore } from '../shared/services/progress';
 import { DEMO_MODE } from './appConfig';
 import type * as DemoModule from './dev/demo';
@@ -30,12 +30,13 @@ export const session: SessionManager = demo
   ? demo.createDemoSessionManager()
   : createSessionManager();
 
-// The demo keeps its progress (Story 4.2 review) and its quality preference
-// (Story 4.3) in memory: the owner's real `boostytv-account` and
+// The demo keeps its progress (Story 4.2 review), its quality preference
+// (Story 4.3) and its speed (Story 8.1) in memory: the owner's real `boostytv-account` and
 // `boostytv-device` databases are never read, written or cleared.
 if (demo) {
   setProgressKeyValueStore(demo.createDemoKeyValueStore());
   setQualityPreferenceKeyValueStore(demo.createDemoKeyValueStore());
+  setSpeedPreferenceKeyValueStore(demo.createDemoKeyValueStore());
 }
 
 /**

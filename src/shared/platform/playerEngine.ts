@@ -30,6 +30,12 @@ export type PlayerEngineHandle = {
 export type PlayerEngineProps = {
   source: EngineSource;
   paused: boolean;
+  /**
+   * Story 8.1: the playback rate (1 = normal; the player sends only its
+   * presets, 0.5–3). A change applies to the mounted engine (no remount, no
+   * seek). Positions and durations stay in media seconds at any rate.
+   */
+  rate?: number;
   testID?: string;
   style?: StyleProp<ViewStyle>;
   /** Loaded: the duration in whole seconds (0 when unknown or live). */

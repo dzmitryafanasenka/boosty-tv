@@ -38,11 +38,13 @@ const SHORT_CODE = /^[A-Za-z0-9_-]{1,24}$/;
  * cap of `adaptiveBitrateCap`. For adaptive sources it reports the playing
  * track's height (`onResolution`, Story 4.3) from `onBandwidthUpdate`
  * (`reportBandwidth`; 0 means unknown and is never reported). It never plays in the background and keeps
- * the system's audio focus handling.
+ * the system's audio focus handling. The rate (Story 8.1) is react-native-video's
+ * `rate` prop (Media3 playback parameters on Android).
  */
 export function PlayerEngineView({
   source,
   paused,
+  rate = 1,
   testID,
   style,
   onLoad,
@@ -75,6 +77,7 @@ export function PlayerEngineView({
       testID={testID}
       source={{ uri: source.uri, type: TYPE_HINT[source.format] }}
       paused={paused}
+      rate={rate}
       resizeMode="contain"
       focusable={false}
       playInBackground={false}

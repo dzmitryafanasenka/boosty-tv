@@ -5,6 +5,7 @@ import {
   parseQualityPreference,
   serializeQualityPreference,
 } from '../qualityPreference';
+import { logger } from '../../../shared/services/logger';
 
 function memoryKv(seed: Record<string, string> = {}) {
   const values = new Map(Object.entries(seed));
@@ -27,6 +28,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  logger.clear();
   jest.restoreAllMocks();
 });
 
@@ -101,5 +103,18 @@ describe('createQualityPreferenceStore', () => {
     await Promise.resolve();
     await Promise.resolve();
     expect(store.peek()).toBe(720);
+  });
+
+  it('a store that throws synchronously (Story 8.1 review): read → null, write → logged, memory kept; nothing escapes', async () => {
+    const store = createQualityPreferenceStore(() => {
+      throw new Error('no native module');
+    });
+    await expect(store.read()).resolves.toBeNull();
+    store.forget();
+    expect(() => store.write(720)).not.toThrow();
+    expect(store.peek()).toBe(720);
+    const messages = logger.entries().map(entry => entry.message);
+    expect(messages).toContain('quality preference not read');
+    expect(messages).toContain('quality preference not stored');
   });
 });

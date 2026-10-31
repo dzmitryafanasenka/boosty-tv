@@ -60,6 +60,8 @@ export type PlayerScreenProps = {
    * origin shows the stream page's QR. Default: `onExit`.
    */
   onLiveUnplayable?: () => void;
+  /** Story 8.1: `phaseFlags.speed` (from the route): the «Скорость» row for recordings (live ignores it). */
+  speedEnabled: boolean;
 };
 
 /**
@@ -133,6 +135,7 @@ export function PlayerScreen({
   onEnded,
   start = 'resume',
   onLiveUnplayable,
+  speedEnabled,
 }: PlayerScreenProps) {
   // Story 7.2: the ref kind is fixed for a mounted player (route params).
   const { liveRef, vodRef } = splitMediaRef(mediaRef);
@@ -140,8 +143,8 @@ export function PlayerScreen({
   const progressRepository = useProgressRepository();
   // Every live/VOD decision (playbackMode.ts); no progress is ever written for live.
   const mode = useMemo(
-    () => (isLive ? createLiveMode() : createVodMode(progressRepository)),
-    [isLive, progressRepository],
+    () => (isLive ? createLiveMode() : createVodMode(progressRepository, { speed: speedEnabled })),
+    [isLive, progressRepository, speedEnabled],
   );
   // Hook order is effect order: source, session, heartbeat, overlay timers,
   // settings, focus, progress and lifecycle, remote, access endings, live exit.
@@ -176,6 +179,8 @@ export function PlayerScreen({
     settingsShown,
     showOverlay: commands.showOverlay,
     pickQuality: commands.pickQuality,
+    speed: mode.speedShown ? source.speed : null,
+    pickSpeed: commands.pickSpeed,
   });
 
   // Live (Story 7.2): only a failed E15 request offers «Повторить»; a broken
@@ -286,6 +291,7 @@ export function PlayerScreen({
           positionSec={view.positionSec}
           durationSec={view.durationSec}
           seekTargetSec={view.seekTarget}
+          rate={view.rate}
           onTogglePause={commands.onOk}
           onTimelineFocus={focus.onTimelineFocus}
           onPlayPauseFocus={focus.onPlayPauseFocus}

@@ -2,6 +2,7 @@ import type { ProgressRepository } from '../../shared/services/progress';
 import { pickSource, type MediaSourceState, type QualityKey } from './mediaResolver';
 import { recoveryTarget, type StartGate } from './recovery';
 import { liveQualitySwitch, liveSettingsShown } from './livePolicy';
+import type { PlaybackSpeed } from './speedPreference';
 
 /**
  * Story 4.6: a source older than this (client clock, since its E8) is
@@ -73,6 +74,11 @@ export type PlaybackMode = {
   /** Where focus goes when the overlay shows (live: play/pause, no timeline). */
   overlayFocus: 'timeline' | 'playPause';
   /**
+   * Story 8.1: the settings sheet has the «Скорость» row and the stored
+   * speed applies (VOD with the `speed` phase flag on; live: false).
+   */
+  speedShown: boolean;
+  /**
    * The ProgressRepository, or null: no progress writes at all (no `begin`,
    * report, `resumePoint` or `forget`). Null for live, and also for a VOD
    * opened without a repository. The session's `progress === null` paths
@@ -90,12 +96,17 @@ export type PlaybackMode = {
   playIntent(input: { play: boolean; paused: boolean; sourceAgeMs: number | null }): PlayIntent;
   qualityIntent(current: ReadySource | null, key: QualityKey): QualityIntent;
   endIntent(): EndIntent;
+  /** Story 8.1: the engine's rate for the stored speed (live, or the row hidden: 1). */
+  rate(speed: PlaybackSpeed): PlaybackSpeed;
   /** Where the next source continues after an error (live: undefined, the live edge). */
   recoveryTarget(gate: StartGate, pendingSeek: () => number | null, positionSec: number): number | undefined;
 };
 
-/** The VOD mode (Stories 4.1–4.7): progress, seeking, quality preference. */
-export function createVodMode(progress: ProgressRepository | null): PlaybackMode {
+/**
+ * The VOD mode (Stories 4.1–4.7): progress, seeking, quality preference;
+ * Story 8.1: the playback speed while `speed` (the phase flag) is on.
+ */
+export function createVodMode(progress: ProgressRepository | null, { speed = false }: { speed?: boolean } = {}): PlaybackMode {
   return {
     kind: 'vod',
     canSeek: true,
@@ -103,6 +114,7 @@ export function createVodMode(progress: ProgressRepository | null): PlaybackMode
     noSourceLeaves: false,
     heartbeat: false,
     overlayFocus: 'timeline',
+    speedShown: speed,
     progress,
     pickMedia: vod => vod,
     retryable: () => true,
@@ -114,6 +126,7 @@ export function createVodMode(progress: ProgressRepository | null): PlaybackMode
       return current !== null && next !== null && next !== current.source ? 'switchSource' : 'storeOnly';
     },
     endIntent: () => 'reportEnd',
+    rate: stored => (speed ? stored : 1),
     recoveryTarget: (gate, pendingSeek, positionSec) => recoveryTarget(gate, pendingSeek(), positionSec),
   };
 }
@@ -127,6 +140,7 @@ export function createLiveMode(): PlaybackMode {
     noSourceLeaves: true,
     heartbeat: true,
     overlayFocus: 'playPause',
+    speedShown: false,
     progress: null,
     pickMedia: (_vod, live) => live,
     retryable: state => state.kind === 'error',
@@ -134,6 +148,8 @@ export function createLiveMode(): PlaybackMode {
     playIntent: ({ play, paused }) => (play && paused ? 'liveEdge' : 'plain'),
     qualityIntent: (current, key) => (liveQualitySwitch(current, key) ? 'liveSwitch' : 'none'),
     endIntent: () => 'markEnded',
+    // Story 8.1: a live stream always plays at 1× (no row, the stored speed ignored).
+    rate: () => 1,
     recoveryTarget: () => undefined,
   };
 }
