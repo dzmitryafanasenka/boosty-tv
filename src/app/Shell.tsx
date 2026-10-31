@@ -38,6 +38,11 @@ export type ShellProps = {
   onOpenSignOut: (initiator: RefObject<HostView | null>) => void;
   /** Debug builds only: open «Проверка фокуса» from Настройки. */
   onOpenFocusCheck?: () => void;
+  /**
+   * Story 8.3: the «Версия» gesture's target (the hidden Diagnostics route).
+   * The Shell passes it to Настройки only while `phaseFlags.diagnostics` is on.
+   */
+  onOpenDiagnostics?: () => void;
   /** Debug builds only: the live refresh check row in Настройки. */
   onCheckSession?: () => void;
   /** Debug builds only: the in-memory A11 trigger row in Настройки. */
@@ -105,6 +110,7 @@ export function Shell({
   http,
   onOpenSignOut,
   onOpenFocusCheck,
+  onOpenDiagnostics,
   onCheckSession,
   onExpireSession,
   onBreakNextVideoUrl,
@@ -349,6 +355,7 @@ export function Shell({
           eventsFocus={eventsFocus}
           onOpenSignOut={onOpenSignOut}
           onOpenFocusCheck={onOpenFocusCheck}
+          onOpenDiagnostics={onOpenDiagnostics}
           onCheckSession={onCheckSession}
           onExpireSession={onExpireSession}
           onBreakNextVideoUrl={onBreakNextVideoUrl}
@@ -373,6 +380,7 @@ function SectionContent({
   eventsFocus,
   onOpenSignOut,
   onOpenFocusCheck,
+  onOpenDiagnostics,
   onCheckSession,
   onExpireSession,
   onBreakNextVideoUrl,
@@ -391,6 +399,7 @@ function SectionContent({
   eventsFocus: EventsFocusInfo;
   onOpenSignOut: (initiator: RefObject<HostView | null>) => void;
   onOpenFocusCheck?: () => void;
+  onOpenDiagnostics?: () => void;
   onCheckSession?: () => void;
   onExpireSession?: () => void;
   onBreakNextVideoUrl?: () => void;
@@ -430,6 +439,7 @@ function SectionContent({
         <SettingsSection
           onOpenSignOut={onOpenSignOut}
           onOpenFocusCheck={onOpenFocusCheck}
+          onOpenDiagnostics={onOpenDiagnostics}
           onCheckSession={onCheckSession}
           onExpireSession={onExpireSession}
           onBreakNextVideoUrl={onBreakNextVideoUrl}
@@ -478,13 +488,23 @@ function SectionContent({
  * warms the read at startup (`src/app/session.ts`), so the row is normally
  * there on the first visit and never inserted above a focused «Версия»;
  * this gate is the safety net.
+ *
+ * Story 8.3: the «Версия» gesture reaches Diagnostics only while
+ * `phaseFlags.diagnostics` is on; otherwise Настройки gets no target and
+ * «Версия» does nothing on any number of presses.
  */
-function SettingsSection(props: Omit<SettingsScreenProps, 'externalPlayer'>) {
+function SettingsSection({ onOpenDiagnostics, ...props }: Omit<SettingsScreenProps, 'externalPlayer'>) {
   const enabled = phaseFlags.externalPlayer;
   const { on, toggle } = useExternalPlayerPreference(enabled);
   const externalPlayer = useMemo(
     () => (enabled && on !== undefined ? { on, onToggle: toggle } : undefined),
     [enabled, on, toggle],
   );
-  return <SettingsScreen {...props} externalPlayer={externalPlayer} />;
+  return (
+    <SettingsScreen
+      {...props}
+      externalPlayer={externalPlayer}
+      onOpenDiagnostics={phaseFlags.diagnostics ? onOpenDiagnostics : undefined}
+    />
+  );
 }

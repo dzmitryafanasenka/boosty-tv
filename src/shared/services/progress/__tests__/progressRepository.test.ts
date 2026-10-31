@@ -128,6 +128,7 @@ const silentLogger: Logger = {
   error: () => {},
   entries: () => [],
   clear: () => {},
+  setSink: () => {},
 };
 
 type Harness = {

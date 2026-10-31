@@ -74,12 +74,12 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `logger.ts` + test -- redaction rules, field-key redaction, sink hook.
-- [ ] `LogFileModule.kt`, `BoostyNativePackage.kt`, `src/shared/platform/logFile.ts` + test -- `append(lines[])`, `clear()`, `location()`; rotation at 256 KB; never logs content.
-- [ ] `src/shared/services/logFileSink.ts` + test -- batching, generation guard, ring dump on enable, the capture preference, the reset store, bootstrap registration.
-- [ ] `useVersionPresses`, `SettingRow` info `onPress`, `SettingsScreen`, `Shell.tsx`, `DiagnosticsScreen.tsx`, route wiring, `ru.ts`, `phaseFlags` -- per the matrix.
-- [ ] Tests -- matrix rows; settings and diagnostics flow (gesture, slow presses, Back order, toggle, clear); reset clearing ring + file and dropping stale batches; release-bundle check.
-- [ ] Docs -- `docs/feature-parity.md` SET-04/SET-05, `EXPERIENCE.md` as-built, `docs/focus-map.md` Diagnostics, `docs/testing.md` Story 8.3 with the adb steps.
+- [x] `logger.ts` + test -- redaction rules, field-key redaction, sink hook.
+- [x] `LogFileModule.kt`, `BoostyNativePackage.kt`, `src/shared/platform/logFile.ts` + test -- `append(lines[])`, `clear()`, `location()`; rotation at 256 KB; never logs content.
+- [x] `src/shared/services/logFileSink.ts` + test -- batching, generation guard, ring dump on enable, the capture preference, the reset store, bootstrap registration.
+- [x] `useVersionPresses`, `SettingRow` info `onPress`, `SettingsScreen`, `Shell.tsx`, `DiagnosticsScreen.tsx`, route wiring, `ru.ts`, `phaseFlags` -- per the matrix.
+- [x] Tests -- matrix rows; settings and diagnostics flow (gesture, slow presses, Back order, toggle, clear); reset clearing ring + file and dropping stale batches; release-bundle check.
+- [x] Docs -- `docs/feature-parity.md` SET-04/SET-05, `EXPERIENCE.md` as-built, `docs/focus-map.md` Diagnostics, `docs/testing.md` Story 8.3 with the adb steps.
 
 **Acceptance Criteria:**
 - Given the flag off, when «Версия» is pressed any number of times, then nothing opens.

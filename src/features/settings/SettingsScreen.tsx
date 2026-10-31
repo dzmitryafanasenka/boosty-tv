@@ -4,6 +4,7 @@ import { useZoneItem } from '../../shared/focus';
 import { t } from '../../shared/i18n';
 import { getVersionName } from '../../shared/platform/appInfo';
 import { SettingRow, Text, spacing, type HostView } from '../../shared/ui';
+import { useVersionPresses } from './useVersionPresses';
 
 /** Focus ids (docs/focus-map.md §1.5). */
 export const SETTINGS_EXTERNAL_PLAYER_ID = 'settings/row/external-player';
@@ -28,6 +29,13 @@ export type SettingsScreenProps = {
    * is the current value; `onToggle` flips and stores it at once.
    */
   externalPlayer?: { on: boolean; onToggle: () => void };
+  /**
+   * Story 8.3 (SET-05): seven OK presses on «Версия» (each < 2 s apart,
+   * `useVersionPresses`) call it; the app opens the hidden Diagnostics
+   * route. Absent (`phaseFlags.diagnostics` off): «Версия» does nothing on
+   * any number of presses.
+   */
+  onOpenDiagnostics?: () => void;
   /**
    * OK on «Выйти из аккаунта» (Story 2.7): the app opens the sign-out
    * dialog in the modal host with the row as the initiator, so focus
@@ -65,13 +73,16 @@ export type SettingsScreenProps = {
  * Настройки (Stories 2.4, 2.7, 8.2): first the toggle row «Системный
  * видеоплеер» (Story 8.2, when given: «Вкл» / «Выкл», a description that
  * progress is not tracked; OK flips it at once); then the info row «Версия
- * <versionName>» (OK does nothing), the initial focus of the section; below
+ * <versionName>» (OK does nothing visible; seven quick presses open the
+ * hidden Diagnostics when `onOpenDiagnostics` is given, Story 8.3), the
+ * initial focus of the section; below
  * it the nav row «Выйти из аккаунта», which opens the sign-out dialog; the
  * debug rows (`__DEV__` only) after it. Rendered inside the Shell's content
  * FocusZone.
  */
 export function SettingsScreen({
   externalPlayer,
+  onOpenDiagnostics,
   onOpenSignOut,
   onOpenFocusCheck,
   onCheckSession,
@@ -79,6 +90,7 @@ export function SettingsScreen({
   onBreakNextVideoUrl,
 }: SettingsScreenProps) {
   const externalPlayerRow = useZoneItem(SETTINGS_EXTERNAL_PLAYER_ID);
+  const onVersionPress = useVersionPresses(onOpenDiagnostics);
   const version = useZoneItem(SETTINGS_VERSION_ID);
   const focusCheck = useZoneItem(SETTINGS_FOCUS_CHECK_ID);
   const sessionCheck = useZoneItem(SETTINGS_SESSION_CHECK_ID);
@@ -121,6 +133,7 @@ export function SettingsScreen({
           kind="info"
           label={t('settings.version')}
           value={getVersionName() ?? t('settings.versionUnknown')}
+          onPress={onVersionPress}
           onFocus={version.onFocus}
         />
         <SettingRow

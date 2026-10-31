@@ -77,14 +77,12 @@ describe('NavItem', () => {
 });
 
 describe('SettingRow', () => {
-  it('info: focusable, label + value, OK does nothing, setting-row tokens', async () => {
-    const onPress = jest.fn();
-    const root = await render(
-      <SettingRow testID={ID} kind="info" label="Версия" value="1.0" onPress={onPress} />,
-    );
+  it('info: focusable, label + value, OK does nothing without onPress, setting-row tokens', async () => {
+    const root = await render(<SettingRow testID={ID} kind="info" label="Версия" value="1.0" />);
     const node = host(root);
     expect(node.props.focusable).toBe(true);
     expect(node.props.accessibilityLabel).toBe('Версия 1.0');
+    expect(node.props.accessibilityRole).toBe('text');
     expect(surface(root)).toMatchObject({
       minHeight: components['setting-row'].minHeight,
       borderRadius: components['setting-row'].radius,
@@ -92,12 +90,24 @@ describe('SettingRow', () => {
     await act(async () => {
       host(root).props.onClick({ nativeEvent: {} });
     });
-    expect(onPress).not.toHaveBeenCalled();
 
     await setFocused(root, true);
     expect(surface(root).backgroundColor).toBe(components['setting-row'].bgFocus);
     expect(byId(root, `${ID}/ring`)).toHaveLength(1);
     expect(focus['scale-row']).toBe(components['setting-row'].scaleFocus);
+  });
+
+  it('Story 8.3: info with onPress: OK calls it; the role and the look stay', async () => {
+    const onPress = jest.fn();
+    const root = await render(<SettingRow testID={ID} kind="info" label="Версия" value="1.0" onPress={onPress} />);
+    const plain = await render(<SettingRow testID={ID} kind="info" label="Версия" value="1.0" />);
+    expect(host(root).props.accessibilityRole).toBe('text');
+    expect(host(root).props.accessibilityState).toEqual(host(plain).props.accessibilityState);
+    expect(surface(root)).toEqual(surface(plain));
+    await act(async () => {
+      host(root).props.onClick({ nativeEvent: {} });
+    });
+    expect(onPress).toHaveBeenCalledTimes(1);
   });
 
   it('nav: OK calls onPress', async () => {

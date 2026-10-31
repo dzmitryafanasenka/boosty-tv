@@ -36,6 +36,12 @@
  * видеоплеер» toggle and the hand-off it drives. While it is off, there is
  * no row and every recording plays in the built-in player (the stored
  * toggle is neither read nor applied). Live always uses the built-in player.
+ *
+ * `diagnostics` (Story 8.3, SET-05) is the hidden Diagnostics route, opened
+ * by seven OK presses on Настройки' «Версия». It ships in release; only the
+ * gesture reveals it. While it is off, «Версия» does nothing on any number
+ * of presses, and the stored «Запись логов» toggle is neither read nor
+ * applied (nothing is written to the log file).
  */
 export const phaseFlags = {
   home: true,
@@ -49,6 +55,7 @@ export const phaseFlags = {
   live: true,
   speed: true,
   externalPlayer: true,
+  diagnostics: true,
 } as const satisfies Record<string, boolean>;
 
 export type Capability = keyof typeof phaseFlags;

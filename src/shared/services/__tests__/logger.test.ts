@@ -1,4 +1,4 @@
-import { createLogger, LOG_RING_CAPACITY, redact } from '../logger';
+import { createLogger, isSecretFieldKey, LOG_RING_CAPACITY, redact, type LogEntry } from '../logger';
 
 const PHONE = '+375291234567';
 const CHALLENGE = 'a'.repeat(20) + 'B9c8D7e6F5g4H3i2J1k0' + 'zZyYxXwWvVuUtTsSrRqQ'; // 60 chars
@@ -17,6 +17,26 @@ describe('redact', () => {
     ['sms_code= value', 'sms_code=4821&x=1', '4821'],
     ['phone= value', 'phone=%2B375291234567', '%2B375291234567'],
     ['JSON code key', '{"code":"short-challenge"}', 'short-challenge'],
+    // Story 8.3 (FR54, AD-14).
+    ['Cookie header', 'Cookie: auth=s3ss10n; _ga=x1', 's3ss10n'],
+    ['Set-Cookie header', 'set-cookie: refresh=r3fr; Path=/; HttpOnly', 'r3fr'],
+    ['Basic Authorization', 'Authorization: Basic dXNlcjpwYXNz', 'dXNlcjpwYXNz'],
+    ['bare-token Authorization', 'authorization:tok3n-value', 'tok3n-value'],
+    ['access_token= value', 'grant access_token=at-123&x=1', 'at-123'],
+    ['refresh_token= value', 'refresh_token=rt-456', 'rt-456'],
+    ['token= value', 'token=short1', 'short1'],
+    ['signedQuery= value', 'signedQuery=sq-789', 'sq-789'],
+    ['signature= value', 'signature=sg-1', 'sg-1'],
+    ['JSON access_token key', '{"access_token":"at-json"}', 'at-json'],
+    ['JSON refresh_token key', '{"refresh_token": "rt-json"}', 'rt-json'],
+    ['JSON token key', '{"token":"tk-json"}', 'tk-json'],
+    ['JSON signedQuery key', '{"signedQuery":"sq-json"}', 'sq-json'],
+    ['JSON sig key', '{"sig":"sg-json"}', 'sg-json'],
+    ['JSON signature key', '{"signature":"sig-json"}', 'sig-json'],
+    ['JSON numeric code', '{"code":4821}', '4821'],
+    ['bare query with expires=', 'src ?expires=1735&acl=/v/*&hmac=ab12 next', 'hmac=ab12'],
+    ['bare query with sig=', 'path /v/1.m3u8?sig=zz9&x=1', 'zz9'],
+    ['bare query without ?', 'expires=1735&sig=q1w2', 'q1w2'],
   ])('removes %s', (_name, input, secret) => {
     const out = redact(input);
     expect(out).not.toContain(secret);
@@ -31,6 +51,18 @@ describe('redact', () => {
     );
   });
 
+  it('Story 8.3: header values are replaced to the end of the line only', () => {
+    expect(redact('Cookie: a=1; b=2\nnext line')).toBe('Cookie: <redacted>\nnext line');
+    expect(redact('Authorization: Basic xyz')).toBe('Authorization: <redacted>');
+    expect(redact('token=t1&page=2')).toBe('token=<redacted>&page=2');
+    expect(redact('see ?sig=1 ok')).toBe('see <query> ok');
+  });
+
+  it('Story 8.3: ordinary words around the new keys stay', () => {
+    expect(redact('retry after 2 s, expires soon')).toBe('retry after 2 s, expires soon');
+    expect(redact('tokenless request, cookie jar empty')).toBe('tokenless request, cookie jar empty');
+  });
+
   it('replaces values with stable markers', () => {
     expect(redact(`x ${PHONE} y`)).toBe('x <phone> y');
     expect(redact('Bearer abc')).toBe('Bearer <redacted>');
@@ -39,7 +71,72 @@ describe('redact', () => {
   });
 });
 
+describe('isSecretFieldKey (Story 8.3)', () => {
+  it.each([
+    'token', 'Token', 'TOKEN', 'accessToken', 'refresh_token', 'idTokens',
+    'cookie', 'Cookie', 'setCookie', 'Set-Cookie', 'cookies',
+    'authorization', 'Authorization', 'AUTHORIZATION', 'proxyAuthorization',
+    'signedQuery', 'signedquery', 'SIGNED_QUERY',
+    'phone', 'Phone', 'phoneNumber', 'user.phone',
+    'code', 'Code', 'sms_code', 'smsCode', 'statusCode',
+  ])('%s is secret', key => {
+    expect(isSecretFieldKey(key)).toBe(true);
+  });
+
+  it.each(['status', 'decoder', 'encoded', 'store', 'outcome', 'tokenizer', 'url', 'error'])('%s is not', key => {
+    expect(isSecretFieldKey(key)).toBe(false);
+  });
+});
+
 describe('createLogger', () => {
+  it('Story 8.3: secret field keys get the marker whatever the value', () => {
+    const log = createLogger();
+    log.info('auth', 'm', {
+      code: '4821',
+      smsCode: 4821,
+      Phone: 'x',
+      accessToken: 'short',
+      Cookie: 'a=1',
+      Authorization: 'Basic abc',
+      signedQuery: 'expires=1',
+      token: true,
+      status: 401,
+    });
+    expect(log.entries()[0].fields).toEqual({
+      code: '<redacted>',
+      smsCode: '<redacted>',
+      Phone: '<redacted>',
+      accessToken: '<redacted>',
+      Cookie: '<redacted>',
+      Authorization: '<redacted>',
+      signedQuery: '<redacted>',
+      token: '<redacted>',
+      status: '401',
+    });
+  });
+
+  it('Story 8.3: the sink gets each redacted entry after the ring; a throwing sink is ignored', () => {
+    const log = createLogger({ now: () => 5 });
+    const seen: LogEntry[] = [];
+    log.setSink(entry => {
+      seen.push(entry);
+      throw new Error('sink broke');
+    });
+    log.warn('net', `Cookie: s=${TOKEN}`, { phone: PHONE, status: 500 });
+    expect(seen).toHaveLength(1);
+    expect(JSON.stringify(seen)).not.toContain(TOKEN);
+    expect(JSON.stringify(seen)).not.toContain(PHONE);
+    expect(seen[0]).toEqual(log.entries()[0]);
+    // A copy: changing it does not change the ring.
+    seen[0].message = 'changed';
+    expect(log.entries()[0].message).toBe('Cookie: <redacted>');
+
+    log.setSink(null);
+    log.info('net', 'after');
+    expect(seen).toHaveLength(1);
+    expect(log.entries()).toHaveLength(2);
+  });
+
   it('stores only redacted messages and fields in the ring', () => {
     const log = createLogger({ now: () => 1000 });
     log.info('auth', `sent to ${PHONE} with ${CHALLENGE}`, {

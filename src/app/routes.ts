@@ -54,6 +54,12 @@ export type RootStackParamList = {
   };
   /** A11 Session expired (Story 2.6): the stack root after an expiry. */
   Expired: undefined;
+  /**
+   * Story 8.3 (SET-05): the hidden Diagnostics, pushed over the Shell by
+   * seven OK presses on Настройки' «Версия». Registered while
+   * `phaseFlags.diagnostics` is on; ships in release.
+   */
+  Diagnostics: undefined;
   /** Debug builds only: «Проверка фокуса» (registered under `__DEV__`). */
   DevFocus: undefined;
   /** Debug builds only: the card detail pushed from «Проверка фокуса». */

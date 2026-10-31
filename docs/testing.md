@@ -904,6 +904,58 @@ Review fixes (2026-10-28, host-tested only): short visits write nothing (owner d
 
 Host tests: `src/shared/services/progress/__tests__/progressRepository.test.ts` (29: the finished rule and status, resume precedence, the 10 s cadence, one write in flight with the latest position, forced events, start over, seeks as movement, failure gating ≥ 10 s and the bounded automatic retry, expired hold/flush/drop, sign-out wipe, a late write after a reset, the debounced/forced disk write, cold-start load, corrupt disk, the 200-entry cap, the stale disk write undone, a load after a reset dropped, stable snapshots); `__tests__/playerFlow.test.tsx` «progress and resume (Story 4.2)» (10: server only with no pre-seek t=0 and the E9 request shape, local wins, finished, multi-video + start over, hold-scrub, background and end, the vanished «С начала» fallback, failure retry, cold start from the persisted entry, log hygiene); `__tests__/postFlow.test.tsx` (status and «Продолжить» only while the player is on); `__tests__/accountScopeRegistry.test.js` (`progress` registered); `demoFlow` (the row label now ends with the status). Lint (`--max-warnings 0`), typecheck, `check:fixtures` clean; `npm test` ×3: 1494 passed each; `playerFlow` + `postFlow` + the progress suite 30/30 (187 tests each run).
 
+### Story 8.3 — Hidden diagnostics for testing, 2026-10-31
+
+**Status: implemented and host-tested; the release build compiles. Not run on a device or emulator (the rows below).** `spec-8-3-hidden-diagnostics.md`. Seven OK presses on Настройки' «Версия», each less than 2 s after the previous one, push the hidden `Diagnostics` route (phase flag `diagnostics`, on; the route ships in release, only the gesture reveals it). «Версия» stays an info row: no press scale, role `text`. The press handling is `useVersionPresses` (`src/features/settings/`); its `onFirstPress` hook is where Epic 9's single-press update check goes, and it runs once per series. Diagnostics has «Запись логов» (device-scoped `diagnostics.capture.v1` in `boostytv-device`, default off, the initial focus) and «Очистить логи», followed by the adb steps and the folder the app reports. Log lines are never shown. Back pops to Настройки with focus on «Версия».
+
+While capture is on, `logFileSink` (`src/shared/services/logFileSink.ts`) first writes the Logger ring and then every new entry. Entries are already redacted by the Logger. The sink formats each as one line and appends batches (≤ 20 lines, or 1 s after the first) through the LogFile port (`src/shared/platform/logFile.ts` → `LogFileModule.kt`). The native side writes `getExternalFilesDir(null)/logs/boostytv.log` on one serial thread, rotates it to `boostytv.log.1` at 256 KB (≤ 512 KB in total), and needs no permission. A stored «on» resumes capture at app start. A failed append logs one warning, to the ring only, and capture stays on.
+
+Account scope: `logFileAccountStore` (`logFile`) is registered in `bootstrap.ts` right after the ring. On reset it drops the queued lines and clears the file. Each batch carries `accountScope.guard('logFile')`, so a batch of an older generation is dropped. A failed native clear is reported in `failed[]`.
+
+Logger redaction (`logger.ts`) adds:
+- `Cookie:` / `Set-Cookie:` and any `Authorization:` value (to the end of the line);
+- bare query strings with `expires=` / `sig=`;
+- `access_token`, `refresh_token`, `token`, `signedQuery`, `sig`, `signature` (also `authorization`, `cookie`, `set-cookie`) as query or JSON keys, string or bare values;
+- field keys naming token / cookie / authorization / signedQuery / phone / code in any case (`isSecretFieldKey`), whose values are always `<redacted>`.
+
+`AudioBlock`'s engine-error field was renamed from `code` to `error`, so it is not redacted.
+
+Host tests:
+- `src/shared/services/__tests__/logger.test.ts`: every new secret kind, the field-key rule, the sink hook.
+- `src/shared/services/__tests__/logFileSink.test.ts`:
+  - line format and cut, capture off, the ring dump then new entries, batching 20 / 1 s;
+  - every file line redacted, disable, a failed append (one ring-only warning);
+  - clear, the stale-generation drop, and the acceptance: after a sign-out the file holds no line of the previous account, an in-flight append is cleared by the reset's ordered clear, a failed clear lands in `failed[]`;
+  - the capture preference.
+- `src/shared/platform/__tests__/logFile.test.ts`: no module, call order, fixed errors, location.
+- `__tests__/logFileModule.test.js`: a source guard for registration, path, cap, serial thread, no content logging, no storage permission, `allowBackup=false`.
+- `src/features/settings/__tests__/useVersionPresses.test.ts`.
+- `__tests__/diagnosticsFlow.test.tsx`: the gesture, Back to «Версия», single / six presses, slow presses, the flag off, the toggle with the ring dump and the KV value, the folder, clear, reset.
+- `shellPrimitives.test.tsx`: an info row with `onPress` keeps its role and look.
+- `accountScopeRegistry.test.js` now expects `logFile`. `releaseBundle.test.js` asserts the Diagnostics ids are in the release bundle. `phaseFlags.test.ts` covers the new flag.
+
+Checks run:
+- `npm run lint -- --max-warnings 0`, `npx tsc --noEmit`, `npm run check:fixtures` (30): clean.
+- `npm test`: 136 suites, 3004 tests passed (the release-bundle test included).
+- `./gradlew assembleRelease -PreactNativeArchitectures=armeabi-v7a` with `JAVA_HOME=/opt/homebrew/opt/openjdk@17` and `ANDROID_HOME=/opt/homebrew/share/android-commandlinetools`: BUILD SUCCESSFUL.
+- Not run: any device or emulator check. The rotation at 256 KB and the native call order are covered only by code and the source guard.
+
+Retrieving the logs (release or debug build, no `run-as` needed):
+
+```sh
+# On the TV: Настройки → seven quick OK on «Версия» → «Запись логов» → «Вкл»; reproduce the problem.
+adb connect <tv-ip>:5555        # or the wireless-debugging pairing flow
+adb pull /sdcard/Android/data/io.github.dzmitryafanasenka.boostytv/files/logs/ ./boostytv-logs
+# boostytv-logs/boostytv.log (newest) and, after a rotation, boostytv.log.1
+```
+
+Device rows to run (owner or a later agent pass, Chromecast with Google TV):
+- Seven quick OK on «Версия» open Diagnostics with focus on «Запись логов»; a single press and slow presses (≥ 2 s apart) do nothing visible; Back returns to Настройки on «Версия».
+- Capture on, browse and play a video, then the `adb pull` above. The file exists; no line contains a URL query, a token, a cookie, the phone or a code.
+- «Очистить логи» → the pulled folder is empty. Sign-out → the folder is empty; the toggle is still «Вкл» after the next sign-in.
+- Capture on across `am force-stop` and a relaunch: new lines appear without touching the toggle.
+- Rotation: enough activity (or a temporary low cap in a local build) gives `boostytv.log.1`, with neither file above 256 KB.
+
 ### Story 8.2 — System video player option, 2026-10-31
 
 **Status: implemented, host-tested, built and checked on the device by the agent over adb (below).** `spec-8-2-system-video-player.md`. Настройки' first row «Системный видеоплеер» (phase flag `externalPlayer`, on): a device-scoped toggle (`player.external.v1` in `boostytv-device`, default off, outside the AccountScope wipe), «Вкл» in accent / «Выкл», with the description that progress is not tracked; «Версия» keeps the initial focus. With it on, a recording opens a fresh E8 and the «Качество» list (`player/external/sheet`, the player's extracted `QualityMenu`) with focus on the quality the device preference picks; OK hands that source's URL and the title to the `ExternalPlayer` port (`src/shared/platform/externalPlayer.ts` → `ExternalPlayerModule.kt`: `ACTION_VIEW` `video/*`, `title` / `forcename` extras, this app and `com.android.tv.frameworkpackagestubs` dropped, one explicit intent per remaining player; `prepare` then `launch`). One player opens directly, several get the chooser with those intents. Ready → the route pops to the origin first, then the player starts 300 ms later; no ProgressRepository call, no E9, no start position; a launch failure after the pop is only logged. No player, a resolve failure or no module → PlayerScreen at that quality (`qualityPreference.remember`: kept in memory until the app restarts, so later built-in videos start there too; the stored preference unchanged) with «Внешний плеер не найден» in the overlay, which shows once at the start. A non-playable E8 → PlayerScreen's own state. Live, the flag off and the toggle off: the built-in player as before. The manifest declares `<queries>` for VIEW `video/*` (https and URI-less). The log line carries the outcome only.

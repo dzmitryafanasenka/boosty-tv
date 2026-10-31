@@ -621,6 +621,33 @@ export const ru = {
       on: 'Вкл',
       off: 'Выкл',
     },
+    // Story 8.3 (SET-05): the hidden Diagnostics route (seven OK presses on
+    // «Версия»). For testing and debugging: the log file is pulled over adb;
+    // log lines are never shown on the TV. `command` is the adb command as
+    // typed on the computer; `folder` names the directory the app reports.
+    diagnostics: {
+      title: 'Диагностика',
+      capture: {
+        row: 'Запись логов',
+        description: 'Технический журнал приложения сохраняется в файл на телевизоре. Номера, коды и токены в нём скрыты.',
+        on: 'Вкл',
+        off: 'Выкл',
+      },
+      clear: {
+        row: 'Очистить логи',
+        done: 'Логи очищены',
+        failed: 'Не удалось очистить логи',
+      },
+      adb: {
+        title: 'Как забрать логи',
+        step1: '1. Включите «Запись логов» и повторите проблему.',
+        step2: '2. Включите на телевизоре отладку по сети и подключите компьютер через adb.',
+        step3: '3. Выполните на компьютере:',
+        command: 'adb pull /sdcard/Android/data/io.github.dzmitryafanasenka.boostytv/files/logs/',
+        step4: '4. Выключите «Запись логов», когда файл больше не нужен.',
+        folder: 'Папка на телевизоре: {path}',
+      },
+    },
   },
   // The sign-out confirmation (Story 2.7, docs/focus-map.md K4); copy from
   // the approved Settings mock.
