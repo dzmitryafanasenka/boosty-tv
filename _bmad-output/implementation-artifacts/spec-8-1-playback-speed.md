@@ -2,7 +2,7 @@
 title: 'Story 8.1: Playback speed'
 type: 'feature'
 created: '2026-10-31'
-status: 'in-review'
+status: 'done'
 route: 'dispatch'
 review_loop_iteration: 0
 baseline_commit: '990c62aeb67e1eab3ef05b062185bd3e57fcbed7'
