@@ -3,7 +3,12 @@
  * as the global `fetch`: Главная → Пост → «Смотреть» or a MediaRow → Player
  * (a fresh E8, the source order), the overlay, remote seeking, auto-hide,
  * the spinner, Back, origin focus, the error states and the PlaybackArbiter
- * slot. Every row of the spec's I/O matrix. The PlayerEngine port is
+ * slot. Every row of the spec's I/O matrix. Also the Story 4.5 end-exit
+ * rows, the Epic 3 retro A6 locked-E8 session check and the Story 6.3
+ * timestamp chips. Split from the original player flow file in Epic 8 retro
+ * A4: progress, quality, recovery, live, speed and the system player have
+ * their own `*Flow.test.tsx`; the shared setup is
+ * `src/test/playerFlowHarness.tsx`. The PlayerEngine port is
  * mocked (`src/test/playerEngineMock`): these tests prove what the player
  * asks of the engine and which element it asks to focus, not native
  * playback, decoding or focus movement (device checks, docs/testing.md).

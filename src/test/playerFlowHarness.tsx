@@ -134,9 +134,15 @@ export const withData = (data: unknown[]) => {
 /**
  * Registers the suite hooks (fake timers, the console spies, the mock
  * resets, the stored session, the transport routing and the per-test
- * cleanup); call once at the top level of each player flow suite.
+ * cleanup); call once at the top level of each player flow suite. A second
+ * call would register every hook twice, so it throws.
  */
+let registered = false;
 export function setupPlayerFlowHarness(): PlayerFlowHandlers {
+  if (registered) {
+    throw new Error('setupPlayerFlowHarness: call it once, at the top level of the suite');
+  }
+  registered = true;
   beforeAll(() => {
     jest.useFakeTimers();
     notifyManager.setScheduler(callback => {

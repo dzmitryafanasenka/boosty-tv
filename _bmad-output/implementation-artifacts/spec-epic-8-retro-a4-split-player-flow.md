@@ -2,7 +2,7 @@
 title: 'Epic 8 retro A4: split __tests__/playerFlow.test.tsx'
 type: 'chore'
 created: '2026-10-31'
-status: 'in-progress'
+status: 'done'
 route: 'dispatch'
 baseline_commit: '203804003e21de25ebde1f0cbbcb6bc60f019a1e'
 review_loop_iteration: 0
@@ -64,3 +64,30 @@ context:
 
 **Commands:**
 - `npm run lint -- --max-warnings 0 && npx tsc --noEmit && npm test` -- expected: clean, 3104 passed.
+
+## Implementation Notes
+
+- Split commit `7be0ce2`: `src/test/playerFlowHarness.tsx` plus seven files (68 / 13 / 19 / 27 / 33 / 15 / 17 tests). Test bodies are byte-identical apart from the `handlers.` prefix on the mutable E8/E9/E15/E16/transport handlers.
+- Verification (coordinator): the sorted full names of the seven files equal the pre-split list (192; the SHA-256 prefix is recorded in `docs/testing.md`); lint and typecheck clean; `npm test` ×3: 3104 passed; the seven files ×30: 0 failed runs.
+- Review patches: a double-registration guard in `setupPlayerFlowHarness`; the `playerFlow.test.tsx` header (scope and split note); `docs/testing.md` (scope incl. 4.5 and Epic 3 A6, a missed 4.2 reference, historical names marked «now `X`», the seven-file command, the name-list hash).
+
+## Review Triage Log
+
+Blind Hunter (1 layer):
+
+| # | Finding | Verdict | Route |
+|---|---------|---------|-------|
+| 1 | `handlers` reachable both as an export and as the return value | low | Harmless; rejected |
+| 2 | No guard against registering hooks twice | low | patched (throws) |
+| 3 | The seven `jest.mock` copies are not checked for drift | low | Adds assertions beyond scope; rejected |
+| 4 | `handlers.transport` starts as a cast `undefined` | low | Unchanged from the single file; rejected |
+| 5 | The A6 describe keeps its own transport routing copy | low | Pre-existing, moved verbatim; rejected |
+| 6 | No `afterEach` unmount of roots after an early failure | low | Pre-existing behaviour; rejected (a test change beyond scope) |
+| 7 | Exported `URL`/`BACK` names | low | Renaming would edit test bodies (spec: verbatim); rejected |
+| 8 | `playerFlow.test.tsx` header not updated | low | patched |
+| 9 | Scope summary omits 4.5 and Epic 3 A6 | low | patched |
+| 10 | Missed 4.2 reference in `docs/testing.md` | low | patched |
+| 11 | Historical entries mix old and new file names | low | patched («now `X`») |
+| 12 | No reproducible seven-file command | low | patched |
+| 13 | Spec open; evidence only in the scratchpad | low | patched (hash and count in docs; status done) |
+
