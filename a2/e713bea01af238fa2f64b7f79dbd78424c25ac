@@ -1,0 +1,91 @@
+__tests__/androidManifest.test.js
+  s_7477a2e6c69ec6::t_7e5a9737e15450 48-61
+__tests__/demoFlow.test.tsx
+  s_7477a2e6c69ec6::t_2325d5f9d4bb9b 14,17,775-791
+__tests__/homeFeedFlow.test.tsx
+  s_7477a2e6c69ec6::t_61902ccc27149b 17,176-177,2254-2284
+__tests__/playerFlow.test.tsx
+  s_7477a2e6c69ec6::t_979ccc121f99db 29,33,39,230-231,4055-4343
+__tests__/signOutFlow.test.tsx
+  s_7477a2e6c69ec6::t_59912a31903e16 148-149
+_bmad-output/implementation-artifacts/spec-8-2-system-video-player.md
+  s_7477a2e6c69ec6::t_4f84c5a8080977 72,77-82
+_bmad-output/planning-artifacts/ux-designs/ux-boosty-tv-2026-10-25/EXPERIENCE.md
+  s_7477a2e6c69ec6::t_a47de154d3fcd6 95
+android/app/src/main/AndroidManifest.xml
+  s_7477a2e6c69ec6::t_b3eba556abe413 11-24
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/BoostyNativePackage.kt
+  s_7477a2e6c69ec6::t_da924b422fa0cc 16
+docs/feature-parity.md
+  s_7477a2e6c69ec6::t_a778a26ad76863 119,145
+docs/focus-map.md
+  s_7477a2e6c69ec6::t_60375b90f24be6 67,443-448,489
+docs/testing.md
+  s_7477a2e6c69ec6::t_18ea942990d3c1 907-924
+src/app/Shell.tsx
+  s_7477a2e6c69ec6::t_511685367d61cb 13,15,430,473-487
+src/app/__tests__/phaseFlags.test.ts
+  s_7477a2e6c69ec6::t_bc03d8769e512c 15,59-63
+src/app/phaseFlags.ts
+  s_7477a2e6c69ec6::t_989f8a1bea6fae 34-38,51
+src/app/session.ts
+  s_7477a2e6c69ec6::t_02cd4f770faa34 3-7,38-39,45
+src/app/stackRoutes.tsx
+  s_7477a2e6c69ec6::t_d8aea1f9625cb5 7,434-439,530-540
+src/features/player/ExternalHandoff.tsx
+  s_7477a2e6c69ec6::t_84ccb17266292f 1-218
+src/features/player/PlayerOverlay.tsx
+  s_7477a2e6c69ec6::t_37b48b26986ec6 337-341,377,408-419,499-501
+src/features/player/PlayerScreen.tsx
+  s_7477a2e6c69ec6::t_dcb95dfd195be4 1,65-71,146,220-229,325
+src/features/player/PlayerSettingsSheet.tsx
+  s_7477a2e6c69ec6::t_e7e51646c6c952 1,196-230,232-233,237-238,240-242
+src/features/player/index.ts
+  s_7477a2e6c69ec6::t_6dec786ab8aaa8 26-31,39-44
+src/features/settings/SettingsScreen.tsx
+  s_7477a2e6c69ec6::t_f05a9b04a5cdcc 9,24-30,65-71,74,81,105-117
+src/features/settings/index.ts
+  s_7477a2e6c69ec6::t_d9d576ee5a9a60 2
+src/shared/i18n/ru.ts
+  s_7477a2e6c69ec6::t_99bf65c8005a86 437-443,616-623
+src/shared/ui/SettingRow.tsx
+  s_7477a2e6c69ec6::t_056a938f10be47 13-16,18,32-37,41,65,78-79,84,94,98,106-131,134-153,155,157,185-191
+src/shared/ui/__tests__/shellPrimitives.test.tsx
+  s_7477a2e6c69ec6::t_96fff711f42dd1 166-198
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/ExternalPlayerModule.kt
+  s_9798afb8354743::t_bdacff73b9af4f 1-99
+src/features/player/PlayerEntry.tsx
+  s_9798afb8354743::t_17bf6be2ac6873 1-108
+src/features/player/__tests__/externalPlayerPreference.test.ts
+  s_9798afb8354743::t_9f92fc6ba7d9c0 1-109
+src/features/player/externalPlayerPreference.ts
+  s_9798afb8354743::t_fee45e9f8acf9a 1-146
+src/shared/platform/__tests__/externalPlayer.test.ts
+  s_9798afb8354743::t_bd4689a0fe6249 1-42
+src/shared/platform/externalPlayer.ts
+  s_9798afb8354743::t_f60bfa36b64c04 1-52
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "a2e713bea01af238fa2f64b7f79dbd78424c25ac",
+  "prompts": {},
+  "sessions": {
+    "s_7477a2e6c69ec6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d998e7e2-636f-4943-a058-23b274887697",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_9798afb8354743": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-af9d3bc4938bc6895",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
