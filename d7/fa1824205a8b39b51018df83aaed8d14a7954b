@@ -1,0 +1,41 @@
+_bmad-output/implementation-artifacts/epic-5-context.md
+  s_7477a2e6c69ec6::t_4f243e84752006 91-102
+_bmad-output/planning-artifacts/architecture/architecture-boosty-tv-2026-10-25/ARCHITECTURE-SPINE.md
+  s_7477a2e6c69ec6::t_033eea31e6a255 10,122-126,160,187-191,193-197,208-212,257-260,320,333-337,371,393-394,474-475
+_bmad-output/planning-artifacts/ux-designs/ux-boosty-tv-2026-10-25/DESIGN.md
+  s_7477a2e6c69ec6::t_2a5181816d3ac3 191,193-195,228,240,242-244
+_bmad-output/planning-artifacts/ux-designs/ux-boosty-tv-2026-10-25/EXPERIENCE.md
+  s_7477a2e6c69ec6::t_dd2220f0fa6a4f 6,30,42,65,68-69,76-77,80,84,93,113,124,126,128,174,290-294
+docs/feature-parity.md
+  s_7477a2e6c69ec6::t_3a3de9b24120ee 53,55,63-64,80,83,88-90
+_bmad-output/implementation-artifacts/epic-6-context.md
+  s_25768f3485a5a1::t_5c32cf18919aaf 99-114
+_bmad-output/implementation-artifacts/spec-epic-7-retro-a3-planning-reconcile.md
+  s_7477a2e6c69ec6::t_59684ba22c06f2 1-149
+_bmad-output/planning-artifacts/epics.md
+  s_7477a2e6c69ec6::t_25270086e23ac5 38-39,54,61,66,69,73,79-80,98,127,133,142,157,159,755-759,784-785,806-812,841-846,883-884,1098-1102,1119-1120,1149-1150,1215-1219,1240-1246,1271-1272,1289-1290,1311-1316,1341-1342,1359-1360,1385-1389,1437-1444,1473-1477,1514-1520,1545-1551,1692-1693
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "d7fa1824205a8b39b51018df83aaed8d14a7954b",
+  "prompts": {},
+  "sessions": {
+    "s_25768f3485a5a1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a18609a68914e3a98",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_7477a2e6c69ec6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d998e7e2-636f-4943-a058-23b274887697",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
