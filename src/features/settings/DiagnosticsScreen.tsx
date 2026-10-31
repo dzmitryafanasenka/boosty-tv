@@ -4,7 +4,8 @@ import { StyleSheet, View } from 'react-native';
 import { Screen } from '../../shared/focus';
 import { t, tf } from '../../shared/i18n';
 import { logFileLocation } from '../../shared/platform/logFile';
-import { diagnosticsCapture } from '../../shared/services/logFileSink';
+import { diagnosticsCapture } from '../../shared/services/diagnosticsCapture';
+import { usePreference } from '../../shared/storage/devicePreference';
 import { SettingRow, Text, requestHostFocus, spacing, type HostView } from '../../shared/ui';
 
 /** Focus ids (docs/focus-map.md, Diagnostics). */
@@ -35,23 +36,14 @@ type ClearState = 'idle' | 'clearing' | 'done' | 'failed';
  */
 export function DiagnosticsScreen({ testID = 'settings/diagnostics' }: DiagnosticsScreenProps) {
   const captureRef = useRef<HostView>(null);
-  const [on, setOn] = useState<boolean | undefined>(() => diagnosticsCapture.peek());
+  // A failed read shows «Выкл» (the preference's fallback).
+  const { value: on, write } = usePreference(diagnosticsCapture, true);
   const [clear, setClear] = useState<ClearState>('idle');
   const [folder, setFolder] = useState<string | null>(null);
   const alive = useRef(true);
 
   useEffect(() => {
     alive.current = true;
-    if (on === undefined) {
-      diagnosticsCapture
-        .read()
-        .catch(() => false)
-        .then(value => {
-          if (alive.current) {
-            setOn(value);
-          }
-        });
-    }
     logFileLocation().then(path => {
       if (alive.current) {
         setFolder(path);
@@ -60,8 +52,6 @@ export function DiagnosticsScreen({ testID = 'settings/diagnostics' }: Diagnosti
     return () => {
       alive.current = false;
     };
-    // Once per mount: the value is then kept in this screen's state.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useFocusEffect(
@@ -76,9 +66,8 @@ export function DiagnosticsScreen({ testID = 'settings/diagnostics' }: Diagnosti
       // Not read yet: OK does nothing rather than guess.
       return;
     }
-    diagnosticsCapture.set(!current);
-    setOn(!current);
-  }, []);
+    write(!current);
+  }, [write]);
 
   const clearing = useRef(false);
   const onClear = useCallback(() => {

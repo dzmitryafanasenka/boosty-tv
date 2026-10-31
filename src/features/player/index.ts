@@ -39,18 +39,15 @@ export {
 export {
   EXTERNAL_PLAYER_PREFERENCE_KEY,
   externalPlayerPreference,
-  setExternalPlayerPreferenceKeyValueStore,
   useExternalPlayerPreference,
 } from './externalPlayerPreference';
 export {
   QUALITY_PREFERENCE_KEY,
   qualityPreference,
-  setQualityPreferenceKeyValueStore,
 } from './qualityPreference';
 export {
   PLAYBACK_SPEEDS,
   SPEED_PREFERENCE_KEY,
-  setSpeedPreferenceKeyValueStore,
   speedPreference,
   type PlaybackSpeed,
 } from './speedPreference';

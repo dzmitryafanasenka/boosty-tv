@@ -1,15 +1,8 @@
 import { createAccountScope, defineAccountScoped } from '../../account';
 import type { KeyValueStore } from '../../platform/keyValueStore';
 import type { LogFilePort } from '../../platform/logFile';
-import {
-  DIAGNOSTICS_CAPTURE_KEY,
-  LOG_FILE_BATCH_MS,
-  LOG_FILE_BATCH_SIZE,
-  LOG_FILE_MAX_LINE,
-  createDiagnosticsCapture,
-  createLogFileSink,
-  formatLogLine,
-} from '../logFileSink';
+import { DIAGNOSTICS_CAPTURE_KEY, createDiagnosticsCapture } from '../diagnosticsCapture';
+import { LOG_FILE_BATCH_MS, LOG_FILE_BATCH_SIZE, LOG_FILE_MAX_LINE, createLogFileSink, formatLogLine } from '../logFileSink';
 import { createLogger, type Logger } from '../logger';
 
 const PHONE = '+375291234567';
@@ -307,15 +300,9 @@ describe('account reset with capture on (acceptance)', () => {
   });
 });
 
+// The store contract (default off, junk, failures, forget) is
+// src/shared/storage/__tests__/devicePreference.test.tsx; these are the sink effects.
 describe('createDiagnosticsCapture (Story 8.3)', () => {
-  it('default off: nothing stored means off and the sink stays off', async () => {
-    const { sink, logger } = setup();
-    const capture = createDiagnosticsCapture(() => memoryKv(), sink, logger);
-    expect(capture.peek()).toBeUndefined();
-    await expect(capture.read()).resolves.toBe(false);
-    expect(sink.isEnabled()).toBe(false);
-  });
-
   it('a stored `on` turns the sink on at read', async () => {
     const { sink, logger } = setup();
     const capture = createDiagnosticsCapture(() => memoryKv({ [DIAGNOSTICS_CAPTURE_KEY]: 'on' }), sink, logger);
@@ -323,17 +310,17 @@ describe('createDiagnosticsCapture (Story 8.3)', () => {
     expect(sink.isEnabled()).toBe(true);
   });
 
-  it('set stores the device key and applies at once; a toggle during the read wins', async () => {
+  it('write stores the device key and applies at once; a toggle during the read wins', async () => {
     const { sink, logger } = setup();
     const kv = memoryKv({ [DIAGNOSTICS_CAPTURE_KEY]: 'off' });
     const capture = createDiagnosticsCapture(() => kv, sink, logger);
     const reading = capture.read();
-    capture.set(true);
+    capture.write(true);
     await expect(reading).resolves.toBe(true);
     expect(sink.isEnabled()).toBe(true);
     await flushPromises();
     expect(kv.data.get(DIAGNOSTICS_CAPTURE_KEY)).toBe('on');
-    capture.set(false);
+    capture.write(false);
     expect(sink.isEnabled()).toBe(false);
     await flushPromises();
     expect(kv.data.get(DIAGNOSTICS_CAPTURE_KEY)).toBe('off');
@@ -342,24 +329,24 @@ describe('createDiagnosticsCapture (Story 8.3)', () => {
   it('review: off deletes the log file; a failed delete is logged', async () => {
     const { sink, logger, file } = setup();
     const capture = createDiagnosticsCapture(() => memoryKv(), sink, logger);
-    capture.set(true);
+    capture.write(true);
     logger.info('t', 'line');
     sink.flush();
     await flushPromises();
     expect(file.state.lines).toHaveLength(1);
-    capture.set(false);
+    capture.write(false);
     await flushPromises();
     expect(file.state.lines).toEqual([]);
     expect(file.state.ops[file.state.ops.length - 1]).toBe('clear');
 
     file.state.failClear = true;
-    capture.set(true);
-    capture.set(false);
+    capture.write(true);
+    capture.write(false);
     await flushPromises();
     expect(logger.entries().map(e => e.message)).toContain('log file not cleared');
   });
 
-  it('an unreadable or junk value is off; a failed write is only logged', async () => {
+  it('an unreadable value is off; a failed write is only logged and still applied', async () => {
     const { sink, logger } = setup();
     const broken: KeyValueStore = {
       get: () => Promise.reject(new Error('io')),
@@ -369,15 +356,12 @@ describe('createDiagnosticsCapture (Story 8.3)', () => {
     };
     const capture = createDiagnosticsCapture(() => broken, sink, logger);
     await expect(capture.read()).resolves.toBe(false);
-    capture.set(true);
+    capture.write(true);
     await flushPromises();
     expect(sink.isEnabled()).toBe(true);
     const messages = logger.entries().map(e => e.message);
     expect(messages).toContain('capture preference not read');
     expect(messages).toContain('capture preference not stored');
-
-    const junk = createDiagnosticsCapture(() => memoryKv({ [DIAGNOSTICS_CAPTURE_KEY]: 'true' }), setup().sink, logger);
-    await expect(junk.read()).resolves.toBe(false);
   });
 
   it('clearLogs resolves true, or false (and logs) when the file was not cleared', async () => {

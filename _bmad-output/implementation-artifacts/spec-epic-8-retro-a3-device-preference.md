@@ -69,11 +69,11 @@ They differ in their verb (`write` vs `set`) and their placement. Their tests re
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `src/shared/storage/devicePreference.ts` (+ test) -- `createDevicePreference<T>({ key, parse, serialize, fallback, scope, label })` → `{ peek, read, write, forget }`; quality adds `remember`; `setDevicePreferenceKeyValueStore`; `usePreference(store, enabled)`.
-- [ ] The four stores -- re-expressed on the factory; public API unchanged except `diagnosticsCapture.set` → `write`; the capture moves to `shared/services/diagnosticsCapture.ts`.
-- [ ] `session.ts`, `DiagnosticsScreen.tsx`, `useExternalPlayerPreference` -- wiring and hook adoption.
-- [ ] Tests -- the parameterised suite plus updated flows. All existing flow tests (`playerFlow`, `homeFeedFlow`, `diagnosticsFlow`, `demoFlow`, `signOutFlow`) pass unchanged in meaning.
-- [ ] Docs -- `ARCHITECTURE-SPINE.md` AD-4 As built (the factory and the single setter), `docs/testing.md` with a short entry for this change.
+- [x] `src/shared/storage/devicePreference.ts` (+ test) -- `createDevicePreference<T>({ key, parse, serialize, fallback, scope, label })` → `{ peek, read, write, forget }`; quality adds `remember`; `setDevicePreferenceKeyValueStore`; `usePreference(store, enabled)`.
+- [x] The four stores -- re-expressed on the factory; public API unchanged except `diagnosticsCapture.set` → `write`; the capture moves to `shared/services/diagnosticsCapture.ts`.
+- [x] `session.ts`, `DiagnosticsScreen.tsx`, `useExternalPlayerPreference` -- wiring and hook adoption.
+- [x] Tests -- the parameterised suite plus updated flows. All existing flow tests (`playerFlow`, `homeFeedFlow`, `diagnosticsFlow`, `demoFlow`, `signOutFlow`) pass unchanged in meaning.
+- [x] Docs -- `ARCHITECTURE-SPINE.md` AD-4 As built (the factory and the single setter), `docs/testing.md` with a short entry for this change.
 
 **Acceptance Criteria:**
 - Given the same stored values as before, when the app starts, then the quality, speed, «Системный видеоплеер» and «Запись логов» values are identical to before.
