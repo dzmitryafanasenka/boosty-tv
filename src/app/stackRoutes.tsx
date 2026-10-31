@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { BackHandler } from 'react-native';
 import { AuthorScreen } from '../features/author';
-import { PlayerScreen } from '../features/player';
+import { PlayerEntry, PlayerScreen } from '../features/player';
 import { PostScreen, endedReturnFocusId, postIdPrefix } from '../features/post';
 import { queryKeys } from '../shared/api';
 import type { MediaRef, PostResult } from '../shared/entities/post';
@@ -431,6 +431,12 @@ export function PostRoute({ navigation, route }: StackScreenProps<RootStackParam
  * MediaRow after the ended video, else its primary button, instead
  * (`endedFocus`). `setReturnFocus` is not used: the content zone reads with
  * `peek`, so a one-shot override would never be consumed there.
+ *
+ * Story 8.2: a recording with `phaseFlags.externalPlayer` on goes through
+ * `PlayerEntry` (the «Системный видеоплеер» value picks the hand-off or the
+ * built-in player); the flag off, or live, renders PlayerScreen as before.
+ * The hand-off exits through the same `onExit`, so `beforeRemove` restores
+ * the origin focus on every path.
  */
 export function PlayerRoute({ navigation, route }: StackScreenProps<RootStackParamList, 'Player'>) {
   const { ref, origin, start } = route.params;
@@ -519,6 +525,17 @@ export function PlayerRoute({ navigation, route }: StackScreenProps<RootStackPar
           isActive={isActive}
           onExit={onExit}
           onLiveUnplayable={onLiveUnplayable}
+          speedEnabled={phaseFlags.speed}
+        />
+      ) : vodRef !== null && phaseFlags.externalPlayer ? (
+        <PlayerEntry
+          http={session.http}
+          mediaRef={vodRef}
+          isActive={isActive}
+          onExit={onExit}
+          onNoAccess={onNoAccess}
+          onEnded={onEnded}
+          start={start ?? 'resume'}
           speedEnabled={phaseFlags.speed}
         />
       ) : (

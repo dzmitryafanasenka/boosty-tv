@@ -24,12 +24,24 @@ export {
 } from './PlayerOverlay';
 export { debugBreakNextVideoSource } from './mediaResolver';
 export {
+  EXTERNAL_SHEET_ID,
+  EXTERNAL_SURFACE_ID,
+  externalQualityRowId,
+} from './ExternalHandoff';
+export { PlayerEntry, type PlayerEntryProps } from './PlayerEntry';
+export {
   PLAYER_SHEET_ID,
   PLAYER_SHEET_QUALITY_ID,
   PLAYER_SHEET_SPEED_ID,
   qualityRowId,
   speedRowId,
 } from './PlayerSettingsSheet';
+export {
+  EXTERNAL_PLAYER_PREFERENCE_KEY,
+  externalPlayerPreference,
+  setExternalPlayerPreferenceKeyValueStore,
+  useExternalPlayerPreference,
+} from './externalPlayerPreference';
 export {
   QUALITY_PREFERENCE_KEY,
   qualityPreference,

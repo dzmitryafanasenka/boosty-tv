@@ -11,8 +11,10 @@ import { engine } from '../src/test/playerEngineMock';
 import { resetQueryCache } from '../src/app/queryClient';
 import { session } from '../src/app/session';
 import {
+  EXTERNAL_PLAYER_PREFERENCE_KEY,
   QUALITY_PREFERENCE_KEY,
   SPEED_PREFERENCE_KEY,
+  externalPlayerPreference,
   qualityPreference,
   speedPreference,
 } from '../src/features/player';
@@ -767,6 +769,23 @@ test('Story 8.1 review: a demo speed or quality pick stays in memory; the real `
   } finally {
     speedPreference.forget();
     qualityPreference.forget();
+    await real.clear();
+  }
+});
+
+test('Story 8.2: a demo «Системный видеоплеер» toggle stays in memory; the real `boostytv-device` value is untouched', async () => {
+  const real = createAsyncStorage('boostytv-device');
+  await real.setItem(EXTERNAL_PLAYER_PREFERENCE_KEY, 'off');
+  try {
+    await act(async () => {
+      externalPlayerPreference.write(true);
+    });
+    externalPlayerPreference.forget();
+    // Read back from the demo's in-memory store, not the owner's database.
+    await expect(externalPlayerPreference.read()).resolves.toBe(true);
+    expect(await real.getItem(EXTERNAL_PLAYER_PREFERENCE_KEY)).toBe('off');
+  } finally {
+    externalPlayerPreference.forget();
     await real.clear();
   }
 });

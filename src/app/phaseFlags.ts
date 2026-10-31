@@ -31,6 +31,11 @@
  * `speed` (Story 8.1) is the player settings sheet's «Скорость» row for
  * recordings. While it is off, there is no row and every video plays at 1×
  * (the stored speed is not applied).
+ *
+ * `externalPlayer` (Story 8.2, PLAY-13) is Настройки' «Системный
+ * видеоплеер» toggle and the hand-off it drives. While it is off, there is
+ * no row and every recording plays in the built-in player (the stored
+ * toggle is neither read nor applied). Live always uses the built-in player.
  */
 export const phaseFlags = {
   home: true,
@@ -43,6 +48,7 @@ export const phaseFlags = {
   filters: true,
   live: true,
   speed: true,
+  externalPlayer: true,
 } as const satisfies Record<string, boolean>;
 
 export type Capability = keyof typeof phaseFlags;

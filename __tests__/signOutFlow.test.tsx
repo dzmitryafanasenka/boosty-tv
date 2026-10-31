@@ -145,7 +145,8 @@ describe('Настройки', () => {
     expect(text(root)).toContain(t('settings.signOut.row'));
     const [settings] = byTestId(root, 'settings');
     const ids = focusableIds(settings);
-    expect(ids.slice(0, 2)).toEqual([VERSION, ROW]);
+    // Story 8.2: «Системный видеоплеер» is the first row; the version keeps the initial focus.
+    expect(ids.slice(0, 3)).toEqual(['settings/row/external-player', VERSION, ROW]);
     expect(one(root, ROW).props.accessibilityLabel).toBe('Выйти из аккаунта');
     await unmount(root);
   });

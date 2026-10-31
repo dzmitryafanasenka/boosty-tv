@@ -69,17 +69,17 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `android/.../ExternalPlayerModule.kt`, `BoostyNativePackage.kt`, `AndroidManifest.xml` -- add `open(url, title, chooserTitle): Promise<'opened'|'none'>`:
+- [x] `android/.../ExternalPlayerModule.kt`, `BoostyNativePackage.kt`, `AndroidManifest.xml` -- add `open(url, title, chooserTitle): Promise<'opened'|'none'>`:
   - an `ACTION_VIEW` with `video/*` data and the `title` / `forcename` extras;
   - `queryIntentActivities` excluding our package and `com.android.tv.frameworkpackagestubs` (Google TV resolves VIEW to that stub, which is not a player);
   - none left → `'none'`; otherwise `createChooser` with those excluded via `EXTRA_EXCLUDE_COMPONENTS`;
   - the URI is never logged.
-- [ ] `src/shared/platform/externalPlayer.ts` (+ test) -- `openExternalPlayer({url,title})` → `'opened' | 'none'`. A missing module or a rejection → `'none'`.
-- [ ] `src/features/player/externalPlayerPreference.ts` (+ test), `src/app/session.ts` -- store and demo wiring.
-- [ ] `src/shared/ui/SettingRow.tsx`, `SettingsScreen.tsx`, `Shell.tsx`, `ru.ts` -- toggle row; component tests for the states and the flip.
-- [ ] `src/features/player/ExternalHandoff.tsx`, `PlayerEntry.tsx`, the `PlayerSettingsSheet.tsx` extraction, `PlayerScreen.tsx` notice, `stackRoutes.tsx` -- the hand-off flow per the matrix.
-- [ ] Tests -- the matrix rows, plus no `progress.begin`/E9 on hand-off, the URL absent from logger output, and the Back order. Extend `__tests__/playerFlow`-style flow tests, the demo flow and the manifest test.
-- [ ] `docs/feature-parity.md` PLAY-13/SET-xx, `EXPERIENCE.md` as-built, `docs/focus-map.md` hand-off sheet, `docs/testing.md` Story 8.2.
+- [x] `src/shared/platform/externalPlayer.ts` (+ test) -- `openExternalPlayer({url,title})` → `'opened' | 'none'`. A missing module or a rejection → `'none'`.
+- [x] `src/features/player/externalPlayerPreference.ts` (+ test), `src/app/session.ts` -- store and demo wiring.
+- [x] `src/shared/ui/SettingRow.tsx`, `SettingsScreen.tsx`, `Shell.tsx`, `ru.ts` -- toggle row; component tests for the states and the flip.
+- [x] `src/features/player/ExternalHandoff.tsx`, `PlayerEntry.tsx`, the `PlayerSettingsSheet.tsx` extraction, `PlayerScreen.tsx` notice, `stackRoutes.tsx` -- the hand-off flow per the matrix.
+- [x] Tests -- the matrix rows, plus no `progress.begin`/E9 on hand-off, the URL absent from logger output, and the Back order. Extend `__tests__/playerFlow`-style flow tests, the demo flow and the manifest test.
+- [x] `docs/feature-parity.md` PLAY-13/SET-xx, `EXPERIENCE.md` as-built, `docs/focus-map.md` hand-off sheet, `docs/testing.md` Story 8.2.
 
 **Acceptance Criteria:**
 - Given the flag off, when Настройки or a recording opens, then the app behaves exactly as before.

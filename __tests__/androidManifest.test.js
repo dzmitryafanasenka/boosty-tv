@@ -45,4 +45,18 @@ describe('AndroidManifest.xml', () => {
       expect(tag).toContain('android:required="false"');
     }
   });
+
+  it('Story 8.2: declares the VIEW video/* query (other players are visible on Android 11+), nothing broader', () => {
+    const queries = manifest.slice(manifest.indexOf('<queries>'), manifest.indexOf('</queries>'));
+    expect(queries.length).toBeGreaterThan(0);
+    const intents = queries.split('<intent>').slice(1);
+    expect(intents.length).toBeGreaterThan(0);
+    for (const intent of intents) {
+      expect(intent).toContain('<action android:name="android.intent.action.VIEW" />');
+      expect(intent).toContain('android:mimeType="video/*"');
+    }
+    expect(queries).toContain('android:scheme="https"');
+    expect(queries).not.toContain('<package');
+    expect(manifest).not.toContain('QUERY_ALL_PACKAGES');
+  });
 });

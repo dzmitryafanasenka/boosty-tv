@@ -8,6 +8,20 @@
     <uses-feature android:name="android.hardware.faketouch" android:required="false" />
     <uses-feature android:name="android.software.leanback" android:required="false" />
 
+    <!-- Story 8.2 «Системный видеоплеер»: on Android 11+ other apps' players are
+         hidden from queryIntentActivities unless they are declared here. Only
+         VIEW video/* (https and URI-less); nothing else becomes visible. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" android:mimeType="video/*" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="video/*" />
+        </intent>
+    </queries>
+
     <!-- usesCleartextTraffic comes from the React Native Gradle plugin:
          "true" in debug (Metro dev server only), "false" in release. -->
     <application

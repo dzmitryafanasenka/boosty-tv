@@ -14,6 +14,7 @@ import { act } from 'react';
 import { AppState, FlatList, StyleSheet } from 'react-native';
 import App, { navigationRef } from '../src/app/App';
 import { HomeScreen, type HomeFocusInfo } from '../src/features/home';
+import { EXTERNAL_PLAYER_PREFERENCE_KEY, externalPlayerPreference } from '../src/features/player';
 import type { HttpClient } from '../src/shared/api';
 import { QUERY_STALE_TIME_MS, queryClient, resetQueryCache } from '../src/app/queryClient';
 import { DEFAULT_FILTER, filtersStore, getFilter } from '../src/shared/filters';
@@ -172,6 +173,8 @@ afterEach(async () => {
   await progressStore.reset();
   // Story 5.3: nor a Filter.
   filtersStore.getState().clear();
+  // Story 8.2: nor the «Системный видеоплеер» value read by a player.
+  externalPlayerPreference.forget();
   await resetQueryCache();
   clearNativeModules();
   focusRestoration.clear();
@@ -2246,6 +2249,37 @@ describe('Story 4.7: «Продолжить просмотр» on Главная
     await fire('onLoad', { durationSec: DURATION });
     expect(engine.seek).toHaveBeenCalledWith(720);
     await unmount(root);
+  });
+
+  it('Story 8.2 «Hand-off» from a Continue card: the «Качество» list, OK opens the chooser; back on the same card, its resume point unchanged (no E9)', async () => {
+    seed(1, 720, 1000);
+    const open = jest.fn().mockResolvedValue('opened');
+    installNativeModules({ ExternalPlayer: { open } });
+    await createAsyncStorage('boostytv-device').setItem(EXTERNAL_PLAYER_PREFERENCE_KEY, 'on');
+    // An earlier player in this file read the value (off) into memory.
+    externalPlayerPreference.forget();
+    try {
+      const root = await renderApp();
+      await press(root, card(1));
+      expect(currentRoute()).toBe('Player');
+      await advance(50);
+      expect(visible(root, 'player/external/sheet')).toBe(true);
+      expect(lastFocusTarget()).toBe('player/external/quality/auto');
+      focusMock.mockClear();
+      await press(root, 'player/external/quality/auto');
+      // No start position: only the URL, the title and the chooser title.
+      expect(open).toHaveBeenCalledWith('https://example.invalid/player', expect.any(String), 'Открыть в');
+      expect(currentRoute()).toBe('Shell');
+      expect(lastFocusTarget()).toBe(card(1));
+      expect(engine.mounts).toBe(0);
+      await advance(60_000);
+      expect(e9Sent()).toEqual([]);
+      expect(progressStore.get('cw-v1')?.positionSec).toBe(720);
+      await unmount(root);
+    } finally {
+      externalPlayerPreference.forget();
+      await createAsyncStorage('boostytv-device').clear();
+    }
   });
 
   it('matrix «Return»: Back from that player → focus on the same card, now first', async () => {

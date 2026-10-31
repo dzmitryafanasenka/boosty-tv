@@ -334,6 +334,11 @@ export type PlayerOverlayProps = {
    * 2026-10-30): for live, only when the quality list has a real choice.
    */
   showSettings?: boolean;
+  /**
+   * Story 8.2: a one-line hint in the top band («Внешний плеер не найден»
+   * after a system-player fallback); none by default. Not focusable.
+   */
+  notice?: string;
 };
 
 /**
@@ -369,6 +374,7 @@ export function PlayerOverlay({
   settingsRef,
   live = null,
   showSettings = true,
+  notice,
 }: PlayerOverlayProps) {
   const showVideoTitle = isDistinctVideoTitle(meta.videoTitle, meta.postTitle);
   const isLive = live !== null;
@@ -397,6 +403,18 @@ export function PlayerOverlay({
         {showVideoTitle ? (
           <Text testID="player/video-title" variant="body-s" color="text-secondary" numberOfLines={1}>
             {meta.videoTitle}
+          </Text>
+        ) : null}
+        {notice ? (
+          <Text
+            testID="player/notice"
+            variant="body-s"
+            color="accent"
+            numberOfLines={1}
+            accessibilityLiveRegion="polite"
+            style={styles.notice}
+          >
+            {notice}
           </Text>
         ) : null}
       </View>
@@ -478,6 +496,9 @@ export function PlayerOverlay({
 }
 
 const styles = StyleSheet.create({
+  notice: {
+    marginTop: spacing['3'],
+  },
   overlay: {
     ...StyleSheet.absoluteFill,
     justifyContent: 'space-between',

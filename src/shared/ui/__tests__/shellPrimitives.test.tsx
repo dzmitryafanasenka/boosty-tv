@@ -163,6 +163,39 @@ describe('SettingRow check (Story 5.5)', () => {
   });
 });
 
+describe('SettingRow toggle (Story 8.2)', () => {
+  const valueColor = (root: Root) => StyleSheet.flatten(byId(root, `${ID}/value`)[0].props.style).color;
+
+  it('on: a switch role, checked, the accent «Вкл», the description under the label; OK calls onPress', async () => {
+    const onPress = jest.fn();
+    const root = await render(
+      <SettingRow testID={ID} kind="toggle" label="Системный видеоплеер" value="Вкл" checked description="Прогресс не сохраняется." onPress={onPress} />,
+    );
+    const node = host(root);
+    expect(node.props.accessibilityRole).toBe('switch');
+    expect(node.props.accessibilityState).toMatchObject({ checked: true });
+    expect(node.props.accessibilityLabel).toBe('Системный видеоплеер Вкл Прогресс не сохраняется.');
+    expect(byId(root, `${ID}/value`)[0].props.children).toBe('Вкл');
+    expect(valueColor(root)).toBe(colors.accent);
+    expect(byId(root, `${ID}/description`)[0].props.children).toBe('Прогресс не сохраняется.');
+    // Focused: the accent stays on «Вкл» (the state), the description lightens.
+    await setFocused(root, true);
+    expect(valueColor(root)).toBe(colors.accent);
+    expect(StyleSheet.flatten(byId(root, `${ID}/description`)[0].props.style).color).toBe(colors['text-secondary']);
+    await act(async () => {
+      host(root).props.onClick({ nativeEvent: {} });
+    });
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
+  it('off: unchecked, «Выкл» without the accent; rows without a description render none', async () => {
+    const root = await render(<SettingRow testID={ID} kind="toggle" label="Системный видеоплеер" value="Выкл" />);
+    expect(host(root).props.accessibilityState).toMatchObject({ checked: false });
+    expect(valueColor(root)).toBe(colors['text-meta']);
+    expect(byId(root, `${ID}/description`)).toHaveLength(0);
+  });
+});
+
 describe('StateView', () => {
   it('without an action: title-s title, body-s body, nothing focusable', async () => {
     const root = await render(<StateView testID="state" title="Лента появится здесь" body="Текст" />);

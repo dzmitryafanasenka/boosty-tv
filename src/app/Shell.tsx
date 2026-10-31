@@ -10,8 +10,9 @@ import {
 import { BackHandler } from 'react-native';
 import { EventsScreen, type EventsFocusInfo } from '../features/events';
 import { HomeScreen, type HomeFocusInfo, type HomeScreenProps } from '../features/home';
+import { useExternalPlayerPreference } from '../features/player';
 import { SearchScreen, type SearchFocusInfo } from '../features/search';
-import { SETTINGS_VERSION_ID, SettingsScreen } from '../features/settings';
+import { SETTINGS_VERSION_ID, SettingsScreen, type SettingsScreenProps } from '../features/settings';
 import { SubscriptionsScreen, type SubscriptionsFocusInfo } from '../features/subscriptions';
 import type { HttpClient } from '../shared/api';
 import type { MediaRef } from '../shared/entities/post';
@@ -426,7 +427,7 @@ function SectionContent({
       );
     case 'settings':
       return (
-        <SettingsScreen
+        <SettingsSection
           onOpenSignOut={onOpenSignOut}
           onOpenFocusCheck={onOpenFocusCheck}
           onCheckSession={onCheckSession}
@@ -468,4 +469,19 @@ function SectionContent({
         />
       );
   }
+}
+
+/**
+ * Настройки with the device-scoped «Системный видеоплеер» toggle (Story
+ * 8.2): the row exists only while `phaseFlags.externalPlayer` is on, and
+ * only once the device value is read (no «Выкл» → «Вкл» flash).
+ */
+function SettingsSection(props: Omit<SettingsScreenProps, 'externalPlayer'>) {
+  const enabled = phaseFlags.externalPlayer;
+  const { on, toggle } = useExternalPlayerPreference(enabled);
+  const externalPlayer = useMemo(
+    () => (enabled && on !== undefined ? { on, onToggle: toggle } : undefined),
+    [enabled, on, toggle],
+  );
+  return <SettingsScreen {...props} externalPlayer={externalPlayer} />;
 }
