@@ -920,7 +920,7 @@ Host tests: `src/shared/services/progress/__tests__/progressRepository.test.ts` 
 
 ### Story 9.3 — Performance on the device, 2026-11-01
 
-**Status: implemented and host-tested. Measured on the pinned Chromecast with Google TV by the agent over adb, using an owner-signed `assembleRelease -PreactNativeArchitectures=armeabi-v7a` build from this branch (`versionName 0.9.1`, installed with `adb install -r`, session kept, nothing uninstalled or cleared). The Подписки grid with 30 demo authors was measured on an Android TV emulator. Every row below is an agent-over-adb or emulator result; none is a physical-remote check. The owner's feel check with the physical remote is still open.** `spec-9-3-performance-on-the-device.md`, [ADR 0015](adr/0015-post-grid-draw-distance.md).
+**Status: implemented and host-tested. Measured on the pinned Chromecast with Google TV by the agent over adb, using an owner-signed `assembleRelease -PreactNativeArchitectures=armeabi-v7a` build from this branch (`versionName 0.9.1`, installed with `adb install -r`, session kept, nothing uninstalled or cleared). The Подписки grid with 30 demo authors was measured on an Android TV emulator. Every row below is an agent-over-adb or emulator result; none is a physical-remote check. The owner checked the scroll with the physical remote on 2026-11-01 and accepted the held-↓ and Graphics exceptions.** `spec-9-3-performance-on-the-device.md`, [ADR 0015](adr/0015-post-grid-draw-distance.md).
 
 Changes:
 - **TTFF line.** `src/shared/services/perfMark.ts` holds `playerOpenMark`, a module-level mark that is taken once. The openers set it: the Post's video row and «Смотреть» (`post`), a timestamp chip (`timestamp`), a «Продолжить» card (`continue`) and Автор's live card (`live`). `usePlaybackSession` takes the mark at mount. The first `onReadyForDisplay` of that opening logs `logger.info('player', 'first frame', { ms, origin, kind })`, where `kind` is `hls`, `mp4`, `dash` or `live`. A quality switch, a recovery or a live-edge remount logs nothing more. An engine error or the error phase (an E8 failure included) clears the mark, so an opening that failed has no line, even after «Повторить». The time is monotonic (`performance.now()`). An early Back unmounts the player with the mark unlogged. A hand-off to the system player (`PlayerEntry`) also clears it. The line carries no URL, id, title or account data. `PlayerEngineView` passes react-native-video's `onReadyForDisplay` through the port.
@@ -965,7 +965,7 @@ Columns on a fast ↓ (after): column 3 kept for 60 ↓ at 0.15 s, 60 ↓ at 0.3
 
 **Scroll result:**
 - Single steps meet the target: no frame of 300 ms or more, and 4.4–5.3 % janky.
-- **Exception for the owner: ↓ held.** Janky frames are 15–21 % against the 10 % target, and 2 of 4 runs still had one or two frames of 300–350 ms. Cause: each 10-post page arrives while focus waits at the end of the list, and its rows mount at once. On top of that, every row that scrolls in rebinds 3 cards (text state, layout, two images), and this 2 GB device with the accessibility service needs about 30–36 ms per frame anyway. Focus waits for each page (about 1.2 s per E5 round trip) during a long hold. That wait is the network, not a backlog of key events: after a 10 s hold, focus was on the same card right after the last key and again 3 s later (uiautomator bounds). Not tried: fewer views per card, and replacing the image views. Both change the card's design or ADR 0011's stale-image guard and need the owner.
+- **Exception, accepted by the owner 2026-11-01 after the physical-remote check: ↓ held.** Janky frames are 15–21 % against the 10 % target, and 2 of 4 runs still had one or two frames of 300–350 ms. Cause: each 10-post page arrives while focus waits at the end of the list, and its rows mount at once. On top of that, every row that scrolls in rebinds 3 cards (text state, layout, two images), and this 2 GB device with the accessibility service needs about 30–36 ms per frame anyway. Focus waits for each page (about 1.2 s per E5 round trip) during a long hold. That wait is the network, not a backlog of key events: after a 10 s hold, focus was on the same card right after the last key and again 3 s later (uiautomator bounds). Not tried: fewer views per card, and replacing the image views. Both change the card's design or ADR 0011's stale-image guard and need the owner.
 
 **Подписки grid (emulator, not the device).** An Android TV API 34 arm64 emulator (`tv_1080p`, host GPU) ran a debug build with the demo on, `DEMO_SUBSCRIPTIONS` temporarily 30 (uncommitted, reverted), and Metro dev JS. It showed 31 tiles («Мой блог» plus 30) in 11 rows.
 
@@ -999,14 +999,16 @@ The individual times in ms: post row 1118–2006 (1118, 1158, 1240, 1250, 1280, 
 
 MB here means MiB (kB / 1024). The run kept Shell, Post and Player mounted together every iteration (the JS-stack risk above).
 
-**Result: PSS meets the criterion. Graphics is a deviation for the owner to accept.**
+**Result: PSS meets the criterion. Graphics is a deviation, accepted by the owner 2026-11-01 after the physical-remote check.**
 - PSS has no trend after 20 min, and its slope over the last 40 min is −0.25 MB/min.
 - The spec asks for Graphics to be stable after the first 10 min. Instead it rose from 57 MB to about 117 MB between 10 and 30 min, while new feed images were decoded.
 - From 30 min Graphics stayed flat at 114–118 MB. That is the image-cache plateau of about 115 MB also seen in Story 3.1, not a leak: it stopped growing while the browsing went on. Views stayed between 393 and 585, and Activities stayed at 1.
 
 **Found on the way (not caused by this story):** Главная has a «Продолжить» card as its remembered focus. Open Настройки from the sidebar, then press ← and ↑ to «Главная» and OK. Главная then shows the feed scrolled past its header, and nothing has focus (uiautomator shows no focused node). This happened twice on this build and once on a build with the old `drawDistance` 3. When a feed card is the remembered focus, the same path works. The problem is recorded in deferred work and is not fixed here.
 
-**Not verified:** the owner's feel check with the physical remote; the Автор grid (same component, not measured separately); TalkBack; the 55-author grid on the device; live and timestamp TTFF on the device (host-tested only).
+**Owner check (physical remote, 2026-11-01):** the owner scrolled Главная with the physical remote (single steps and ↓ held) and accepted both exceptions (held ↓, Graphics plateau).
+
+**Not verified:** the Автор grid (same component, not measured separately); TalkBack; the 55-author grid on the device; live and timestamp TTFF on the device (host-tested only).
 
 ### Story 9.2 — Update notice and in-app install from GitHub Releases, 2026-11-01
 

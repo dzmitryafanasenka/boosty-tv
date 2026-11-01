@@ -113,7 +113,7 @@ development_status:
   epic-9: in-progress
   9-1-signed-release-on-github-releases: done
   9-2-update-notice-from-github-releases: done
-  9-3-performance-on-the-device: review
+  9-3-performance-on-the-device: done
   9-4-visual-fidelity-and-accessibility-pass: backlog
   9-5-full-device-regression-and-owner-acceptance: backlog
   epic-9-retrospective: optional

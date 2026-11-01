@@ -1,6 +1,6 @@
 # ADR 0015: The post grid draws 2 rows beyond the viewport
 
-- Status: proposed (Story 9.3 device profiling; awaiting the owner's physical-remote check)
+- Status: accepted (Story 9.3 device profiling; the owner accepted it after the physical-remote check, 2026-11-01)
 - Date: 2026-11-01
 - Supersedes in part: [ADR 0011](0011-feed-list-flashlist.md) «Setup», `drawDistance` 3 rows
 - Relates to: `_bmad-output/implementation-artifacts/spec-9-3-performance-on-the-device.md`, `docs/testing.md` «Story 9.3», `docs/focus-map.md` §1.5

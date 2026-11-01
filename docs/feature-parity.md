@@ -126,9 +126,9 @@ The reference renders the **full post inline in the feed card** (title, date, au
 |---|---|
 | TTFF: median ≤ 2 s and worst ≤ 4 s, from a post and from «Продолжить» | **Met.** Post: median 1.29 s, worst 2.01 s. «Продолжить»: median 1.54 s, worst 2.20 s. `onReadyForDisplay` is Media3's `STATE_READY`. For a resume it fires at the first frame before the seek to the resume point, so «Продолжить» times exclude that seek. |
 | Scroll, single ↓ steps: no frame over 300 ms and janky ≤ 10 % | **Met** with ADR 0015's `drawDistance` of 2 rows: 4.4–5.3 % janky, longest frame 148 ms |
-| Scroll, ↓ held | **Exception for the owner to accept:** 15–21 % janky and 0–2 frames of 300–350 ms per 20 s run. During a long hold, focus also waits at the end of the list for each E5 page, about 1.2 s per page (the network round trip; key events do not queue) |
+| Scroll, ↓ held | **Exception, accepted by the owner 2026-11-01 after the physical-remote check:** 15–21 % janky and 0–2 frames of 300–350 ms per 20 s run. During a long hold, focus also waits at the end of the list for each E5 page, about 1.2 s per page (the network round trip; key events do not queue) |
 | Grid with 30 authors | Emulator only: 6–7 % janky, no long frames |
-| 1 h memory | **PSS met:** the slope over the last 40 min was −0.25 MB/min. **Graphics is a deviation for the owner to accept:** the criterion says stable after the first 10 min, but Graphics rose from 57 MB to about 117 MB between 10 and 30 min. It then stayed flat at about 117 MB, the image-cache plateau also seen in Story 3.1 |
+| 1 h memory | **PSS met:** the slope over the last 40 min was −0.25 MB/min. **Graphics is a deviation, accepted by the owner 2026-11-01 after the physical-remote check:** the criterion says stable after the first 10 min, but Graphics rose from 57 MB to about 117 MB between 10 and 30 min. It then stayed flat at about 117 MB, the image-cache plateau also seen in Story 3.1 |
 
 ## 7. Live streams (added in 1.14.0 as "MVP")
 
