@@ -72,6 +72,45 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+/**
+ * Story 9.1: the app version. Releases are tagged `v{versionName}`
+ * (docs/release.md). `versionName` is MAJOR.MINOR.PATCH and `versionCode` is
+ * derived from it (MAJOR*10000 + MINOR*100 + PATCH), so every higher version
+ * installs over the previous one. MINOR and PATCH stay below 100.
+ */
+def appVersionName = "0.9.0"
+def appVersionParts = (appVersionName =~ /^(0|[1-9]\d{0,3})\.(0|[1-9]\d?)\.(0|[1-9]\d?)$/)
+if (!appVersionParts.matches()) {
+    throw new GradleException(
+        "versionName \"${appVersionName}\" must be MAJOR.MINOR.PATCH (e.g. 0.9.0, MINOR and PATCH 0-99)")
+}
+def appVersionCode = appVersionParts.group(1).toInteger() * 10000 +
+        appVersionParts.group(2).toInteger() * 100 +
+        appVersionParts.group(3).toInteger()
+
+/**
+ * Story 9.1: release signing from four owner-held Gradle properties, kept only
+ * in ~/.gradle/gradle.properties (docs/release.md). No keystore, password or
+ * certificate lives in this repository. With all four set, `release` is
+ * signed; with none set (CI), it stays unsigned; an empty value counts as
+ * not set. A partial set, or a store file that is not an absolute path to an
+ * existing file, fails the release build (`checkReleaseSigning`), naming only
+ * the keys, never any value.
+ */
+def releaseSigningKeys = [
+    "BOOSTYTV_RELEASE_STORE_FILE",
+    "BOOSTYTV_RELEASE_STORE_PASSWORD",
+    "BOOSTYTV_RELEASE_KEY_ALIAS",
+    "BOOSTYTV_RELEASE_KEY_PASSWORD",
+]
+def releaseSigningValue = { String key ->
+    def value = project.findProperty(key)
+    // A blank value counts as not set; a real value is used as is (not trimmed).
+    return value == null || value.toString().trim().isEmpty() ? null : value.toString()
+}
+def missingReleaseSigningKeys = releaseSigningKeys.findAll { releaseSigningValue(it) == null }
+def releaseSigningEnabled = missingReleaseSigningKeys.isEmpty()
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -82,14 +121,27 @@ android {
         applicationId "io.github.dzmitryafanasenka.boostytv"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode appVersionCode
+        versionName appVersionName
     }
     // No keystore lives in this repository. Debug builds use the Android SDK's
     // per-machine debug keystore (~/.android/debug.keystore, created by AGP).
-    // Release builds are unsigned here; the owner signs them locally.
+    // Release builds are signed only from the owner's properties (see above).
+    signingConfigs {
+        if (releaseSigningEnabled) {
+            release {
+                storeFile file(releaseSigningValue("BOOSTYTV_RELEASE_STORE_FILE"))
+                storePassword releaseSigningValue("BOOSTYTV_RELEASE_STORE_PASSWORD")
+                keyAlias releaseSigningValue("BOOSTYTV_RELEASE_KEY_ALIAS")
+                keyPassword releaseSigningValue("BOOSTYTV_RELEASE_KEY_PASSWORD")
+            }
+        }
+    }
     buildTypes {
         release {
+            if (releaseSigningEnabled) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
@@ -118,6 +170,35 @@ tasks.register("checkDemoModeOff") {
 }
 tasks.matching { it.name == "createBundleReleaseJsAndAssets" }.configureEach {
     dependsOn "checkDemoModeOff"
+}
+
+/**
+ * Story 9.1: a partial set of the four signing properties fails the release
+ * build before packaging. The message names the missing keys only.
+ */
+tasks.register("checkReleaseSigning") {
+    def missing = missingReleaseSigningKeys
+    def total = releaseSigningKeys.size()
+    def storeFilePath = releaseSigningEnabled ? releaseSigningValue("BOOSTYTV_RELEASE_STORE_FILE") : null
+    doLast {
+        if (!missing.isEmpty() && missing.size() < total) {
+            throw new GradleException(
+                "Release signing is partially configured. Missing Gradle properties: " +
+                    missing.join(", ") + ". Set all four in ~/.gradle/gradle.properties " +
+                    "(docs/release.md), or none for an unsigned release.")
+        }
+        if (storeFilePath != null) {
+            def storeFile = new File(storeFilePath)
+            if (!storeFile.isAbsolute() || !storeFile.isFile()) {
+                throw new GradleException(
+                    "Release signing: BOOSTYTV_RELEASE_STORE_FILE must be an absolute path " +
+                        "(no ~) to an existing keystore file (docs/release.md).")
+            }
+        }
+    }
+}
+tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+    dependsOn "checkReleaseSigning"
 }
 
 dependencies {

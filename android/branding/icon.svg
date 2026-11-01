@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="108" height="108">
+  <!--
+    Boosty TV adaptive launcher icon, 108x108 dp canvas (Android adaptive icon).
+    The mark stays inside the 66 dp safe circle (centre 54,54, radius 33).
+    Neutral artwork: a screen with a play cut-out on a stand. No Boosty marks.
+    Colours are app tokens (src/shared/ui/tokens.ts): bg #171615, accent #E8914A.
+    render.mjs turns the `data-layer="foreground"` paths into
+    res/drawable/ic_launcher_foreground.xml and the whole canvas into the legacy PNGs.
+  -->
+  <rect data-layer="background" width="108" height="108" fill="#171615"/>
+  <path data-layer="foreground" fill="#E8914A" fill-rule="evenodd"
+        d="M37,36 H71 A7,7 0 0 1 78,43 V63 A7,7 0 0 1 71,70 H37 A7,7 0 0 1 30,63 V43 A7,7 0 0 1 37,36 Z M49,44.5 L62.5,53 L49,61.5 Z"/>
+  <path data-layer="foreground" fill="#E8914A" fill-rule="nonzero"
+        d="M45.5,74 H62.5 A1.5,1.5 0 0 1 62.5,77 H45.5 A1.5,1.5 0 0 1 45.5,74 Z"/>
+</svg>

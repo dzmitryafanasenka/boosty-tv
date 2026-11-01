@@ -57,7 +57,8 @@ Recorded for Story 1.1 (2026-10-25).
 | ABIs | armeabi-v7a, arm64-v8a, x86, x86_64 (template default) |
 | Video player | `react-native-video` **6.19.3** exact (Media3 1.8.0 on Android; added to `main` in Story 4.1, the version that passed the Story 1.2/1.6 spikes), behind the `PlayerEngine` port (`src/shared/platform/playerEngine.ts`, `PlayerEngineView.tsx`) |
 | applicationId | `io.github.dzmitryafanasenka.boostytv`, launcher label «Boosty TV» |
-| Variants | `debug`: debuggable, cleartext on (Metro only), signed with the local SDK debug keystore. `release`: cleartext off, unsigned in-repo (owner signs locally). |
+| Variants | `debug`: debuggable, cleartext on (Metro only), signed with the local SDK debug keystore. `release`: cleartext off; signed by Gradle with the owner's key when all four `BOOSTYTV_RELEASE_*` properties are in `~/.gradle/gradle.properties`, unsigned otherwise (CI). See [release.md](release.md). |
+| Version | `versionName` `MAJOR.MINOR.PATCH` (first release `0.9.0`), `versionCode` = `MAJOR*10000 + MINOR*100 + PATCH`; tags `v{versionName}` ([release.md](release.md)) |
 | Build host | macOS 26.5.2, Apple Silicon (arm64) |
 
 **JDK note.** The owner approved `zulu@17` via Homebrew. The `zulu@17` cask runs a
@@ -915,6 +916,28 @@ Device checks (pinned Chromecast with Google TV 4K, release-like build, the owne
 Review fixes (2026-10-28, host-tested only): short visits write nothing (owner decision: a session writes no E9 and no local entry until it moved ≥ 10 s from its start or the user paused; a replay after the end is a new session); the local store's disk chain writes a change made during an in-flight write (also after a reset) and `flush()` waits for it; the demo keeps progress in an in-memory store (never the `boostytv-account` database); `begin` once per source resolution. New tests: 7 unit (short visits, disk chain), 4 `playerFlow` (now in `playerProgressFlow`; finished → «Смотреть» → Back after 2 s keeps «Просмотрено» with no E9; a short replay; «Повторить» after an error resumes at the last position from «Смотреть» and «С начала», no new-engine t=0), 1 `postFlow` (a started video without a duration), 1 `demoFlow` (the demo never touches the real database).
 
 Host tests: `src/shared/services/progress/__tests__/progressRepository.test.ts` (29: the finished rule and status, resume precedence, the 10 s cadence, one write in flight with the latest position, forced events, start over, seeks as movement, failure gating ≥ 10 s and the bounded automatic retry, expired hold/flush/drop, sign-out wipe, a late write after a reset, the debounced/forced disk write, cold-start load, corrupt disk, the 200-entry cap, the stale disk write undone, a load after a reset dropped, stable snapshots); `__tests__/playerProgressFlow.test.tsx` «progress and resume (Story 4.2)» (10: server only with no pre-seek t=0 and the E9 request shape, local wins, finished, multi-video + start over, hold-scrub, background and end, the vanished «С начала» fallback, failure retry, cold start from the persisted entry, log hygiene); `__tests__/postFlow.test.tsx` (status and «Продолжить» only while the player is on); `__tests__/accountScopeRegistry.test.js` (`progress` registered); `demoFlow` (the row label now ends with the status). Lint (`--max-warnings 0`), typecheck, `check:fixtures` clean; `npm test` ×3: 1494 passed each; `playerFlow` + `postFlow` + the progress suite 30/30 (187 tests each run).
+
+### Story 9.1 — Signed release on GitHub Releases, 2026-11-01
+
+**Status: implemented, host-checked and checked on the pinned device (agent over adb, the owner signed in with the physical remote); the GitHub Release step runs after the merge.** `spec-9-1-signed-release-on-github-releases.md`. Release signing from four owner-held Gradle properties (all set: signed; none or empty: unsigned; partial: `checkReleaseSigning` fails before packaging and names only the missing keys), `versionName` `0.9.0` validated as `MAJOR.MINOR.PATCH` with `versionCode` 900 derived from it, the final neutral banner (`drawable-xhdpi/tv_banner.png`, 320×180) and adaptive icon (`mipmap-anydpi-v26`, vector foreground, legacy PNGs) rendered by `android/branding/render.mjs` with headless Chrome, `CHANGELOG.md` / `CHANGELOG.ru.md`, and [release.md](release.md).
+
+Host tests: `__tests__/releaseSigning.test.js` (source guard: the four property names only, no literal secret, signing gated on all four, the partial-set check before `preReleaseBuild`, the demo guard kept, the version format and derived code); `__tests__/androidManifest.test.js` (the banner resolves to one 320×180 xhdpi PNG; the adaptive icon XML and the legacy PNG sizes).
+
+Builds (build host, `-PreactNativeArchitectures=armeabi-v7a`): with all four properties overridden empty → `app-release-unsigned.apk`, `versionCode='900' versionName='0.9.0'`, cleartext and backup off, banner present; with the owner's properties (values never read by the agent) → `app-release.apk`, `apksigner verify --print-certs`: v2 verified, certificate DN not `CN=Android Debug`, certificate SHA-256 `b7b8b0f1…c47d59eb`; one property set and three empty → fails with the three missing names; a temporary `versionName "1.0"` → fails at configuration with the expected format (reverted).
+
+Review fixes (host): a blank-only property counts as not set; with all four set, `checkReleaseSigning` also requires an absolute path to an existing store file (the message names the key, never the path); CI now runs `checkReleaseSigning` with one dummy property (must fail, name the other three keys and not print the value) and checks `versionName` / `versionCode` from `aapt dump badging`. `npm test`: 147 suites, 3112 passed; lint, typecheck and `check:fixtures` clean.
+
+Device (Chromecast with Google TV, API 34, 2026-11-01, `assembleRelease -PreactNativeArchitectures=armeabi-v7a` signed with the owner's key, certificate SHA-256 `b7b8b0f14ffcd2b7fc153891ed660c0c8d61c264128c1bce0386e312c47d59eb`):
+
+| Row | Result | Who |
+|---|---|---|
+| Key switch | `adb install -r` over the old SDK-debug-key build (`versionCode 1`, `1.0`) → `INSTALL_FAILED_UPDATE_INCOMPATIBLE`; one-time `adb uninstall` (owner-approved), then `adb install` → `versionCode=900`, `versionName=0.9.0`, the new signature | agent via adb |
+| Sign-in | A1 sign-in screen after the fresh install; phone and code entered by the owner | owner, physical remote |
+| Update in place | the same-key APK again with `adb install -r` (`lastUpdateTime` changed) → cold start opens Главная with the feed, no sign-in: the session is kept | agent via adb (screenshot) |
+| «Версия» | Настройки → «Версия 0.9.0» | agent via adb (screenshot) |
+| Launcher | Google TV home, «Ваши приложения»: the new «Boosty TV» banner (mark + wordmark) is shown; a fresh install is placed at the end of the grid, not in the first row | agent via adb (screenshot) |
+
+The adaptive icon is not shown by the Google TV launcher (it uses the banner); it was checked only as rendered PNGs.
 
 ### Epic 8 retro A4 — playerFlow split, 2026-10-31
 
