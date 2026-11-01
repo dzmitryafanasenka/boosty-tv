@@ -1,0 +1,135 @@
+__tests__/authorFlow.test.tsx
+  s_6884b16d8e6d90::t_f4d6af932cb718 1692-1704
+__tests__/eventsFlow.test.tsx
+  s_6884b16d8e6d90::t_5f721574a80eb2 340-348
+__tests__/externalPlayerFlow.test.tsx
+  s_6884b16d8e6d90::t_f8a46a0eb1273e 144
+__tests__/homeFeedFlow.test.tsx
+  s_6884b16d8e6d90::t_423ef83f728352 2543-2631
+__tests__/labelGuard.test.tsx
+  s_6884b16d8e6d90::t_85cde9b8459252 1-84
+__tests__/noRawStyleLiterals.test.js
+  s_6884b16d8e6d90::t_204c61fe3bf499 1-145
+__tests__/searchFlow.test.tsx
+  s_6884b16d8e6d90::t_6ca0f0d0396b60 654-670
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_6884b16d8e6d90::t_46b26e493de63f 102,376-391
+_bmad-output/implementation-artifacts/spec-9-4-visual-fidelity-and-accessibility-pass.md
+  s_6884b16d8e6d90::t_63d0156db2f912 1-162
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_6884b16d8e6d90::t_7a7c673db91d90 32,117
+_bmad-output/planning-artifacts/ux-designs/ux-boosty-tv-2026-10-25/DESIGN.md
+  s_6884b16d8e6d90::t_2f9d71446a3ca3 7,122,128,131-135,141-142,233-234
+docs/testing.md
+  s_6884b16d8e6d90::t_5c0e37b82119b0 921-1001
+src/features/author/AuthorScreen.tsx
+  s_6884b16d8e6d90::t_89756c832b2e52 556
+src/features/author/LiveCard.tsx
+  s_6884b16d8e6d90::t_84339a8de4b00b 146,149-192,352
+src/features/author/__tests__/LiveCard.test.tsx
+  s_6884b16d8e6d90::t_a1c0dd419ad4b1 252-266
+src/features/author/useAuthorActionRowFocus.ts
+  s_6884b16d8e6d90::t_b824984f172462 25-30,69,71,79-81,91
+src/features/events/EventRow.tsx
+  s_6884b16d8e6d90::t_1662e38970903e 12,96-124,193,196
+src/features/home/ContinueRow.tsx
+  s_6884b16d8e6d90::t_afec7370566765 140-145,160,218-219,230,252-261
+src/features/home/HomeScreen.tsx
+  s_6884b16d8e6d90::t_3516a3ad7442cf 295-297,299-304,308-315,993,1015
+src/features/home/__tests__/continueRowOffset.test.ts
+  s_6884b16d8e6d90::t_27ce2ed883f6b3 1-31
+src/features/player/AudioBlock.tsx
+  s_6884b16d8e6d90::t_e4eb71b739efe8 18,551-554,592-595,602,605-607
+src/features/player/PlayerOverlay.tsx
+  s_6884b16d8e6d90::t_bf4b3b17316587 564,630-633,639,642-644
+src/features/polls/__tests__/PollWidget.test.tsx
+  s_6884b16d8e6d90::t_e8db9c1c1df160 767,770,783,792
+src/features/polls/pollLabels.ts
+  s_6884b16d8e6d90::t_87dc0c6aaa4f72 2,29-30,57
+src/features/polls/pollStyles.ts
+  s_6884b16d8e6d90::t_5f5eac702238a3 107
+src/features/post/body/ExternalVideoChip.tsx
+  s_6884b16d8e6d90::t_28edca56ef70c8 104-105
+src/features/post/body/TextBlocks.tsx
+  s_6884b16d8e6d90::t_9d0b078a42f2c3 11,192
+src/features/post/body/chipParts.tsx
+  s_6884b16d8e6d90::t_44ebd3abda87b9 101
+src/features/search/SearchScreen.tsx
+  s_6884b16d8e6d90::t_635408ddc80f8e 417-422,430
+src/features/settings/DiagnosticsScreen.tsx
+  s_6884b16d8e6d90::t_9eb68cea948415 9,165,174
+src/shared/filters/PeriodStepper.tsx
+  s_6884b16d8e6d90::t_b83712c6191e5f 13,479
+src/shared/i18n/__tests__/catalog.test.ts
+  s_6884b16d8e6d90::t_33010deec07438 76-85
+src/shared/i18n/index.ts
+  s_6884b16d8e6d90::t_85e83c5058cccd 36-38,41-47,55-69
+src/shared/i18n/ru.ts
+  s_6884b16d8e6d90::t_4566491047d039 542-543
+src/shared/ui/AuthorCard.tsx
+  s_6884b16d8e6d90::t_31e901b9aafa5d 177
+src/shared/ui/Button.tsx
+  s_6884b16d8e6d90::t_c397d60a28d893 161
+src/shared/ui/FocusableSurface.tsx
+  s_6884b16d8e6d90::t_cbcf94c6cf6999 36,38-43
+src/shared/ui/MediaRow.tsx
+  s_6884b16d8e6d90::t_ac7167fd6207ab 122-153,155-157,160,163-186,189-190
+src/shared/ui/PostCard.tsx
+  s_6884b16d8e6d90::t_d82fa83d11b836 471
+src/shared/ui/PostGrid.tsx
+  s_6884b16d8e6d90::t_2a8fc8ec093e1e 31,839
+src/shared/ui/SettingRow.tsx
+  s_6884b16d8e6d90::t_b0a63a66805e71 4,7,96-98,213,227-228
+src/shared/ui/Spinner.tsx
+  s_6884b16d8e6d90::t_193827892cb140 4,55
+src/shared/ui/StateView.tsx
+  s_6884b16d8e6d90::t_29deb53e27529e 83
+src/shared/ui/Text.tsx
+  s_6884b16d8e6d90::t_99353fd72612d5 11-20,24
+src/shared/ui/TextField.tsx
+  s_6884b16d8e6d90::t_36e6f90aa85677 12,114
+src/shared/ui/__tests__/AuthorCard.test.tsx
+  s_6884b16d8e6d90::t_b6c4d9949fa10a 118-126
+src/shared/ui/__tests__/Button.test.tsx
+  s_6884b16d8e6d90::t_14683d0e0e55fe 71-80
+src/shared/ui/__tests__/FocusableSurface.test.tsx
+  s_6884b16d8e6d90::t_69e2c0077f1cbd 27
+src/shared/ui/__tests__/MediaRow.test.tsx
+  s_6884b16d8e6d90::t_a24be3aff118e7 92-116
+src/shared/ui/__tests__/TextField.test.tsx
+  s_6884b16d8e6d90::t_98e7c64b7c955a 7,118-125
+src/shared/ui/__tests__/contrast.test.js
+  s_6884b16d8e6d90::t_80bf03925ed89c 1-152
+src/shared/ui/__tests__/shellPrimitives.test.tsx
+  s_6884b16d8e6d90::t_12074ea217ae99 212
+src/shared/ui/tokens.ts
+  s_6884b16d8e6d90::t_6217163202f348 189,235-236,267,274-277,285-293,301-313,340-347
+src/test/flow.tsx
+  s_6884b16d8e6d90::t_23624d25f2a681 108-137,336,348-349
+_bmad-output/implementation-artifacts/epic-9-context.md
+  s_77f7e269d99104::t_a3fd1ab084996f 7,13-14,19-32,34-45,47-49,53-62,66-85,89-97
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "3f4a6d209c62621c6753a9d3ddf95d38e4045b7b",
+  "prompts": {},
+  "sessions": {
+    "s_6884b16d8e6d90": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0996ac81-5811-4fbc-abf9-a4c938711610",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_77f7e269d99104": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ac4515fe0c65987d2",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
