@@ -1,0 +1,109 @@
+.github/workflows/ci.yml
+  s_6884b16d8e6d90::t_46e0dcae45174d 57-58,63-65,70-71,78-79
+__tests__/appUpdaterModule.test.js
+  s_6884b16d8e6d90::t_4355a84d630039 1-107
+__tests__/demoFlow.test.tsx
+  s_6884b16d8e6d90::t_49ace7f6e9fb97 42-43,794-810
+__tests__/updateDialog.test.tsx
+  s_6884b16d8e6d90::t_f4b5e1ca461183 1-428
+__tests__/updateFlow.test.tsx
+  s_6884b16d8e6d90::t_2c43316fac371b 1-473
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_6884b16d8e6d90::t_74c649953d406c 359-364
+_bmad-output/implementation-artifacts/spec-9-2-update-notice-from-github-releases.md
+  s_6884b16d8e6d90::t_84f550bfa24e2c 1-145
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_6884b16d8e6d90::t_3c52f3d5112da8 32,115
+_bmad-output/planning-artifacts/architecture/architecture-boosty-tv-2026-10-25/ARCHITECTURE-SPINE.md
+  s_6884b16d8e6d90::t_3841804c008524 313
+_bmad-output/planning-artifacts/epics.md
+  s_6884b16d8e6d90::t_29791bbaddad4d 102,1652,1655-1658,1663,1667-1676,1682,1684
+_bmad-output/planning-artifacts/prds/prd-boosty-tv-2026-10-25/prd.md
+  s_6884b16d8e6d90::t_b2119ba10b0a00 376,379-381,423
+android/app/build.gradle
+  s_6884b16d8e6d90::t_874c09b1675a64 91-98,135-147
+android/app/src/main/AndroidManifest.xml
+  s_6884b16d8e6d90::t_96736d89d10073 4-7,55-65
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/AppUpdaterModule.kt
+  s_6884b16d8e6d90::t_3ce3955ed6b976 1-436
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/BoostyNativePackage.kt
+  s_6884b16d8e6d90::t_772c35427d4965 18
+android/app/src/main/res/xml/update_file_paths.xml
+  s_6884b16d8e6d90::t_1dc157d1a984df 1-6
+docs/feature-parity.md
+  s_6884b16d8e6d90::t_bda77833ab9bed 149-151,182
+docs/focus-map.md
+  s_6884b16d8e6d90::t_76efbdc47656be 485-486,502-507
+docs/release.md
+  s_6884b16d8e6d90::t_7d25a325d46947 49-50,96-99,102-107,113-117,120-123,131-132,160,162-167,171,173-174,178-184,196,211-216
+docs/testing.md
+  s_6884b16d8e6d90::t_e60dd0d0188869 235-237,245,338-339,921-955
+src/app/App.tsx
+  s_6884b16d8e6d90::t_005d2eebbfb47d 35,47-48,61,275-301,323-324,341-349,407-425,497,503,548,593-595
+src/app/Shell.tsx
+  s_6884b16d8e6d90::t_db5441d2441b87 46-49,118-119,365-366,392-393,413-414,455-456
+src/app/__tests__/phaseFlags.test.ts
+  s_6884b16d8e6d90::t_c0e93b9df98932 17,71-75
+src/app/phaseFlags.ts
+  s_6884b16d8e6d90::t_bdf09b40b1b0d8 45-51,66
+src/features/settings/SettingsScreen.tsx
+  s_6884b16d8e6d90::t_9a3af1196d8336 1,4,39-52,90-94,102-103,112-135,172,176-177
+src/features/update/UpdateDialog.tsx
+  s_6884b16d8e6d90::t_9868512ae9ea06 1-479
+src/features/update/UpdatePlaque.tsx
+  s_6884b16d8e6d90::t_45c7fa3c1a5fed 1-69
+src/features/update/__tests__/updateChecker.test.ts
+  s_6884b16d8e6d90::t_b505cc64f9886e 1-275
+src/features/update/index.ts
+  s_6884b16d8e6d90::t_a558a8b248d2d0 1-48
+src/features/update/updateChecker.ts
+  s_6884b16d8e6d90::t_584fc4cdb7fec1 1-239
+src/shared/platform/__tests__/appUpdater.test.ts
+  s_6884b16d8e6d90::t_63c8038431fa17 1-108
+src/shared/platform/appUpdater.ts
+  s_6884b16d8e6d90::t_52a9925418751f 1-184
+src/shared/ui/QrDialog.tsx
+  s_6884b16d8e6d90::t_0233f18b274389 29-72,91,118
+src/shared/ui/SettingRow.tsx
+  s_6884b16d8e6d90::t_5b01972a8e0713 48-52,80,95
+src/shared/ui/index.ts
+  s_6884b16d8e6d90::t_887474d1b6a6ab 21
+src/app/update.ts
+  s_c894bc1c24f177::t_6ae7d7ce3861fc 1-32
+src/features/update/__tests__/releaseInfo.test.ts
+  s_c894bc1c24f177::t_6f348eb5e17120 1-200
+src/features/update/releaseInfo.ts
+  s_c894bc1c24f177::t_8510357d812519 1-214
+src/features/update/updateStore.ts
+  s_c894bc1c24f177::t_5b4252412aa7d3 1-107
+src/features/update/version.ts
+  s_c894bc1c24f177::t_41816dac3f9365 1-52
+src/shared/i18n/ru.ts
+  s_c894bc1c24f177::t_72074fb708bfcf 313-342,643-645
+src/features/update/__tests__/UpdatePlaque.test.tsx
+  s_6884b16d8e6d90::t_51d51d51f94d5c 1-69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "11fe0f8f75880ac26db1ed9cf6d0ccefb4e8032f",
+  "prompts": {},
+  "sessions": {
+    "s_6884b16d8e6d90": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0996ac81-5811-4fbc-abf9-a4c938711610",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_c894bc1c24f177": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-afb6909cad39b6057",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
