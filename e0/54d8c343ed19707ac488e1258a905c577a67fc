@@ -1,0 +1,25 @@
+CHANGELOG.md
+  s_6884b16d8e6d90::t_0ecd3af22fe3c9 7-18
+CHANGELOG.ru.md
+  s_6884b16d8e6d90::t_a9a13a584926d0 7-18
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_6884b16d8e6d90::t_b5aece3387a131 32,115
+android/app/build.gradle
+  s_6884b16d8e6d90::t_129c385374dc35 81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "e054d8c343ed19707ac488e1258a905c577a67fc",
+  "prompts": {},
+  "sessions": {
+    "s_6884b16d8e6d90": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0996ac81-5811-4fbc-abf9-a4c938711610",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
