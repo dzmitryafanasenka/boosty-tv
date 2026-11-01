@@ -32,6 +32,7 @@ import { refreshAuthorPostsHeads } from '../features/author';
 import { refreshFeedHead } from '../features/home';
 import { debugBreakNextVideoSource } from '../features/player';
 import { DiagnosticsScreen, SignOutDialog } from '../features/settings';
+import { UpdateDialog, UpdatePlaqueHost, useUpdateSnapshot, type KnownRelease } from '../features/update';
 import { accountScope } from '../shared/account';
 import {
   SessionCheckContext,
@@ -43,6 +44,8 @@ import {
 import { getFilter } from '../shared/filters';
 import { ModalHostProvider, useModal, type ModalApi } from '../shared/focus';
 import type { MediaRef } from '../shared/entities/post';
+import { subscribeAppForeground } from '../shared/platform/appLifecycle';
+import { cleanupUpdates } from '../shared/platform/appUpdater';
 import { ProgressContext } from '../shared/services/progress';
 import { t } from '../shared/i18n';
 import { Text, colors, components, spacing, type HostView } from '../shared/ui';
@@ -55,6 +58,7 @@ import { DEMO_ACTIVE, session } from './session';
 import { SessionUiContext, useSessionUi, type SessionUi } from './sessionUi';
 import { Shell } from './Shell';
 import { AuthorRoute, PlayerRoute, PostRoute, takePendingShellSection } from './stackRoutes';
+import { updateChecker, updateEnabled, updateStore } from './update';
 
 /**
  * Debug builds only (Story 2.4 «Проверка фокуса»). `__DEV__` is a constant
@@ -268,6 +272,33 @@ function ShellRoute({
     }
   }, [navigation]);
   const modal = useModal();
+  // Story 9.2: the first OK of a «Версия» press series. A known newer
+  // release opens the update dialog at once; otherwise the manual check runs
+  // (60 s throttle in the checker) and a newer release opens the dialog, but
+  // only while the row is still mounted, the Shell is focused and no other
+  // modal is open. No newer release or a failure: nothing visible.
+  const { known } = useUpdateSnapshot(updateStore);
+  const onVersionFirstPress = useCallback(
+    (initiator: RefObject<HostView | null>) => {
+      const openDialog = (release: KnownRelease) => {
+        if (initiator.current === null || !navigation.isFocused() || modal.isOpen()) {
+          return;
+        }
+        modal.open(<UpdateDialog release={release} onClose={() => modal.close()} />, initiator);
+      };
+      const current = updateStore.get().known;
+      if (current) {
+        openDialog(current);
+        return;
+      }
+      updateChecker.checkManual().then(release => {
+        if (release) {
+          openDialog(release);
+        }
+      });
+    },
+    [modal, navigation],
+  );
   const onOpenSignOut = useCallback(
     (initiator: RefObject<HostView | null>) => {
       modal.open(
@@ -289,6 +320,8 @@ function ShellRoute({
         __DEV__ ? () => navigation.navigate('DevFocus') : undefined
       }
       onOpenDiagnostics={phaseFlags.diagnostics ? onOpenDiagnostics : undefined}
+      onVersionFirstPress={updateEnabled() ? onVersionFirstPress : undefined}
+      availableVersion={updateEnabled() ? known?.version : undefined}
       onCheckSession={__DEV__ ? ui.onCheckSession : undefined}
       onExpireSession={__DEV__ ? ui.onExpireSession : undefined}
       onBreakNextVideoUrl={__DEV__ ? debugBreakNextVideoSource : undefined}
@@ -304,6 +337,15 @@ function ShellRoute({
     />
   );
 }
+
+/**
+ * Story 9.2: the routes the update plaque may show over: the signed-in
+ * Shell and the screens stacked on it, where «Настройки → Версия» is
+ * reachable. Never over the Player, the sign-in routes or A11 (a plaque
+ * that arrives there is dropped). Before the navigator is ready the host is
+ * not mounted, so a plaque waits instead of being dropped.
+ */
+const PLAQUE_ROUTES: ReadonlySet<string> = new Set<keyof RootStackParamList>(['Shell', 'Author', 'Post', 'Diagnostics']);
 
 /** The persistent «ДЕМО» badge (DESIGN Badge tokens); not focusable. */
 function DemoBadge() {
@@ -362,6 +404,25 @@ function App() {
   const [retrying, setRetrying] = useState(false);
   const alive = useRef(true);
   const modalApi = useRef<ModalApi | null>(null);
+  /** Story 9.2: the top route's name (the update plaque shows only over `PLAQUE_ROUTES`). */
+  const [topRoute, setTopRoute] = useState<string | undefined>(undefined);
+  const onNavigationState = useCallback(() => {
+    setTopRoute(navigationRef.getCurrentRoute()?.name);
+  }, []);
+
+  // Story 9.2: on start, old update files are deleted and the daily update
+  // check runs; again on every return to the foreground (still at most once
+  // a day). Off with the flag or in the demo.
+  useEffect(() => {
+    if (!updateEnabled()) {
+      return undefined;
+    }
+    cleanupUpdates().catch(() => {});
+    updateChecker.start().catch(() => {});
+    return subscribeAppForeground(() => {
+      updateChecker.checkAuto().catch(() => {});
+    });
+  }, []);
 
   /** Cold start and «Повторить»: only `Network` keeps the offline view. */
   const applyColdResult = useCallback((result: ValidateResult) => {
@@ -433,12 +494,13 @@ function App() {
    * so an `expired` result can always reset the stack.
    */
   const onNavigationReady = useCallback(() => {
+    onNavigationState();
     if (session.getStatus() === 'expired') {
       openExpired();
     } else if (session.getStatus() === 'signedIn') {
       session.validate().then(applyColdResult);
     }
-  }, [applyColdResult]);
+  }, [applyColdResult, onNavigationState]);
 
   const onRetry = useCallback(() => {
     setRetrying(true);
@@ -483,6 +545,7 @@ function App() {
                     ref={navigationRef}
                     theme={theme}
                     onReady={onNavigationReady}
+                    onStateChange={onNavigationState}
                   >
                     <Stack.Navigator
                       initialRouteName={boot.initial}
@@ -527,6 +590,9 @@ function App() {
         <View testID="app/splash" style={styles.root} />
       )}
       {DEMO_ACTIVE ? <DemoBadge /> : null}
+      {boot && updateEnabled() && topRoute !== undefined ? (
+        <UpdatePlaqueHost store={updateStore} suppressed={!PLAQUE_ROUTES.has(topRoute)} />
+      ) : null}
     </GestureHandlerRootView>
   );
 }

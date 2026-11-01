@@ -46,8 +46,8 @@ Signing rules in `android/app/build.gradle`:
 
 | Properties set | Result |
 |---|---|
-| all four | `app-release.apk`, signed with the release key |
-| none (CI), or all blank | `app-release-unsigned.apk`, as before |
+| all four | `app-<abi>-release.apk` and `app-universal-release.apk`, signed with the release key |
+| none (CI), or all blank | `app-<abi>-release-unsigned.apk` and `app-universal-release-unsigned.apk` |
 | one to three | the build fails before packaging (`checkReleaseSigning`); the message names the missing keys, never values |
 | all four, but the store file is relative, uses `~` or does not exist | the build fails before packaging; the message names `BOOSTYTV_RELEASE_STORE_FILE`, never the path |
 
@@ -93,25 +93,34 @@ as recorded.
 ```sh
 npm run lint -- --max-warnings 0 && npm run typecheck && npm test && npm run check:fixtures
 (cd android && ./gradlew clean assembleRelease)
-# output: android/app/build/outputs/apk/release/app-release.apk
+# output, android/app/build/outputs/apk/release/:
+#   app-armeabi-v7a-release.apk  app-arm64-v8a-release.apk
+#   app-x86-release.apk          app-x86_64-release.apk
+#   app-universal-release.apk    (all four ABIs)
 ```
 
-All four ABIs are built by default. `(cd android && ./gradlew assembleRelease
--PreactNativeArchitectures=armeabi-v7a)` builds only the Chromecast with Google TV ABI,
-which is enough for a device check but not for a public release.
+Story 9.2: `splits.abi` in `android/app/build.gradle` builds one APK per ABI plus the
+universal APK. Every split has the same `versionCode`, so any of them installs over any
+earlier release. All four ABIs are built by default. `(cd android && ./gradlew
+assembleRelease -PreactNativeArchitectures=armeabi-v7a)` builds only the Chromecast with
+Google TV ABI (`app-armeabi-v7a-release.apk` and a universal APK with that ABI only), which
+is enough for a device check but not for a public release.
 
 ## Verify the signature
 
 ```sh
 BT="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)"
-APK=android/app/build/outputs/apk/release/app-release.apk
-"$BT/apksigner" verify --verbose --print-certs "$APK"
-"$BT/aapt" dump badging "$APK" | grep -E '^package:|^native-code:'
+for APK in android/app/build/outputs/apk/release/app-*-release.apk; do
+  echo "== $APK"
+  "$BT/apksigner" verify --verbose --print-certs "$APK" | grep -E 'Verifie|SHA-256'
+  "$BT/aapt" dump badging "$APK" | grep -E '^package:|^native-code:'
+done
 ```
 
-Expected: `Verifies`, `Verified using v2 scheme ... true`, the release certificate DN
-(not `CN=Android Debug`), the recorded certificate SHA-256, `versionName` / `versionCode` as
-set, and (for a public release) all four ABIs in `native-code`.
+Expected for every APK: `Verifies`, `Verified using v2 scheme ... true`, the release
+certificate DN (not `CN=Android Debug`), the recorded certificate SHA-256, and the same
+`versionName` / `versionCode`. `native-code` lists one ABI for each split and (for a public
+release) all four ABIs for the universal APK.
 
 The certificate DN is public in every APK signed with this key. The owner accepted their
 name and city in it (2026-11-01).
@@ -119,7 +128,8 @@ name and city in it (2026-11-01).
 ## Install and update
 
 ```sh
-adb install -r android/app/build/outputs/apk/release/app-release.apk
+adb install -r android/app/build/outputs/apk/release/app-universal-release.apk
+# or the device's split, e.g. app-armeabi-v7a-release.apk on the Chromecast with Google TV
 ```
 
 - **Over a previous release (same key, higher `versionCode`):** the install succeeds and keeps
@@ -147,17 +157,30 @@ test -z "$(git status --porcelain)" || { echo "working tree not clean"; exit 1; 
 npm run lint -- --max-warnings 0 && npm run typecheck && npm test && npm run check:fixtures
 (cd android && ./gradlew clean assembleRelease)
 
-VERSION=0.9.0
+VERSION=0.9.1
 OUT="$(mktemp -d)"
-cp android/app/build/outputs/apk/release/app-release.apk "$OUT/boosty-tv-$VERSION.apk"
-shasum -a 256 "$OUT/boosty-tv-$VERSION.apk"
+APKS=android/app/build/outputs/apk/release
+cp "$APKS/app-universal-release.apk" "$OUT/boosty-tv-$VERSION.apk"
+for ABI in armeabi-v7a arm64-v8a x86 x86_64; do
+  cp "$APKS/app-$ABI-release.apk" "$OUT/boosty-tv-$VERSION-$ABI.apk"
+done
+(cd "$OUT" && shasum -a 256 boosty-tv-*.apk)
 # Write "$OUT/release-notes.md" (format below), then:
 git tag -a "v$VERSION" -m "Boosty TV $VERSION"
 git push origin "v$VERSION"
-gh release create "v$VERSION" "$OUT/boosty-tv-$VERSION.apk" \
+gh release create "v$VERSION" "$OUT"/boosty-tv-*.apk \
   --title "Boosty TV $VERSION" --notes-file "$OUT/release-notes.md"
+# GitHub's asset digests must equal the local ones (the TV verifies against them):
+gh release view "v$VERSION" --json assets --jq '.assets[] | "\(.digest)  \(.name)"'
 rm -rf "$OUT"
 ```
+
+Story 9.2: the TV downloads the asset for its ABI (the first `Build.SUPPORTED_ABIS` entry
+that has `boosty-tv-{v}-{abi}.apk`, else the universal `boosty-tv-{v}.apk`) and verifies it
+against GitHub's `sha256:` asset digest before the system installer opens. The digest comes from the same unauthenticated API response as the download URL, so it guards against a corrupted or truncated download; authenticity comes from Android refusing an update that is not signed with the installed app's key. Keep the names
+exactly: an asset under another name is not offered on the TV (the QR to the release page is
+shown instead). The universal APK stays for manual installs. `0.9.0` was published with the
+universal APK only, before the splits.
 
 `release-notes.md` format (Russian first, so the TV in Story 9.2 can show the part before
 the first `---`; the blank lines around `---` keep GitHub from turning the Russian text
@@ -170,7 +193,7 @@ above it into a heading):
 
 <the version's section from CHANGELOG.md>
 
-APK SHA-256: <shasum -a 256 of the attached APK>
+APK SHA-256: <shasum -a 256 of each attached APK, one line per file>
 Signing certificate SHA-256: <from apksigner verify --print-certs>
 ```
 
@@ -185,8 +208,10 @@ Before tagging and before publishing:
 - [ ] `npm run check:fixtures` passes.
 - [ ] The release notes contain no account data, phone numbers, tokens, signed media URLs or
       log excerpts.
-- [ ] The only asset is the signed APK; `apksigner` shows the release certificate with the
-      recorded SHA-256.
-- [ ] `aapt dump badging` of the APK lists all four ABIs in `native-code`
-      (`armeabi-v7a`, `arm64-v8a`, `x86`, `x86_64`).
+- [ ] The only assets are the five signed APKs (`boosty-tv-{v}.apk` and
+      `boosty-tv-{v}-{abi}.apk` for the four ABIs); `apksigner` shows the release
+      certificate with the recorded SHA-256 for each, and all share one `versionCode`.
+- [ ] `aapt dump badging` of the universal APK lists all four ABIs in `native-code`
+      (`armeabi-v7a`, `arm64-v8a`, `x86`, `x86_64`); each split lists its own ABI only.
+- [ ] Every asset has a `sha256:` digest on GitHub equal to the local `shasum`.
 - [ ] The APK was built with `DEMO_MODE = false` (the build enforces it).

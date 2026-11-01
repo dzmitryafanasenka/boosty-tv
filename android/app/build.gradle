@@ -89,6 +89,14 @@ def appVersionCode = appVersionParts.group(1).toInteger() * 10000 +
         appVersionParts.group(3).toInteger()
 
 /**
+ * Story 9.2: the ABIs being built (`-PreactNativeArchitectures`, defaulting to
+ * `reactNativeArchitectures` in android/gradle.properties: all four).
+ */
+def appArchitectures() {
+    return project.property("reactNativeArchitectures").toString().split(",").collect { it.trim() }.findAll { !it.isEmpty() }
+}
+
+/**
  * Story 9.1: release signing from four owner-held Gradle properties, kept only
  * in ~/.gradle/gradle.properties (docs/release.md). No keystore, password or
  * certificate lives in this repository. With all four set, `release` is
@@ -123,6 +131,19 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode appVersionCode
         versionName appVersionName
+    }
+    // Story 9.2: one APK per ABI plus the universal APK, so the in-app update
+    // downloads only what the device runs (docs/release.md). Every split keeps
+    // the same versionCode (no per-ABI offsets): any of them installs over
+    // any previous release. The ABIs follow `reactNativeArchitectures`, so a
+    // single-ABI device build produces that split and the universal APK.
+    splits {
+        abi {
+            enable true
+            reset()
+            include(*appArchitectures())
+            universalApk true
+        }
     }
     // No keystore lives in this repository. Debug builds use the Android SDK's
     // per-machine debug keystore (~/.android/debug.keystore, created by AGP).

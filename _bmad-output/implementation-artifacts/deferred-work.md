@@ -356,3 +356,9 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-9-1-signed-release-on-github-releases.md`
   summary: Agent branch builds signed with the release key carry the same versionName/versionCode as the published release, so «Версия», diagnostics and the 9.2 comparison cannot tell them apart, and installing an older branch build needs `adb install -r -d`.
   evidence: Story 9.1 review (Blind Hunter); owner chose branch builds replacing the family build (2026-11-01) but no build marker rule exists. Decide with 9.2 (for example a debug-only suffix or a commit field in diagnostics).
+- source_spec: `_bmad-output/implementation-artifacts/spec-9-2-update-notice-from-github-releases.md`
+  summary: One test in `src/shared/api/__tests__/sessionManager.test.ts` failed once in three full `npm test` runs during Story 9.2; the file was untouched and passed 30/30 in isolation.
+  evidence: maybe-false (unverified medium). Settle with repeated full-suite runs (`npm test` ×10) and the failing test name from the Jest output; likely timing under full-suite load.
+- source_spec: `_bmad-output/implementation-artifacts/spec-9-2-update-notice-from-github-releases.md`
+  summary: `AppUpdaterModule.kt` download, redirect, size, digest and cancel logic has no executed JVM test; CI only greps the Kotlin source.
+  evidence: Story 9.2 review (verification-gap, Blind Hunter). The repo has no JVM/Robolectric setup; the Story 9.2 device run executes the path once. A JVM test (MockWebServer) would guard regressions.

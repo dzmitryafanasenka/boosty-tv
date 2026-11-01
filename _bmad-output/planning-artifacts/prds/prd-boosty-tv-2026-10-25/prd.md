@@ -373,11 +373,12 @@ Seven OK presses on «Версия» reveal Diagnostics. It can capture logs for
 A signed release APK installs on the test device and appears in the Google TV launcher with a TV banner. It declares no mandatory touchscreen (APP-03).
 - The APK is published as an asset of a GitHub Release of the **public** project repository (owner decision 2026-10-25) and installed manually. Because the repository is public, it must never contain secrets, the signing key, real account data, unsanitized fixtures or signed URLs.
 - The signing key stays outside the repository.
-- There is no in-app download or installation of updates.
+- In-app download and install of an update is allowed only as FR-56 describes (owner decision 2026-11-01; this replaces the earlier "no in-app download or installation of updates"). Each release attaches one APK per ABI (`boosty-tv-{v}-{abi}.apk`) and the universal `boosty-tv-{v}.apk`, all signed with the release key and with the same `versionCode`.
 
 #### FR-56: Update check via GitHub Releases [P3] [IMPROVEMENT of UPD-01]
-The app checks the latest release of the public project repository (GitHub Releases API, unauthenticated) at most once per day and on «Версия» in Настройки. When a newer version exists, it shows a non-blocking notice with the version and changelog, plus a QR handoff to the release page.
-- The check never downloads or installs anything. Installation stays manual (UPD-02 remains excluded).
+The app checks the latest release of the public project repository (GitHub Releases API, unauthenticated) on start and on return to the foreground (at most once per day), and on «Версия» in Настройки. When a newer version exists, an automatic check shows a passive, non-focusable plaque for about 10 s («Доступна версия X.Y.Z · Настройки → Версия»; never while the Player is on top), and «Версия» reads «0.9.0 · доступна X.Y.Z». OK on «Версия» opens a dialog with the Russian changelog, «Скачать и установить» and «Закрыть».
+- Owner decision 2026-11-01 (replaces "the check never downloads or installs anything"; UPD-02 is now in scope as our own channel): only after an explicit OK on «Скачать и установить», the app downloads the release APK for the device ABI (the first `Build.SUPPORTED_ABIS` entry with an asset, else the universal APK) from this repository's release URLs over HTTPS, verifies its SHA-256 against GitHub's asset digest, and hands it to the Android system installer, which asks the user again. The digest comes from the same unauthenticated API response as the download URL, so it guards against a corrupted or truncated download; authenticity comes from Android refusing an update that is not signed with the installed app's key. Never silent, no PackageInstaller session, no automatic retry. If installs from this app are not allowed, the dialog explains it and opens the system «Установка неизвестных приложений» screen.
+- The QR to the release page is the fallback: shown when there is no usable asset or digest, or after a failed download, verification or install.
 - A failed check is silent, apart from a diagnostics log entry.
 - No account data or identifiers are sent; it is a plain anonymous GET.
 - Versions are compared semantically against the app's `versionName`.
@@ -419,7 +420,7 @@ The app checks the latest release of the public project repository (GitHub Relea
 - No sign-in via the website, QR or a companion phone.
 - No global Boosty search, recommendations, sorting, subtitles, audio tracks, chapters or seek thumbnails.
 - No live chat and no live DVR/seek.
-- No in-app download or install of updates; only the update check and notice (FR-56). No Google Play publication in v1.
+- No silent or background update install; in-app install only after the user's explicit OK and the system installer's confirmation (FR-56, owner decision 2026-11-01). No Google Play publication in v1.
 - No own backend, proxy or cloud sync. Continue history is device-local.
 - No Apple TV work: Apple TV (tvOS) is out of scope (owner decision 2026-10-27).
 

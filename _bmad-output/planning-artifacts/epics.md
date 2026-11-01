@@ -99,7 +99,7 @@ The full text and testable consequences are in `prd.md` §4.
 - FR53 [P1 minimal / P2 full]: Настройки. P1: version and «Выйти из аккаунта». P2: «Системный видеоплеер».
 - FR54 [P2]: Diagnostics opens after 7 OK presses on «Версия». Redacted log capture, retrieved via adb.
 - FR55 [P3]: A signed release APK installs on Google TV with banner and launcher entry. It is published in a GitHub Release of the public repo. The key stays outside the repo.
-- FR56 [P3]: Update check against GitHub Releases: at most daily, plus on «Версия» at most once per 60 s. Shows a notice and a QR. Never downloads or installs.
+- FR56 [P3]: Update check against GitHub Releases: at most daily, plus on «Версия» at most once per 60 s. Shows a passive plaque and a «Версия» hint; the dialog offers «Скачать и установить» (owner decision 2026-11-01: download for the device ABI, SHA-256 check, the system installer; never silent), with a QR to the release page as the fallback.
 
 ### NonFunctional Requirements
 
@@ -1649,29 +1649,39 @@ So that the family runs a stable build, not a debug one.
 **When** they are produced
 **Then** they use the app's own neutral branding, not Boosty marks. The working title «Boosty TV» is used only if the owner approves it.
 
-### Story 9.2: Update notice from GitHub Releases
+### Story 9.2: Update notice and in-app install from GitHub Releases
 
 As the owner,
-I want the TV to tell me when a newer version is available,
-So that I know when to sideload an update.
+I want the TV to tell me when a newer version is available and install it after my OK,
+So that an update needs no computer and no adb.
+
+*Owner decisions 2026-11-01: in-app download and install replaces "nothing is downloaded or installed" (never silent; the Android installer asks). One story. The QR to the release page stays as the fallback. Spec: `_bmad-output/implementation-artifacts/spec-9-2-update-notice-from-github-releases.md`.*
 
 **Acceptance Criteria:**
 
 **Given** `UpdateChecker` with its own unauthenticated client
-**When** the app starts (at most once per day) or I press OK on «Версия» (at most once per 60 s, and never more than once during the 7-press gesture)
+**When** the app starts or returns to the foreground (at most once per day), or I press OK on «Версия» (at most once per 60 s, and never more than once during the 7-press gesture)
 **Then** it fetches the latest release of the configured public repository (FR56).
 
 **Given** the latest tag is newer than `versionName` by semantic comparison
-**When** the check completes
-**Then** a non-blocking notice shows the new version, the changelog and a QR to the release page. Nothing is downloaded or installed.
+**When** an automatic check completes
+**Then** a non-focusable plaque shows the new version for about 10 s (never while the Player is on top), and «Версия» reads «0.9.0 · доступна X.Y.Z».
+
+**Given** a newer release is known
+**When** I press OK on «Версия»
+**Then** a dialog shows the changelog, «Скачать и установить» and «Закрыть»; Back closes it and focus returns to «Версия».
+
+**Given** I press «Скачать и установить»
+**When** installs from the app are allowed (otherwise the dialog explains it and opens the system screen)
+**Then** the APK for the device ABI (or the universal one) is downloaded with progress, its SHA-256 is verified against GitHub's digest, and the system installer opens. A mismatch, a failure or a cancel deletes the file and shows the QR fallback. Back during the download cancels it.
 
 **Given** the check fails or is rate-limited
 **When** it errors
 **Then** nothing is shown to the user and a diagnostics log entry is written.
 
-**Given** any check request
+**Given** any check or download request
 **When** it is inspected
-**Then** it carries no account data, identifiers or Boosty auth.
+**Then** only the fixed GitHub API URL and this repository's asset URLs are fetched, with no account data, identifiers or Boosty auth.
 
 ### Story 9.3: Performance on the device
 
