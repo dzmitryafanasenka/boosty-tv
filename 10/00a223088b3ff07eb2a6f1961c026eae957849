@@ -1,0 +1,27 @@
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_6884b16d8e6d90::t_a26563ca31613d 367
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_6884b16d8e6d90::t_617cd755292ca2 116
+docs/adr/0015-post-grid-draw-distance.md
+  s_6884b16d8e6d90::t_0a98e8bd257977 3
+docs/feature-parity.md
+  s_6884b16d8e6d90::t_f22a90911b2353 129,131
+docs/testing.md
+  s_6884b16d8e6d90::t_d539180333fa69 923,968,1002,1009-1011
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "1000a223088b3ff07eb2a6f1961c026eae957849",
+  "prompts": {},
+  "sessions": {
+    "s_6884b16d8e6d90": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0996ac81-5811-4fbc-abf9-a4c938711610",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
