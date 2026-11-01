@@ -158,9 +158,7 @@ export function Button({
       hasTVPreferredFocus={hasTVPreferredFocus}
       accessibilityRole="button"
       accessibilityLabel={
-        busy && (busyAccessibilityLabel ?? busyLabel) !== undefined
-          ? (busyAccessibilityLabel ?? busyLabel)
-          : (accessibilityLabel ?? label)
+        (busy ? (busyAccessibilityLabel ?? busyLabel) : undefined) ?? accessibilityLabel ?? label
       }
       accessibilityState={
         selected === undefined

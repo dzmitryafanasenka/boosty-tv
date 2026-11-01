@@ -1689,6 +1689,19 @@ describe('Story 5.7: search and filters inside an author', () => {
     await unmount(root);
   });
 
+  it('Story 9.4 (device): a fallback focus on the sidebar while the sheet is open keeps the chip focusable; Back → the chip', async () => {
+    const root = await openAuthor();
+    await openSheet(root);
+    // A sheet level change unmounts the focused row; Android falls back to the sidebar for a moment.
+    await f.focusOn(root, SIDEBAR_SUBS);
+    focusMock.mockClear();
+    await back();
+    expect(visible(root, 'filters/sheet')).toBe(false);
+    expect(byTestId(root, CHIP).filter(n => n.props.focusable === true)).toHaveLength(1);
+    expect(lastFocusTarget()).toBe(CHIP);
+    await unmount(root);
+  });
+
   it('Filter: an E4 error under the new Filter → the page-1 error state behind the sheet', async () => {
     const root = await openAuthor();
     await openSheet(root);

@@ -143,49 +143,53 @@ function LiveCardView({ stream, testID, nowMs, onFocus, onPress, ref }: LiveCard
       style={styles.slot}
       surfaceStyle={({ focused }) => [
         styles.surface,
-        { backgroundColor: focused ? colors['surface-raised'] : colors.surface },
+        { backgroundColor: focused ? colors['surface-focus-row'] : colors.surface },
       ]}
     >
-      <View style={styles.cover}>
-        {cover ? (
-          <Image
-            key={cover}
-            testID={`${testID}/cover`}
-            source={{ uri: cover }}
-            resizeMode="cover"
-            resizeMethod="resize"
-            fadeDuration={0}
-            onError={() => setCoverFailed(true)}
-            style={styles.coverImage}
-            accessibilityIgnoresInvertColors
-          />
-        ) : null}
-        <Text
-          testID={`${testID}/badge`}
-          variant="badge"
-          numberOfLines={1}
-          style={[styles.badge, live ? styles.badgeLive : styles.badgeScheduled]}
-        >
-          {live ? t('author.live.badgeLive') : t('author.live.badgeScheduled')}
-        </Text>
-      </View>
-      <View style={styles.text}>
-        <Text testID={`${testID}/status`} variant="body-s" color="text-secondary" numberOfLines={1}>
-          {liveCardStatus(stream, nowMs)}
-        </Text>
-        <Text variant="section" numberOfLines={2} style={styles.title}>
-          {liveCardTitle(stream)}
-        </Text>
-        <Text
-          testID={`${testID}/details`}
-          variant="meta"
-          color={state === 'needsLevel' ? 'accent-text' : 'text-meta'}
-          numberOfLines={1}
-          style={styles.details}
-        >
-          {liveCardDetails(stream)}
-        </Text>
-      </View>
+      {({ focused }) => (
+        <>
+          <View style={styles.cover}>
+            {cover ? (
+              <Image
+                key={cover}
+                testID={`${testID}/cover`}
+                source={{ uri: cover }}
+                resizeMode="cover"
+                resizeMethod="resize"
+                fadeDuration={0}
+                onError={() => setCoverFailed(true)}
+                style={styles.coverImage}
+                accessibilityIgnoresInvertColors
+              />
+            ) : null}
+            <Text
+              testID={`${testID}/badge`}
+              variant="badge"
+              numberOfLines={1}
+              style={[styles.badge, live ? styles.badgeLive : styles.badgeScheduled]}
+            >
+              {live ? t('author.live.badgeLive') : t('author.live.badgeScheduled')}
+            </Text>
+          </View>
+          <View style={styles.text}>
+            <Text testID={`${testID}/status`} variant="body-s" color="text-secondary" numberOfLines={1}>
+              {liveCardStatus(stream, nowMs)}
+            </Text>
+            <Text variant="section" numberOfLines={2} style={styles.title}>
+              {liveCardTitle(stream)}
+            </Text>
+            <Text
+              testID={`${testID}/details`}
+              variant="meta"
+              color={state === 'needsLevel' ? 'accent-text' : focused ? 'text-secondary' : 'text-meta'}
+              numberOfLines={1}
+              style={styles.details}
+            >
+              {liveCardDetails(stream)}
+            </Text>
+          </View>
+        </>
+      )}
     </FocusableSurface>
   );
 }
@@ -345,7 +349,7 @@ function LiveCardActionsView({
               testID={`${likeId}/heart${stream.isLiked ? '/filled' : ''}`}
               filled={stream.isLiked}
               color={buttonInk({ kind: 'secondary', selected: stream.isLiked })}
-              size={16}
+              size={components['button-small'].iconSize}
             />
           }
           accessibilityBusy={likeSending}

@@ -119,71 +119,75 @@ export function MediaRowView({ row, playable, status, onPress, testID, onFocus, 
       style={style}
       surfaceStyle={surfaceStyle}
     >
-      {preview ? (
-        <Image
-          // Keyed by the URL: a new preview never shows the previous one.
-          key={preview}
-          testID={testID ? `${testID}/thumb` : undefined}
-          source={{ uri: preview }}
-          resizeMode="cover"
-          resizeMethod="resize"
-          fadeDuration={0}
-          onError={() => setFailed(true)}
-          style={styles.thumb}
-          accessibilityIgnoresInvertColors
-        />
-      ) : (
-        <View
-          testID={testID ? `${testID}/thumb-placeholder` : undefined}
-          style={[styles.thumb, styles.thumbPlaceholder]}
-        />
-      )}
-      {fraction !== null ? (
-        // Over the thumbnail's bottom edge (the row's padding is the thumb's inset).
-        <View testID={testID ? `${testID}/progress` : undefined} style={styles.track} pointerEvents="none">
-          <View style={[styles.fill, { width: Math.round(THUMB_WIDTH * fraction) }]} />
-        </View>
-      ) : null}
-      <View style={styles.texts}>
-        <Text testID={testID ? `${testID}/label` : undefined} variant="card-title" numberOfLines={1}>
-          {mediaRowLabel(row)}
-        </Text>
-        {row.title.length > 0 ? (
-          <Text
-            testID={testID ? `${testID}/title` : undefined}
-            variant="body-s"
-            color="text-secondary"
-            numberOfLines={1}
-          >
-            {row.title}
-          </Text>
-        ) : null}
-        {row.durationSec !== null || statusText !== null ? (
-          <View style={styles.metaLine}>
-            {row.durationSec !== null ? (
+      {({ focused }) => (
+        <>
+          {preview ? (
+            <Image
+              // Keyed by the URL: a new preview never shows the previous one.
+              key={preview}
+              testID={testID ? `${testID}/thumb` : undefined}
+              source={{ uri: preview }}
+              resizeMode="cover"
+              resizeMethod="resize"
+              fadeDuration={0}
+              onError={() => setFailed(true)}
+              style={styles.thumb}
+              accessibilityIgnoresInvertColors
+            />
+          ) : (
+            <View
+              testID={testID ? `${testID}/thumb-placeholder` : undefined}
+              style={[styles.thumb, styles.thumbPlaceholder]}
+            />
+          )}
+          {fraction !== null ? (
+            // Over the thumbnail's bottom edge (the row's padding is the thumb's inset).
+            <View testID={testID ? `${testID}/progress` : undefined} style={styles.track} pointerEvents="none">
+              <View style={[styles.fill, { width: Math.round(THUMB_WIDTH * fraction) }]} />
+            </View>
+          ) : null}
+          <View style={styles.texts}>
+            <Text testID={testID ? `${testID}/label` : undefined} variant="card-title" numberOfLines={1}>
+              {mediaRowLabel(row)}
+            </Text>
+            {row.title.length > 0 ? (
               <Text
-                testID={testID ? `${testID}/duration` : undefined}
-                variant="meta"
-                color="text-meta"
+                testID={testID ? `${testID}/title` : undefined}
+                variant="body-s"
+                color="text-secondary"
                 numberOfLines={1}
               >
-                {formatDuration(row.durationSec)}
+                {row.title}
               </Text>
             ) : null}
-            {statusText !== null ? (
-              <Text
-                testID={testID ? `${testID}/status` : undefined}
-                variant="meta"
-                color="text-meta"
-                numberOfLines={1}
-                style={row.durationSec !== null ? styles.status : null}
-              >
-                {statusText}
-              </Text>
+            {row.durationSec !== null || statusText !== null ? (
+              <View style={styles.metaLine}>
+                {row.durationSec !== null ? (
+                  <Text
+                    testID={testID ? `${testID}/duration` : undefined}
+                    variant="meta"
+                    color={focused ? 'text-secondary' : 'text-meta'}
+                    numberOfLines={1}
+                  >
+                    {formatDuration(row.durationSec)}
+                  </Text>
+                ) : null}
+                {statusText !== null ? (
+                  <Text
+                    testID={testID ? `${testID}/status` : undefined}
+                    variant="meta"
+                    color={focused ? 'text-secondary' : 'text-meta'}
+                    numberOfLines={1}
+                    style={row.durationSec !== null ? styles.status : null}
+                  >
+                    {statusText}
+                  </Text>
+                ) : null}
+              </View>
             ) : null}
           </View>
-        ) : null}
-      </View>
+        </>
+      )}
     </FocusableSurface>
   );
 }

@@ -2540,6 +2540,95 @@ describe('Story 4.7: «Продолжить просмотр» on Главная
     await unmount(root);
   });
 
+  it('Story 9.4: a remembered Continue card, Настройки → OK «Главная»: the grid opens at its top (no initial row from the Continue index); the card gets focus', async () => {
+    for (let n = 1; n <= 5; n += 1) {
+      seed(n, 600, n * 1000);
+    }
+    feed = syntheticFeed({ total: 30 });
+    const root = await renderApp();
+    // Index 4 in the Continue row: as a feed index it would be grid row 1.
+    await focusOn(root, card(5));
+    await back(); // → nav/home
+    await focusOn(root, 'nav/settings');
+    await press(root, 'nav/settings');
+    expect(visible(root, 'shell/content/settings')).toBe(true);
+    await focusOn(root, 'nav/home');
+    focusMock.mockClear();
+    await press(root, 'nav/home');
+    expect(visible(root, 'shell/content/home')).toBe(true);
+    expect(grid(root).props.initialScrollIndex).toBeUndefined();
+    expect(visible(root, 'home/continue')).toBe(true);
+    // The row opens with card 5 (index 4) in view, flush on column 3 (device: an off-view card took no focus).
+    const [row] = byTestId(root, 'home/continue/row').filter(n => n.props.contentOffset);
+    expect(row.props.contentOffset).toEqual({ x: 2 * (221 + 16), y: 0 });
+    expect(lastFocusTarget()).toBe(card(5));
+    expect(destinationIds('shell/content/home')).toEqual([card(5)]);
+    await unmount(root);
+  });
+
+  it('Story 9.4: the remembered Continue card is gone on return (finished meanwhile): §1.6 fallback to its neighbour by index; the row opens at 0', async () => {
+    for (let n = 1; n <= 5; n += 1) {
+      seed(n, 600, n * 1000);
+    }
+    feed = syntheticFeed({ total: 30 });
+    const root = await renderApp();
+    await focusOn(root, card(5)); // index 4
+    await back(); // → nav/home
+    await focusOn(root, 'nav/settings');
+    await press(root, 'nav/settings');
+    // Finished while Настройки is shown: its card leaves the row.
+    await act(async () => {
+      seed(5, 3590, 5000);
+    });
+    await settle();
+    await focusOn(root, 'nav/home');
+    focusMock.mockClear();
+    await press(root, 'nav/home');
+    expect(rowIds(root)).toEqual([card(1), card(2), card(3), card(4)]);
+    expect(grid(root).props.initialScrollIndex).toBeUndefined();
+    const [row] = byTestId(root, 'home/continue/row').filter(n => n.props.contentOffset);
+    expect(row.props.contentOffset).toEqual({ x: 0, y: 0 });
+    // The remembered index 4 is past the end: the previous card (now last).
+    expect(lastFocusTarget()).toBe(card(4));
+    await unmount(root);
+  });
+
+  it('Story 9.4: a remembered Continue card, Back from Настройки: focus stays on nav/home; → lands on the remembered card', async () => {
+    for (let n = 1; n <= 5; n += 1) {
+      seed(n, 600, n * 1000);
+    }
+    feed = syntheticFeed({ total: 30 });
+    const root = await renderApp();
+    await focusOn(root, card(5));
+    await back(); // → nav/home
+    await focusOn(root, 'nav/settings');
+    await press(root, 'nav/settings');
+    focusMock.mockClear();
+    await back(); // → Главная, nav/home
+    expect(visible(root, 'shell/content/home')).toBe(true);
+    expect(grid(root).props.initialScrollIndex).toBeUndefined();
+    expect(focusTargets().filter(id => id?.startsWith('home/'))).toEqual([]);
+    expect(destinationIds('shell/content/home')).toEqual([card(5)]);
+    await unmount(root);
+  });
+
+  it('Story 9.4: a remembered feed card (with the Continue row), Back from Настройки: the grid opens at that card\'s row; → lands on it', async () => {
+    seed(1, 600, 1000);
+    feed = syntheticFeed({ total: 30 });
+    const root = await renderApp();
+    await focusOn(root, 'home/feed/feed-post-7');
+    await back(); // → nav/home
+    await focusOn(root, 'nav/settings');
+    await press(root, 'nav/settings');
+    focusMock.mockClear();
+    await back();
+    expect(grid(root).props.initialScrollIndex).toBe(2);
+    expect(destinationIds('shell/content/home')).toEqual(['home/feed/feed-post-7']);
+    const [row] = byTestId(root, 'home/continue/row').filter(n => n.props.contentOffset);
+    expect(row.props.contentOffset).toEqual({ x: 0, y: 0 });
+    await unmount(root);
+  });
+
   it('matrix «↑ ↓»: the row guide points at the remembered card (↑ from the feed lands there); the columns line up with the grid', async () => {
     seed(1, 600, 1000);
     seed(2, 600, 2000);

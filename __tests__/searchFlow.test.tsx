@@ -651,6 +651,23 @@ describe('matrix «Filter change»', () => {
     await unmount(root);
   });
 
+  it('Story 9.4 (device): a fallback focus on the sidebar while the sheet is open keeps the chip focusable; Back → the chip', async () => {
+    const root = await openSearch();
+    await focusOn(root, FIELD);
+    await focusOn(root, CHIP);
+    await press(root, CHIP);
+    expect(visible(root, 'filters/sheet')).toBe(true);
+    // A sheet level change unmounts the focused row; Android falls back to the sidebar for a moment.
+    await focusOn(root, 'nav/search');
+    expect(one(root, CHIP).props.focusable).toBe(true);
+    focusMock.mockClear();
+    await back();
+    expect(visible(root, 'filters/sheet')).toBe(false);
+    expect(one(root, CHIP).props.focusable).toBe(true);
+    expect(lastFocusTarget()).toBe(CHIP);
+    await unmount(root);
+  });
+
   it('the `search` sheet offers the feed tags (E13) and sends `tags_ids` with the query', async () => {
     other = req =>
       req.path === E13

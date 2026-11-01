@@ -89,6 +89,31 @@ describe('MediaRow (Story 3.5)', () => {
     await act(async () => failing.unmount());
   });
 
+  it('Story 9.4: the meta line switches to text-secondary in focus (DESIGN.md Colors)', async () => {
+    const root = await render(row());
+    const color = () => StyleSheet.flatten(byId(root, `${ID}/duration`)[0].props.style).color;
+    expect(color()).toBe(colors['text-meta']);
+    await act(async () => host(root).props.onFocus(evt));
+    expect(color()).toBe(colors['text-secondary']);
+    await act(async () => host(root).props.onBlur(evt));
+    expect(color()).toBe(colors['text-meta']);
+    await act(async () => root.unmount());
+  });
+
+  it('Story 9.4: the status switches to text-secondary in focus too', async () => {
+    const root = createRoot();
+    await act(async () => {
+      root.render(
+        <MediaRow row={row()} playable status={{ kind: 'inProgress', minutesLeft: 5, fraction: 0.5 }} testID={ID} />,
+      );
+    });
+    const color = () => StyleSheet.flatten(byId(root, `${ID}/status`)[0].props.style).color;
+    expect(color()).toBe(colors['text-meta']);
+    await act(async () => host(root).props.onFocus(evt));
+    expect(color()).toBe(colors['text-secondary']);
+    await act(async () => root.unmount());
+  });
+
   it('states: default, focused (ring, row background, scale-row), pressed', async () => {
     const root = await render(row());
     expect(byId(root, `${ID}/ring`)).toHaveLength(0);

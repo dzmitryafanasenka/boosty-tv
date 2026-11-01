@@ -1,5 +1,5 @@
 import { isChosen, pollPercent, type Poll, type PollOption } from '../../shared/entities/poll';
-import { t, tf, tp } from '../../shared/i18n';
+import { joinSentences, t, tf, tp } from '../../shared/i18n';
 import { formatCount } from '../../shared/i18n/format';
 import type { PollMutation } from './usePollVote';
 
@@ -26,17 +26,8 @@ export const shownPollTitle = (poll: Poll) => {
   return title.length > 0 ? title : t('poll.untitled');
 };
 
-/** A part that already ends a sentence gets no added period (no «?.» or «..»). */
-const ENDS_SENTENCE = /[.?!…]$/;
-
-/** Label parts as sentences: each but the last ends with a period unless it already ends one. */
-export function joinSentences(parts: readonly string[]): string {
-  return parts
-    .map(part => part.trim())
-    .filter(part => part.length > 0)
-    .map((part, i, all) => (i < all.length - 1 && !ENDS_SENTENCE.test(part) ? `${part}.` : part))
-    .join(' ');
-}
+/** Shared since Story 9.4 (SettingRow uses it too). */
+export { joinSentences };
 
 /** «Вариант, 48 %, 1 210 голосов» (or «…, ваш выбор» when `chosen`). */
 function optionLabel(option: PollOption, index: number, chosen: boolean): string {
@@ -63,7 +54,7 @@ export function pollAccessibilityLabel(poll: Poll): string {
   ]);
 }
 
-/** The checkbox option's readable label: text, percent, votes, then «отмечено» / «не отмечено». */
+/** The checkbox option's readable label: text, percent, votes, then «Отмечено» / «Не отмечено». */
 export function pollCheckOptionAccessibilityLabel(
   option: PollOption,
   index: number,

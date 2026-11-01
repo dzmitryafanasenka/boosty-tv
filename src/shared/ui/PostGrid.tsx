@@ -28,7 +28,7 @@ import type { HostView } from './FocusableSurface';
 import { PostCard, postCardHeight, postCardWidth } from './PostCard';
 import { Spinner } from './Spinner';
 import { Text } from './Text';
-import { colors, spacing } from './tokens';
+import { colors, components, spacing } from './tokens';
 
 /**
  * The 3-column PostCard grid (Story 3.1 Главная, Story 3.3 Автор): a
@@ -836,7 +836,7 @@ const styles = StyleSheet.create({
     marginLeft: spacing['card-gap-x'],
   },
   endGuide: {
-    height: 1,
+    height: components['focus-guide'].endHeight,
     width: spacing['content-width'] - 2 * HEADROOM,
   },
   retryRow: {

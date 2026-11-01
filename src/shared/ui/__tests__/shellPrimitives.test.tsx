@@ -209,7 +209,7 @@ describe('SettingRow toggle (Story 8.2)', () => {
     const node = host(root);
     expect(node.props.accessibilityRole).toBe('switch');
     expect(node.props.accessibilityState).toMatchObject({ checked: true });
-    expect(node.props.accessibilityLabel).toBe('Системный видеоплеер Вкл Прогресс не сохраняется.');
+    expect(node.props.accessibilityLabel).toBe('Системный видеоплеер Вкл. Прогресс не сохраняется.');
     expect(byId(root, `${ID}/value`)[0].props.children).toBe('Вкл');
     expect(valueColor(root)).toBe(colors.accent);
     expect(byId(root, `${ID}/description`)[0].props.children).toBe('Прогресс не сохраняется.');

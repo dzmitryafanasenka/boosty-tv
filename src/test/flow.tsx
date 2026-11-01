@@ -105,6 +105,36 @@ export function focusableIds(target: Root | Node, within?: Node): string[] {
     .map(node => node.props.testID as string);
 }
 
+/**
+ * Story 9.4 label guard: the focusable host views (`focusable === true`,
+ * and `TextInput` hosts unless `focusable={false}`) whose accessibility label is missing or blank, as `testID` (or the host
+ * type when there is none). TalkBack reads `accessibilityLabel` as the
+ * view's content description; a focusable without one announces nothing
+ * meaningful. Every `focusOn` and `press` of a flow checks the whole tree.
+ */
+export function unlabelledFocusables(target: Root | Node): string[] {
+  return containerOf(target)
+    .queryAll(
+      node =>
+        node.props.focusable === true ||
+        // TextInput hosts (TextField) are focusable unless they say otherwise.
+        (node.type === 'TextInput' && node.props.focusable !== false),
+    )
+    .filter(node => {
+      const label = node.props.accessibilityLabel;
+      return typeof label !== 'string' || label.trim().length === 0;
+    })
+    .map(node => (node.props.testID as string | undefined) ?? String(node.type));
+}
+
+/** Throws when a focusable host view in the tree has no label (Story 9.4). */
+export function expectLabelledFocusables(root: Root): void {
+  const missing = unlabelledFocusables(root);
+  if (missing.length > 0) {
+    throw new Error(`Focusable views without an accessibility label: ${[...new Set(missing)].join(', ')}`);
+  }
+}
+
 /** The topmost of `ids` that is mounted (the JS stack keeps covered screens mounted). */
 export function topScreen(root: Root, ids: readonly string[]): string | undefined {
   const present = ids.filter(id => visible(root, id));
@@ -303,6 +333,7 @@ export function createFlow(profile: FlowProfile) {
 
   /** Native focus arrived on an element (what Android does on a D-pad move). */
   async function focusOn(root: Root, testID: string) {
+    expectLabelledFocusables(root);
     const node = one(root, testID);
     await act(async () => {
       node.props.onFocus({ nativeEvent: {} });
@@ -314,6 +345,8 @@ export function createFlow(profile: FlowProfile) {
     const focus = options.focus ?? profile.pressFocuses;
     if (focus === true) {
       await focusOn(root, testID);
+    } else {
+      expectLabelledFocusables(root);
     }
     const node = one(root, testID);
     await act(async () => {

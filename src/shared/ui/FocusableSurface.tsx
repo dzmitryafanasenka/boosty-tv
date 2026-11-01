@@ -33,8 +33,14 @@ export type SurfaceState = {
 
 export type FocusableSurfaceProps = Omit<
   PressableProps,
-  'style' | 'children' | 'focusable' | 'disabled'
+  'style' | 'children' | 'focusable' | 'disabled' | 'accessibilityLabel'
 > & {
+  /**
+   * What TalkBack announces (Story 9.4: required, a non-empty Russian
+   * string from the `ru` catalog or built from content with it). The
+   * flow-test label guard (`src/test/flow.tsx`) checks it is not blank.
+   */
+  accessibilityLabel: string;
   /** Corner radius of the surface; the ring follows it at the ring offset. */
   radius: number;
   /** Component focus scale from DESIGN.md (`focus.scale-*`). */

@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'test-renderer';
 import { TextField, type TextFieldHandle } from '../TextField';
 import { colors, components } from '../tokens';
 import { requestHostFocus } from '../requestHostFocus';
+import { MAX_FONT_SIZE_MULTIPLIER } from '../Text';
 
 jest.mock('../requestHostFocus', () => ({ requestHostFocus: jest.fn() }));
 
@@ -113,4 +114,12 @@ test('passes input, submit and IME options through', async () => {
     returnKeyType: 'done',
     autoCorrect: false,
   });
+});
+
+test('Story 9.4 font scale: the TextInput caps its growth at MAX_FONT_SIZE_MULTIPLIER (1.3)', async () => {
+  const { root } = await render();
+  const node = input(root);
+  expect(node.type).toBe('TextInput');
+  expect(node.props.maxFontSizeMultiplier).toBe(MAX_FONT_SIZE_MULTIPLIER);
+  expect(MAX_FONT_SIZE_MULTIPLIER).toBe(1.3);
 });

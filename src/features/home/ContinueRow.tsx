@@ -137,6 +137,12 @@ const RowCard = memo(function RowCardView({
 
 export type ContinueRowProps = {
   items: readonly ContinueItem[];
+  /**
+   * The card Главная restores at mount (Story 9.4): the row opens scrolled
+   * so it is in view, flush on column 3 as Android's own focus scroll leaves
+   * it. A card in the first three needs no scroll.
+   */
+  initialCardId?: string;
   restoration: ListRestoration;
   /** OK on a card (by focus id). */
   onCardPress: (id: string) => void;
@@ -151,7 +157,7 @@ export type ContinueRowProps = {
  * inside the row and scroll it; ↓ lands natively on the grid card in the
  * same column (the columns line up).
  */
-export function ContinueRow({ items, restoration, onCardPress }: ContinueRowProps) {
+export function ContinueRow({ items, initialCardId, restoration, onCardPress }: ContinueRowProps) {
   const views = useRef(new Map<string, HostView>());
   const remembered = useRef<string | null>(null);
   const [target, setTarget] = useState<HostView | null>(null);
@@ -209,6 +215,8 @@ export function ContinueRow({ items, restoration, onCardPress }: ContinueRowProp
   }, [ids, pickTarget]);
 
   const destinations = useMemo(() => (target ? [target] : []), [target]);
+  // Read once at mount: a later change of `items` never scrolls the row.
+  const [contentOffset] = useState(() => ({ x: continueRowOffset(items, initialCardId), y: 0 }));
 
   return (
     <View testID="home/continue">
@@ -219,6 +227,7 @@ export function ContinueRow({ items, restoration, onCardPress }: ContinueRowProp
         <ScrollView
           testID="home/continue/row"
           horizontal
+          contentOffset={contentOffset}
           showsHorizontalScrollIndicator={false}
           style={styles.row}
           contentContainerStyle={styles.rowContent}
@@ -238,6 +247,16 @@ export function ContinueRow({ items, restoration, onCardPress }: ContinueRowProp
       </TVFocusGuideView>
     </View>
   );
+}
+
+/**
+ * The row's start offset that shows `cardId` flush on the last visible
+ * column (0 when it is among the first `POST_GRID_COLUMNS` or not in the row).
+ * Each card's padded view advances by one column step (`WIDTH + GAP`).
+ */
+export function continueRowOffset(items: readonly ContinueItem[], cardId: string | undefined): number {
+  const index = cardId === undefined ? -1 : items.findIndex(item => item.id === cardId);
+  return Math.max(0, index - (POST_GRID_COLUMNS - 1)) * (WIDTH + GAP);
 }
 
 /** The header's height above the feed title (for layout checks). */

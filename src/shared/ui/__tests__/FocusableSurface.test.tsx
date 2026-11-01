@@ -24,7 +24,7 @@ afterEach(() => {
 async function pressIn(scalePressed?: number): Promise<Root> {
   const root = createRoot();
   await act(async () => {
-    root.render(<FocusableSurface testID={ID} radius={4} scaleFocus={1} scalePressed={scalePressed} />);
+    root.render(<FocusableSurface testID={ID} accessibilityLabel="Probe" radius={4} scaleFocus={1} scalePressed={scalePressed} />);
   });
   const [host] = root.container.queryAll(node => node.props.testID === ID);
   await act(async () => host.props.onFocus(evt));

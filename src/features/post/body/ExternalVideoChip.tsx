@@ -101,8 +101,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   videoThumb: {
-    width: 96,
-    height: 54,
+    width: CHIP.thumbWidth,
+    height: CHIP.thumbHeight,
     borderRadius: rounded.sm,
     marginRight: spacing['5'],
     backgroundColor: colors.skeleton,

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Animated, StyleSheet } from 'react-native';
 import { toEasing } from './motion';
-import { colors, motion, rounded } from './tokens';
+import { colors, components, motion, rounded } from './tokens';
 
 const SIZE = 16;
 
@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
     width: SIZE,
     height: SIZE,
     borderRadius: rounded.full,
-    borderWidth: 2,
+    borderWidth: components.stroke.mark,
     borderTopColor: 'transparent',
   },
 });

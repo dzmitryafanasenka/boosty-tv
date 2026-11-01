@@ -292,11 +292,26 @@ export function HomeScreen({
   // Keep scroll on return (owner decision 2026-10-26): mounted with cached
   // cards, the grid opens at the remembered card's row (so it is mounted and
   // → from the sidebar lands on it), then at the exact remembered offset.
+  // Only a feed card's index is a grid index: a remembered Continue card's
+  // index is its place in the Continue row (Story 9.4: as a grid row it
+  // opened the list past its header, with the row and the card unmounted).
   const [initialRow] = useState(() => {
-    const index = focusRestoration.peek(routeKey, HOME_SECTION)?.index;
-    return shownPosts.length > 0 && index !== undefined && index < shownPosts.length
+    const entry = focusRestoration.peek(routeKey, HOME_SECTION);
+    const index = entry?.index;
+    return entry?.focusId.startsWith(FEED_CARD_PREFIX) &&
+      shownPosts.length > 0 &&
+      index !== undefined &&
+      index < shownPosts.length
       ? Math.floor(index / FEED_COLUMNS)
       : undefined;
+  });
+  // The Continue row's remembered card (Story 9.4, device): a card past the
+  // third is outside the row's viewport when Главная mounts, and a focus
+  // request on it does not stick on the device. The row opens scrolled so
+  // that card is in view (see ContinueRow `initialCardId`).
+  const [initialContinueId] = useState(() => {
+    const focusId = focusRestoration.peek(routeKey, HOME_SECTION)?.focusId;
+    return focusId?.startsWith(CONTINUE_CARD_PREFIX) ? focusId : undefined;
   });
   const adapterRef = useRef(gridListAdapter(listRef));
   const ids = useMemo(() => shownPosts.map(post => feedCardId(post.id)), [shownPosts]);
@@ -975,6 +990,7 @@ export function HomeScreen({
             showContinue ? (
               <ContinueHeader
                 items={continueItems}
+                initialCardId={initialContinueId}
                 restoration={restoration}
                 onCardPress={onContinuePress}
                 titleRow={titleRow}
@@ -996,6 +1012,7 @@ function ContinueHeader({
   ...props
 }: {
   items: readonly ContinueItem[];
+  initialCardId?: string;
   restoration: ReturnType<typeof useFocusRestoration>;
   onCardPress: (id: string) => void;
   titleRow: ReactNode;

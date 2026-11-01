@@ -186,7 +186,7 @@ export const components = {
     bgFocus: colors['surface-focus-button'],
     text: colors.text,
   },
-  'button-small': { height: 32, paddingX: 14, text: typography['button-s'] },
+  'button-small': { height: 32, paddingX: 14, text: typography['button-s'], iconSize: 16 },
   'filter-chip': {
     height: 32,
     radius: rounded.full,
@@ -232,6 +232,8 @@ export const components = {
     radius: rounded.md,
     bgFocus: colors['surface-focus-row'],
     scaleFocus: focus['scale-row'],
+    /** Story 9.4: the Диагностика rows' column. */
+    listMaxWidth: 640,
   },
   'poll-option': {
     height: 42,
@@ -262,12 +264,17 @@ export const components = {
     bgFocus: colors['surface-focus-row'],
     chip: colors.live,
     scaleFocus: focus['scale-row'],
+    skeletonLine: 12,
   },
   'link-chip': {
     height: 32,
     radius: rounded.full,
     bg: colors['surface-raised'],
     suffix: 'QR',
+    labelMaxWidth: 420,
+    /** The external-video chip's preview. */
+    thumbWidth: 96,
+    thumbHeight: 54,
   },
   'player-control': {
     size: 40,
@@ -275,6 +282,15 @@ export const components = {
     bg: colors['overlay-badge'],
     bgFocus: colors.text,
     iconFocus: colors.bg,
+    /** The play triangle (a bordered view) and the pause bars. */
+    playWidth: 13,
+    playHeight: 16,
+    pauseBarWidth: 4,
+    pauseBarHeight: 16,
+    pauseGap: 4,
+    /** The triangle's optical centering nudge to the right. */
+    glyphNudge: 3,
+    barRadius: 1,
   },
   timeline: {
     trackHeight: 3,
@@ -282,6 +298,19 @@ export const components = {
     progress: colors.accent,
     thumb: colors.text,
     bubble: colors['overlay-badge'],
+    bubbleMinWidth: 56,
+  },
+  /** DESIGN.md AudioBlock: the round glyph box, its play/pause glyph and the 2 dp progress line. */
+  'audio-block': {
+    glyphBox: 32,
+    playWidth: 11,
+    playHeight: 14,
+    pauseBarWidth: 3,
+    pauseBarHeight: 13,
+    pauseGap: 3,
+    glyphNudge: 3,
+    barRadius: 1,
+    progressHeight: 2,
   },
   'side-sheet': {
     widthFilters: 320,
@@ -308,5 +337,13 @@ export const components = {
     bg: colors['overlay-badge'],
     text: typography.badge,
   },
+  /**
+   * Story 9.4: `mark` outlines the glyphs drawn with views (radio, check
+   * box, spinner, StateView glyph, lock shackle); `hairline` is the text
+   * placeholder's border.
+   */
+  stroke: { mark: 2, hairline: 1 },
+  /** Invisible TVFocusGuideView strips: the post grid's end guide and the period stepper's band. */
+  'focus-guide': { endHeight: 1, bandWidth: 2 },
   avatar: { meta: 16, player: 22, post: 28, authorHeader: 56 },
 } as const;

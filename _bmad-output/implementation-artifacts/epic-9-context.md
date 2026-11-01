@@ -4,59 +4,94 @@
 
 ## Goal
 
-Turn the Android build into something the family can run every evening and the owner can retire BoostBuddy for (FR55, FR56, NFR5). The signed release and the update path are done: releases 0.9.0 and 0.9.1 are published on the public repository's GitHub Releases, and the TV checks for a newer release and, after an explicit OK, downloads and installs it through the Android system installer. What remains is to measure and fix performance, visual fidelity and accessibility on the pinned Chromecast with Google TV 4K, then run a full real-device regression that ends in the owner's explicit acceptance of the Android release. That acceptance starts the switch-over and session-longevity observation periods.
+Turn the Android build into something the family can run every evening and the owner can retire BoostBuddy for. Releases, in-app updates and performance are done. 0.9.0 and 0.9.1 are on GitHub Releases, and the TV installs updates after an explicit OK. Story 9.3 measured scrolling, time to first frame and memory on the pinned Chromecast with Google TV 4K against targets the owner set, and the owner accepted two exceptions. Two stories remain. Story 9.4 checks visual fidelity and accessibility against the agreed design. Story 9.5 is the full real-device regression and ends with the owner's explicit acceptance of the Android release. That acceptance starts the switch-over and session-longevity observation periods.
 
 ## Stories
 
 - Story 9.1: Signed release on GitHub Releases (done)
 - Story 9.2: Update notice and in-app install from GitHub Releases (done)
-- Story 9.3: Performance on the device
-- Story 9.4: Visual fidelity and accessibility pass
+- Story 9.3: Performance on the device (done)
+- Story 9.4: Visual fidelity and accessibility pass (next)
 - Story 9.5: Full device regression and owner acceptance
 
 ## Requirements & Constraints
 
-- **Owner decisions (2026-11-01):**
-  - «Boosty TV» is approved as the final app name. The neutral TV banner and adaptive icon carry no Boosty marks.
-  - The release keystore lives outside the repository. Its passwords live only in `~/.gradle/gradle.properties` and never enter agent context (do not read, print or log them).
-  - The one-time uninstall to switch from the SDK debug key to the release key is done. Installs over a previous release with the same key keep the session.
-  - In-app update download and install is allowed (reverses the earlier "nothing is downloaded or installed" rule), only after an explicit OK and the system installer's confirmation. Never silent, no PackageInstaller session, no automatic retry. The QR to the release page stays as the fallback.
-- **Release state:** each release attaches one APK per ABI plus the universal APK, all with the same `versionCode`, tagged `v{versionName}`. The repository and releases stay free of secrets, keystores, account data, unsanitized fixtures and signed URLs; the CI fixture check must pass. Publishing needs the owner's explicit OK.
-- **Performance (9.3):**
-  - No visible frame drops or focus lag with 300+ fixture feed posts, 55 authors and real data, with the D-pad held and in single steps.
-  - Time to first frame from a post and from «Продолжить» meets the target, or the owner accepts a documented exception. No numeric target has been recorded yet; the spike measured TTFF of roughly 0.9–2.5 s (HLS) and 1.0–1.6 s (MP4/DASH). Propose a target to the owner.
-  - No steady memory growth over a 1-hour browse-and-watch session (images, players, listeners).
-  - Method and numbers go in `docs/testing.md`.
-- **Fidelity and accessibility (9.4):**
-  - Every screen compared to the mocks and DESIGN.md at 1080p and 720p; deviations fixed, or listed and accepted.
+- **Settled owner decisions:**
+  - «Boosty TV» is the final name. The banner and icon carry no Boosty marks.
+  - The keystore and its passwords stay outside the repository. The passwords are in `~/.gradle/gradle.properties`. Never read, print or log them.
+  - In-app update needs an explicit OK plus the system installer. It is never silent and never retried automatically. The QR is the fallback.
+  - Publishing a release needs the owner's OK.
+- **Performance (9.3, done, must not regress):**
+  - Scroll target: no frame of 300 ms or longer, janky frames ≤ 10 % (gfxinfo), no focus lag.
+  - TTFF target: median ≤ 2 s, worst ≤ 4 s. Both pass.
+  - Memory: PSS shows no growth.
+  - Exceptions the owner accepted on 2026-11-01: held-↓ jank on Главная (15–21 %) and the Graphics image-cache plateau (about 115 MB).
+  - The untried fixes need the owner, because they change the PostCard design or the stale-image guard. Fewer views per PostCard is one of them, so 9.4 must not quietly add views to the card.
+- **Fidelity (9.4):**
+  - Compare every IA screen on the device at 1080p and 720p against the mocks and DESIGN.md.
+  - Fix each deviation, or list it for the owner to accept.
   - Components use tokens only, with no raw colors or sizes.
-  - All contrast pairs meet their targets, including focused rows and the LIVE badge.
-  - Every focusable element announces a meaningful Russian TalkBack label.
-  - Each screen matches `docs/focus-map.md`. Changing the doc instead of the code needs owner approval.
+- **Contrast (9.4):** check every pair in the DESIGN.md contrast table in the built app, including:
+  - text-secondary on surface-focus-row, since all secondary and tertiary text switches to it inside a focused row or tile;
+  - text on live (the LIVE badge and the «Эфир» chip);
+  - accent-ink on accent / accent-focus;
+  - the focus ring on bg and on surface-focus-button;
+  - text on overlay-badge over video.
+  - text-tertiary is allowed only on bg, bg-sidebar and surface.
+- **Text size:** no text below 11 sp.
+- **Font scale (deferred to 9.4):** pick a font-scale policy (cap `maxFontSizeMultiplier`, or let fixed-height controls grow). Check A1 and Button at the largest Android TV text size with a screenshot.
+- **TalkBack (9.4):** every focusable element announces a meaningful Russian label, for example «Видео. {title}. {author}, {date}. Осталось {n} минут». Earlier stories left TalkBack unverified everywhere. Their deferred rows (player controls, MediaRows, cards, tiles, LiveCard, polls) close here.
+- **Focus map (9.4):** walk every screen against `docs/focus-map.md`: initial focus, arrows, OK, Back and restoration. Fix any mismatch in code. Changing the doc instead needs the owner's approval.
+  - Known open defect: with a «Продолжить» card as Главная's remembered focus, the path Настройки → ← ↑ to «Главная» → OK leaves Главная scrolled past its header with nothing focused.
 - **Regression (9.5):**
-  - Run the CLAUDE.md device checklist on the Chromecast with the release build; record in `docs/testing.md`.
-  - Walk UJ-0 to UJ-7 with the remote only (SM-5). UJ-1 must take 5 presses or fewer (SM-3), without autoplay shortcuts.
-  - Keep physical-device results separate from emulator or mock results. Never report agent-over-adb runs as physical-remote checks.
-  - The epic ends with the owner's explicit acceptance, which starts SM-1 (4 weeks without BoostBuddy) and SM-2 (session longevity).
+  - Run the CLAUDE.md device checklist with the release build. Walk UJ-0 to UJ-7 with the remote only. UJ-1 takes 5 presses or fewer, with no autoplay shortcuts.
+  - Record the results in `docs/testing.md`.
+- **Evidence labels:** keep physical-device, emulator and mock results apart. A run by the agent over adb is never a physical-remote or TalkBack-by-owner check.
 
 ## Technical Decisions
 
-- **Builds and signing:** release builds are signed by Gradle with the owner's key; CI only lints, typechecks, tests and builds debug, and never signs. Debug builds use the SDK debug key and cannot install over the family build. Agent device builds are therefore `assembleRelease` with the owner's key (a branch build replaces the family build until the next release is installed). The release build fails if the demo flag is on.
-- **Update path (shipped):** `UpdateChecker` lives in `features/update`, wired in `app/update.ts` over `fetchTransport` (never `HttpClient`, so no Boosty auth or `http` log line reaches GitHub). The `AppUpdater` port (`shared/platform/appUpdater.ts`, native module) downloads only this repository's assets into `cacheDir/updates/`, verifies GitHub's SHA-256 digest and launches the system installer. Phase flag `updateCheck`, off in the demo. Changes in 9.3–9.5 must not regress this path.
-- **Lists:** FlashList 2.3.3 is adopted for the grids (ADR 0011) and reused by later lists. Any further list change for performance needs profiling evidence and an ADR.
-- **Logging:** structured logger fields, not values in message text; the `loggerFieldKeys` source-scan test covers new logger call sites. Redact signed URLs and personal data.
-- **Hardening stays:** `allowBackup=false`, no cleartext traffic, default TLS validation.
-- **Copy:** Russian strings in `ru` (i18n-ready); code and docs in English.
+- **Builds:** agent device builds are owner-signed `assembleRelease`, installed with `adb install -r` over the family build. Nothing is uninstalled or cleared. Debug builds cannot install over the family build. The release build fails if the demo flag is on, so demo-only states need a debug build with Metro.
+- **Before each adb key batch:** confirm the app is in the foreground. The device runs the owner's «Button Mapper» accessibility service. Leave it enabled; it affects frame numbers and may interact with TalkBack.
+- **Tokens:** `src/shared/ui/tokens.ts` mirrors the DESIGN.md frontmatter. `src/shared/ui/__tests__/tokens.test.js` compares the two, so change both together.
+  - Typography sets `fontFamily` per weight and never `fontWeight` (bundled Golos Text).
+  - Shared primitives live in `src/shared/ui/`. FocusableSurface supplies the ring, the surface lift and the scale as a transform, so focus never reflows the layout.
+- **Lists:** FlashList 2.3.3 (ADR 0011). The post grid's `drawDistance` is 2 rows (ADR 0015, pinned in `homeFeedFlow.test.tsx`). Any further list change needs profiling evidence and an ADR.
+- **Focus:** native only (react-native-tvos, `TVFocusGuideView`). There is no JS focus engine. Focus IDs follow `<screen>/<zone>/<id>`.
+- **Logging:** use structured fields; `loggerFieldKeys` covers new call sites. Redact signed URLs and personal data. The TTFF `first frame` line carries no URL, id or title.
+- **Update path:** `features/update`, `app/update.ts` and the `AppUpdater` port must not regress.
+- **Copy:** Russian strings in `ru` (i18n-ready). Code and docs are in English.
 
 ## UX & Interaction Patterns
 
-- One clear focus target; focus scaling must not reflow layouts or clip rings. Deterministic initial focus and stable focus during refetch, pagination and image loading.
-- Back closes the top overlay first (update dialog, QrDialog, settings) and returns focus to the initiator; no focus behind modals.
-- The update plaque is non-focusable and never shows over the Player. Technical errors appear only in Diagnostics, never in family-facing UI.
+- **Where the 9.4 inputs live:**
+  - `_bmad-output/planning-artifacts/ux-designs/ux-boosty-tv-2026-10-25/DESIGN.md`: tokens frontmatter, Colors with the contrast table, Typography, Layout & Spacing, the Components anatomy and states table, and Do's and Don'ts.
+  - `EXPERIENCE.md` (same folder): IA screen list A–K, Interaction Primitives, Accessibility Floor, Key Flows 0–7, and «Overrides of the mocks and focus-map».
+  - `review-rubric.md` (same folder): an earlier review of the DESIGN.md / EXPERIENCE.md pair.
+  - Mocks: `_bmad-output/planning-artifacts/design/claude-design-v1/`. The overviews are `Boosty TV - A B C.dc.html` and `Boosty TV - D-L.dc.html`, the state matrix is `Boosty TV - Компоненты.dc.html`, and per-screen and per-component `*.dc.html` files sit alongside. `docs/tokens.md`, `docs/focus-map.md` and `docs/handoff-rn-tv.md` are in that package. `screenshots/` is non-normative.
+  - Normative focus contract: `docs/focus-map.md`.
+- **Precedence:** EXPERIENCE.md > DESIGN.md / `docs/focus-map.md` > the design package's focus map > the mocks. As-built and superseded notes in DESIGN.md are the target, not the mocks:
+  - post grids have 3 columns of 221 dp, not 4;
+  - Пост is one column with the header on top;
+  - Автор and Пост show the Shell sidebar;
+  - ImageBlock focus has no scale;
+  - the PostCard placeholder without a preview, the LiveCard and EventRow layouts, and the «Показаны первые 30» copy.
+  - `TV Keyboard.dc.html` only illustrates the system IME. Never implement it.
+- **Layout:** one logical layout of 960×540 dp at 720p, 1080p and 4K. This is still marked as an assumption to verify on the device, and 9.4 can settle it. Text and focusable elements stay inside the safe area. The fifth card of a row is cut by the edge as a scroll hint.
+- **Focus visuals:**
+  - One clear target: the ring plus the surface lift plus the scale, never color alone.
+  - «Current» (surface-current plus an accent bar) is distinct from «focused».
+  - Disabled elements are not focusable.
+  - With the system "reduce motion" setting, the scale stays and scrolling becomes instant.
+- **Anti-patterns:** no comment counts, prices, sort controls or light theme, and no gradients except the player legibility band. Never offer quality, speed or track options the stream lacks.
 
 ## Cross-Story Dependencies
 
-- 9.3 builds on the Story 1.6 TTFF baseline and the Story 3.1 FlashList adoption. Device measurements need a release-signed build installed over the family build.
-- 9.4 and 9.5 feed fixes back into earlier epics' screens. 9.4's focus-map and TalkBack pass should land before 9.5 so the regression runs on the final UI.
-- 9.5 runs on a published release build (the next one after 0.9.1); it should also exercise the in-app update from the previous release, including the per-ABI asset path, which has not yet run on the device.
-- Open owner device passes from earlier retros (second account, physical-remote passes, live at 1×, chooser with 2+ players) overlap with the 9.5 checklist and can be closed there.
+- 9.4 feeds fixes back into earlier epics' screens. Its focus-map and TalkBack pass should land before 9.5, so the regression runs on the final UI.
+- 9.4 changes to PostCard or the grids must keep the 9.3 numbers. Re-measure, or note the risk, if the card's view count grows.
+- 9.5 runs on the next published release after 0.9.1. It should also exercise the in-app update from the previous release, including the per-ABI asset path, which has not run on the device yet.
+- 9.5 can close open owner device passes from earlier retros:
+  - a second account;
+  - physical-remote passes;
+  - live at 1×;
+  - the chooser with 2+ players;
+  - the 55-author grid, measured only on the emulator so far.

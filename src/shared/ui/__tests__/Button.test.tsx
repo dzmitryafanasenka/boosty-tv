@@ -68,6 +68,16 @@ describe('Button', () => {
     expect(surfaceBackground(root)).toBe(colors.accent);
   });
 
+  it('Story 9.4 font scale: every label caps its growth at 1.3× (fixed height kept)', async () => {
+    const root = await render(<Button testID={ID} label="Обновить" busyLabel="Обновляем…" onPress={() => {}} />);
+    const texts = root.container.queryAll(node => node.type === 'Text');
+    expect(texts.length).toBeGreaterThan(0);
+    for (const node of texts) {
+      expect(node.props.maxFontSizeMultiplier).toBe(1.3);
+    }
+    await act(async () => root.unmount());
+  });
+
   it('focused: ring, surface lift and scale-button with motion.focus', async () => {
     const root = await render(<Button testID={ID} label="A" />);
     await act(async () => {

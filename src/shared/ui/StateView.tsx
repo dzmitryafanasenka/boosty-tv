@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
     width: GLYPH,
     height: GLYPH,
     borderRadius: rounded.md,
-    borderWidth: 2,
+    borderWidth: components.stroke.mark,
     borderColor: colors['text-tertiary'],
   },
   title: {

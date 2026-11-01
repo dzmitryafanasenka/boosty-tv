@@ -73,6 +73,16 @@ describe('ru catalog', () => {
     expect(() => tp('test.lesson', n)).toThrow(RangeError);
   });
 
+  it('Story 9.4: a value that ends a sentence absorbs the template period after it', () => {
+    const values = { badge: 'Видео', author: 'Автор', date: 'вчера' };
+    expect(tf('postCard.a11y', { ...values, title: 'Привет!' })).toBe('Видео. Привет! Автор, вчера.');
+    expect(tf('postCard.a11y', { ...values, title: 'Конец.' })).toBe('Видео. Конец. Автор, вчера.');
+    expect(tf('postCard.a11y', { ...values, title: 'Вопрос?' })).toBe('Видео. Вопрос? Автор, вчера.');
+    expect(tf('postCard.a11y', { ...values, title: 'Обычный' })).toBe('Видео. Обычный. Автор, вчера.');
+    // No period after the placeholder: nothing is absorbed.
+    expect(tf('auth.code.resendIn', { time: '0:42.' })).toBe('через 0:42.');
+  });
+
   it('rejects unknown and wrong-kind keys at typecheck', () => {
     // These lines exist for `npm run typecheck`; they are not executed.
     const typeOnly = () => {

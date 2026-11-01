@@ -764,10 +764,10 @@ describe('Story 6.7: multiple-choice poll', () => {
     expect(first.props.accessibilityRole).toBe('checkbox');
     expect(first.props.accessibilityState).toMatchObject({ checked: false });
     expect(first.props.accessibilityLabel).toBe(
-      'Опрос. Какой формат удобнее? Длинные, 48 %, 1 210 голосов. не отмечено',
+      'Опрос. Какой формат удобнее? Длинные, 48 %, 1 210 голосов. Не отмечено',
     );
     expect(node(root, OPT('3')).props.accessibilityLabel).toBe(
-      'Эфиры, 14 %, 353 голоса. не отмечено. Затем выберите «Проголосовать» под вариантами. Проголосовали: 2 521',
+      'Эфиры, 14 %, 353 голоса. Не отмечено. Затем выберите «Проголосовать» под вариантами. Проголосовали: 2 521',
     );
     // The submit hint is the last option's only (and only before the vote).
     expect(node(root, OPT('2')).props.accessibilityLabel).not.toContain(t('poll.submitHint'));
@@ -780,7 +780,7 @@ describe('Story 6.7: multiple-choice poll', () => {
     expect(scale.transform).toEqual([{ scale: 1 }]);
   });
 
-  it('matrix «Toggle»: OK on 1, OK on 3, OK on 1 → only 3 checked (accent box, a11y «отмечено»); nothing sent, no pending step', async () => {
+  it('matrix «Toggle»: OK on 1, OK on 3, OK on 1 → only 3 checked (accent box, a11y «Отмечено»); nothing sent, no pending step', async () => {
     const root = await renderMulti(multi());
     await ok(root, OPT('1'));
     expect(checked(root)).toEqual(['1']);
@@ -789,7 +789,7 @@ describe('Story 6.7: multiple-choice poll', () => {
     await ok(root, OPT('1'));
     expect(checked(root)).toEqual(['3']);
     expect(node(root, OPT('3')).props.accessibilityState).toMatchObject({ checked: true });
-    expect(node(root, OPT('3')).props.accessibilityLabel).toContain('353 голоса. отмечено');
+    expect(node(root, OPT('3')).props.accessibilityLabel).toContain('353 голоса. Отмечено');
     expect(node(root, OPT('1')).props.accessibilityState).toMatchObject({ checked: false });
     const box = root.container.queryAll(n => n.props.testID === `${ID}/option/3/box`)[0];
     expect(StyleSheet.flatten(box.props.style).backgroundColor).toBe(colors.accent);
