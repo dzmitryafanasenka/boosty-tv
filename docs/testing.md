@@ -921,7 +921,7 @@ Host tests: `src/shared/services/progress/__tests__/progressRepository.test.ts` 
 
 ### Story 9.5 — Full device regression and owner acceptance, 2026-11-01
 
-**Status: in progress. The release candidate `0.9.2` is built and verified on the build host, and it is not published yet: publishing needs the owner's OK. The regression runs on `0.9.2` after the TV updates to it in the app from `0.9.1` (owner decision 2026-11-01). Every row is labelled agent over adb, emulator, owner or physical remote.** `spec-9-5-full-device-regression-and-owner-acceptance.md`.
+**Status: in progress. `0.9.2` (the release candidate) is published and installed on the pinned TV through the in-app update from `0.9.1`. The agent regression on `0.9.2` is done. Still open: the joint sign-out session, the owner's remote walk, the owner's acceptance and `1.0.0`. Every row is labelled agent over adb, emulator, owner or physical remote.** `spec-9-5-full-device-regression-and-owner-acceptance.md`.
 
 Changes so far:
 - «Device rules»: an agent player visit on the owner's content is one command (OK, a fixed sleep of 5 s or less, Back), and steps that pause or seek the owner's video belong to the owner.
@@ -938,12 +938,38 @@ Host checks (2026-11-01): `npm run lint -- --max-warnings 0`, `npm run typecheck
 | Поиск | 4 (about 1.5 s, 0.3 s, 0.6 s, 1.0 s) | Focus on «Фильтры: Доступные мне» every time; the node stays `focusable`. ← → the field, → → the chip again | agent over adb |
 | Автор (Алексей Антонов) | 3 (0.3 s, 0.6 s, 1.0 s), plus one Back that closed the sheet from «Период» without opening the list | Same: focus on «Фильтры», `focusable`; ← → «В этом блоге», → → the chip. Back from the chip → the author's tile on Подписки | agent over adb |
 
-No failure was reproduced, so no code change. The run repeats on `0.9.2` in the regression below.
+No failure was reproduced, so no code change. The run was repeated on `0.9.2` (below).
 
-Pending (each row is filled when it is done):
-- Per-ABI in-app update from `0.9.1` to `0.9.2` (after the owner's OK to publish).
-- Agent regression on `0.9.2` (agent over adb): D-pad browsing, long lists, filter apply and reset, keyboard close, multiple media, Back hierarchy, sleep and resume, the chip race again.
-- Joint sign-out session (owner signs out and in with the remote, the agent reads the logs): UJ-0, UJ-3, UJ-7, A3–A11.
+**Release `0.9.2` (published 2026-11-01 with the owner's OK).** Built from `main` `3b66624` (PR #93), tag `v0.9.2`, https://github.com/dzmitryafanasenka/boosty-tv/releases/tag/v0.9.2. All five APKs verified before publishing (v2, certificate SHA-256 `b7b8b0f1…c47d59eb`, `versionCode` 902), and GitHub's asset digests equal the local `shasum` values. Asset digests: `boosty-tv-0.9.2-armeabi-v7a.apk` `b237f9e7…aa86`, `boosty-tv-0.9.2.apk` (universal) `81fc3eec…9461`.
+
+**In-app update from `0.9.1` to `0.9.2`, the first device run of the per-ABI path.**
+
+| Check | Result | Evidence |
+|---|---|---|
+| Update from the app | The owner opened Настройки → «Версия» → «Скачать и установить», and the system installer ran only after the owner's OK | owner |
+| Installed version | `versionName 0.9.2`, `versionCode 902`, `installerPackageName com.google.android.packageinstaller`, `primaryCpuAbi armeabi-v7a`, «Версия 0.9.2» in Настройки | agent over adb |
+| ABI asset | SHA-256 of the installed `base.apk` = `b237f9e7…aa86` = the `boosty-tv-0.9.2-armeabi-v7a.apk` digest. The split was downloaded and verified, not the universal APK | agent over adb |
+| Session | Kept: the owner reported it, and after a later force-stop and cold start the app opened on Главная signed in, with «Продолжить» unchanged | owner; agent over adb |
+
+**Agent regression on `0.9.2` (agent over adb, 2026-11-01).** The release build installed by the in-app update, the owner's session, the stock key events from `adb shell input keyevent`. Before every key batch the agent checked that the app was in the foreground, and it read the focused node from `uiautomator dump` before every OK. «Button Mapper» was left as it was. No screenshots were taken, and the dump file on the TV was deleted afterwards. Nothing was reinstalled, uninstalled or cleared. There was no sign-out, vote, like, pause or seek.
+
+| Item | Steps | Result | Evidence |
+|---|---|---|---|
+| D-pad browsing | Sidebar Настройки → События → Подписки → Главная → Поиск, OK on each item, Back from each content area | Each screen opens on its documented initial element: «Версия 0.9.2»; «Обновить» (События is empty); the first tile; the remembered feed card; the field. Back from content → the current sidebar item | agent over adb |
+| Long lists | Главная feed (3 subscriptions, the history back to 2024): 40 single ↓ at 0.5 s, then 60 ↓ at 0.3 s in column 1; → → to column 3, 20 ↓ at 0.15 s, 30 ↑ at 0.15 s, then about 90 ↑ to the top | About 100 rows (about 300 posts) loaded page by page. The column was kept on every run (x 408 for column 1, x 1356 for column 3), and one card was focused after every run | agent over adb |
+| Filter apply and reset | Главная «Фильтры» → «Все посты» → Back; then «Фильтры» → «Сбросить» → Back | Apply: «Сбросить» appears in the sheet, and Back → the chip «Фильтры: Все посты. 1 активный фильтр». Reset: focus → «Доступные мне», «Сбросить» goes away, and Back → «Фильтры: Доступные мне» (the default is restored) | agent over adb |
+| Keyboard close | Поиск: OK on the field (`mInputShown=true`) → Back; OK → `input text` + Enter | Back closes the keyboard (`mInputShown=false`), and focus stays on the field. Enter submits: the keyboard closes and focus goes to the first result. OK on it → Пост, Back → the same result, with the query kept | agent over adb |
+| Multiple media | Главная → the «2 видео» post («Разбор работ на конкурс RATT») | «Смотреть · Видео 1», then rows «Видео 1. Video. Не начато» and «Видео 2. … 47:33. Не начато», each with its own status. ↓ ↓ ↑ ↑ moves through the rows and back to «Смотреть» | agent over adb |
+| Player visit (one-command rule) | On «Смотреть · Видео 1» of that post: OK, `sleep 4`, Back in one command (18:51:11–18:51:15) | Back → «Смотреть · Видео 1»; both rows still «Не начато», and no new «Продолжить» entry after a cold start. Playback start is shown only indirectly: the audio HAL was active in logcat in that window. The video was not dumped while it played | agent over adb |
+| Back hierarchy | Пост → Back; Автор → Back; Подписки tile → Back; feed card → Back; `nav/home` → Back | Пост → the same card or result; Автор → the author's tile; content → the current sidebar item; Главная's sidebar → the app exits to the Google TV home (focus-map §1.4). The player layers (overlay, settings) belong to the owner's walk | agent over adb |
+| Sleep and resume | On Главная: `keyevent 223` (SLEEP), 8 s (`mWakefulness=Asleep`), `keyevent 224` (WAKEUP) | Awake, the app in the foreground, focus on the same card, and ← → work at once | agent over adb |
+| Cold start | `am force-stop`, then the launcher intent | Signed in, Главная, initial focus on the first «Продолжить» card. The row is unchanged: «ОТЕ №15» 62 min, «Прошмандовки…» 8 min, «За какое мнение…» 60 min, «Lavrov_Full_2.mp4» 39 min | agent over adb |
+| Chip race (carry-in) | Поиск and Автор: from «Фильтры» OK → «Период» → OK → Back, a gap of 0.2 / 0.3 / 0.6 / 1.0 / 1.5 s, Back | 5 of 5 runs on each screen: focus on «Фильтры», `focusable="true"`; ← → the field and → → the chip again; ↓ → the grid | agent over adb |
+
+**Not run by the agent (owner's steps):** a quality change, resume within ±10 s, the player overlay and settings sheet (labels on the device), a poll vote (outward), UJ-1's press count and the SM-5 remote-only walk. These are in the owner's remote walk.
+
+Pending:
+- Joint sign-out session (the owner signs out and in with the remote, the agent reads the logs): UJ-0, UJ-3, UJ-7, A3–A11.
 - The owner's remote walk UJ-0 to UJ-7 (physical remote), then the owner's acceptance, then `1.0.0`.
 
 Not verified by decision (owner, 2026-11-01): the account switch (no second account), network loss during playback, the external-player chooser with 2+ players. Live at 1× only if a subscribed author streams during the story.

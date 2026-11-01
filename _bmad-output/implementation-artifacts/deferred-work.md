@@ -381,12 +381,15 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-9-4-visual-fidelity-and-accessibility-pass.md`
   summary: Player overlay labels on the device. The overlay controls (timeline, −10, play/pause, +10, «Настройки») and the settings sheet were not opened on the device: showing them pauses or seeks the owner's video, which writes progress. Their labels are host-tested only.
   evidence: `docs/testing.md` «Story 9.4».
+  status: Open (Story 9.5). Moved to the owner's remote walk (the overlay and the settings sheet pause or seek the owner's video); the agent regression did not open them.
 - source_spec: `_bmad-output/implementation-artifacts/spec-9-4-visual-fidelity-and-accessibility-pass.md`
   summary: Named layout constants are outside the tokens-only scan. `__tests__/noRawStyleLiterals.test.js` catches literals in style properties and JSX size props; module constants such as `COLUMN_WIDTH = 440` (auth screens), `FIELD_WIDTH`, `BOX_HEIGHT`, `RADIO`, `CHECK`, `MARK_WIDTH` remain local values without a DESIGN.md entry.
   evidence: Story 9.4 scan; about 30 such constants in `src/features` and `src/shared/ui`.
 - source_spec: `_bmad-output/implementation-artifacts/spec-9-4-visual-fidelity-and-accessibility-pass.md`
   summary: Story 9.5 device runs need a rule that keeps agent player visits from writing progress on the owner's account (Story 9.4 wrote a ~10 s resume point on one video).
   evidence: `docs/testing.md` «Story 9.4» Method, Playback: one visit ran about 11 s and the 10 s progress cadence wrote a point; no prevention step exists.
+  status: Done 2026-11-01 (Story 9.5). `docs/testing.md` «Device rules»: an agent player visit is one command (OK, a fixed sleep of 5 s or less, Back), and steps that pause or seek belong to the owner. Applied in the 9.5 regression: one 4 s visit wrote nothing.
 - source_spec: `_bmad-output/implementation-artifacts/spec-9-4-visual-fidelity-and-accessibility-pass.md`
   summary: Medium, unverified — a sidebar fallback focus event delivered after the filter sheet's `close()` could still make the Поиск/Автор chip unfocusable.
   evidence: `SearchScreen.tsx` and `useAuthorActionRowFocus` ignore focus only while `isOpen()`; settle with a device trace of the focus-event order around close after a level change.
+  status: Done 2026-11-01 (Story 9.5, agent over adb). Not reproduced: «Фильтры» → «Период» → list → Back → gap → Back, with gaps from 0.2 s to 1.5 s. 9 runs on Поиск and 8 on Автор over the 9.4 build and `0.9.2`; focus was on the chip every time, and the chip stayed focusable. No code change.
