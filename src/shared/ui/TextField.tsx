@@ -121,7 +121,7 @@ export function TextField({
           }}
           onBlur={() => setFocused(false)}
           placeholder={placeholder}
-          placeholderTextColor={colors['text-disabled']}
+          placeholderTextColor={FIELD.placeholder}
           cursorColor={colors.accent}
           selectionColor={colors['accent-tint']}
           keyboardType={keyboardType}

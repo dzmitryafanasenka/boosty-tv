@@ -121,7 +121,7 @@ components:
   button-secondary: { height: 40, paddingX: 20, radius: '{rounded.lg}', bg: '{colors.surface-raised}', bgFocus: '{colors.surface-focus-button}', text: '{colors.text}' }
   button-small: { height: 32, paddingX: 14, text: '{typography.button-s}', iconSize: 16 }
   filter-chip: { height: 32, radius: '{rounded.full}', bg: '{colors.surface-raised}', countBg: '{colors.accent-tint}' }
-  text-field: { height: 50, borderWidth: 1.5, radius: '{rounded.lg}', bg: '{colors.surface}', border: '{colors.border}', borderFocus: '{colors.focus-ring}', borderError: '{colors.error}', scaleFocus: '{focus.scale-field}' }
+  text-field: { height: 50, borderWidth: 1.5, radius: '{rounded.lg}', bg: '{colors.surface}', border: '{colors.border}', borderFocus: '{colors.focus-ring}', borderError: '{colors.error}', scaleFocus: '{focus.scale-field}', placeholder: '{colors.text-tertiary}' }
   post-card: { width: '{spacing.card-width}', thumbAspect: '16:9', radius: '{rounded.md}', titleLines: 2, title: '{typography.card-title}', meta: '{typography.meta}', scaleFocus: '{focus.scale-post-card}' }
   author-card: { width: '{spacing.author-tile-width}', height: 76, avatar: 52, radius: '{rounded.md}', scaleFocus: '{focus.scale-author-card}' }
   live-card: { width: 520, height: 120, cover: '192x108', badge: '{colors.live}', scaleFocus: '{focus.scale-live-card}' }
@@ -229,6 +229,8 @@ The focus ring follows the shape at `{focus.ring-offset}`.
 ## Components
 
 Names: tables use PascalCase; frontmatter keys use kebab-case (`PostCard` = `post-card`). The component sheet's "VideoCard" is PostCard, and "PrimaryButton" is Button primary. Sizes live in the frontmatter `components`. The rows below describe anatomy and states only. [ASSUMPTION] Sizes for player-control, timeline, media-row, dialog, qr-dialog and state-view, the post left-column width (≈ 260 dp; obsolete since the one-column Post, owner decision 2026-10-27) and the image max height (300 dp) were estimated from the mocks, not taken from `tokens.md`. Confirm them against the mocks when implementing.
+
+*As built (Story 9.4, owner decision 2026-11-01): TextField placeholders use `text-field.placeholder` = `{colors.text-tertiary}` (4.68:1 on `{colors.surface}`), not `{colors.text-disabled}` (3.01:1).*
 
 *As built (Story 9.4, tokens-only styling): component sizes that the mocks drew but this file did not list are frontmatter tokens with the built values, unchanged on screen: `button-small.iconSize` (the like heart), `setting-row.listMaxWidth` (Диагностика rows), `event-row.skeletonLine`, `link-chip.labelMaxWidth` and its external-video thumb, the PlayerControl and AudioBlock play/pause glyph geometry (`player-control.play*`/`pause*`, `audio-block`), `timeline.bubbleMinWidth`, `stroke` (`mark`: the outline of the radio, check box, spinner, StateView glyph and lock shackle; `hairline`: the text placeholder border) and `focus-guide` (the invisible end guide of the post grid and the period stepper's band guide). `__tests__/noRawStyleLiterals.test.js` fails on any hex color or non-zero size literal in a style outside `src/shared/ui/tokens.ts`.*
 

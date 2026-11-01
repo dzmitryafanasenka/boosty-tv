@@ -124,6 +124,8 @@ describe('DESIGN.md contrast pairs (Story 9.4)', () => {
     ['accent-text', 'surface-focus-row'],
     // EventRow's text line on the focused row.
     ['text-card', 'surface-focus-row'],
+    // TextField placeholder (owner decision 2026-11-01: text-tertiary, not text-disabled).
+    ['text-tertiary', 'surface'],
   ])('drawn but not in the table: %s on %s ≥ 4.5', (fg, bg) => {
     expect(contrast(fg, bg)).toBeGreaterThanOrEqual(4.5);
   });

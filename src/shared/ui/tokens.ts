@@ -202,6 +202,7 @@ export const components = {
     borderFocus: colors['focus-ring'],
     borderError: colors.error,
     scaleFocus: focus['scale-field'],
+    placeholder: colors['text-tertiary'],
   },
   'post-card': {
     width: spacing['card-width'],

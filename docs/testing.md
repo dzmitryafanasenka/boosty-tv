@@ -979,11 +979,11 @@ D-pad focus moved as without TalkBack, and OK still activated items (TalkBack on
 - At 2.0 the text stays at 1.3×; the cap works. The line spacing of multi-line body text still grows, because React Native scales `lineHeight` past the cap.
 - On A2 at 1.3, «Код страны» wraps to two lines, so the country field sits one line lower than the number field.
 
-**Deviations for the owner to accept** (screenshots from the emulator demo):
-1. A2 at font scale 1.3: «Код страны» wraps to two lines and the two phone fields no longer line up (`a2-font-1.3-720p.png`). Options: accept, shorten the label, or align the fields to the bottom (that affects the error line under the number).
-2. Field placeholders use `text-disabled` on `surface`: 3.01:1, below 4.5. Placeholders are hints, and each field also has a visible label above it (`author-live-720p.png`, «Поиск в блоге»). This needs a token decision: accept, or use `text-tertiary` (4.68).
-3. With font scale above 1.3 (the 2.0 test; outside the TV's own text-size range), line spacing still grows (`a1-font-2.0-720p.png`).
-4. react-native-tvos's «FocusGuide» placeholder description (see TalkBack). It comes from the framework and cannot be fixed in the app.
+**Deviations and the owner's decisions (2026-11-01)** (screenshots from the emulator demo):
+1. A2 at font scale 1.3: «Код страны» wraps to two lines and the two phone fields no longer line up (`a2-font-1.3-720p.png`). **Accepted as is.**
+2. Field placeholders used `text-disabled` on `surface`: 3.01:1, below 4.5. **Fixed (owner's choice):** TextField placeholders now use `text-field.placeholder` = `text-tertiary`, 4.68:1 (DESIGN.md frontmatter and `contrast.test.js`). Not reinstalled on the device for this change alone.
+3. With font scale above 1.3 (the 2.0 test; outside the TV's own text-size range), line spacing still grows (`a1-font-2.0-720p.png`). **Accepted.**
+4. react-native-tvos's «FocusGuide» placeholder description (see TalkBack). It comes from the framework and cannot be fixed in the app. **Accepted**; revisit if the owner hears it while listening.
 
 **Labels:** every focusable seen on the device had a Russian `content-desc` from `ru`, or one built from content with it. Exceptions:
 - the native scroll containers (ScrollView / HorizontalScrollView, focusable for scrolling, no description);
