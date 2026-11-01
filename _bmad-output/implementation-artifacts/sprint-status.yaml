@@ -115,7 +115,7 @@ development_status:
   9-2-update-notice-from-github-releases: done
   9-3-performance-on-the-device: done
   9-4-visual-fidelity-and-accessibility-pass: review
-  9-5-full-device-regression-and-owner-acceptance: backlog
+  9-5-full-device-regression-and-owner-acceptance: in-progress
   epic-9-retrospective: optional
 
   epic-10: backlog
