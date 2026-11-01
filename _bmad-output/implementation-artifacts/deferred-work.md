@@ -377,6 +377,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-9-4-visual-fidelity-and-accessibility-pass.md`
   summary: TalkBack by ear. The agent ran TalkBack over adb (Story 9.4) and saw one speech request per focus move, but TalkBack 14.2 does not log its spoken text, so the words were not checked. The owner listens to Главная, Пост, the player overlay and Настройки. Open questions for that session: whether the search fields are announced (no speech request was seen on the move into «Поиск в блоге»), and whether react-native-tvos's «FocusGuide» placeholder description is ever spoken.
   evidence: `docs/testing.md` «Story 9.4» (TalkBack rows, agent over adb).
+  status: Done 2026-11-01 (owner). The owner listened on the device and reported that everything is announced properly; no «FocusGuide» or missing-field announcement was reported.
 - source_spec: `_bmad-output/implementation-artifacts/spec-9-4-visual-fidelity-and-accessibility-pass.md`
   summary: Player overlay labels on the device. The overlay controls (timeline, −10, play/pause, +10, «Настройки») and the settings sheet were not opened on the device: showing them pauses or seeks the owner's video, which writes progress. Their labels are host-tested only.
   evidence: `docs/testing.md` «Story 9.4».

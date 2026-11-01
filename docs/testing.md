@@ -920,7 +920,7 @@ Host tests: `src/shared/services/progress/__tests__/progressRepository.test.ts` 
 
 ### Story 9.4 — Visual fidelity and accessibility pass, 2026-11-01
 
-**Status: implemented and host-tested. The 1080p walk ran on the pinned Chromecast with Google TV by the agent over adb, using owner-signed `assembleRelease -PreactNativeArchitectures=armeabi-v7a` builds from this branch (`versionName 0.9.1`, installed with `adb install -r`, session kept, nothing uninstalled or cleared). TalkBack ran on the same device, turned on and off by the agent over adb. The 720p and font-scale rows ran on an Android TV emulator in demo mode. Every row below is labelled agent over adb or emulator. The owner has not yet listened to TalkBack or checked the changes with the physical remote.** `spec-9-4-visual-fidelity-and-accessibility-pass.md`.
+**Status: implemented and host-tested. The 1080p walk ran on the pinned Chromecast with Google TV by the agent over adb, using owner-signed `assembleRelease -PreactNativeArchitectures=armeabi-v7a` builds from this branch (`versionName 0.9.1`, installed with `adb install -r`, session kept, nothing uninstalled or cleared). TalkBack ran on the same device, turned on and off by the agent over adb. The 720p and font-scale rows ran on an Android TV emulator in demo mode. Every row below is labelled agent over adb or emulator. The owner listened to TalkBack on the device on 2026-11-01 (owner) and reported that everything is announced properly; the physical-remote feel check of these changes is still open.** `spec-9-4-visual-fidelity-and-accessibility-pass.md`.
 
 Changes:
 - **«Продолжить» focus (the Story 9.3 finding).** There were two causes. Главная's `initialRow` read a remembered Continue card's index in the row as a grid index, so the list opened past its header. Also, a Continue card past the third sat outside the row's viewport at mount, and on the device the focus request on it did not stick (uiautomator: nothing focused). Fixes: `initialRow` applies only to a feed card (`HomeScreen.tsx`), and the row opens scrolled so the remembered card sits on column 3 (`ContinueRow` `initialCardId`, `continueRowOffset`), where Android's own focus scroll leaves it.
@@ -990,7 +990,7 @@ D-pad focus moved as without TalkBack, and OK still activated items (TalkBack on
 - the «FocusGuide» placeholders while TalkBack runs.
 
 **Not verified:**
-- TalkBack by ear: the owner should listen to Главная, Пост, the player overlay and Настройки.
+- TalkBack by ear: **done by the owner, 2026-11-01.** The agent turned TalkBack on over adb (appended to «Button Mapper»); the owner listened with the remote to Главная, Пост, the player overlay and Настройки and reported «всё произносится нормально». The build on the device predates the review copy fixes («Не отмечено» capitalised, placeholder color). Afterwards the agent restored `enabled_accessibility_services` = `flar2.homebutton/a.i` and `accessibility_enabled` = 1 exactly.
 - The physical remote.
 - The player overlay and settings sheet on the device: opening them pauses or seeks the owner's video. Their labels are host-tested only.
 - The A3–A11 sign-in screens on the device: no sign-out on the family TV.
