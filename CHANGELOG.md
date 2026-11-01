@@ -4,6 +4,13 @@ All notable changes to Boosty TV, an unofficial Boosty client for Android TV / G
 Versions follow `MAJOR.MINOR.PATCH`; each release is tagged `v{version}` on GitHub Releases.
 The Russian version of this file is [CHANGELOG.ru.md](CHANGELOG.ru.md); both list the same versions.
 
+## [1.0.0] - 2026-11-01
+
+First stable release: the owner accepted the Android release after the full device regression (Story 9.5). Same code as 0.9.2.
+
+### Notes
+- Install from the app on 0.9.x: Settings → «Версия» → «Скачать и установить». The session is kept.
+
 ## [0.9.2] - 2026-11-01
 
 Release candidate for 1.0.0: fixes from the performance, visual and accessibility passes.

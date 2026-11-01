@@ -921,7 +921,7 @@ Host tests: `src/shared/services/progress/__tests__/progressRepository.test.ts` 
 
 ### Story 9.5 — Full device regression and owner acceptance, 2026-11-01
 
-**Status: in progress. `0.9.2` (the release candidate) is published and installed on the pinned TV through the in-app update from `0.9.1`. The agent regression on `0.9.2` is done. Still open: the joint sign-out session, the owner's remote walk, the owner's acceptance and `1.0.0`. Every row is labelled agent over adb, emulator, owner or physical remote.** `spec-9-5-full-device-regression-and-owner-acceptance.md`.
+**Status: done. The owner accepted the Android release on 2026-11-01, which starts SM-1 (4 weeks without BoostBuddy) and SM-2 (30+ days without a forced re-login). `0.9.2` (the release candidate) was published and installed on the pinned TV through the in-app update from `0.9.1`; the agent regression, the joint sign-out session and the owner's remote walk ran on it. `1.0.0` is built from the same code. Every row is labelled agent over adb, emulator, owner or physical remote.** `spec-9-5-full-device-regression-and-owner-acceptance.md`.
 
 Changes so far:
 - «Device rules»: an agent player visit on the owner's content is one command (OK, a fixed sleep of 5 s or less, Back), and steps that pause or seek the owner's video belong to the owner.
@@ -968,9 +968,28 @@ No failure was reproduced, so no code change. The run was repeated on `0.9.2` (b
 
 **Not run by the agent (owner's steps):** a quality change, resume within ±10 s, the player overlay and settings sheet (labels on the device), a poll vote (outward), UJ-1's press count and the SM-5 remote-only walk. These are in the owner's remote walk.
 
-Pending:
-- Joint sign-out session (the owner signs out and in with the remote, the agent reads the logs): UJ-0, UJ-3, UJ-7, A3–A11.
-- The owner's remote walk UJ-0 to UJ-7 (physical remote), then the owner's acceptance, then `1.0.0`.
+**Joint sign-out session (owner, physical remote, 2026-11-01, on `0.9.2`).** The owner signed out in Настройки and signed in again by phone and code with the remote, going through the A3–A11 screens, and reported that everything worked. The agent did not capture the screens, so no phone number or code reached it. Afterwards the app was in the foreground on `0.9.2`, signed in.
+
+| Journey | Result | Evidence |
+|---|---|---|
+| UJ-7 sign out | Passed: back to Welcome with no account data | owner, physical remote |
+| UJ-0 / A3–A11 sign in by phone and code | Passed: the same account | owner, physical remote |
+| UJ-3 expired session, prefilled phone | Not verified: a real expiry cannot be forced, and a normal sign-out wipes the stored phone (owner decision 2026-10-25) | — |
+
+**Owner's remote walk (physical remote, 2026-11-01, on `0.9.2`).** The agent gave the owner a short script; the owner reported «всё прошло».
+
+| Journey | Result | Evidence |
+|---|---|---|
+| UJ-1 cold start to a playing video, 5 presses or fewer, no autoplay; quality change keeps the position; Back restores the card | Passed | owner, physical remote |
+| UJ-2 two-video post, seek, exit, resume from «Продолжить» within ±10 s | Passed | owner, physical remote |
+| UJ-4 search with the keyboard and a custom period; Back restores the query, filter and card | Passed | owner, physical remote |
+| UJ-6 single-choice vote | Passed (the step was optional in the script) | owner, physical remote |
+| UJ-5 live to stream end | Not verified unless a subscribed author was streaming; the owner reported no failure | owner |
+| Player overlay and settings sheet on the device | Covered by UJ-1 (quality change); labels heard by TalkBack in Story 9.4 | owner, physical remote |
+
+The press counts and the resume offsets were not reported as numbers; the owner reported each step as passed.
+
+**Owner acceptance.** On 2026-11-01 the owner wrote «всё прошло, принимаю релиз, выпускай 1.0.0». The Android release is accepted. SM-1 and SM-2 start on 2026-11-01.
 
 Not verified by decision (owner, 2026-11-01): the account switch (no second account), network loss during playback, the external-player chooser with 2+ players. Live at 1× only if a subscribed author streams during the story.
 

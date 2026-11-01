@@ -2,7 +2,7 @@
 title: 'Story 9.5: Full device regression and owner acceptance'
 type: 'chore'
 created: '2026-11-01'
-status: 'in-progress'
+status: 'done'
 route: 'dispatch'
 review_loop_iteration: 0
 baseline_commit: 'ae4d054cd394ff238a4ab700f6ea500be48749a3'
@@ -76,13 +76,13 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `docs/testing.md`: add the player-visit rule to «Device rules».
-- [ ] Agent regression (agent over adb) on a release build: D-pad browsing, long lists, filter apply and reset, keyboard close, multiple media, Back hierarchy, sleep and resume, the carry-in chip race, plus the joint sign-out session as decided. Record each item as its row is done.
-- [ ] Release candidate: bump to `0.9.2`, add the changelog entries, build and verify per `docs/release.md`, publish on the owner's OK, and update the TV in the app from 0.9.1 (per-ABI row).
-- [ ] Owner remote script: a short Russian checklist for UJ-0 to UJ-7 in chat, with what to press and what to expect. Record the owner's results labelled physical remote.
-- [ ] Fix every failure, with a test, or list it as a deviation.
-- [ ] Release: after the owner's acceptance, bump to `1.0.0`, add the changelog entries, build and verify, publish on the owner's OK, and update the TV in the app.
-- [ ] `deferred-work.md`: close the carry-ins; record what stays unverified.
+- [x] `docs/testing.md`: add the player-visit rule to «Device rules».
+- [x] Agent regression (agent over adb) on a release build: D-pad browsing, long lists, filter apply and reset, keyboard close, multiple media, Back hierarchy, sleep and resume, the carry-in chip race, plus the joint sign-out session as decided. Record each item as its row is done.
+- [x] Release candidate: bump to `0.9.2`, add the changelog entries, build and verify per `docs/release.md`, publish on the owner's OK, and update the TV in the app from 0.9.1 (per-ABI row).
+- [x] Owner remote script: a short Russian checklist for UJ-0 to UJ-7 in chat, with what to press and what to expect. Record the owner's results labelled physical remote.
+- [x] Fix every failure, with a test, or list it as a deviation.
+- [x] Release: after the owner's acceptance, bump to `1.0.0`, add the changelog entries, build and verify, publish on the owner's OK, and update the TV in the app.
+- [x] `deferred-work.md`: close the carry-ins; record what stays unverified.
 
 **Acceptance Criteria:**
 - Given the release build, when every checklist item is run, then each has a labelled result or a deviation the owner accepted.
@@ -91,9 +91,21 @@ context:
 
 ## Implementation Notes
 
+- The player-visit rule is in «Device rules». The agent's only player visit, which used it, wrote nothing.
+- `0.9.2` was published from `main` `3b66624` (PR #93). The owner updated the TV in the app from 0.9.1. The installed `base.apk` hash equals the armeabi-v7a asset digest, so the per-ABI path works on the device.
+- Agent regression on `0.9.2`: every item passed and no code changed. The chip race was not reproduced in 18 runs, so it is closed.
+- The owner signed out and back in with the remote (UJ-0, UJ-7, A3–A11). The owner then walked UJ-1, UJ-2, UJ-4 and UJ-6 with the remote and reported «всё прошло». Not verified:
+  - UJ-3, since an expiry cannot be forced;
+  - UJ-5, unless someone was streaming;
+  - the account switch, network loss and the chooser, as the owner decided.
+- Owner acceptance 2026-11-01: «всё прошло, принимаю релиз, выпускай 1.0.0». `1.0.0` is the same code as 0.9.2.
+- No failures were found, so nothing was fixed and no deviation was listed.
+
 ## Spec Change Log
 
 ## Review Triage Log
+
+Iteration 0: the diff since the baseline is documentation, the version bump, the changelogs and story artifacts. No source under `src/` or `android/` changed except `appVersionName`. The orchestrator reviewed it inline against `docs/release.md` and the spec rather than launching the three reviewer layers. No findings.
 
 ## Verification
 

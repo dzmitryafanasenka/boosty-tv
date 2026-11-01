@@ -381,7 +381,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-9-4-visual-fidelity-and-accessibility-pass.md`
   summary: Player overlay labels on the device. The overlay controls (timeline, −10, play/pause, +10, «Настройки») and the settings sheet were not opened on the device: showing them pauses or seeks the owner's video, which writes progress. Their labels are host-tested only.
   evidence: `docs/testing.md` «Story 9.4».
-  status: Open (Story 9.5). Moved to the owner's remote walk (the overlay and the settings sheet pause or seek the owner's video); the agent regression did not open them.
+  status: Done 2026-11-01 (Story 9.5, owner). The owner used the overlay and the settings sheet on the device in the remote walk (UJ-1 quality change) and heard them with TalkBack in Story 9.4.
 - source_spec: `_bmad-output/implementation-artifacts/spec-9-4-visual-fidelity-and-accessibility-pass.md`
   summary: Named layout constants are outside the tokens-only scan. `__tests__/noRawStyleLiterals.test.js` catches literals in style properties and JSX size props; module constants such as `COLUMN_WIDTH = 440` (auth screens), `FIELD_WIDTH`, `BOX_HEIGHT`, `RADIO`, `CHECK`, `MARK_WIDTH` remain local values without a DESIGN.md entry.
   evidence: Story 9.4 scan; about 30 such constants in `src/features` and `src/shared/ui`.
