@@ -318,6 +318,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-6-3-links-files-and-external-videos-via-qr.md`
   summary: Owner idea (2026-10-29): show a post's timestamps as chapter marks on the player timeline (as YouTube), and possibly jump to a timestamp from the post; plan with Epic 8 (player options).
   evidence: Owner request during Story 6.3; timestamps arrive as YouTube links with `t=` in the post text; the live format for Boosty videos is not checked yet.
+  status: Moved to the backlog as Story 10.1 «Chapter marks on the player timeline» (`epics.md` Epic 10, sprint-status `10-1-chapter-marks-on-the-player-timeline`), owner request 2026-11-01.
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-6-3-links-files-and-external-videos-via-qr.md`
   summary: Device check of a file chip (busy state, the dialog with a signed target, «Не удалось открыть файл», «Нет доступа к файлу», the accessibility labels while busy and after a failure) and an owner phone scan of a file QR (no photo kept).

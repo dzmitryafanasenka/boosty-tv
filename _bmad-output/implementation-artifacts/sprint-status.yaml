@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 10-25-2026 14:34
-last_updated: 11-01-2026 13:09
+last_updated: 11-01-2026 13:25
 project: Boosty TV
 project_key: NOKEY
 tracking_system: file-system
@@ -117,6 +117,10 @@ development_status:
   9-4-visual-fidelity-and-accessibility-pass: backlog
   9-5-full-device-regression-and-owner-acceptance: backlog
   epic-9-retrospective: optional
+
+  epic-10: backlog
+  10-1-chapter-marks-on-the-player-timeline: backlog
+  epic-10-retrospective: optional
 action_items:
   - id: "epic-2-retro-item-1-route-the-a2-a5-auth-api-calls-send-rese"
     epic: 2

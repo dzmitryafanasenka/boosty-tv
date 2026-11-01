@@ -276,6 +276,10 @@ The family can change playback speed and use the system player. The owner gets f
 A signed release is installed from GitHub Releases, update notices work, performance is tuned and measured, visual fidelity is checked against the mocks, and the full device regression passes.
 **FRs covered:** FR55, FR56 (plus NFR5)
 
+### Epic 10: Player improvements (backlog, our improvements)
+Additions the owner asked for beyond BoostBuddy parity, planned after Epic 9.
+**FRs covered:** none (our improvements; owner request 2026-10-29, added to the backlog 2026-11-01)
+
 ## Epic 1: Prove it on the TV (P0)
 
 Set up the production project skeleton. Then show, on the Chromecast with Google TV 4K, with throwaway spike code on a separate branch, that each of the following works with the real Boosty API:
@@ -1764,3 +1768,38 @@ So that I can retire BoostBuddy with confidence.
 **Given** the results
 **When** they are presented to the owner
 **Then** the owner explicitly accepts the Android release. The SM-1 and SM-2 observation periods start.
+
+## Epic 10: Player improvements (backlog, our improvements)
+
+Additions the owner asked for beyond BoostBuddy parity. They are not parity obligations and are planned after Epic 9.
+
+### Story 10.1: Chapter marks on the player timeline
+
+*Our improvement (owner request 2026-10-29 during Story 6.3; added to the backlog 2026-11-01). Not in BoostBuddy.*
+
+As a family member,
+I want the post's timestamps shown as chapter marks on the player's timeline, as on YouTube,
+So that I can see the structure of a long video and jump to a part with the remote.
+
+**Open before the spec:**
+- The live format of timestamps for Boosty-hosted videos (today they are known as YouTube links with `t=` in the post text, Story 6.3), and how a timestamp names its chapter (the link text or the line it sits on).
+- Which timestamps belong to which video in a post with several videos.
+
+**Acceptance Criteria:**
+
+**Given** a post whose text has timestamps for the video being played
+**When** the player's controls are shown
+**Then** the timeline shows a mark at each timestamp inside the video's duration, and the current chapter's name is shown next to the elapsed time. Timestamps outside the duration are ignored.
+
+**Given** the D-pad scrub on the timeline
+**When** the pending position crosses a chapter
+**Then** the chapter name for the pending position is shown, and the existing seek behaviour is unchanged.
+
+**Given** chapters exist
+**When** a remote key for the next or previous chapter is pressed (keys chosen at spec time from the pinned remote; no new focusable controls unless the owner approves them)
+**Then** playback seeks to that chapter's start, with progress written by the usual rules.
+
+**Given** a video with no timestamps, a live stream or the system video player
+**When** it plays
+**Then** no marks or chapter names are shown, and nothing else changes.
+
