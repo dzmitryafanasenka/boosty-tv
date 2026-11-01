@@ -15,7 +15,7 @@ Every command block below runs from the repository root.
   derived `versionCode` of the unsigned release APK.
 - The tag is `v{versionName}` (for example `v0.9.0`). Story 9.2 compares the latest tag with
   the installed `versionName`, so keep this format.
-- `0.9.0` is the first release. `1.0.0` is reserved for the owner's acceptance (Story 9.5).
+- `0.9.0` is the first release. `1.0.0` (2026-11-01) is the release the owner accepted in Story 9.5.
 - «Версия» in Настройки shows the native `versionName`.
 
 ## One-time setup (owner, outside the repository)

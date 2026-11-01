@@ -78,7 +78,7 @@ def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
  * derived from it (MAJOR*10000 + MINOR*100 + PATCH), so every higher version
  * installs over the previous one. MINOR and PATCH stay below 100.
  */
-def appVersionName = "0.9.2"
+def appVersionName = "1.0.0"
 def appVersionParts = (appVersionName =~ /^(0|[1-9]\d{0,3})\.(0|[1-9]\d?)\.(0|[1-9]\d?)$/)
 if (!appVersionParts.matches()) {
     throw new GradleException(
