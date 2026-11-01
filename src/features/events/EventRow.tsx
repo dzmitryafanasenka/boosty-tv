@@ -9,6 +9,7 @@ import {
   Text,
   colors,
   components,
+  rounded,
   spacing,
   type FocusableSurfaceProps,
   type HostView,
@@ -92,25 +93,35 @@ export const EventRow = memo(function EventRowView({ event, testID, onFocus, onP
       onPress={press}
       surfaceStyle={surfaceStyle}
     >
-      <View
-        testID={event.isRead ? undefined : `${testID}/dot`}
-        style={[styles.dot, !event.isRead && styles.dotUnread]}
-      />
-      <View style={styles.avatar}>
-        <AuthorAvatar url={event.avatarUrl} size={TOKENS.avatar} testID={`${testID}/avatar`} />
-      </View>
-      <Text testID={`${testID}/line`} variant="body-s" color="text-card" numberOfLines={1} style={styles.line}>
-        <Text variant="card-title">{eventAuthorName(event)}</Text>
-        {tf('events.afterName', { text: eventText(event) })}
-      </Text>
-      {event.kind === 'stream' ? (
-        <Text testID={`${testID}/chip`} variant="badge" numberOfLines={1} style={styles.chip}>
-          {t('events.streamChip')}
-        </Text>
-      ) : null}
-      <Text testID={`${testID}/time`} variant="meta" color="text-meta" numberOfLines={1} style={styles.time}>
-        {formatCardDate(event.time, nowMs)}
-      </Text>
+      {({ focused }) => (
+        <>
+          <View
+            testID={event.isRead ? undefined : `${testID}/dot`}
+            style={[styles.dot, !event.isRead && styles.dotUnread]}
+          />
+          <View style={styles.avatar}>
+            <AuthorAvatar url={event.avatarUrl} size={TOKENS.avatar} testID={`${testID}/avatar`} />
+          </View>
+          <Text testID={`${testID}/line`} variant="body-s" color="text-card" numberOfLines={1} style={styles.line}>
+            <Text variant="card-title">{eventAuthorName(event)}</Text>
+            {tf('events.afterName', { text: eventText(event) })}
+          </Text>
+          {event.kind === 'stream' ? (
+            <Text testID={`${testID}/chip`} variant="badge" numberOfLines={1} style={styles.chip}>
+              {t('events.streamChip')}
+            </Text>
+          ) : null}
+          <Text
+            testID={`${testID}/time`}
+            variant="meta"
+            color={focused ? 'text-secondary' : 'text-meta'}
+            numberOfLines={1}
+            style={styles.time}
+          >
+            {formatCardDate(event.time, nowMs)}
+          </Text>
+        </>
+      )}
     </FocusableSurface>
   );
 });
@@ -179,10 +190,10 @@ const styles = StyleSheet.create({
   },
   skeletonLine: {
     flex: 1,
-    height: 12,
+    height: TOKENS.skeletonLine,
     marginLeft: spacing['6'],
     marginRight: spacing['12'],
-    borderRadius: 4,
+    borderRadius: rounded.sm,
     backgroundColor: colors['surface-raised'],
   },
 });

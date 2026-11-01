@@ -99,6 +99,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-2-1-welcome-screen-on-the-design-foundation.md`
   summary: Decide the font-scale policy (cap `maxFontSizeMultiplier` or let fixed-height controls grow) and check A1 and Button at the largest Android TV text size on the device.
   evidence: maybe-false (would be medium). Button has a fixed height with numberOfLines=1 and Text keeps allowFontScaling; A1 places the column and the footer absolutely, so a large system font scale may clip labels or overlap the footer. DESIGN.md sizes are "at default font scale" only. Settle in Story 9.4 (accessibility pass) by setting the device font scale to max and taking a screenshot.
+  status: Done 2026-11-01 (Story 9.4, owner decision): the shared Text and TextField cap the growth at 1.3× (`MAX_FONT_SIZE_MULTIPLIER`); fixed heights stay. A1 and Button screenshotted at font scale 1.0, 1.3 and 2.0 on a 720p Android TV emulator in demo mode (`docs/screenshots/story-9-4/`). Not on the device. Left for the owner: «Код страны» wraps at 1.3× on A2 (`docs/testing.md` «Story 9.4»).
 - source_spec: `_bmad-output/implementation-artifacts/spec-2-1-welcome-screen-on-the-design-foundation.md`
   summary: Bundle Golos Text for tvOS (Info.plist UIAppFonts) in phase 4; today the fonts exist only under android/app/src/main/assets/fonts.
   evidence: Typography tokens resolve fontFamily by PostScript name (`GolosText-Regular`, `GolosText-SemiBold`); without the iOS bundle entry tvOS would silently fall back to the system font.
@@ -372,3 +373,20 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-9-3-performance-on-the-device.md`
   summary: Focus is lost on Главная when a «Продолжить» card is the remembered focus. Open Настройки from the sidebar, then ← and ↑ to «Главная» and OK: the feed is scrolled past its header and nothing has focus. When a feed card is the remembered focus, the same path works.
   evidence: Story 9.3 device run (agent over adb, release build, 2026-11-01). It reproduced twice on the 9.3 build and once on a build with `drawDistance` 3, so the grid change did not cause it. The cause is not investigated; the suspect is Главная's return restore for a header (Continue) item versus the remembered scroll offset.
+  status: Done 2026-11-01 (Story 9.4). Two causes: Главная's `initialRow` read the Continue card's index in the row as a grid index (the list opened past its header), and a Continue card past the third was outside the row's viewport, where the focus request did not stick on the device. Fixed: `initialRow` only for a feed card; the row opens scrolled to the remembered card (`ContinueRow` `initialCardId`). Host tests in `homeFeedFlow.test.tsx` «Story 9.4»; checked on the pinned device by the agent over adb (release build, the fifth Continue card remembered).
+- source_spec: `_bmad-output/implementation-artifacts/spec-9-4-visual-fidelity-and-accessibility-pass.md`
+  summary: TalkBack by ear. The agent ran TalkBack over adb (Story 9.4) and saw one speech request per focus move, but TalkBack 14.2 does not log its spoken text, so the words were not checked. The owner listens to Главная, Пост, the player overlay and Настройки. Open questions for that session: whether the search fields are announced (no speech request was seen on the move into «Поиск в блоге»), and whether react-native-tvos's «FocusGuide» placeholder description is ever spoken.
+  evidence: `docs/testing.md` «Story 9.4» (TalkBack rows, agent over adb).
+  status: Done 2026-11-01 (owner). The owner listened on the device and reported that everything is announced properly; no «FocusGuide» or missing-field announcement was reported.
+- source_spec: `_bmad-output/implementation-artifacts/spec-9-4-visual-fidelity-and-accessibility-pass.md`
+  summary: Player overlay labels on the device. The overlay controls (timeline, −10, play/pause, +10, «Настройки») and the settings sheet were not opened on the device: showing them pauses or seeks the owner's video, which writes progress. Their labels are host-tested only.
+  evidence: `docs/testing.md` «Story 9.4».
+- source_spec: `_bmad-output/implementation-artifacts/spec-9-4-visual-fidelity-and-accessibility-pass.md`
+  summary: Named layout constants are outside the tokens-only scan. `__tests__/noRawStyleLiterals.test.js` catches literals in style properties and JSX size props; module constants such as `COLUMN_WIDTH = 440` (auth screens), `FIELD_WIDTH`, `BOX_HEIGHT`, `RADIO`, `CHECK`, `MARK_WIDTH` remain local values without a DESIGN.md entry.
+  evidence: Story 9.4 scan; about 30 such constants in `src/features` and `src/shared/ui`.
+- source_spec: `_bmad-output/implementation-artifacts/spec-9-4-visual-fidelity-and-accessibility-pass.md`
+  summary: Story 9.5 device runs need a rule that keeps agent player visits from writing progress on the owner's account (Story 9.4 wrote a ~10 s resume point on one video).
+  evidence: `docs/testing.md` «Story 9.4» Method, Playback: one visit ran about 11 s and the 10 s progress cadence wrote a point; no prevention step exists.
+- source_spec: `_bmad-output/implementation-artifacts/spec-9-4-visual-fidelity-and-accessibility-pass.md`
+  summary: Medium, unverified — a sidebar fallback focus event delivered after the filter sheet's `close()` could still make the Поиск/Автор chip unfocusable.
+  evidence: `SearchScreen.tsx` and `useAuthorActionRowFocus` ignore focus only while `isOpen()`; settle with a device trace of the focus-event order around close after a level change.

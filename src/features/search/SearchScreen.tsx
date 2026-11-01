@@ -414,6 +414,12 @@ export function SearchScreen({
   useEffect(
     () =>
       focus.onFocusChange(focusId => {
+        // The sheet is open: a level change's momentary fallback focus behind
+        // it (device, Story 5.4) must not make the chip unfocusable before the
+        // sheet hands focus back to it (Story 9.4, device).
+        if (modal.isOpen()) {
+          return;
+        }
         if (focusId.startsWith(SEARCH_RESULT_PREFIX)) {
           lastResult.current = { id: focusId, index: Math.max(idsRef.current.indexOf(focusId), 0) };
         }
@@ -421,7 +427,7 @@ export function SearchScreen({
           focusId === SEARCH_FIELD_ID ? 'field' : focusId === SEARCH_FILTERS_ID ? 'chip' : 'other',
         );
       }),
-    [focus, idsRef],
+    [focus, idsRef, modal],
   );
   const [downTarget, setDownTarget] = useState<HostView | null>(null);
   useEffect(() => {

@@ -4,7 +4,7 @@ description: Unofficial, remote-first Boosty client for Android TV. Dark, calm, 
 title: "Boosty TV — Design"
 status: final
 created: 2026-10-25
-updated: 2026-10-25
+updated: 2026-11-01
 sources:
   - ../../briefs/brief-boosty-tv-2026-10-25/brief.md
   - ../../design/claude-design-v1/docs/tokens.md
@@ -119,24 +119,27 @@ components:
   nav-item: { width: 136, insetX: 16, paddingLeft: 32, height: 36, radius: '{rounded.md}', currentBg: '{colors.surface-current}', currentMark: '{colors.accent}', focusBg: '{colors.surface-focus-row}', text: '{typography.button}' }
   button-primary: { height: 40, paddingX: 20, radius: '{rounded.lg}', bg: '{colors.accent}', bgFocus: '{colors.accent-focus}', text: '{colors.accent-ink}', scaleFocus: '{focus.scale-button}' }
   button-secondary: { height: 40, paddingX: 20, radius: '{rounded.lg}', bg: '{colors.surface-raised}', bgFocus: '{colors.surface-focus-button}', text: '{colors.text}' }
-  button-small: { height: 32, paddingX: 14, text: '{typography.button-s}' }
+  button-small: { height: 32, paddingX: 14, text: '{typography.button-s}', iconSize: 16 }
   filter-chip: { height: 32, radius: '{rounded.full}', bg: '{colors.surface-raised}', countBg: '{colors.accent-tint}' }
-  text-field: { height: 50, borderWidth: 1.5, radius: '{rounded.lg}', bg: '{colors.surface}', border: '{colors.border}', borderFocus: '{colors.focus-ring}', borderError: '{colors.error}', scaleFocus: '{focus.scale-field}' }
+  text-field: { height: 50, borderWidth: 1.5, radius: '{rounded.lg}', bg: '{colors.surface}', border: '{colors.border}', borderFocus: '{colors.focus-ring}', borderError: '{colors.error}', scaleFocus: '{focus.scale-field}', placeholder: '{colors.text-tertiary}' }
   post-card: { width: '{spacing.card-width}', thumbAspect: '16:9', radius: '{rounded.md}', titleLines: 2, title: '{typography.card-title}', meta: '{typography.meta}', scaleFocus: '{focus.scale-post-card}' }
   author-card: { width: '{spacing.author-tile-width}', height: 76, avatar: 52, radius: '{rounded.md}', scaleFocus: '{focus.scale-author-card}' }
   live-card: { width: 520, height: 120, cover: '192x108', badge: '{colors.live}', scaleFocus: '{focus.scale-live-card}' }
-  setting-row: { minHeight: 44, compactHeight: 38, radius: '{rounded.md}', bgFocus: '{colors.surface-focus-row}', scaleFocus: '{focus.scale-row}' }
+  setting-row: { minHeight: 44, compactHeight: 38, radius: '{rounded.md}', bgFocus: '{colors.surface-focus-row}', scaleFocus: '{focus.scale-row}', listMaxWidth: 640 }
   poll-option: { height: 42, radius: '{rounded.md}', resultBar: '{colors.accent-tint}', chosenMark: '{colors.accent}', scaleFocus: '{focus.scale-row}' }
   media-row: { height: 64, thumb: '96x54', radius: '{rounded.md}', progress: '{colors.accent}', scaleFocus: '{focus.scale-row}' }
-  event-row: { width: 696, height: 56, avatar: 32, dot: 6, radius: '{rounded.lg}', bg: '{colors.surface}', bgFocus: '{colors.surface-focus-row}', chip: '{colors.live}', scaleFocus: '{focus.scale-row}' }
-  link-chip: { height: 32, radius: '{rounded.full}', bg: '{colors.surface-raised}', suffix: 'QR' }
-  player-control: { size: 40, radius: '{rounded.full}', bg: '{colors.overlay-badge}', bgFocus: '{colors.text}', iconFocus: '{colors.bg}' }
-  timeline: { trackHeight: 3, trackHeightFocus: 5, progress: '{colors.accent}', thumb: '{colors.text}', bubble: '{colors.overlay-badge}' }
+  event-row: { width: 696, height: 56, avatar: 32, dot: 6, radius: '{rounded.lg}', bg: '{colors.surface}', bgFocus: '{colors.surface-focus-row}', chip: '{colors.live}', scaleFocus: '{focus.scale-row}', skeletonLine: 12 }
+  link-chip: { height: 32, radius: '{rounded.full}', bg: '{colors.surface-raised}', suffix: 'QR', labelMaxWidth: 420, thumbWidth: 96, thumbHeight: 54 }
+  player-control: { size: 40, radius: '{rounded.full}', bg: '{colors.overlay-badge}', bgFocus: '{colors.text}', iconFocus: '{colors.bg}', playWidth: 13, playHeight: 16, pauseBarWidth: 4, pauseBarHeight: 16, pauseGap: 4, glyphNudge: 3, barRadius: 1 }
+  timeline: { trackHeight: 3, trackHeightFocus: 5, progress: '{colors.accent}', thumb: '{colors.text}', bubble: '{colors.overlay-badge}', bubbleMinWidth: 56 }
+  audio-block: { glyphBox: 32, playWidth: 11, playHeight: 14, pauseBarWidth: 3, pauseBarHeight: 13, pauseGap: 3, glyphNudge: 3, barRadius: 1, progressHeight: 2 }
   side-sheet: { widthFilters: 320, widthPlayer: 340, bg: '{colors.bg-sidebar}', radius: 0, enter: '{motion.panel}' }
   dialog: { maxWidth: 560, radius: '{rounded.xl}', bg: '{colors.surface}', scrim: '{colors.scrim}' }
   qr-dialog: { qrSize: 200, radius: '{rounded.xl}', qrBg: '{colors.qr-bg}' }
   state-view: { iconSize: 48, title: '{typography.title-s}', body: '{typography.body-s}' }
   badge: { height: 20, radius: '{rounded.sm}', bg: '{colors.overlay-badge}', text: '{typography.badge}' }
+  stroke: { mark: 2, hairline: 1 }
+  focus-guide: { endHeight: 1, bandWidth: 2 }
   avatar: { meta: 16, player: 22, post: 28, authorHeader: 56 }
 ---
 
@@ -226,6 +229,10 @@ The focus ring follows the shape at `{focus.ring-offset}`.
 ## Components
 
 Names: tables use PascalCase; frontmatter keys use kebab-case (`PostCard` = `post-card`). The component sheet's "VideoCard" is PostCard, and "PrimaryButton" is Button primary. Sizes live in the frontmatter `components`. The rows below describe anatomy and states only. [ASSUMPTION] Sizes for player-control, timeline, media-row, dialog, qr-dialog and state-view, the post left-column width (≈ 260 dp; obsolete since the one-column Post, owner decision 2026-10-27) and the image max height (300 dp) were estimated from the mocks, not taken from `tokens.md`. Confirm them against the mocks when implementing.
+
+*As built (Story 9.4, owner decision 2026-11-01): TextField placeholders use `text-field.placeholder` = `{colors.text-tertiary}` (4.68:1 on `{colors.surface}`), not `{colors.text-disabled}` (3.01:1).*
+
+*As built (Story 9.4, tokens-only styling): component sizes that the mocks drew but this file did not list are frontmatter tokens with the built values, unchanged on screen: `button-small.iconSize` (the like heart), `setting-row.listMaxWidth` (Диагностика rows), `event-row.skeletonLine`, `link-chip.labelMaxWidth` and its external-video thumb, the PlayerControl and AudioBlock play/pause glyph geometry (`player-control.play*`/`pause*`, `audio-block`), `timeline.bubbleMinWidth`, `stroke` (`mark`: the outline of the radio, check box, spinner, StateView glyph and lock shackle; `hairline`: the text placeholder border) and `focus-guide` (the invisible end guide of the post grid and the period stepper's band guide). `__tests__/noRawStyleLiterals.test.js` fails on any hex color or non-zero size literal in a style outside `src/shared/ui/tokens.ts`.*
 
 Every focusable component is built on **FocusableSurface**. In focus it gets the ring, a surface lift and a component-specific scale applied as a transform, so layout never changes. Pressed adds `{focus.pressed-scale}` for `{motion.press}`. Disabled components are not focusable and use `{colors.text-disabled}`.
 

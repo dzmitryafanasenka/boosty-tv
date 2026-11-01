@@ -115,6 +115,15 @@ describe('AuthorCard', () => {
     await act(async () => root.unmount());
   });
 
+  it('Story 9.4: the blog title line switches to text-secondary in focus (DESIGN.md Colors)', async () => {
+    const root = await render(author());
+    const color = () => StyleSheet.flatten(byId(root, `${ID}/title`)[0].props.style).color;
+    expect(color()).toBe(colors['text-meta']);
+    await act(async () => host(root).props.onFocus(evt));
+    expect(color()).toBe(colors['text-secondary']);
+    await act(async () => root.unmount());
+  });
+
   it('no title: the name alone, no second line; no owner either: «Без названия» (as PostCard)', async () => {
     const root = await render(author({ title: '' }));
     expect(byId(root, `${ID}/title`)).toHaveLength(0);

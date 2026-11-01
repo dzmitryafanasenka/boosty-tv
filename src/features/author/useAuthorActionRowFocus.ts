@@ -22,6 +22,12 @@ export type AuthorActionRowFocusOptions = {
   /** The grid is shown. */
   gridShown: boolean;
   restoration: Pick<ListRestoration, 'viewOf'>;
+  /**
+   * A modal (the filter sheet) is open: its focus events are ignored, so a
+   * level change's momentary fallback focus behind it never makes the chip
+   * unfocusable before the sheet hands focus back to it (Story 9.4, device).
+   */
+  isModalOpen?: () => boolean;
 };
 
 export type AuthorActionRowFocus = {
@@ -60,7 +66,9 @@ export function useAuthorActionRowFocus({
   ids,
   gridShown,
   restoration,
+  isModalOpen,
 }: AuthorActionRowFocusOptions): AuthorActionRowFocus {
+  const isModalOpenRef = useLatestRef(isModalOpen);
   const idsRef = useLatestRef(ids);
   const lastCard = useRef<{ id: string; index: number } | null>(null);
   const [rowFocus, setRowFocus] = useState(false);
@@ -68,6 +76,9 @@ export function useAuthorActionRowFocus({
   useEffect(
     () =>
       focus.onFocusChange(focusId => {
+        if (isModalOpenRef.current?.()) {
+          return;
+        }
         if (focusId.startsWith(cardPrefix)) {
           lastCard.current = { id: focusId, index: Math.max(idsRef.current.indexOf(focusId), 0) };
         }
@@ -77,7 +88,7 @@ export function useAuthorActionRowFocus({
         setRowFocus(focusId === fieldId || focusId === chipId || focusId === resetId);
         setLiveFocus(focusId === liveId || liveActionIds.includes(focusId));
       }),
-    [focus, cardPrefix, fieldId, chipId, resetId, liveId, liveActionIds, idsRef, fieldAuto],
+    [focus, cardPrefix, fieldId, chipId, resetId, liveId, liveActionIds, idsRef, fieldAuto, isModalOpenRef],
   );
   const [downTarget, setDownTarget] = useState<HostView | null>(null);
   const aboveGrid = liveShown ? liveFocus : rowFocus;

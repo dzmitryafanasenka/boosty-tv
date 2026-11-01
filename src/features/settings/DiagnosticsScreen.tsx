@@ -6,7 +6,7 @@ import { t, tf } from '../../shared/i18n';
 import { logFileLocation } from '../../shared/platform/logFile';
 import { diagnosticsCapture } from '../../shared/services/diagnosticsCapture';
 import { usePreference } from '../../shared/storage/devicePreference';
-import { SettingRow, Text, requestHostFocus, spacing, type HostView } from '../../shared/ui';
+import { SettingRow, Text, components, requestHostFocus, spacing, type HostView } from '../../shared/ui';
 
 /** Focus ids (docs/focus-map.md, Diagnostics). */
 export const DIAGNOSTICS_CAPTURE_ID = 'settings/diagnostics/capture';
@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
   },
   // Focus headroom: the scaled row and its ring stay inside the safe area.
   rows: {
-    maxWidth: 640,
+    maxWidth: components['setting-row'].listMaxWidth,
     paddingHorizontal: spacing['focus-headroom'],
   },
   status: {
@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
   },
   steps: {
     marginTop: spacing['10'],
-    maxWidth: 720,
+    maxWidth: spacing['content-width'],
     paddingHorizontal: spacing['focus-headroom'] + spacing['8'],
   },
   step: {

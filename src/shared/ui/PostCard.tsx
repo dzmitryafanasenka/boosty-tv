@@ -468,7 +468,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: LOCK.shackle,
     height: LOCK.shackle,
-    borderWidth: 2,
+    borderWidth: components.stroke.mark,
     borderBottomWidth: 0,
     borderColor: colors.text,
     borderTopLeftRadius: LOCK.shackle / 2,

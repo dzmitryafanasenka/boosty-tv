@@ -98,7 +98,7 @@ export const chipStyles = StyleSheet.create({
     alignItems: 'center',
   },
   chipLabel: {
-    maxWidth: 420,
+    maxWidth: CHIP.labelMaxWidth,
   },
   suffix: {
     marginLeft: spacing['4'],

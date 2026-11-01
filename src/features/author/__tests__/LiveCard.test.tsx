@@ -249,3 +249,18 @@ describe('Story 7.4: like and share', () => {
     await act(async () => clean.root.unmount());
   });
 });
+
+describe('Story 9.4: focus colors (DESIGN.md Colors)', () => {
+  it('focused: the surface lifts to surface-focus-row and the details line switches to text-secondary', async () => {
+    const root = await render(stream({}));
+    const host = () => byId(root, ID).filter(n => n.props.focusable !== undefined)[0];
+    const surface = () => StyleSheet.flatten(byId(root, `${ID}/scale`)[0].props.style).backgroundColor;
+    const details = () => StyleSheet.flatten(byId(root, `${ID}/details`)[0].props.style).color;
+    expect(surface()).toBe(colors.surface);
+    expect(details()).toBe(colors['text-meta']);
+    await act(async () => host().props.onFocus({ nativeEvent: {} }));
+    expect(surface()).toBe(colors['surface-focus-row']);
+    expect(details()).toBe(colors['text-secondary']);
+    await act(async () => root.unmount());
+  });
+});

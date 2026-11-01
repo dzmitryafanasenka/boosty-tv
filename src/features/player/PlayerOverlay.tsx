@@ -561,7 +561,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing['2'],
     borderRadius: CONTROL.radius,
     backgroundColor: TIMELINE.bubble,
-    minWidth: 56,
+    minWidth: TIMELINE.bubbleMinWidth,
     alignItems: 'center',
   },
   tabular: {
@@ -627,20 +627,20 @@ const styles = StyleSheet.create({
   playGlyph: {
     width: 0,
     height: 0,
-    marginLeft: 3,
-    borderTopWidth: 8,
-    borderBottomWidth: 8,
-    borderLeftWidth: 13,
+    marginLeft: CONTROL.glyphNudge,
+    borderTopWidth: CONTROL.playHeight / 2,
+    borderBottomWidth: CONTROL.playHeight / 2,
+    borderLeftWidth: CONTROL.playWidth,
     borderTopColor: 'transparent',
     borderBottomColor: 'transparent',
   },
   pauseGlyph: {
     flexDirection: 'row',
-    gap: 4,
+    gap: CONTROL.pauseGap,
   },
   pauseBar: {
-    width: 4,
-    height: 16,
-    borderRadius: 1,
+    width: CONTROL.pauseBarWidth,
+    height: CONTROL.pauseBarHeight,
+    borderRadius: CONTROL.barRadius,
   },
 });

@@ -8,6 +8,7 @@ import {
   Text,
   colors,
   fontFiles,
+  components,
   rounded,
   spacing,
   typography,
@@ -188,7 +189,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing['5'],
     paddingHorizontal: spacing['6'],
     borderRadius: rounded.md,
-    borderWidth: 1,
+    borderWidth: components.stroke.hairline,
     borderColor: colors.border,
   },
 });

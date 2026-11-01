@@ -104,7 +104,7 @@ export const pollStyles = StyleSheet.create({
     height: CHECK_BOX_SIZE,
     marginRight: spacing['3'],
     borderRadius: rounded.sm,
-    borderWidth: 2,
+    borderWidth: components.stroke.mark,
     borderColor: colors['text-secondary'],
     alignItems: 'center',
     justifyContent: 'center',

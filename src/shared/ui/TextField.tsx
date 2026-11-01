@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import type { HostView } from './FocusableSurface';
 import { requestHostFocus } from './requestHostFocus';
-import { Text } from './Text';
+import { MAX_FONT_SIZE_MULTIPLIER, Text } from './Text';
 import { colors, components, focus, spacing, typography } from './tokens';
 
 export type TextFieldHandle = {
@@ -111,6 +111,7 @@ export function TextField({
       >
         <TextInput
           testID={testID}
+          maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
           value={value}
           onChangeText={onChangeText}
           onSubmitEditing={onSubmitEditing}
@@ -120,7 +121,7 @@ export function TextField({
           }}
           onBlur={() => setFocused(false)}
           placeholder={placeholder}
-          placeholderTextColor={colors['text-disabled']}
+          placeholderTextColor={FIELD.placeholder}
           cursorColor={colors.accent}
           selectionColor={colors['accent-tint']}
           keyboardType={keyboardType}

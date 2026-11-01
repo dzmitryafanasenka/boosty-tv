@@ -33,16 +33,38 @@ export function t(key: MessageKey): string {
 /**
  * A message with `{name}` placeholders replaced by `values`. A placeholder
  * without a value is left as is, so a missing value is visible in tests.
+ * A value that already ends a sentence (`.`, `!`, `?`, `…`) absorbs the
+ * template's own period right after it, so a title such as «Привет!» reads
+ * «Привет! Автор», not «Привет!. Автор» (Story 9.4, TalkBack labels).
  */
 export function tf(key: MessageKey, values: Readonly<Record<string, string>>): string {
-  return t(key).replace(/\{(\w+)\}/g, (match, name: string) =>
-    Object.prototype.hasOwnProperty.call(values, name) ? values[name] : match,
-  );
+  return t(key).replace(/\{(\w+)\}(\.?)/g, (match, name: string, period: string) => {
+    if (!Object.prototype.hasOwnProperty.call(values, name)) {
+      return match;
+    }
+    const value = values[name];
+    return period !== '' && /[.!?…]$/.test(value) ? value : value + period;
+  });
 }
 
 /** The plural form for `n` (non-negative integer; throws otherwise). */
 export function tp(key: PluralKey, n: number): string {
   return pluralRu(n, lookup(key) as RuPluralForms);
+}
+
+/** A part that already ends a sentence gets no added period (no «?.» or «..»). */
+const ENDS_SENTENCE = /[.?!…]$/;
+
+/**
+ * Accessibility label parts as sentences: each but the last ends with a
+ * period unless it already ends one (TalkBack pauses between them).
+ */
+export function joinSentences(parts: readonly string[]): string {
+  return parts
+    .map(part => part.trim())
+    .filter(part => part.length > 0)
+    .map((part, i, all) => (i < all.length - 1 && !ENDS_SENTENCE.test(part) ? `${part}.` : part))
+    .join(' ');
 }
 
 export { pluralRu, selectRuPluralCategory } from './plural';

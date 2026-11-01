@@ -15,6 +15,7 @@ import {
   Spinner,
   Text,
   colors,
+  components,
   rounded,
   spacing,
   type HostView,
@@ -547,9 +548,10 @@ export const AudioBlock = memo(function AudioBlockView({
   );
 });
 
-/** DESIGN.md AudioBlock: a 2 dp progress line under the row. */
-const BAR_HEIGHT = 2;
-const GLYPH_BOX = 32;
+/** DESIGN.md AudioBlock (`audio-block` tokens): a 2 dp progress line under the row. */
+const AUDIO = components['audio-block'];
+const BAR_HEIGHT = AUDIO.progressHeight;
+const GLYPH_BOX = AUDIO.glyphBox;
 
 const styles = StyleSheet.create({
   guide: {
@@ -587,22 +589,22 @@ const styles = StyleSheet.create({
   playGlyph: {
     width: 0,
     height: 0,
-    marginLeft: 3,
-    borderTopWidth: 7,
-    borderBottomWidth: 7,
-    borderLeftWidth: 11,
+    marginLeft: AUDIO.glyphNudge,
+    borderTopWidth: AUDIO.playHeight / 2,
+    borderBottomWidth: AUDIO.playHeight / 2,
+    borderLeftWidth: AUDIO.playWidth,
     borderTopColor: 'transparent',
     borderBottomColor: 'transparent',
     borderLeftColor: colors.text,
   },
   pauseGlyph: {
     flexDirection: 'row',
-    gap: 3,
+    gap: AUDIO.pauseGap,
   },
   pauseBar: {
-    width: 3,
-    height: 13,
-    borderRadius: 1,
+    width: AUDIO.pauseBarWidth,
+    height: AUDIO.pauseBarHeight,
+    borderRadius: AUDIO.barRadius,
     backgroundColor: colors.text,
   },
   track: {

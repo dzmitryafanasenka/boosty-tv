@@ -553,6 +553,7 @@ export function AuthorScreen({
     ids,
     gridShown: phase === 'grid',
     restoration,
+    isModalOpen: modal.isOpen,
   });
 
   const chip = filtersEnabled ? chipLabels(filter) : null;

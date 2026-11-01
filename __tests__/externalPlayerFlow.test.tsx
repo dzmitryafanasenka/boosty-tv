@@ -141,7 +141,7 @@ describe('Story 8.2: the system video player (PLAY-13, SET-02)', () => {
       expect(description).toBe(translate('settings.externalPlayer.description'));
       expect(description).toContain('Прогресс просмотра в этом режиме не сохраняется');
       expect(one(root, ROW).props.accessibilityLabel).toBe(
-        `Системный видеоплеер Выкл ${translate('settings.externalPlayer.description')}`,
+        `Системный видеоплеер Выкл. ${translate('settings.externalPlayer.description')}`,
       );
       await press(root, ROW);
       expect(valueText(root)).toBe('Вкл');

@@ -539,8 +539,8 @@ export const ru = {
     // the vote (two OKs, `pendingRetract`), and the checkbox option's state.
     submit: 'Проголосовать',
     retract: 'Отозвать голос',
-    a11yChecked: 'отмечено',
-    a11yUnchecked: 'не отмечено',
+    a11yChecked: 'Отмечено',
+    a11yUnchecked: 'Не отмечено',
     // The last checkbox option's label (a screen reader): a submit step follows.
     submitHint: 'Затем выберите «Проголосовать» под вариантами',
   },

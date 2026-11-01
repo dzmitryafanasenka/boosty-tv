@@ -1,9 +1,10 @@
 import type { Ref } from 'react';
 import { StyleSheet, View, type BlurEvent, type FocusEvent } from 'react-native';
 import { FocusableSurface, type HostView, type SurfaceState } from './FocusableSurface';
+import { joinSentences } from '../i18n';
 import { CheckIcon } from './icons';
 import { Text } from './Text';
-import { colors, components, spacing } from './tokens';
+import { colors, components, rounded, spacing } from './tokens';
 
 /**
  * Kinds implemented so far (DESIGN.md SettingRow): `info` shows a value and
@@ -92,7 +93,9 @@ export function SettingRow({
     styles.surface,
     focused && { backgroundColor: TOKENS.bgFocus },
   ];
-  const a11yLabel = accessibilityLabel ?? [label, value, description].filter(Boolean).join(' ');
+  // «Скорость 1×», then the description as its own sentence (Story 9.4: TalkBack pauses before it).
+  const a11yLabel =
+    accessibilityLabel ?? joinSentences([[label, value].filter(Boolean).join(' '), description ?? '']);
 
   return (
     <FocusableSurface
@@ -207,7 +210,7 @@ const styles = StyleSheet.create({
     width: RADIO,
     height: RADIO,
     borderRadius: RADIO / 2,
-    borderWidth: 2,
+    borderWidth: components.stroke.mark,
     borderColor: colors['text-meta'],
     alignItems: 'center',
     justifyContent: 'center',
@@ -221,8 +224,8 @@ const styles = StyleSheet.create({
   check: {
     width: CHECK,
     height: CHECK,
-    borderRadius: 4,
-    borderWidth: 2,
+    borderRadius: rounded.sm,
+    borderWidth: components.stroke.mark,
     borderColor: colors['text-meta'],
     alignItems: 'center',
     justifyContent: 'center',

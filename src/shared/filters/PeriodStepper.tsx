@@ -10,6 +10,7 @@ import {
   Text,
   colors,
   focus as focusTokens,
+  components,
   rounded,
   spacing,
   type HostView,
@@ -475,7 +476,7 @@ const styles = StyleSheet.create({
     gap: spacing['5'],
   },
   band: {
-    width: 2,
+    width: components['focus-guide'].bandWidth,
     height: BOX_HEIGHT,
   },
   box: {

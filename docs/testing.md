@@ -918,6 +918,87 @@ Review fixes (2026-10-28, host-tested only): short visits write nothing (owner d
 
 Host tests: `src/shared/services/progress/__tests__/progressRepository.test.ts` (29: the finished rule and status, resume precedence, the 10 s cadence, one write in flight with the latest position, forced events, start over, seeks as movement, failure gating ≥ 10 s and the bounded automatic retry, expired hold/flush/drop, sign-out wipe, a late write after a reset, the debounced/forced disk write, cold-start load, corrupt disk, the 200-entry cap, the stale disk write undone, a load after a reset dropped, stable snapshots); `__tests__/playerProgressFlow.test.tsx` «progress and resume (Story 4.2)» (10: server only with no pre-seek t=0 and the E9 request shape, local wins, finished, multi-video + start over, hold-scrub, background and end, the vanished «С начала» fallback, failure retry, cold start from the persisted entry, log hygiene); `__tests__/postFlow.test.tsx` (status and «Продолжить» only while the player is on); `__tests__/accountScopeRegistry.test.js` (`progress` registered); `demoFlow` (the row label now ends with the status). Lint (`--max-warnings 0`), typecheck, `check:fixtures` clean; `npm test` ×3: 1494 passed each; `playerFlow` + `postFlow` + the progress suite 30/30 (187 tests each run).
 
+### Story 9.4 — Visual fidelity and accessibility pass, 2026-11-01
+
+**Status: implemented and host-tested. The 1080p walk ran on the pinned Chromecast with Google TV by the agent over adb, using owner-signed `assembleRelease -PreactNativeArchitectures=armeabi-v7a` builds from this branch (`versionName 0.9.1`, installed with `adb install -r`, session kept, nothing uninstalled or cleared). TalkBack ran on the same device, turned on and off by the agent over adb. The 720p and font-scale rows ran on an Android TV emulator in demo mode. Every row below is labelled agent over adb or emulator. The owner listened to TalkBack on the device on 2026-11-01 (owner) and reported that everything is announced properly; the physical-remote feel check of these changes is still open.** `spec-9-4-visual-fidelity-and-accessibility-pass.md`.
+
+Changes:
+- **«Продолжить» focus (the Story 9.3 finding).** There were two causes. Главная's `initialRow` read a remembered Continue card's index in the row as a grid index, so the list opened past its header. Also, a Continue card past the third sat outside the row's viewport at mount, and on the device the focus request on it did not stick (uiautomator: nothing focused). Fixes: `initialRow` applies only to a feed card (`HomeScreen.tsx`), and the row opens scrolled so the remembered card sits on column 3 (`ContinueRow` `initialCardId`, `continueRowOffset`), where Android's own focus scroll leaves it.
+- **Filter chip after the sheet (found in this walk).** On Поиск and Автор, open the sheet, open «Период» and Back to the sheet. That level change drops focus to the sidebar for a moment (the Story 5.4 device lesson). The screen took it as «focus left the field row» and made the chip not focusable, so Back from the sheet left nothing focused. Fix: Поиск (`SearchScreen.tsx`) and Автор (`useAuthorActionRowFocus` `isModalOpen`) ignore focus events while a modal is open.
+- **Tokens only.** `__tests__/noRawStyleLiterals.test.js` fails on a hex or rgb() color, or on a non-zero number literal in a size style property or a JSX size prop, anywhere in `src/` outside `tokens.ts`. It names the file and line. The allowlist is `0`, `StyleSheet.hairlineWidth` and the QR code's black modules in `qrRenderer.tsx`. Not scanned: the SVG glyph geometry in `src/shared/ui/icons/`, the demo API data in `src/app/dev/demo.ts` and named module constants (deferred work). Known blind spots of the line-based scan: named CSS colors and `hsl()`; transform `scale` (a multiplier, for example the spinner's `scale: 2`); a value after a ternary or on the next line; a string that contains `/*` (the `*/*` ACCEPT value in `profiles.ts`), which makes the comment stripper blank every line up to the next `*/`. It found 35 literals: 34 style values and one JSX icon size. They moved to new tokens, or to existing tokens with the same value. The new DESIGN.md frontmatter entries keep the built values, so nothing looks different: `button-small.iconSize`, `setting-row.listMaxWidth`, `event-row.skeletonLine`, `link-chip.labelMaxWidth` / `thumbWidth` / `thumbHeight`, the `player-control` glyph geometry, `timeline.bubbleMinWidth`, `audio-block`, `stroke` and `focus-guide`.
+- **Contrast.** `src/shared/ui/__tests__/contrast.test.js` parses the DESIGN.md contrast table and computes each pair from `tokens.ts` with the WCAG 2.x relative luminance. A translucent background (`overlay-badge`) is composited over black and white, and the worse result counts. It also checks `text-tertiary` on its three allowed backgrounds. Every pair meets its target, so no token changed. Results: text/bg 15.79; text-tertiary on bg / bg-sidebar / surface 5.16 / 4.90 / 4.68; text-secondary/surface-focus-row 5.57; accent-ink on accent / accent-focus 7.40 / 8.58; text/live 4.83; text/overlay-badge 10.90 over white, 16.88 over black; focus-ring on bg / surface-focus-button 15.79 / 8.82.
+- **Focused secondary text (DESIGN.md Colors).** MediaRow's duration and status, AuthorCard's blog title, EventRow's time and LiveCard's details line used `text-meta` inside a focused row or tile. They now switch to `text-secondary`. LiveCard's focused surface was `surface-raised`; it is now `surface-focus-row`, as for every row and tile. The card's view tree is unchanged.
+- **Labels.** `FocusableSurface` now requires `accessibilityLabel` at the type level. The flow-test harness (`src/test/flow.tsx`) checks the whole tree on every `focusOn` and `press` across 24 flow suites and fails on a focusable host view with a missing or blank label. `__tests__/labelGuard.test.tsx` proves the guard. No unlabelled focusable was found. Label wording: a value that already ends a sentence absorbs the template's period (`tf`), so «договариваться!. Алексей» now reads «договариваться! Алексей». SettingRow joins the description as its own sentence («Системный видеоплеер Выкл. Видео откроется…»; it used to be «Выкл Видео»). `joinSentences` moved from polls to `shared/i18n`. Poll checkbox states are capitalized («…31 голос. Не отмечено»; it was «не отмечено» after a period).
+- **Font scale (owner decision 2026-11-01).** The shared `Text` (so every Button label) and the `TextField` input cap growth at 1.3× (`MAX_FONT_SIZE_MULTIPLIER`). Fixed heights stay.
+
+Host checks: `npm run lint -- --max-warnings 0`, `npm run typecheck`, `npm test` (160 suites, 3274 tests) and `npm run check:fixtures` (30 clean) pass. New and changed tests:
+- `homeFeedFlow.test.tsx` «Story 9.4»: a remembered fifth Continue card on OK and on Back, and a remembered feed card with the row shown. The first two failed before the fix. A remembered Continue card that is gone on return falls back to its neighbour by index (§1.6), and the row opens at 0. `src/features/home/__tests__/continueRowOffset.test.ts` covers the offset.
+- `searchFlow.test.tsx` and `authorFlow.test.tsx` «Story 9.4»: the sidebar fallback while the sheet is open. Both failed before the fix.
+- `noRawStyleLiterals`, `contrast` (also `accent-text` and `text-card` on `surface-focus-row`, drawn but not in the table: 5.85 and 9.13 ≥ 4.5), `labelGuard` (also `TextInput` hosts, focusable unless `focusable={false}`); `catalog.test.ts` (the period rule); `Button.test.tsx` and `TextField.test.tsx` (the 1.3× cap); `MediaRow` (duration and status), `AuthorCard`, `LiveCard` and `eventsFlow` (EventRow time) for the focus colors.
+- The 9.3 results hold: PostCard has no added view, `POST_GRID_DRAW_DISTANCE` is still 2 rows, and `homeFeedFlow` and `authorFlow` are green.
+
+**Method.**
+- **1080p (agent over adb).** Real account, 1920×1080 UI = 960×540 dp. The app was checked in the foreground before every key batch, and the focused node was read (`uiautomator dump`: bounds, `focused`, `content-desc`) before every OK. Screenshots of the real account stayed in the scratchpad and were deleted.
+- **Playback.** Each player visit was meant to stay under 10 s with no pause or seek. **One visit ran about 11 s** (OK, then ↑ and ↓ with two dumps in between, then Back). It wrote a resume point of about 10 s on «ОТЕ №15: ракеты для Patriot кончились…», which now shows first in «Продолжить» («Осталось 62 мин»). The owner should know; nothing else was written.
+- **720p (emulator).** AVD `tv_720p`: Android TV API 34, arm64, 1280×720 at 213 dpi, which gives 961×541 dp. Debug APK with Metro and a local, uncommitted `DEMO_MODE = true` (reverted; the release bundle has `createDemoSessionManager` 0). The family TV's display settings were not touched.
+- **TalkBack (agent over adb).** Before: `enabled_accessibility_services` = `flar2.homebutton/a.i` («Button Mapper»), `accessibility_enabled` = 1, `touch_exploration_enabled` = 0. TalkBack (`com.google.android.marvin.talkback/.TalkBackService`, 14.2.0 leanback) was appended to that list. Afterwards both values were restored exactly, and only «Button Mapper» was bound. TalkBack 14.2 does not log its spoken text, and its developer log level was not changed. So the check was:
+  - a Google TTS «Synthesis request» in logcat (ru-RU) for each focus move;
+  - the words TalkBack reads, taken from the `content-desc` of the focused node.
+
+  A `uiautomator` dump suspends TalkBack for a moment, so the speech runs had no dumps.
+- **Font scale (emulator).** `settings put system font_scale` set to 1.3 and then 2.0, then deleted.
+
+**Walk (1080p, agent over adb; 720p, emulator).**
+
+| Screen | Layout vs DESIGN.md / mocks (as built) | Focus map: initial, arrows, OK, Back, restoration | Labels (`content-desc`) | 720p |
+|---|---|---|---|---|
+| B Главная with «Продолжить» | Row title, 3 cards on the grid's columns, the title row with «Фильтры» and «Обновить», a 3-column grid | Initial: the first Continue card. → along the row; ↓ keeps the column (card 5 → column 3). Настройки → «Главная» OK: the remembered fifth card is focused and the header is shown (fixed). Back from Настройки → `nav/home`, then → lands on the card | «{title}. {author}. Осталось N мин»; feed cards «Видео. {title}. {author}, {date}. Длительность h:mm:ss.» | Same layout (`home-720p.png`) |
+| E Поиск | The field, «Фильтры» on the right, the hint | Initial: the field. → chip, OK → sheet («Доступные мне» focused), «Период» → list, Back → «Период», Back → the chip (**was lost; fixed**) | «Поиск по подпискам» (field), «Фильтры: Доступные мне», «Период За всё время» | — |
+| C Подписки | 3 tiles, «Мой блог» first in the demo | Initial: the first tile; OK → Автор; Back → the same tile | «{owner}. {title}»; «Мой блог. {owner}. {title}» | `subs` checked |
+| D Автор | Header, «В этом блоге» field, chip, 3-column grid, LiveCard in the demo | Initial: the first post (LiveCard from События in the demo). ↑ → the field, → chip; the sheet's Back → the chip (**fixed**). Back → the tile | «Эфир: {title}. Идёт эфир. 128 зрителей», «Нравится, 42», «Поделиться эфиром: QR-код со ссылкой» | `author-live-720p.png` |
+| F Пост | One column: author row, title, «вчера · 22 лайка», «Смотреть», MediaRow, paragraphs, link chips, audio, poll | Initial: «Смотреть»; ↓ through the stops; Back from the player → «Смотреть»; Back → the card | «Автор: {name}. Открыть страницу автора», «Видео 1. Video. 1:02:04. Не начато», «{text}. Показать QR-код», «Аудио. {title}. 0:00 / 3:12. Воспроизвести», poll options «История, 78 %, 31 голос. Не отмечено» | `post-poll-720p.png` |
+| G Плеер | Surface only (the overlay was not opened, see Not verified); on the emulator the error state | Initial: the surface; Back → «Смотреть»; error: «Повторить», ← → «Назад» | «Видео. OK — пауза, влево и вправо — перемотка» | error state checked |
+| J События | Real account: the empty state. Demo: 5 rows, unread dots, «Эфир» chip | Empty: OK on «События» → «Обновить». Demo: the first row; OK on a stream → Автор on the LiveCard | «Новое. {name}: Начался эфир. Эфир. сегодня, 17:27» | `events-720p.png` |
+| K Настройки | 3 rows (release); dialog over the scrim | Initial: «Версия»; ↑ → the toggle; «Выйти из аккаунта» → dialog on «Отмена», Back → the row; 7 × OK on «Версия» → Диагностика on «Запись логов» (left Выкл), Back → «Версия» | «Системный видеоплеер Выкл. Видео откроется…», «Версия 0.9.1», «Отмена», «Выйти», «Запись логов Выкл. Технический журнал…» | `settings` checked |
+| A1, A2 | Hero, body, «Войти в Boosty»; phone form | Demo only (no sign-out on the TV): A1 → «Войти в Boosty»; A2 → the number field | «Войти в Boosty», «Код страны», «Номер телефона», «Получить код», «Назад» | `a1-font-*.png`, `a2-font-1.3-720p.png` |
+
+**720p result:** at 1280×720 the app lays out as 961×541 dp, the same logical layout as 1080p. The DESIGN.md assumption («1280×720 gives the same 960×540 dp») holds on the emulator. Nothing was clipped or moved compared with 1080p.
+
+**TalkBack (agent over adb).** Speech requests per key, without dumps:
+- Главная: 7 moves, 6 spoken; the last ← had nothing to move to.
+- Поиск: 4/4.
+- Подписки: 5/5.
+- Автор: 3 of 5. The first key after a dump is not spoken, and two ↑ moves toward the field «Поиск в блоге» gave no request. Whether the field is announced is still open.
+- Пост: 7/7.
+- Back, События, Настройки: 9 of 10.
+
+D-pad focus moved as without TalkBack, and OK still activated items (TalkBack on Google TV). With TalkBack on, uiautomator shows react-native-tvos's focus guides as focusable views with the placeholder description «FocusGuide». The framework forwards them to a destination and says the placeholder is never spoken. Whether it is spoken is for the owner's listening session.
+
+**Font scale (emulator, demo; `docs/screenshots/story-9-4/`).**
+- At 1.3 the body text grows; «Войти в Boosty» fits its fixed 40 dp height.
+- At 2.0 the text stays at 1.3×; the cap works. The line spacing of multi-line body text still grows, because React Native scales `lineHeight` past the cap.
+- On A2 at 1.3, «Код страны» wraps to two lines, so the country field sits one line lower than the number field.
+
+**Deviations and the owner's decisions (2026-11-01)** (screenshots from the emulator demo):
+1. A2 at font scale 1.3: «Код страны» wraps to two lines and the two phone fields no longer line up (`a2-font-1.3-720p.png`). **Accepted as is.**
+2. Field placeholders used `text-disabled` on `surface`: 3.01:1, below 4.5. **Fixed (owner's choice):** TextField placeholders now use `text-field.placeholder` = `text-tertiary`, 4.68:1 (DESIGN.md frontmatter and `contrast.test.js`). Not reinstalled on the device for this change alone.
+3. With font scale above 1.3 (the 2.0 test; outside the TV's own text-size range), line spacing still grows (`a1-font-2.0-720p.png`). **Accepted.**
+4. react-native-tvos's «FocusGuide» placeholder description (see TalkBack). It comes from the framework and cannot be fixed in the app. **Accepted**; revisit if the owner hears it while listening.
+
+**Labels:** every focusable seen on the device had a Russian `content-desc` from `ru`, or one built from content with it. Exceptions:
+- the native scroll containers (ScrollView / HorizontalScrollView, focusable for scrolling, no description);
+- the «FocusGuide» placeholders while TalkBack runs.
+
+**Not verified:**
+- TalkBack by ear: **done by the owner, 2026-11-01.** The agent turned TalkBack on over adb (appended to «Button Mapper»); the owner listened with the remote to Главная, Пост, the player overlay and Настройки and reported «всё произносится нормально». The build on the device predates the review copy fixes («Не отмечено» capitalised, placeholder color). Afterwards the agent restored `enabled_accessibility_services` = `flar2.homebutton/a.i` and `accessibility_enabled` = 1 exactly.
+- The physical remote.
+- The player overlay and settings sheet on the device: opening them pauses or seeks the owner's video. Their labels are host-tested only.
+- The A3–A11 sign-in screens on the device: no sign-out on the family TV.
+- The Автор LiveCard on the real account: no live stream.
+- A real event list: the account has no events.
+
+**Device state afterwards:** the final release build is installed and open on Главная with focus on `nav/home`. TalkBack is off and the two accessibility settings have their previous values («Button Mapper» kept). «Запись логов» is Выкл, as before. The `log.tag` properties tried for TalkBack are cleared. Metro is stopped, the emulator is shut down and `DEMO_MODE` is `false`.
+
 ### Story 9.3 — Performance on the device, 2026-11-01
 
 **Status: implemented and host-tested. Measured on the pinned Chromecast with Google TV by the agent over adb, using an owner-signed `assembleRelease -PreactNativeArchitectures=armeabi-v7a` build from this branch (`versionName 0.9.1`, installed with `adb install -r`, session kept, nothing uninstalled or cleared). The Подписки grid with 30 demo authors was measured on an Android TV emulator. Every row below is an agent-over-adb or emulator result; none is a physical-remote check. The owner checked the scroll with the physical remote on 2026-11-01 and accepted the held-↓ and Graphics exceptions.** `spec-9-3-performance-on-the-device.md`, [ADR 0015](adr/0015-post-grid-draw-distance.md).

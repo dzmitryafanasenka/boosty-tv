@@ -337,6 +337,15 @@ describe('matrix «Loading» and «List»', () => {
     await unmount(root);
   });
 
+  it('Story 9.4: the time switches from text-meta to text-secondary in focus (DESIGN.md Colors)', async () => {
+    const root = await openEvents();
+    const time = () => StyleSheet.flatten(byTestId(root, `${ROW(5002)}/time`)[0].props.style).color;
+    expect(time()).toBe(colors['text-meta']);
+    await focusOn(root, ROW(5002));
+    expect(time()).toBe(colors['text-secondary']);
+    await unmount(root);
+  });
+
   it('300 events: virtualized (fewer rows mounted), one request, no load-more', async () => {
     e18 = () => ({ status: 200, body: e18Body(Array.from({ length: 300 }, (_, i) => event(i + 1))) });
     const root = await openEvents();

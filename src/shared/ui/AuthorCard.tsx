@@ -174,7 +174,7 @@ export function AuthorCardView({
               <Text
                 testID={testID ? `${testID}/title` : undefined}
                 variant="meta"
-                color="text-meta"
+                color={focused ? 'text-secondary' : 'text-meta'}
                 numberOfLines={1}
                 style={styles.secondary}
               >
