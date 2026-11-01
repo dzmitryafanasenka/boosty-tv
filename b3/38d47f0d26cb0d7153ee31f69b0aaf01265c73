@@ -1,0 +1,79 @@
+__tests__/authorFlow.test.tsx
+  s_6884b16d8e6d90::t_9baff27ea72c1a 2606-2617
+__tests__/externalPlayerFlow.test.tsx
+  s_6884b16d8e6d90::t_c15c48ee050bdf 389-400
+__tests__/homeFeedFlow.test.tsx
+  s_6884b16d8e6d90::t_f3ab998f88fe47 48,873-874,2256-2274
+__tests__/liveFlow.test.tsx
+  s_6884b16d8e6d90::t_c2857166b11197 21,245-259
+__tests__/playerFirstFrameFlow.test.tsx
+  s_6884b16d8e6d90::t_ee2d5840c5e401 1-209
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_6884b16d8e6d90::t_340e88201e5680 366-374
+_bmad-output/implementation-artifacts/spec-9-3-performance-on-the-device.md
+  s_6884b16d8e6d90::t_5c9c9809d90be2 1-137
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_6884b16d8e6d90::t_c5a6c20c1c6bc4 32,116
+_bmad-output/planning-artifacts/prds/prd-boosty-tv-2026-10-25/prd.md
+  s_6884b16d8e6d90::t_3eb196974480e0 400-403,520
+docs/adr/0011-feed-list-flashlist.md
+  s_6884b16d8e6d90::t_90ea1681e65e09 6,36
+docs/adr/0015-post-grid-draw-distance.md
+  s_6884b16d8e6d90::t_69698dda86703f 1-45
+docs/feature-parity.md
+  s_6884b16d8e6d90::t_a83fa938d6813c 123-132
+docs/focus-map.md
+  s_6884b16d8e6d90::t_d295ff1aa80bd5 160
+docs/testing.md
+  s_6884b16d8e6d90::t_7fc1639f0f1f92 321,921-1010
+src/app/App.tsx
+  s_6884b16d8e6d90::t_16cebfac2038ab 49,260-261
+src/app/stackRoutes.tsx
+  s_6884b16d8e6d90::t_25d6e5e1fef047 19,300-301,366-367
+src/features/player/PlayerEntry.tsx
+  s_6884b16d8e6d90::t_a849720443b2eb 6,60-67
+src/features/player/usePlaybackSession.ts
+  s_6884b16d8e6d90::t_08429a98b5633d 7,66-67,252-266,675-676,739-757,797,816-823
+src/shared/platform/PlayerEngineView.tsx
+  s_6884b16d8e6d90::t_7ff1a089a751a7 42-43,59,111
+src/shared/platform/__tests__/PlayerEngineView.test.tsx
+  s_6884b16d8e6d90::t_9560a3987dcceb 152-169
+src/shared/platform/playerEngine.ts
+  s_6884b16d8e6d90::t_456ec030bde067 69-75
+src/shared/services/__tests__/perfMark.test.ts
+  s_6884b16d8e6d90::t_8d5581d313f7f7 1-38
+src/shared/services/perfMark.ts
+  s_6884b16d8e6d90::t_1070832ba740b9 1-40
+src/shared/ui/PostGrid.tsx
+  s_6884b16d8e6d90::t_4ba14ba903c683 772-775,804-811
+src/test/playerEngineMock.tsx
+  s_6884b16d8e6d90::t_22b1c69b84c45e 12-13
+src/test/playerFlowHarness.tsx
+  s_6884b16d8e6d90::t_3b22d55b1ec077 237-246
+_bmad-output/implementation-artifacts/epic-9-context.md
+  s_bbad9b3ffd3565::t_221192f2befc15 7,11-12,20-24,27-29,31,34,37-38,40,44-47,49,53-55,59-62
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "b338d47f0d26cb0d7153ee31f69b0aaf01265c73",
+  "prompts": {},
+  "sessions": {
+    "s_6884b16d8e6d90": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0996ac81-5811-4fbc-abf9-a4c938711610",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_bbad9b3ffd3565": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ac38802f13ef17c5f",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
