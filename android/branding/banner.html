@@ -1,0 +1,46 @@
+<!doctype html>
+<!--
+  Boosty TV launcher banner (Android TV / Google TV), 320x180 px at xhdpi.
+  Rendered by render.mjs to res/drawable-xhdpi/tv_banner.png. Open this file in a
+  browser to preview it. Neutral artwork: no Boosty logo, colours or wordmark style.
+  Colours are app tokens (src/shared/ui/tokens.ts); the font is the bundled Golos Text.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face {
+    font-family: "Golos Text";
+    font-weight: 600;
+    src: url("../app/src/main/assets/fonts/GolosText-SemiBold.ttf") format("truetype");
+  }
+  html, body { margin: 0; padding: 0; }
+  body { width: 320px; height: 180px; overflow: hidden; background: #171615; }
+  .banner {
+    box-sizing: border-box;
+    width: 320px; height: 180px;
+    display: flex; align-items: center; justify-content: center; gap: 14px;
+    padding: 0 20px;
+  }
+  .mark { width: 76px; height: 76px; flex: none; }
+  .word {
+    font-family: "Golos Text", sans-serif; font-weight: 600;
+    font-size: 38px; line-height: 1; letter-spacing: -0.5px;
+    color: #F4EFE7; white-space: nowrap;
+  }
+  .word .tv { color: #E8914A; }
+</style>
+</head>
+<body>
+  <div class="banner">
+    <!-- Same mark as icon.svg, cropped to its 26..82 box. -->
+    <svg class="mark" viewBox="26 26 56 56" xmlns="http://www.w3.org/2000/svg">
+      <path fill="#E8914A" fill-rule="evenodd"
+            d="M37,36 H71 A7,7 0 0 1 78,43 V63 A7,7 0 0 1 71,70 H37 A7,7 0 0 1 30,63 V43 A7,7 0 0 1 37,36 Z M49,44.5 L62.5,53 L49,61.5 Z"/>
+      <path fill="#E8914A"
+            d="M45.5,74 H62.5 A1.5,1.5 0 0 1 62.5,77 H45.5 A1.5,1.5 0 0 1 45.5,74 Z"/>
+    </svg>
+    <div class="word">Boosty <span class="tv">TV</span></div>
+  </div>
+</body>
+</html>

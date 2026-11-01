@@ -10,10 +10,16 @@
 const fs = require('fs');
 const path = require('path');
 
-const manifest = fs.readFileSync(
-  path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'AndroidManifest.xml'),
-  'utf8',
-);
+const main = path.join(__dirname, '..', 'android', 'app', 'src', 'main');
+const res = path.join(main, 'res');
+const manifest = fs.readFileSync(path.join(main, 'AndroidManifest.xml'), 'utf8');
+
+/** Width and height from a PNG's IHDR chunk. */
+function pngSize(file) {
+  const buf = fs.readFileSync(file);
+  expect(buf.toString('latin1', 1, 4)).toBe('PNG');
+  return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+}
 
 describe('AndroidManifest.xml', () => {
   it('takes usesCleartextTraffic from the build-type placeholder', () => {
@@ -58,5 +64,44 @@ describe('AndroidManifest.xml', () => {
     expect(queries).toContain('android:scheme="https"');
     expect(queries).not.toContain('<package');
     expect(manifest).not.toContain('QUERY_ALL_PACKAGES');
+  });
+
+  it('Story 9.1: the banner resolves to one 320x180 xhdpi PNG', () => {
+    const banners = [...manifest.matchAll(/android:banner="([^"]*)"/g)].map(m => m[1]);
+    expect(banners.length).toBeGreaterThan(0);
+    expect(new Set(banners)).toEqual(new Set(['@drawable/tv_banner']));
+    const found = fs
+      .readdirSync(res)
+      .filter(dir => dir.startsWith('drawable'))
+      .filter(dir => fs.readdirSync(path.join(res, dir)).some(f => f.startsWith('tv_banner.')));
+    expect(found).toEqual(['drawable-xhdpi']);
+    expect(pngSize(path.join(res, 'drawable-xhdpi', 'tv_banner.png'))).toEqual({
+      width: 320,
+      height: 180,
+    });
+  });
+
+  it('Story 9.1: the launcher icon is adaptive on API 26+ with legacy PNGs below', () => {
+    expect(manifest).toContain('android:icon="@mipmap/ic_launcher"');
+    expect(manifest).toContain('android:roundIcon="@mipmap/ic_launcher_round"');
+    for (const name of ['ic_launcher', 'ic_launcher_round']) {
+      const xml = fs.readFileSync(path.join(res, 'mipmap-anydpi-v26', `${name}.xml`), 'utf8');
+      expect(xml).toContain('<adaptive-icon');
+      expect(xml).toContain('@color/ic_launcher_background');
+      expect(xml).toContain('@drawable/ic_launcher_foreground');
+    }
+    expect(fs.existsSync(path.join(res, 'drawable', 'ic_launcher_foreground.xml'))).toBe(true);
+    expect(fs.readFileSync(path.join(res, 'values', 'ic_launcher_background.xml'), 'utf8')).toContain(
+      'name="ic_launcher_background"',
+    );
+    const sizes = { mdpi: 48, hdpi: 72, xhdpi: 96, xxhdpi: 144, xxxhdpi: 192 };
+    for (const [density, size] of Object.entries(sizes)) {
+      for (const name of ['ic_launcher', 'ic_launcher_round']) {
+        expect(pngSize(path.join(res, `mipmap-${density}`, `${name}.png`))).toEqual({
+          width: size,
+          height: size,
+        });
+      }
+    }
   });
 });

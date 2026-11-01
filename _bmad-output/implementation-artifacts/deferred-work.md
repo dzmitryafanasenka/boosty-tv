@@ -353,3 +353,6 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-8-3-hidden-diagnostics.md`
   summary: Add a JVM (or instrumented) test for LogFileModule rotation, clear of both files and the append/clear order.
   evidence: The native log file behaviour is guarded only by source-text assertions (`__tests__/logFileModule.test.js`); the repo has no JVM test setup (Story 8.3 review, V4).
+- source_spec: `_bmad-output/implementation-artifacts/spec-9-1-signed-release-on-github-releases.md`
+  summary: Agent branch builds signed with the release key carry the same versionName/versionCode as the published release, so «Версия», diagnostics and the 9.2 comparison cannot tell them apart, and installing an older branch build needs `adb install -r -d`.
+  evidence: Story 9.1 review (Blind Hunter); owner chose branch builds replacing the family build (2026-11-01) but no build marker rule exists. Decide with 9.2 (for example a debug-only suffix or a commit field in diagnostics).

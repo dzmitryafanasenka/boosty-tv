@@ -47,8 +47,10 @@ jobs:
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
       - run: npm ci
-      # No signing secrets: debug uses the runner's generated debug keystore,
-      # release stays unsigned (the owner signs locally). One ABI keeps CI fast.
+      # No signing secrets: debug uses the runner's generated debug keystore.
+      # Gradle signs release only from the owner's four BOOSTYTV_RELEASE_*
+      # properties (docs/release.md); CI has none, so release stays unsigned.
+      # One ABI keeps CI fast.
       - name: assembleDebug assembleRelease
         working-directory: android
         run: ./gradlew assembleDebug assembleRelease -PreactNativeArchitectures=x86_64 --no-daemon
@@ -61,3 +63,24 @@ jobs:
           grep -q 'allowBackup(0x[0-9a-f]*)=(type 0x12)0x0' release-manifest.txt || { echo "release must disable backup"; exit 1; }
           grep -q 'android.intent.category.LEANBACK_LAUNCHER' release-manifest.txt || { echo "LEANBACK_LAUNCHER missing"; exit 1; }
           grep -q 'banner(0x' release-manifest.txt || { echo "TV banner missing"; exit 1; }
+          "$AAPT" dump badging app/build/outputs/apk/release/app-release-unsigned.apk > release-badging.txt
+          NAME="$(sed -n "s/^package: .* versionName='\([^']*\)'.*/\1/p" release-badging.txt)"
+          CODE="$(sed -n "s/^package: .* versionCode='\([^']*\)'.*/\1/p" release-badging.txt)"
+          echo "$NAME" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "versionName must be MAJOR.MINOR.PATCH, got '$NAME'"; exit 1; }
+          IFS=. read -r MAJOR MINOR PATCH <<< "$NAME"
+          EXPECTED=$((10#$MAJOR * 10000 + 10#$MINOR * 100 + 10#$PATCH))
+          [ "$CODE" = "$EXPECTED" ] || { echo "versionCode $CODE, expected $EXPECTED for $NAME"; exit 1; }
+      # A partial set of the signing properties must fail and name only the
+      # missing keys, never a value.
+      - name: Check partial signing properties fail
+        working-directory: android
+        run: |
+          if ./gradlew :app:checkReleaseSigning -PBOOSTYTV_RELEASE_KEY_ALIAS=ci-dummy --no-daemon > partial-signing.txt 2>&1; then
+            echo "a partial signing set must fail"; exit 1
+          fi
+          for key in BOOSTYTV_RELEASE_STORE_FILE BOOSTYTV_RELEASE_STORE_PASSWORD BOOSTYTV_RELEASE_KEY_PASSWORD; do
+            grep -q "$key" partial-signing.txt || { echo "message must name $key"; exit 1; }
+          done
+          if grep -q 'ci-dummy' partial-signing.txt; then
+            echo "output must not contain a property value"; exit 1
+          fi
