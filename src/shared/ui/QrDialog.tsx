@@ -26,6 +26,50 @@ export type QrDialogProps = {
   testID?: string;
 };
 
+export type QrCodeBoxProps = {
+  /** The QR target; only drawn, never shown as text, logged or stored. */
+  value: string;
+  testID: string;
+};
+
+/**
+ * The QR code on its white `qr-bg` square (200 dp), or «Не удалось показать
+ * QR-код» when the value cannot be encoded. Not focusable. QrDialog's code,
+ * also used inside other dialogs (Story 9.2: the update dialog's fallback).
+ */
+export function QrCodeBox({ value, testID }: QrCodeBoxProps) {
+  const [failed, setFailed] = useState(false);
+  // The library reports a value it cannot encode during its own render:
+  // deferred, so this box never updates in the middle of a child's render.
+  const onQrError = useCallback(() => {
+    Promise.resolve().then(() => setFailed(true));
+  }, []);
+  return (
+    <View
+      testID={`${testID}/code`}
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={failed ? t('qr.error') : t('qr.a11yCode')}
+      style={styles.code}
+    >
+      {failed ? (
+        // Dark text: it sits on the white `qr-bg`.
+        <Text variant="body-s" color="bg" style={styles.error}>
+          {t('qr.error')}
+        </Text>
+      ) : (
+        <QrCode
+          testID={`${testID}/svg`}
+          value={value}
+          size={TOKENS.qrSize}
+          background={TOKENS.qrBg}
+          onError={onQrError}
+        />
+      )}
+    </View>
+  );
+}
+
 /**
  * DESIGN.md QrDialog (`qr-dialog` tokens, Story 6.3, focus-map §4 F7): the
  * title, a QR code generated on the device (200 dp on `qr-bg`), «Откроется на
@@ -36,42 +80,15 @@ export type QrDialogProps = {
  */
 export function QrDialog({ title, value, onClose, testID = 'dialog/qr' }: QrDialogProps) {
   const closeRef = useRef<HostView>(null);
-  const [failed, setFailed] = useState(false);
   useEffect(() => {
     requestHostFocus(closeRef.current);
-  }, []);
-  // The library reports a value it cannot encode during its own render:
-  // deferred, so this dialog never updates in the middle of a child's render.
-  const onQrError = useCallback(() => {
-    Promise.resolve().then(() => setFailed(true));
   }, []);
   return (
     <View testID={testID} style={styles.dialog}>
       <Text variant="title-s" accessibilityRole="header" numberOfLines={2} style={styles.title}>
         {title}
       </Text>
-      <View
-        testID={`${testID}/code`}
-        accessible
-        accessibilityRole="image"
-        accessibilityLabel={failed ? t('qr.error') : t('qr.a11yCode')}
-        style={styles.code}
-      >
-        {failed ? (
-          // Dark text: it sits on the white `qr-bg`.
-          <Text variant="body-s" color="bg" style={styles.error}>
-            {t('qr.error')}
-          </Text>
-        ) : (
-          <QrCode
-            testID={`${testID}/svg`}
-            value={value}
-            size={TOKENS.qrSize}
-            background={TOKENS.qrBg}
-            onError={onQrError}
-          />
-        )}
-      </View>
+      <QrCodeBox value={value} testID={testID} />
       <Text variant="body-s" color="text-secondary" style={styles.hint}>
         {t('qr.hint')}
       </Text>
@@ -98,9 +115,9 @@ const styles = StyleSheet.create({
   },
   title: {
     textAlign: 'center',
+    marginBottom: spacing['8'],
   },
   code: {
-    marginTop: spacing['8'],
     width: TOKENS.qrSize,
     height: TOKENS.qrSize,
     borderRadius: components['qr-dialog'].radius / 2,

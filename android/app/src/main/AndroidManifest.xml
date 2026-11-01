@@ -1,6 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Story 9.2 (owner decision 2026-11-01): hand a downloaded release APK to the
+         system installer, which asks the user. The user grants it per app in
+         «Установка неизвестных приложений»; no silent install. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Android TV / Google TV: no touchscreen required, leanback optional so the
          same APK also installs on non-leanback Android devices used for testing. -->
@@ -48,5 +52,16 @@
             <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
         </intent-filter>
       </activity>
+      <!-- Story 9.2: content URIs for the downloaded update APK only
+           (res/xml/update_file_paths.xml: cacheDir/updates/). -->
+      <provider
+        android:name="androidx.core.content.FileProvider"
+        android:authorities="${applicationId}.updates"
+        android:exported="false"
+        android:grantUriPermissions="true">
+        <meta-data
+          android:name="android.support.FILE_PROVIDER_PATHS"
+          android:resource="@xml/update_file_paths" />
+      </provider>
     </application>
 </manifest>

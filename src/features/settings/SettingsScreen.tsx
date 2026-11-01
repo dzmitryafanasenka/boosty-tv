@@ -1,7 +1,7 @@
-import { useCallback, useRef, type RefObject } from 'react';
+import { useCallback, useMemo, useRef, type RefObject } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useZoneItem } from '../../shared/focus';
-import { t } from '../../shared/i18n';
+import { t, tf } from '../../shared/i18n';
 import { getVersionName } from '../../shared/platform/appInfo';
 import { SettingRow, Text, spacing, type HostView } from '../../shared/ui';
 import { useVersionPresses } from './useVersionPresses';
@@ -36,6 +36,20 @@ export type SettingsScreenProps = {
    * any number of presses.
    */
   onOpenDiagnostics?: () => void;
+  /**
+   * Story 9.2 (FR-56): the first OK of a «Версия» press series
+   * (`useVersionPresses` `onFirstPress`, so the seven-press gesture runs it
+   * at most once). The app opens the update dialog for a known release, or
+   * runs the manual check (its own 60 s throttle); the row is the
+   * initiator, so focus returns to it. Absent (`phaseFlags.updateCheck`
+   * off, the demo): no check.
+   */
+  onVersionFirstPress?: (initiator: RefObject<HostView | null>) => void;
+  /**
+   * Story 9.2: a newer release is known (`X.Y.Z`): «Версия» reads
+   * «0.9.0 · доступна X.Y.Z». Absent: the installed version only.
+   */
+  availableVersion?: string;
   /**
    * OK on «Выйти из аккаунта» (Story 2.7): the app opens the sign-out
    * dialog in the modal host with the row as the initiator, so focus
@@ -73,9 +87,11 @@ export type SettingsScreenProps = {
  * Настройки (Stories 2.4, 2.7, 8.2): first the toggle row «Системный
  * видеоплеер» (Story 8.2, when given: «Вкл» / «Выкл», a description that
  * progress is not tracked; OK flips it at once); then the info row «Версия
- * <versionName>» (OK does nothing visible; seven quick presses open the
- * hidden Diagnostics when `onOpenDiagnostics` is given, Story 8.3), the
- * initial focus of the section; below
+ * <versionName>» (seven quick presses open the hidden Diagnostics when
+ * `onOpenDiagnostics` is given, Story 8.3; the first OK of a series runs
+ * `onVersionFirstPress`, the update check or dialog, Story 9.2; with a
+ * known newer release it reads «0.9.0 · доступна X.Y.Z»), the initial
+ * focus of the section; below
  * it the nav row «Выйти из аккаунта», which opens the sign-out dialog; the
  * debug rows (`__DEV__` only) after it. Rendered inside the Shell's content
  * FocusZone.
@@ -83,6 +99,8 @@ export type SettingsScreenProps = {
 export function SettingsScreen({
   externalPlayer,
   onOpenDiagnostics,
+  onVersionFirstPress,
+  availableVersion,
   onOpenSignOut,
   onOpenFocusCheck,
   onCheckSession,
@@ -90,8 +108,31 @@ export function SettingsScreen({
   onBreakNextVideoUrl,
 }: SettingsScreenProps) {
   const externalPlayerRow = useZoneItem(SETTINGS_EXTERNAL_PLAYER_ID);
-  const onVersionPress = useVersionPresses(onOpenDiagnostics);
   const version = useZoneItem(SETTINGS_VERSION_ID);
+  /** The row's host view, the update dialog's initiator. */
+  const versionView = useRef<HostView | null>(null);
+  const versionZoneRef = version.ref;
+  const versionRef = useCallback(
+    (view: HostView | null) => {
+      versionView.current = view;
+      versionZoneRef?.(view);
+    },
+    [versionZoneRef],
+  );
+  const onFirstPress = useMemo(
+    () => (onVersionFirstPress ? () => onVersionFirstPress(versionView) : undefined),
+    [onVersionFirstPress],
+  );
+  const onVersionPress = useVersionPresses(onOpenDiagnostics, onFirstPress);
+  const installed = getVersionName();
+  const versionValue =
+    installed !== null && availableVersion !== undefined
+      ? tf('settings.versionUpdate', { current: installed, version: availableVersion })
+      : (installed ?? t('settings.versionUnknown'));
+  const versionA11y =
+    installed !== null && availableVersion !== undefined
+      ? tf('settings.versionUpdateA11y', { current: installed, version: availableVersion })
+      : undefined;
   const focusCheck = useZoneItem(SETTINGS_FOCUS_CHECK_ID);
   const sessionCheck = useZoneItem(SETTINGS_SESSION_CHECK_ID);
   const expiredCheck = useZoneItem(SETTINGS_EXPIRED_CHECK_ID);
@@ -128,11 +169,12 @@ export function SettingsScreen({
           />
         ) : null}
         <SettingRow
-          ref={version.ref}
+          ref={versionRef}
           testID={SETTINGS_VERSION_ID}
           kind="info"
           label={t('settings.version')}
-          value={getVersionName() ?? t('settings.versionUnknown')}
+          value={versionValue}
+          accessibilityLabel={versionA11y}
           onPress={onVersionPress}
           onFocus={version.onFocus}
         />

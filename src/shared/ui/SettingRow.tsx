@@ -45,6 +45,11 @@ export type SettingRowProps = {
   selected?: boolean;
   /** `check` rows: checked (accent box with a tick, `accessibilityState.checked`); `toggle` rows: on (accent value). */
   checked?: boolean;
+  /**
+   * Replaces the spoken label (default: label, value and description
+   * joined), e.g. «Версия» with a known update (Story 9.2).
+   */
+  accessibilityLabel?: string;
   onFocus?: (event: FocusEvent) => void;
   onBlur?: (event: BlurEvent) => void;
   hasTVPreferredFocus?: boolean;
@@ -72,6 +77,7 @@ export function SettingRow({
   onPress,
   selected = false,
   checked = false,
+  accessibilityLabel,
   onFocus,
   onBlur,
   hasTVPreferredFocus,
@@ -86,7 +92,7 @@ export function SettingRow({
     styles.surface,
     focused && { backgroundColor: TOKENS.bgFocus },
   ];
-  const a11yLabel = [label, value, description].filter(Boolean).join(' ');
+  const a11yLabel = accessibilityLabel ?? [label, value, description].filter(Boolean).join(' ');
 
   return (
     <FocusableSurface

@@ -310,6 +310,36 @@ export const ru = {
     a11yCode: 'QR-код',
     error: 'Не удалось показать QR-код',
   },
+  // Update notice and in-app install (Story 9.2, FR-56): the passive plaque
+  // after an automatic check, and the dialog opened from «Версия». Nothing
+  // downloads before «Скачать и установить»; the Android installer asks
+  // again. The QR (the release page) is the fallback.
+  update: {
+    plaque: 'Доступна версия {version} · Настройки → Версия',
+    dialog: {
+      title: 'Доступна версия {version}',
+      noNotes: 'Описание изменений не указано.',
+      install: 'Скачать и установить',
+      close: 'Закрыть',
+      cancel: 'Отменить',
+      permission:
+        'Чтобы установить обновление, разрешите Boosty TV устанавливать приложения. Откроется экран «Установка неизвестных приложений»: включите разрешение и вернитесь назад.',
+      openSettings: 'Открыть настройки',
+      permissionDenied: 'Разрешение не включено. Обновление можно скачать по QR-коду.',
+      downloading: 'Загружаем обновление… {percent} %',
+      verifying: 'Проверяем файл…',
+      installing: 'Открыт установщик Android. Подтвердите установку.',
+      qrHint: 'Страница выпуска откроется на телефоне',
+      unavailable: 'Это обновление нельзя установить прямо на телевизоре. Его можно скачать по QR-коду.',
+      failed: {
+        network: 'Не удалось загрузить обновление. Проверьте подключение к сети.',
+        digest: 'Файл обновления не прошёл проверку и удалён.',
+        storage: 'Не удалось сохранить файл обновления.',
+        installCancelled: 'Установка отменена.',
+        install: 'Не удалось установить обновление.',
+      },
+    },
+  },
   // File sizes (Story 6.3): `{n}` is already formatted (a decimal comma).
   fileSize: {
     b: '{n} Б',
@@ -610,6 +640,9 @@ export const ru = {
     version: 'Версия',
     /** Shown when the native versionName cannot be read. */
     versionUnknown: 'неизвестна',
+    // Story 9.2: «Версия» while a newer release is known; OK opens the update dialog.
+    versionUpdate: '{current} · доступна {version}',
+    versionUpdateA11y: 'Версия {current}. Доступна версия {version}, нажмите OK, чтобы обновить',
     signOut: {
       row: 'Выйти из аккаунта',
     },

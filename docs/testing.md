@@ -232,8 +232,9 @@ npm run check:fixtures   # sanitization check for src/test/fixtures (Story 1.5)
 npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output /tmp/rn-check.bundle   # release Metro bundle (Zod 4 needs the Babel plugin; Story 2.2, also in CI)
 npm ls react-native        # react-native@npm:react-native-tvos@0.87.1-1, deduped
 cd android && ./gradlew assembleDebug assembleRelease
-aapt dump badging app/build/outputs/apk/debug/app-debug.apk   # leanback-launchable-activity + banner
-aapt dump xmltree app/build/outputs/apk/release/app-release-unsigned.apk AndroidManifest.xml
+# Story 9.2 ABI splits: app-<abi>-<type>[-unsigned].apk plus app-universal-<type>[-unsigned].apk
+aapt dump badging app/build/outputs/apk/debug/app-universal-debug.apk   # leanback-launchable-activity + banner
+aapt dump xmltree app/build/outputs/apk/release/app-universal-release-unsigned.apk AndroidManifest.xml
 ```
 
 Device install and launch (owner connects the Chromecast over network `adb`):
@@ -241,7 +242,7 @@ Device install and launch (owner connects the Chromecast over network `adb`):
 ```sh
 adb pair <chromecast-ip>:<pairing-port> <code>   # once, from «Беспроводная отладка» → pair with code
 adb connect <chromecast-ip>:<debug-port>
-adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+adb install -r android/app/build/outputs/apk/debug/app-armeabi-v7a-debug.apk   # the Chromecast's split (or app-universal-debug.apk)
 adb reverse tcp:8081 tcp:8081 && npm start
 adb shell wm size && adb shell wm density   # dp = px * 160 / density
 ```
@@ -334,8 +335,8 @@ The three missing ADRs are recorded elsewhere as decisions; the owner can accept
 |---|---|
 | `npm ci && npm run lint && npm run typecheck && npm test` | Pass (3 suites, 25 tests) after the review fixes |
 | `npm ls react-native` | `react-native-tvos@0.87.1-1`, one copy |
-| `./gradlew assembleDebug` | BUILD SUCCESSFUL, `app-debug.apk` |
-| `./gradlew assembleRelease` | BUILD SUCCESSFUL, `app-release-unsigned.apk` |
+| `./gradlew assembleDebug` | BUILD SUCCESSFUL, `app-debug.apk` (before the 9.2 ABI splits) |
+| `./gradlew assembleRelease` | BUILD SUCCESSFUL, `app-release-unsigned.apk` (before the 9.2 ABI splits) |
 | Debug APK badging | `leanback-launchable-activity` with banner, `launchable-activity`, touchscreen/faketouch/leanback not required, `allowBackup=false`, cleartext on |
 | Release APK manifest | `usesCleartextTraffic=false`, `allowBackup=false`, not debuggable. The same `aapt` check now runs in CI ("Check release manifest") |
 | On-device install (physical Chromecast) | `adb install -r app-debug.apk` → Success |
@@ -917,6 +918,41 @@ Review fixes (2026-10-28, host-tested only): short visits write nothing (owner d
 
 Host tests: `src/shared/services/progress/__tests__/progressRepository.test.ts` (29: the finished rule and status, resume precedence, the 10 s cadence, one write in flight with the latest position, forced events, start over, seeks as movement, failure gating ≥ 10 s and the bounded automatic retry, expired hold/flush/drop, sign-out wipe, a late write after a reset, the debounced/forced disk write, cold-start load, corrupt disk, the 200-entry cap, the stale disk write undone, a load after a reset dropped, stable snapshots); `__tests__/playerProgressFlow.test.tsx` «progress and resume (Story 4.2)» (10: server only with no pre-seek t=0 and the E9 request shape, local wins, finished, multi-video + start over, hold-scrub, background and end, the vanished «С начала» fallback, failure retry, cold start from the persisted entry, log hygiene); `__tests__/postFlow.test.tsx` (status and «Продолжить» only while the player is on); `__tests__/accountScopeRegistry.test.js` (`progress` registered); `demoFlow` (the row label now ends with the status). Lint (`--max-warnings 0`), typecheck, `check:fixtures` clean; `npm test` ×3: 1494 passed each; `playerFlow` + `postFlow` + the progress suite 30/30 (187 tests each run).
 
+### Story 9.2 — Update notice and in-app install from GitHub Releases, 2026-11-01
+
+**Status: implemented and host-tested; the release build checked on the build host; the full update path run on the pinned device (2026-11-01, below): agent over adb up to the dialog, the owner with the physical remote for the permission screen and the system installer.** `spec-9-2-update-notice-from-github-releases.md`. `UpdateChecker` (`src/features/update/`, wired in `src/app/update.ts` over `fetchTransport`) reads `GET https://api.github.com/repos/dzmitryafanasenka/boosty-tv/releases/latest` with only `Accept: application/vnd.github+json` and `X-GitHub-Api-Version: 2022-11-28`, `credentials: 'omit'`, a 10 s timeout and no retry: on start and on return to the foreground at most once per day (`update.state.v1` in `boostytv-device`), and on the first OK of a «Версия» press series at most once per 60 s. A newer `vX.Y.Z` tag shows the passive plaque (about 10 s, not focusable, never over the Player) and «0.9.0 · доступна X.Y.Z»; OK opens the update dialog (K5, `docs/focus-map.md` §5). After «Скачать и установить»: `canRequestPackageInstalls` (else «Открыть настройки» → `ACTION_MANAGE_UNKNOWN_APP_SOURCES`), the download of the device-ABI asset (else the universal one) through `AppUpdaterModule.kt` into `cacheDir/updates/update.apk` with progress (Back cancels and deletes it), the SHA-256 check against GitHub's asset digest, and `ACTION_INSTALL_PACKAGE` with a FileProvider URI. A failure, a mismatch or an installer cancel shows the reason and the QR. Phase flag `updateCheck`; off in the demo.
+
+Host tests:
+- `src/features/update/__tests__/releaseInfo.test.ts`: tag / versionName parsing and numeric compare, the notes before `---` as capped plain text, the release shape, the page URL fallback, the stored copy, and the asset pick (per-ABI in device order, the universal fallback, no asset, no or bad digest, a foreign or non-HTTPS URL, bad sizes, no fallback from an unusable per-ABI asset).
+- `src/features/update/__tests__/updateChecker.test.ts`: every check row of the matrix (newer on start, within a day, persisted gate, same, stored release dropped after the update, manual OK and its 60 s throttle, one request at a time, demo / flag off / unparsable version → no request), the request URL and exact headers, one log entry per failure (`reason`, `status`), the timeout.
+- `__tests__/updateDialog.test.tsx` (fake port): info with «Закрыть» focused and nothing downloaded, the allowed install (progress → verify → installer), installer cancelled, digest / network / storage failures with the QR and no retry, Back and «Отменить» cancel and the dialog stays, unmount cancels, not allowed → the system screen → granted on return → download, still denied → the QR, the settings screen missing, the ABI fallback, no digest / foreign URL / no asset → the QR at once, empty notes, logs without URL / digest / path.
+- `src/features/update/__tests__/UpdatePlaque.test.tsx`: the text, not focusable / no touches / hidden from accessibility, gone after 10 s, Player on top → none and dropped.
+- `src/shared/platform/__tests__/appUpdater.test.ts`: the port without a module, progress events, the native codes, install answers, the permission calls.
+- `__tests__/appUpdaterModule.test.js`: a source guard for the module (registration, `ACTION_INSTALL_PACKAGE` + FileProvider, no PackageInstaller session, the repository prefix, HTTPS and GitHub-only redirects, SHA-256, delete on failure, nothing logged), the manifest permission and provider, `update_file_paths.xml` (`cache-path updates/` only) and the gradle splits.
+- `__tests__/updateFlow.test.tsx` (the real App): the start-up request with no Boosty headers and nothing else fetched off Boosty, the plaque never focusable and focus unchanged, gone after 10 s, a restart within a day, same version, the flag off, the row hint and its a11y label, OK → the dialog («Закрыть» focused, no extra request), Back → «Версия», no download before «Скачать и установить» and then the repository URL, manual OK → the dialog, the seven-press gesture → one request and Diagnostics, a failed manual check → one log entry.
+- `__tests__/demoFlow.test.tsx`: the demo sends no check and shows no plaque. `src/app/__tests__/phaseFlags.test.ts`: the new flag.
+
+Checks run (build host):
+- `npm run lint -- --max-warnings 0`, `npm run typecheck`, `npm run check:fixtures` (30): clean.
+- `npm test`: 154 suites, 3185 passed in two of three full runs; one run had one failure in `src/shared/api/__tests__/sessionManager.test.ts` (untouched by this story), which passed in four isolated runs: recorded as a flake to watch.
+- `(cd android && ./gradlew clean assembleRelease)` (`JAVA_HOME=/opt/homebrew/opt/openjdk@17`, `ANDROID_HOME=/opt/homebrew/share/android-commandlinetools`, the owner's signing properties, values never read): BUILD SUCCESSFUL; `app-armeabi-v7a-release.apk`, `app-arm64-v8a-release.apk`, `app-x86-release.apk`, `app-x86_64-release.apk` (one ABI each in `native-code`) and `app-universal-release.apk` (all four); every APK `Verifies` (v2), the release certificate SHA-256 `b7b8b0f1…c47d59eb`, `versionCode='900' versionName='0.9.0'`, `REQUEST_INSTALL_PACKAGES`; the merged manifest has the FileProvider `io.github.dzmitryafanasenka.boostytv.updates`, not exported, with URI grants.
+
+Device: **not run yet.** Planned row (spec «Device»; owner with the physical remote for the installer screens, the agent over adb for the rest): a temporary uncommitted build with `versionName "0.8.0"` / `versionCode 900`; the plaque, the hint, the dialog, the first-time «Установка неизвестных приложений» screen, the download of the v0.9.0 universal APK (the fallback path: v0.9.0 has no per-ABI assets), the digest, the system installer → the real 0.9.0 installed, the session kept.
+
+
+Device (Chromecast with Google TV, API 34, 2026-11-01). A temporary, uncommitted build from the 9.2 tree with `versionName "0.8.0"` and `versionCode 900` (`assembleRelease -PreactNativeArchitectures=armeabi-v7a`, the release key; `build.gradle` restored right after), installed with `adb install -r` over the published 0.9.0:
+
+| Row | Result | Who |
+|---|---|---|
+| Install over 0.9.0 | `Success`, `versionName=0.8.0`, `versionCode=900`; cold start → Главная, session kept | agent via adb |
+| Newer on start | The plaque «Доступна версия 0.9.0 · Настройки → Версия» at the bottom right; focus stayed on the first card | agent via adb (screenshot) |
+| Row hint | Настройки → «Версия 0.8.0 · доступна 0.9.0» | agent via adb (screenshot) |
+| OK on «Версия» | Dialog «Доступна версия 0.9.0»: the Russian notes (capped with «…»), «Скачать и установить», «Закрыть» (focused) | agent via adb (screenshot) |
+| Permission | «Скачать и установить» → the explanation → «Открыть настройки» → the system «Установка неизвестных приложений» screen; enabled, Back → the download continued | owner, physical remote |
+| Download + digest | The v0.9.0 release has only the universal asset, so the universal fallback was used (83 962 932 bytes); progress, then the SHA-256 check passed (the installer opened) | owner, physical remote |
+| System installer | `com.google.android.packageinstaller` opened; the owner confirmed; installed: `versionName=0.9.0`, `versionCode=900`, same signature, `lastUpdateTime 13:05:31`; `REQUEST_INSTALL_PACKAGES: allow`; the session kept | owner (remote), agent via adb (`dumpsys`, `appops`) |
+
+Not seen on the device: a per-ABI asset (first possible with the next release), a digest mismatch, cancel during the download, the denied-permission return, a failed install (host-tested). The installed 0.9.0 has no updater, so the downloaded file stays in `cacheDir/updates/` until the next start of a build with the updater (`cleanup` on start).
 ### Story 9.1 — Signed release on GitHub Releases, 2026-11-01
 
 **Status: implemented, host-checked and checked on the pinned device (agent over adb, the owner signed in with the physical remote); published as GitHub Release `v0.9.0` (below).** `spec-9-1-signed-release-on-github-releases.md`. Release signing from four owner-held Gradle properties (all set: signed; none or empty: unsigned; partial: `checkReleaseSigning` fails before packaging and names only the missing keys), `versionName` `0.9.0` validated as `MAJOR.MINOR.PATCH` with `versionCode` 900 derived from it, the final neutral banner (`drawable-xhdpi/tv_banner.png`, 320×180) and adaptive icon (`mipmap-anydpi-v26`, vector foreground, legacy PNGs) rendered by `android/branding/render.mjs` with headless Chrome, `CHANGELOG.md` / `CHANGELOG.ru.md`, and [release.md](release.md).

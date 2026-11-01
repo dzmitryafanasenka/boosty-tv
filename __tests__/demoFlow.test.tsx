@@ -39,6 +39,8 @@ import {
   topScreen,
 } from '../src/test/flow';
 
+import { updateChecker, updateEnabled, updateStore } from '../src/app/update';
+
 jest.mock('react-native-keychain');
 jest.mock('../src/app/appConfig', () => ({ DEMO_MODE: true }));
 jest.mock('../src/shared/ui/requestHostFocus', () => ({
@@ -788,4 +790,21 @@ test('Story 8.2: a demo «Системный видеоплеер» toggle stays
     externalPlayerPreference.forget();
     await real.clear();
   }
+});
+
+test('Story 9.2: the demo sends no update check, deletes no update files and shows no plaque, even with a parsable version', async () => {
+  const cleanup = jest.fn(() => Promise.resolve(true));
+  installNativeModules({ AppInfo: { versionName: '0.9.0' }, AppUpdater: { cleanup } });
+  fetchMock.mockClear();
+  const root = await renderApp();
+  await settle({ rounds: 10, timerRounds: 0 });
+  expect(cleanup).not.toHaveBeenCalled();
+  expect(updateEnabled()).toBe(false);
+  await expect(updateChecker.checkManual()).resolves.toBeNull();
+  expect(fetchMock).not.toHaveBeenCalled();
+  expect(root.container.queryAll(n => n.props.testID === 'update/plaque')).toHaveLength(0);
+  expect(updateStore.get()).toEqual({ known: null, plaque: null });
+  await act(async () => {
+    root.unmount();
+  });
 });

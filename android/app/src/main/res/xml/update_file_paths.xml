@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Story 9.2: the FileProvider shares only the update APK directory
+     (AppUpdaterModule.DIR_NAME), never the rest of the app's files. -->
+<paths>
+    <cache-path name="updates" path="updates/" />
+</paths>

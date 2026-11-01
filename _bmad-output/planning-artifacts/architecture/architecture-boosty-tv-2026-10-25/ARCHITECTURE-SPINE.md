@@ -310,6 +310,7 @@ Arrows mean "may import". `shared` never imports `features` or `app`. Features n
   - CI (GitHub Actions) runs only lint, typecheck, tests and the debug build.
   - The owner builds and signs the release APK locally and attaches it to a GitHub Release tagged `v{versionName}`.
   - `UpdateChecker` uses its own unauthenticated client and compares against that tag.
+  - Story 9.2 (owner decision 2026-11-01): `UpdateChecker` lives in `features/update` (the app wires it in `app/update.ts` over `fetchTransport`, never `HttpClient`, so no Boosty auth or per-attempt `http` log line reaches GitHub). The release attaches one APK per ABI plus the universal APK (`splits.abi`, the same `versionCode`). After an explicit OK in the update dialog, the `AppUpdater` port (`shared/platform/appUpdater.ts`, `AppUpdaterModule.kt`) downloads only this repository's release assets over HTTPS into `cacheDir/updates/`, verifies GitHub's `sha256:` digest and launches `ACTION_INSTALL_PACKAGE` with a FileProvider URI. No PackageInstaller session, no silent install. The digest comes from the same unauthenticated API response as the download URL, so it guards against a corrupted or truncated download; authenticity comes from Android refusing an update that is not signed with the installed app's key.
 
 ### AD-17 — Routes and cross-feature composition
 

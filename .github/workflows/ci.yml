@@ -54,22 +54,29 @@ jobs:
       - name: assembleDebug assembleRelease
         working-directory: android
         run: ./gradlew assembleDebug assembleRelease -PreactNativeArchitectures=x86_64 --no-daemon
+      # Story 9.2: ABI splits. The universal APK is checked, and the per-ABI
+      # split must carry the same versionCode.
       - name: Check release manifest
         working-directory: android
         run: |
           AAPT="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)aapt"
-          "$AAPT" dump xmltree app/build/outputs/apk/release/app-release-unsigned.apk AndroidManifest.xml > release-manifest.txt
+          APK=app/build/outputs/apk/release/app-universal-release-unsigned.apk
+          SPLIT=app/build/outputs/apk/release/app-x86_64-release-unsigned.apk
+          "$AAPT" dump xmltree "$APK" AndroidManifest.xml > release-manifest.txt
           grep -q 'usesCleartextTraffic(0x[0-9a-f]*)=(type 0x12)0x0' release-manifest.txt || { echo "release must not allow cleartext"; exit 1; }
           grep -q 'allowBackup(0x[0-9a-f]*)=(type 0x12)0x0' release-manifest.txt || { echo "release must disable backup"; exit 1; }
           grep -q 'android.intent.category.LEANBACK_LAUNCHER' release-manifest.txt || { echo "LEANBACK_LAUNCHER missing"; exit 1; }
           grep -q 'banner(0x' release-manifest.txt || { echo "TV banner missing"; exit 1; }
-          "$AAPT" dump badging app/build/outputs/apk/release/app-release-unsigned.apk > release-badging.txt
+          grep -q 'android.permission.REQUEST_INSTALL_PACKAGES' release-manifest.txt || { echo "REQUEST_INSTALL_PACKAGES missing"; exit 1; }
+          "$AAPT" dump badging "$APK" > release-badging.txt
           NAME="$(sed -n "s/^package: .* versionName='\([^']*\)'.*/\1/p" release-badging.txt)"
           CODE="$(sed -n "s/^package: .* versionCode='\([^']*\)'.*/\1/p" release-badging.txt)"
           echo "$NAME" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "versionName must be MAJOR.MINOR.PATCH, got '$NAME'"; exit 1; }
           IFS=. read -r MAJOR MINOR PATCH <<< "$NAME"
           EXPECTED=$((10#$MAJOR * 10000 + 10#$MINOR * 100 + 10#$PATCH))
           [ "$CODE" = "$EXPECTED" ] || { echo "versionCode $CODE, expected $EXPECTED for $NAME"; exit 1; }
+          SPLIT_CODE="$("$AAPT" dump badging "$SPLIT" | sed -n "s/^package: .* versionCode='\([^']*\)'.*/\1/p")"
+          [ "$SPLIT_CODE" = "$CODE" ] || { echo "split versionCode $SPLIT_CODE, expected $CODE"; exit 1; }
       # A partial set of the signing properties must fail and name only the
       # missing keys, never a value.
       - name: Check partial signing properties fail

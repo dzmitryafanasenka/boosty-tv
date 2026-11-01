@@ -42,6 +42,13 @@
  * gesture reveals it. While it is off, «Версия» does nothing on any number
  * of presses, and the stored «Запись логов» toggle is neither read nor
  * applied (nothing is written to the log file).
+ *
+ * `updateCheck` (Story 9.2, FR-56) is the update check of GitHub Releases
+ * (on start and return to the foreground at most once a day, and on a
+ * single OK on «Версия» at most once per 60 s), the passive plaque, the
+ * «Версия» hint and the update dialog with the in-app install. While it is
+ * off, no request is sent, nothing is shown and «Версия» keeps only the
+ * Diagnostics gesture. Always off in the demo.
  */
 export const phaseFlags = {
   home: true,
@@ -56,6 +63,7 @@ export const phaseFlags = {
   speed: true,
   externalPlayer: true,
   diagnostics: true,
+  updateCheck: true,
 } as const satisfies Record<string, boolean>;
 
 export type Capability = keyof typeof phaseFlags;

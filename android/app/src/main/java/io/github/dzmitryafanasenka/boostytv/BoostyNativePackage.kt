@@ -15,6 +15,7 @@ class BoostyNativePackage : ReactPackage {
       SeekKeysModule(reactContext),
       ExternalPlayerModule(reactContext),
       LogFileModule(reactContext),
+      AppUpdaterModule(reactContext),
     )
 
   override fun createViewManagers(

@@ -43,6 +43,10 @@ export type ShellProps = {
    * The Shell passes it to Настройки only while `phaseFlags.diagnostics` is on.
    */
   onOpenDiagnostics?: () => void;
+  /** Story 9.2: «Версия»'s first OK of a series (the update dialog or check); see SettingsScreen. */
+  onVersionFirstPress?: SettingsScreenProps['onVersionFirstPress'];
+  /** Story 9.2: a known newer release (`X.Y.Z`) for the «Версия» row. */
+  availableVersion?: string;
   /** Debug builds only: the live refresh check row in Настройки. */
   onCheckSession?: () => void;
   /** Debug builds only: the in-memory A11 trigger row in Настройки. */
@@ -111,6 +115,8 @@ export function Shell({
   onOpenSignOut,
   onOpenFocusCheck,
   onOpenDiagnostics,
+  onVersionFirstPress,
+  availableVersion,
   onCheckSession,
   onExpireSession,
   onBreakNextVideoUrl,
@@ -356,6 +362,8 @@ export function Shell({
           onOpenSignOut={onOpenSignOut}
           onOpenFocusCheck={onOpenFocusCheck}
           onOpenDiagnostics={onOpenDiagnostics}
+          onVersionFirstPress={onVersionFirstPress}
+          availableVersion={availableVersion}
           onCheckSession={onCheckSession}
           onExpireSession={onExpireSession}
           onBreakNextVideoUrl={onBreakNextVideoUrl}
@@ -381,6 +389,8 @@ function SectionContent({
   onOpenSignOut,
   onOpenFocusCheck,
   onOpenDiagnostics,
+  onVersionFirstPress,
+  availableVersion,
   onCheckSession,
   onExpireSession,
   onBreakNextVideoUrl,
@@ -400,6 +410,8 @@ function SectionContent({
   onOpenSignOut: (initiator: RefObject<HostView | null>) => void;
   onOpenFocusCheck?: () => void;
   onOpenDiagnostics?: () => void;
+  onVersionFirstPress?: SettingsScreenProps['onVersionFirstPress'];
+  availableVersion?: string;
   onCheckSession?: () => void;
   onExpireSession?: () => void;
   onBreakNextVideoUrl?: () => void;
@@ -440,6 +452,8 @@ function SectionContent({
           onOpenSignOut={onOpenSignOut}
           onOpenFocusCheck={onOpenFocusCheck}
           onOpenDiagnostics={onOpenDiagnostics}
+          onVersionFirstPress={onVersionFirstPress}
+          availableVersion={availableVersion}
           onCheckSession={onCheckSession}
           onExpireSession={onExpireSession}
           onBreakNextVideoUrl={onBreakNextVideoUrl}
