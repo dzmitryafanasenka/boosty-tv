@@ -1,0 +1,39 @@
+CHANGELOG.md
+  s_6884b16d8e6d90::t_efba994ee11730 7-24
+CHANGELOG.ru.md
+  s_6884b16d8e6d90::t_b373f3294b5029 7-24
+_bmad-output/implementation-artifacts/spec-9-5-full-device-regression-and-owner-acceptance.md
+  s_6884b16d8e6d90::t_6e94a37c28aee4 1-105
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_6884b16d8e6d90::t_6c77c06bd4fe81 118
+android/app/build.gradle
+  s_6884b16d8e6d90::t_f756d9421b8a90 81
+_bmad-output/implementation-artifacts/epic-9-context.md
+  s_2386e8596911f0::t_e7928c1dfde42e 7,14-15,19-26,29,32-40,44-53,57-64,68-70
+docs/testing.md
+  s_6884b16d8e6d90::t_91bdd0c780fde6 25,922-950
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "49e4fec68e655c3e2a15a979a7ecd1ea219a5a38",
+  "prompts": {},
+  "sessions": {
+    "s_2386e8596911f0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a01b0ec0ab4fb1b63",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_6884b16d8e6d90": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0996ac81-5811-4fbc-abf9-a4c938711610",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
