@@ -4,6 +4,24 @@ All notable changes to Boosty TV, an unofficial Boosty client for Android TV / G
 Versions follow `MAJOR.MINOR.PATCH`; each release is tagged `v{version}` on GitHub Releases.
 The Russian version of this file is [CHANGELOG.ru.md](CHANGELOG.ru.md); both list the same versions.
 
+## [0.9.2] - 2026-11-01
+
+Release candidate for 1.0.0: fixes from the performance, visual and accessibility passes.
+
+### Fixed
+- Home: returning from Settings to Home with a «Continue watching» card remembered keeps that card focused and the row's header visible.
+- Search and author pages: after the filter sheet's «Period» list, Back returns focus to the «Filters» chip.
+- Text field placeholders are easier to read (higher contrast).
+
+### Changed
+- Smoother scrolling of the post grids on Home and author pages (fewer rows drawn ahead).
+- Secondary text in a focused row or tile is lighter, so it stays readable on the focus surface.
+- Text grows with the system font size up to 1.3×, so labels keep fitting their buttons.
+- Screen reader labels read as full sentences (for example, poll options and setting descriptions).
+
+### Notes
+- Install from the app on 0.9.1: Settings → «Версия» → «Скачать и установить». The session is kept.
+
 ## [0.9.1] - 2026-11-01
 
 Update check and in-app update.
