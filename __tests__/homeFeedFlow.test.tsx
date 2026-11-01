@@ -45,6 +45,7 @@ import {
   syntheticFeed,
 } from '../src/test/feedFixtures';
 import { E2_PATH, e2Body } from '../src/test/subscriptionFixtures';
+import { POST_GRID_ROW_HEIGHT } from '../src/shared/ui/PostGrid';
 import e1Ok from '../src/test/fixtures/boosty/e1-user-current.json';
 import e1Unauthorized from '../src/test/fixtures/boosty/e1-no-token.json';
 import refreshRejected from '../src/test/fixtures/boosty/refresh-invalid-grant.json';
@@ -869,7 +870,8 @@ describe('300-post feed', () => {
     expect(gridPosts(root)).toHaveLength(9);
     expect(list.props.removeClippedSubviews).toBe(false);
     expect(list.props.getItemType(list.props.data[0], 0)).toBe('row');
-    expect(list.props.drawDistance).toBeGreaterThan(0);
+    // ADR 0015 (Story 9.3): 2 rows beyond the viewport.
+    expect(list.props.drawDistance).toBe(2 * POST_GRID_ROW_HEIGHT);
     expect(list.props.maxItemsInRecyclePool).toBeGreaterThan(0);
     // Rows are keyed by their first post id (stable when a partial row grows).
     expect(list.props.data.map((r: { key: string }, i: number) => list.props.keyExtractor(r, i))).toEqual([
@@ -2248,6 +2250,25 @@ describe('Story 4.7: «Продолжить просмотр» on Главная
     await advance(600);
     await fire('onLoad', { durationSec: DURATION });
     expect(engine.seek).toHaveBeenCalledWith(720);
+    await unmount(root);
+  });
+
+  it('Story 9.3: the first rendered frame from a Continue card logs one `first frame` line, origin «continue» (no id, no URL)', async () => {
+    seed(1, 720, 1000);
+    const root = await renderApp();
+    await press(root, card(1));
+    expect(currentRoute()).toBe('Player');
+    await focusOn(root, SURFACE);
+    await advance(600);
+    await act(async () => engine.props?.onReadyForDisplay?.());
+    await fire('onLoad', { durationSec: DURATION });
+    await act(async () => engine.props?.onReadyForDisplay?.());
+    const lines = logger.entries().filter(entry => entry.message === 'first frame');
+    expect(lines).toEqual([
+      expect.objectContaining({ scope: 'player', fields: { ms: expect.any(String), origin: 'continue', kind: 'hls' } }),
+    ]);
+    expect(Number(lines[0].fields?.ms)).toBeGreaterThanOrEqual(600);
+    expect(JSON.stringify(lines)).not.toMatch(/cw-|example\.invalid|Lesson|Video 1/);
     await unmount(root);
   });
 

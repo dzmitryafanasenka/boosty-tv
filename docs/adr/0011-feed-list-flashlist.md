@@ -3,6 +3,7 @@
 - Status: accepted (owner decision 2026-10-26, Story 3.1 device profiling; the owner accepted it on the device 2026-10-26)
 - Date: 2026-10-26
 - Superseded in part: Apple TV (tvOS) is out of scope (owner decision 2026-10-27).
+- Superseded in part: `drawDistance` is 2 rows since Story 9.3 ([ADR 0015](0015-post-grid-draw-distance.md)).
 - Relates to: `_bmad-output/implementation-artifacts/spec-3-1-subscription-feed-on-the-home-screen.md` (Spec Change Log, 2026-10-26 device profiling), `docs/focus-map.md` §3, [ADR 0010](0010-server-state-tanstack-query.md)
 
 ## Context
@@ -32,7 +33,7 @@ The «Новое в подписках» grid (`src/features/home/FeedGrid.tsx`)
 Setup:
 - Items are rows of 3 posts keyed by the first post id (`feedRows`), one item type (`getItemType` → `'row'`), with a fixed row height. v2 has no `getItemLayout`; it measures each row once.
 - The trailing partial row is held back while more pages may come (`visibleFeedPosts`). The end guide stays in the footer.
-- `drawDistance` is 3 rows (keeps the next row ready for Android's focus search on a fast ↓).
+- `drawDistance` is 3 rows (keeps the next row ready for Android's focus search on a fast ↓). Story 9.3 changed it to 2 rows (ADR 0015).
 - `maxItemsInRecyclePool` is 6 rows (bounded for the 2 GB device).
 - `removeClippedSubviews={false}`.
 - Inside a row, cards are keyed by column, never by post id. A post-id key would remount the cards and defeat recycling.

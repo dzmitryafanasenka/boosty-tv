@@ -2603,6 +2603,18 @@ describe('Story 7.2: OK on the live card (watch, or the QR)', () => {
     await unmount(root);
   });
 
+  it('Story 9.3: OK on the live card marks the opening; the first frame logs `origin: live`, `kind: live`', async () => {
+    e15 = () => e15Stream('live', PLAYABLE);
+    const root = await openAuthor();
+    await press(root, LIVE);
+    expect(currentRoute()).toBe('Player');
+    await act(async () => engine.props?.onReadyForDisplay?.());
+    expect(logger.entries().filter(e => e.message === 'first frame').map(e => e.fields)).toEqual([
+      { ms: expect.any(String), origin: 'live', kind: 'live' },
+    ]);
+    await unmount(root);
+  });
+
   it.each([
     ['scheduled', () => e15Stream('scheduled', PLAYABLE)],
     ['needs a level (`hasAccess: false`)', () => e15Stream('locked', PLAYABLE)],

@@ -4,6 +4,7 @@ import { useLatestRef } from '../../shared/focus';
 import { playbackArbiter } from '../../shared/platform/playbackArbiter';
 import type { PlayerEngineHandle } from '../../shared/platform/playerEngine';
 import { logger } from '../../shared/services/logger';
+import { playerClockNow, playerOpenMark } from '../../shared/services/perfMark';
 import type { ProgressEvent, ProgressMeta } from '../../shared/services/progress';
 import { qualityOf, type MediaSourceState, type QualityKey } from './mediaResolver';
 import type { PlaybackMode } from './playbackMode';
@@ -62,6 +63,8 @@ export type EngineProps = {
   onError: (code?: string | null) => void;
   onResolution: (height: number | null) => void;
   onAudioFocusLost: () => void;
+  /** Story 9.3: the first one of this opening logs the time to first frame. */
+  onReadyForDisplay: () => void;
 };
 
 /** What the render and the presentation hooks read. */
@@ -246,6 +249,21 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
    * (react-native-video's `onHostResume` would otherwise start it).
    */
   const heldByLifecycle = useRef(false);
+  /**
+   * Story 9.3: the opening press's mark (`playerOpenMark`, taken once at
+   * mount): the first rendered frame of this opening logs the time since it
+   * and clears it, so a quality switch, a recovery or a live-edge remount
+   * never logs again. An engine error or the error phase clears it too (no
+   * line for an opening whose playback failed), and an early Back unmounts
+   * it unlogged.
+   */
+  const [initialOpenMark] = useState(() => playerOpenMark.take());
+  const openMark = useRef(initialOpenMark);
+  // An opening that reached the error state (an E8 failure included) logs no
+  // first frame: a later «Повторить» would time the error screen too.
+  if (phase === 'error') {
+    openMark.current = null;
+  }
   /** When the current source was resolved (Story 4.6: re-resolve before play when it is ≥ 23 h old). */
   const resolvedAt = useRef(Date.now());
 
@@ -654,6 +672,8 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
    * («Повторить» focused). No E9 for the error itself.
    */
   const onError = useCallback((code?: string | null) => {
+    // Story 9.3: an opening whose playback failed logs no first frame.
+    openMark.current = null;
     // A switched source that failed before `onLoad` is never stored.
     pendingPreferenceWrite.current = null;
     const current = latest.current.ready;
@@ -716,6 +736,25 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
     }
   }, [latest, setPlaying, pauseForLifecycle, showOverlay]);
 
+  /**
+   * Story 9.3: the first rendered frame of this opening: one `first frame`
+   * line (the time since the opening press, its origin and the stream kind;
+   * no id, URL or title).
+   */
+  const onReadyForDisplay = useCallback(() => {
+    const mark = openMark.current;
+    const current = latest.current.ready;
+    if (mark === null || current === null) {
+      return;
+    }
+    openMark.current = null;
+    logger.info('player', 'first frame', {
+      ms: Math.max(0, Math.round(playerClockNow() - mark.at)),
+      origin: mark.origin,
+      kind: firstFrameKind(mode.kind, current.source.format),
+    });
+  }, [latest, mode]);
+
   const hideOverlay = useCallback(() => setOverlay(false), []);
   const background = useCallback(
     (closeSheet: (restoreFocus: boolean) => void) => {
@@ -755,6 +794,7 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
       onError,
       onResolution: setAutoHeight,
       onAudioFocusLost,
+      onReadyForDisplay,
     },
     commands: {
       showOverlay,
@@ -772,4 +812,12 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
     },
     progress: { report, reportRef, readyProgressRef },
   };
+}
+
+/** Story 9.3: the `kind` field of the `first frame` line (progressive sources are MP4). */
+export function firstFrameKind(kind: PlaybackMode['kind'], format: ReadySource['source']['format']): 'hls' | 'mp4' | 'dash' | 'live' {
+  if (kind === 'live') {
+    return 'live';
+  }
+  return format === 'progressive' ? 'mp4' : format;
 }

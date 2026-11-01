@@ -39,7 +39,8 @@ const SHORT_CODE = /^[A-Za-z0-9_-]{1,24}$/;
  * track's height (`onResolution`, Story 4.3) from `onBandwidthUpdate`
  * (`reportBandwidth`; 0 means unknown and is never reported). It never plays in the background and keeps
  * the system's audio focus handling. The rate (Story 8.1) is react-native-video's
- * `rate` prop (Media3 playback parameters on Android).
+ * `rate` prop (Media3 playback parameters on Android). Story 9.3:
+ * `onReadyForDisplay` passes through (the time-to-first-frame line).
  */
 export function PlayerEngineView({
   source,
@@ -55,6 +56,7 @@ export function PlayerEngineView({
   onError,
   onResolution,
   onAudioFocusLost,
+  onReadyForDisplay,
   ref,
 }: PlayerEngineProps) {
   const video = useRef<VideoRef>(null);
@@ -106,6 +108,7 @@ export function PlayerEngineView({
       onBuffer={(e: OnBufferData) => onBuffering?.(e.isBuffering)}
       onSeek={(e: OnSeekData) => onSeekDone?.(wholeSeconds(e.currentTime))}
       onEnd={() => onEnd?.()}
+      onReadyForDisplay={onReadyForDisplay}
       onAudioFocusChanged={(e: OnAudioFocusChangedData) => {
         if (!e.hasAudioFocus) {
           onAudioFocusLost?.();

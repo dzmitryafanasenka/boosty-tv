@@ -386,6 +386,18 @@ describe('Story 8.2: the system video player (PLAY-13, SET-02)', () => {
       await unmount(root);
     });
 
+    it('Story 9.3: the hand-off clears the opening mark: the built-in fallback\'s first frame logs no `first frame` line', async () => {
+      clearNativeModules();
+      installNativeModules({ AppInfo: { versionName: '1.0' } });
+      const root = await openHandoff();
+      await press(root, Q('auto'));
+      expect(currentRoute()).toBe('Player');
+      expect(engine.props).not.toBeNull();
+      await act(async () => engine.props?.onReadyForDisplay?.());
+      expect(logger.entries().filter(e => e.message === 'first frame')).toEqual([]);
+      await unmount(root);
+    });
+
     it('matrix «Not ready»: E8 404 → PlayerScreen owns the state («Видео недоступно»); nothing launched', async () => {
       await device().setItem(EXTERNAL_PLAYER_PREFERENCE_KEY, 'on');
       const root = await openPost();

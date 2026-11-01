@@ -16,6 +16,7 @@ import {
   focusRestoration,
   type FocusZoneHandle,
 } from '../shared/focus';
+import { playerOpenMark } from '../shared/services/perfMark';
 import { requestHostFocus } from '../shared/ui';
 import { progress } from './progress';
 import type { RootStackParamList } from './routes';
@@ -296,6 +297,8 @@ export function AuthorRoute({
     (liveBlogUrl: string, focusId: string) => {
       if (navigation.isFocused()) {
         const ref: LiveRef = { kind: 'live', blogUrl: liveBlogUrl };
+        // Story 9.3: the time-to-first-frame mark (the Player takes it once).
+        playerOpenMark.mark('live');
         navigation.push('Player', { ref, origin: { routeKey, focusId } });
       }
     },
@@ -360,6 +363,8 @@ export function PostRoute({ navigation, route }: StackScreenProps<RootStackParam
   const onOpenPlayer = useCallback(
     (ref: MediaRef, focusId: string, start?: 'beginning' | { atSec: number }) => {
       if (navigation.isFocused()) {
+        // Story 9.3: the time-to-first-frame mark (the Player takes it once).
+        playerOpenMark.mark(typeof start === 'object' ? 'timestamp' : 'post');
         navigation.push('Player', {
           ref,
           origin: { routeKey, focusId },

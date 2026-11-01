@@ -769,9 +769,10 @@ export function PostGrid({
         arrival no longer creates every card's native views (device
         profiling: ≈ 37 ms of native work per mounted card). Items are rows
         of 3 keyed by their first post id, one item type, fixed height.
-        `drawDistance` keeps about 3 rows ready beyond the viewport so on a
-        fast ↓ the next row exists when Android's focus search runs; the
-        recycle pool is bounded for the 2 GB device. `removeClippedSubviews`
+        `drawDistance` keeps 2 rows ready beyond the viewport so on a fast ↓
+        the next row exists when Android's focus search runs (ADR 0015: 3
+        rows made a page arrival mount more rows in one batch); the recycle
+        pool is bounded for the 2 GB device. `removeClippedSubviews`
         stays off (clipped views are unreachable to focus search).
       */}
       <FlashList
@@ -800,8 +801,14 @@ export function PostGrid({
 
 const keyOf = (row: PostRowItem) => row.key;
 const rowType = () => 'row';
-/** About 3 rows beyond the viewport on each side (dp). */
-export const POST_GRID_DRAW_DISTANCE = 3 * POST_GRID_ROW_HEIGHT;
+/**
+ * 2 rows beyond the viewport on each side (dp). ADR 0015 (Story 9.3 device
+ * profiling): with 3 rows a page arrival at the end of the list mounted
+ * every new row in one Fabric batch (frames up to 310–340 ms in single ↓
+ * steps); with 2 the longest frame was 140–150 ms and columns stayed on
+ * a fast ↓.
+ */
+export const POST_GRID_DRAW_DISTANCE = 2 * POST_GRID_ROW_HEIGHT;
 /** Off-screen rows kept for reuse (about 2 viewports of rows). */
 export const POST_GRID_RECYCLE_POOL = 6;
 
