@@ -46,6 +46,7 @@ import { ModalHostProvider, useModal, type ModalApi } from '../shared/focus';
 import type { MediaRef } from '../shared/entities/post';
 import { subscribeAppForeground } from '../shared/platform/appLifecycle';
 import { cleanupUpdates } from '../shared/platform/appUpdater';
+import { playerOpenMark } from '../shared/services/perfMark';
 import { ProgressContext } from '../shared/services/progress';
 import { t } from '../shared/i18n';
 import { Text, colors, components, spacing, type HostView } from '../shared/ui';
@@ -256,6 +257,8 @@ function ShellRoute({
   const onOpenPlayer = useCallback(
     (ref: MediaRef, focusId: string) => {
       if (navigation.isFocused()) {
+        // Story 9.3: the time-to-first-frame mark (the Player takes it once).
+        playerOpenMark.mark('continue');
         navigation.push('Player', {
           ref,
           origin: { routeKey: SHELL_RESTORATION_KEY, sectionId: 'home', focusId },

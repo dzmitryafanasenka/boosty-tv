@@ -149,6 +149,24 @@ describe('PlayerEngineView (react-native-video adapter)', () => {
     });
   });
 
+  it('Story 9.3: onReadyForDisplay passes through (once per native event)', async () => {
+    const onReadyForDisplay = jest.fn();
+    let root!: Root;
+    await act(async () => {
+      root = createRoot();
+      root.render(
+        <PlayerEngineView source={{ uri: URL, format: 'hls' }} paused={false} onReadyForDisplay={onReadyForDisplay} />,
+      );
+    });
+    await act(async () => {
+      mockVideo.props?.onReadyForDisplay();
+    });
+    expect(onReadyForDisplay).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      root.unmount();
+    });
+  });
+
   it('Story 8.1: `rate` is forwarded (default 1); a change updates the mounted Video without a remount', async () => {
     const source = { uri: URL, format: 'hls' as const };
     let root!: Root;

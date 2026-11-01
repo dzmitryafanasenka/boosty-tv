@@ -397,8 +397,10 @@ The app checks the latest release of the public project repository (GitHub Relea
   - Mutations (E9, E11, E12, E16, E17) are never replayed blindly. E9 is resent only with the latest position.
 - **NFR-4 Defensive parsing:** DTOs are validated at the boundary. Missing optional fields degrade gracefully. Sanitized contract fixtures cover feed, post, poll, stream, auth and error shapes.
 - **NFR-5 Performance:**
-  - Feed and grid scrolling stay smooth with hundreds of items on the test device. [ASSUMPTION: target "no visible frame drops during D-pad scroll", measured in P3]
-  - Time to first video frame is measured in the spike, and a target is set after that. [ASSUMPTION]
+  - Feed and grid scrolling stay smooth with hundreds of items on the test device. Owner decision 2026-11-01 (Story 9.3): no frame longer than 300 ms while ↓ is held or a page loads, janky frames ≤ 10 % (`dumpsys gfxinfo`), and focus does not lag behind key presses. A target that is not met is a documented exception for the owner to accept.
+  - Time to first video frame (owner decision 2026-11-01, Story 9.3): median ≤ 2 s and worst ≤ 4 s from OK to the first video frame, measured from a post's video row and from a «Продолжить» card. `onReadyForDisplay` is Media3's `STATE_READY`. For a resume it fires at the first frame before the seek to the resume point, so «Продолжить» times exclude that seek.
+  - No steady memory growth over a 1-hour browse-and-watch session.
+  - Status and numbers: `docs/testing.md` «Story 9.3».
 - **NFR-6 TV accessibility:**
   - Everything works with the remote alone.
   - Each focusable element has a Russian accessibility label.
@@ -515,5 +517,5 @@ Dependency: **phase 0 (spike) must pass before production implementation of the 
 ## 11. Assumptions Index
 
 - §4.8 FR-39: audio keeps playing while the TV would otherwise sleep (verify S9).
-- §5 NFR-5: scroll smoothness target and time-to-first-frame target to be set after the spike.
+- §5 NFR-5: resolved 2026-11-01 (Story 9.3, owner decisions): the scroll and time-to-first-frame targets are set in §5.
 - `DESIGN.md`: 960×540 dp device scale; several component sizes estimated from the mocks.

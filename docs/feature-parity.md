@@ -120,6 +120,16 @@ The reference renders the **full post inline in the feed card** (title, date, au
 | PLAY-14 | Subtitles, audio tracks, aspect ratio, autoplay next | Unverified (not found) | — | No such code in 1.16.0 | Not present in the reference. Expose them only if the stream actually provides them and the owner scopes them in. | — | — |
 | PLAY-15 | Pinch zoom, double-tap seek, tap-to-toggle overlay | Confirmed | N/A | `VideoPlayerControls.kt` (zoom, `DOUBLE_TAP_SEEK`) | Touch-only. Has no TV equivalent and is not carried over. | — | — |
 
+**NFR-5 performance (Story 9.3, 2026-11-01; `docs/testing.md` «Story 9.3»).** The targets are owner decisions from 2026-11-01. Every result below was measured on the pinned Chromecast by the agent over adb with a release build, except where marked emulator.
+
+| Target | Status |
+|---|---|
+| TTFF: median ≤ 2 s and worst ≤ 4 s, from a post and from «Продолжить» | **Met.** Post: median 1.29 s, worst 2.01 s. «Продолжить»: median 1.54 s, worst 2.20 s. `onReadyForDisplay` is Media3's `STATE_READY`. For a resume it fires at the first frame before the seek to the resume point, so «Продолжить» times exclude that seek. |
+| Scroll, single ↓ steps: no frame over 300 ms and janky ≤ 10 % | **Met** with ADR 0015's `drawDistance` of 2 rows: 4.4–5.3 % janky, longest frame 148 ms |
+| Scroll, ↓ held | **Exception, accepted by the owner 2026-11-01 after the physical-remote check:** 15–21 % janky and 0–2 frames of 300–350 ms per 20 s run. During a long hold, focus also waits at the end of the list for each E5 page, about 1.2 s per page (the network round trip; key events do not queue) |
+| Grid with 30 authors | Emulator only: 6–7 % janky, no long frames |
+| 1 h memory | **PSS met:** the slope over the last 40 min was −0.25 MB/min. **Graphics is a deviation, accepted by the owner 2026-11-01 after the physical-remote check:** the criterion says stable after the first 10 min, but Graphics rose from 57 MB to about 117 MB between 10 and 30 min. It then stayed flat at about 117 MB, the image-cache plateau also seen in Story 3.1 |
+
 ## 7. Live streams (added in 1.14.0 as "MVP")
 
 | ID | Capability | Class | Parity | Evidence | Reference behavior | API | Tests (planned) |

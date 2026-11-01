@@ -318,6 +318,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-6-3-links-files-and-external-videos-via-qr.md`
   summary: Owner idea (2026-10-29): show a post's timestamps as chapter marks on the player timeline (as YouTube), and possibly jump to a timestamp from the post; plan with Epic 8 (player options).
   evidence: Owner request during Story 6.3; timestamps arrive as YouTube links with `t=` in the post text; the live format for Boosty videos is not checked yet.
+  status: Moved to the backlog as Story 10.1 «Chapter marks on the player timeline» (`epics.md` Epic 10, sprint-status `10-1-chapter-marks-on-the-player-timeline`), owner request 2026-11-01.
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-6-3-links-files-and-external-videos-via-qr.md`
   summary: Device check of a file chip (busy state, the dialog with a signed target, «Не удалось открыть файл», «Нет доступа к файлу», the accessibility labels while busy and after a failure) and an owner phone scan of a file QR (no photo kept).
@@ -362,3 +363,12 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-9-2-update-notice-from-github-releases.md`
   summary: `AppUpdaterModule.kt` download, redirect, size, digest and cancel logic has no executed JVM test; CI only greps the Kotlin source.
   evidence: Story 9.2 review (verification-gap, Blind Hunter). The repo has no JVM/Robolectric setup; the Story 9.2 device run executes the path once. A JVM test (MockWebServer) would guard regressions.
+- source_spec: `_bmad-output/implementation-artifacts/spec-9-3-performance-on-the-device.md`
+  summary: Holding ↓ on Главная misses the NFR-5 scroll target on the pinned Chromecast: 15–21 % janky frames (target 10 %), and some runs still have one or two frames of 300–350 ms when a 10-post E5 page arrives while focus waits at the end of the list. During a long hold, focus waits about 1.2 s per E5 page at the end of the list (the network round trip), against the «focus does not lag» part of the target. The owner accepted this exception on 2026-11-01 after the physical-remote check; the untried options below remain a follow-up. Untried options, each needing the owner: fewer native views or Texts per PostCard (changes the card design), recycled image views instead of URL-keyed ones (drops ADR 0011's stale-image guard; it made no measurable difference in 9.3), and fewer Image load events (an `onError` listener makes Android emit `topProgress` events, about 1000 per 15 s hold).
+  evidence: `docs/testing.md` «Story 9.3» (gfxinfo and atrace, agent over adb, release build); ADR 0015. The device's «Button Mapper» accessibility service is part of the measured load.
+- source_spec: `_bmad-output/implementation-artifacts/spec-9-3-performance-on-the-device.md`
+  summary: The Подписки grid with 30 or more authors was measured only on an Android TV emulator in demo mode with dev JS (Story 9.3). The real account has 3 subscriptions, so the 55-author AC has no device number.
+  evidence: `docs/testing.md` «Story 9.3» (labelled emulator).
+- source_spec: `_bmad-output/implementation-artifacts/spec-9-3-performance-on-the-device.md`
+  summary: Focus is lost on Главная when a «Продолжить» card is the remembered focus. Open Настройки from the sidebar, then ← and ↑ to «Главная» and OK: the feed is scrolled past its header and nothing has focus. When a feed card is the remembered focus, the same path works.
+  evidence: Story 9.3 device run (agent over adb, release build, 2026-11-01). It reproduced twice on the 9.3 build and once on a build with `drawDistance` 3, so the grid change did not cause it. The cause is not investigated; the suspect is Главная's return restore for a header (Continue) item versus the remembered scroll offset.

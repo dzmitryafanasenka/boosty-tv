@@ -318,7 +318,7 @@ The three missing ADRs are recorded elsewhere as decisions; the owner can accept
 | Live shape and parity treatment of the `video` block (seen in accessible posts, REF only in api-contract §4.1) | An unknown block type in posts | Story 6.3 (external videos via QR) |
 | Second-account isolation not tested | Cross-account leakage | Story 2.8 |
 | Subscriptions beyond 30, E18 paging, feed cursor format unverified | Missing items or broken paging | Stories 3.2, 7.5, 3.1 |
-| JS stack keeps covered screens mounted (memory unmeasured on a 32-bit device with ~350 MB free) | Memory pressure with Shell + Post + Player | Story 9.3 |
+| JS stack keeps covered screens mounted (memory unmeasured on a 32-bit device with ~350 MB free) | Memory pressure with Shell + Post + Player | Story 9.3: measured, no steady growth over 1 h (PSS 326–356 MiB after 20 min) |
 | Focus restoration by id on a long virtualized list unverified | Focus lands on the wrong card after Back | Story 2.4 (device) |
 
 ### Recommendation
@@ -917,6 +917,98 @@ Device checks (pinned Chromecast with Google TV 4K, release-like build, the owne
 Review fixes (2026-10-28, host-tested only): short visits write nothing (owner decision: a session writes no E9 and no local entry until it moved ≥ 10 s from its start or the user paused; a replay after the end is a new session); the local store's disk chain writes a change made during an in-flight write (also after a reset) and `flush()` waits for it; the demo keeps progress in an in-memory store (never the `boostytv-account` database); `begin` once per source resolution. New tests: 7 unit (short visits, disk chain), 4 `playerFlow` (now in `playerProgressFlow`; finished → «Смотреть» → Back after 2 s keeps «Просмотрено» with no E9; a short replay; «Повторить» after an error resumes at the last position from «Смотреть» and «С начала», no new-engine t=0), 1 `postFlow` (a started video without a duration), 1 `demoFlow` (the demo never touches the real database).
 
 Host tests: `src/shared/services/progress/__tests__/progressRepository.test.ts` (29: the finished rule and status, resume precedence, the 10 s cadence, one write in flight with the latest position, forced events, start over, seeks as movement, failure gating ≥ 10 s and the bounded automatic retry, expired hold/flush/drop, sign-out wipe, a late write after a reset, the debounced/forced disk write, cold-start load, corrupt disk, the 200-entry cap, the stale disk write undone, a load after a reset dropped, stable snapshots); `__tests__/playerProgressFlow.test.tsx` «progress and resume (Story 4.2)» (10: server only with no pre-seek t=0 and the E9 request shape, local wins, finished, multi-video + start over, hold-scrub, background and end, the vanished «С начала» fallback, failure retry, cold start from the persisted entry, log hygiene); `__tests__/postFlow.test.tsx` (status and «Продолжить» only while the player is on); `__tests__/accountScopeRegistry.test.js` (`progress` registered); `demoFlow` (the row label now ends with the status). Lint (`--max-warnings 0`), typecheck, `check:fixtures` clean; `npm test` ×3: 1494 passed each; `playerFlow` + `postFlow` + the progress suite 30/30 (187 tests each run).
+
+### Story 9.3 — Performance on the device, 2026-11-01
+
+**Status: implemented and host-tested. Measured on the pinned Chromecast with Google TV by the agent over adb, using an owner-signed `assembleRelease -PreactNativeArchitectures=armeabi-v7a` build from this branch (`versionName 0.9.1`, installed with `adb install -r`, session kept, nothing uninstalled or cleared). The Подписки grid with 30 demo authors was measured on an Android TV emulator. Every row below is an agent-over-adb or emulator result; none is a physical-remote check. The owner checked the scroll with the physical remote on 2026-11-01 and accepted the held-↓ and Graphics exceptions.** `spec-9-3-performance-on-the-device.md`, [ADR 0015](adr/0015-post-grid-draw-distance.md).
+
+Changes:
+- **TTFF line.** `src/shared/services/perfMark.ts` holds `playerOpenMark`, a module-level mark that is taken once. The openers set it: the Post's video row and «Смотреть» (`post`), a timestamp chip (`timestamp`), a «Продолжить» card (`continue`) and Автор's live card (`live`). `usePlaybackSession` takes the mark at mount. The first `onReadyForDisplay` of that opening logs `logger.info('player', 'first frame', { ms, origin, kind })`, where `kind` is `hls`, `mp4`, `dash` or `live`. A quality switch, a recovery or a live-edge remount logs nothing more. An engine error or the error phase (an E8 failure included) clears the mark, so an opening that failed has no line, even after «Повторить». The time is monotonic (`performance.now()`). An early Back unmounts the player with the mark unlogged. A hand-off to the system player (`PlayerEntry`) also clears it. The line carries no URL, id, title or account data. `PlayerEngineView` passes react-native-video's `onReadyForDisplay` through the port.
+- **Grid.** `POST_GRID_DRAW_DISTANCE` changed from 3 rows to 2 (ADR 0015). It applies to Главная and Автор.
+
+Host checks: `npm run lint -- --max-warnings 0`, `npm run typecheck`, `npm test` (156 suites, 3211 tests) and `npm run check:fixtures` (30 clean) pass. New tests:
+- `src/shared/services/__tests__/perfMark.test.ts`: the mark is taken once, a later mark replaces an earlier one, and the default time is now.
+- `__tests__/playerFirstFrameFlow.test.tsx`: origin `post` with one line across repeated «ready» events; kind `mp4` and `dash`; origin `timestamp`; no second line after a quality switch or a recovery; no line after an error before the first frame; no line on an early Back, and the next opening is timed from its own press.
+- `playerFirstFrameFlow.test.tsx` also covers «Смотреть» (origin `post`) and an E8 failure followed by «Повторить» (no line).
+- `homeFeedFlow.test.tsx`: origin `continue`, and `drawDistance` pinned to 2 rows.
+- `authorFlow.test.tsx`: OK on the real Автор LiveCard gives `origin: live`, `kind: live`.
+- `externalPlayerFlow.test.tsx`: the hand-off fallback logs no line.
+- `PlayerEngineView.test.tsx`: `onReadyForDisplay` passes through.
+- `liveFlow.test.tsx`: `kind: live`, with no line after the live-edge remount.
+
+`loggerFieldKeys` covers the new call site.
+
+**Method.** The device has 2 GB of RAM, a 1920×1080 UI and API 34. Its owner keeps the «Button Mapper» accessibility service enabled, which listens to window-content and scroll events. It was left as it is, so the numbers include its overhead.
+- Each scroll run starts from a cold start (`am force-stop`, then launch) on Главная with the owner's real feed and the «Доступные мне» filter. E5 pages hold 10 posts each.
+- «↓ held» means 20 s of `input keyevent` bursts of 6 ↓, about 16 key events per second, which is close to the remote's auto-repeat.
+- «Single steps» means 40 ↓ 0.5 s apart. That covers 40 rows and about 12 page loads.
+- Frames come from `dumpsys gfxinfo <pkg> reset`, then a dump after the run: janky %, percentiles, and the histogram buckets of 300 ms and more. Longest frames and mount work come from `atrace -a <pkg> gfx view input sched` during the single steps (top-level `Choreographer#doFrame`, `IntBufferBatchMountItem::mountViews`, `premountViews`).
+- TTFF is the `first frame` lines in the Diagnostics log file: «Запись логов» on, then `adb pull`, then capture off.
+- Memory is `dumpsys meminfo <pkg>` every 2 min (TOTAL PSS, Graphics).
+
+**Profiling (atrace, ↓ held, ADR 0011 setup).** Every long frame came 0.3–0.5 s after an E5 response (11 page loads in 15 s; the hold outruns 10-post pages). The worst frame, 400 ms, was a single Fabric batch: `preMountItems` 107 ms, `mountViews` 205 ms (`UPDATE_STATE` ×79 67 ms, `UPDATE_LAYOUT` ×99 123 ms) and a 73 ms draw. Over the run the main thread was busy 8.3 s of 16 s, the JS thread 6.1 s and RenderThread 6.3 s. Images keyed by URL created 164 `RCTImageView`s.
+
+**Scroll (Главная, owner's feed).**
+
+| Build | ↓ held 20 s: janky / frames ≥ 300 ms / 99th | 40 single steps: janky / frames ≥ 300 ms / 99th | Longest frames in single steps (atrace) |
+|---|---|---|---|
+| Before (ADR 0011, `drawDistance` 3 rows), 3 + 2 runs | 19.9 / 20.7 / 20.9 %; 1–5 per run (max 550 ms); 200 ms | 5.3 / 5.5 %; none; 150 ms | 312–336 ms; frames over 100 ms add up to 1.15–1.40 s per 40 rows |
+| Rejected: earlier prefetch | 27.7 %; 1 | 9.4 %; none | — |
+| Rejected: images not keyed by URL | 18.2 / 26.4 %; 1–3 | 4.9 %; 1 | — |
+| Rejected: E5 page size 30 | 19.1 / 20.1 %; 5–6 (max 500 ms) | 7.4 %; 1 | — |
+| Rejected: `drawDistance` 1 row | 25.1 / 27.3 %; none | 6.9 %; none | — |
+| **After (`drawDistance` 2 rows), 4 + 2 runs** | **14.8 / 19.3 / 21.0 / 21.2 %; 0, 0, 1, 2 per run; 150–200 ms** | **4.4 / 5.3 %; none; 97–109 ms** | **140–148 ms; frames over 100 ms add up to 0.37–0.80 s per 40 rows** |
+
+The total mount work per row did not change: `mountViews` plus `premount` was 1.5–2.1 s per 40 rows in both builds. The fix spreads it over more, smaller frames. The Google TV launcher's 0 % (Story 3.1) is the reference point.
+
+Columns on a fast ↓ (after): column 3 kept for 60 ↓ at 0.15 s, 60 ↓ at 0.3 s and a burst of 20; column 1 kept for a 15 s hold; column 2 kept for a 10 s hold.
+
+**Scroll result:**
+- Single steps meet the target: no frame of 300 ms or more, and 4.4–5.3 % janky.
+- **Exception, accepted by the owner 2026-11-01 after the physical-remote check: ↓ held.** Janky frames are 15–21 % against the 10 % target, and 2 of 4 runs still had one or two frames of 300–350 ms. Cause: each 10-post page arrives while focus waits at the end of the list, and its rows mount at once. On top of that, every row that scrolls in rebinds 3 cards (text state, layout, two images), and this 2 GB device with the accessibility service needs about 30–36 ms per frame anyway. Focus waits for each page (about 1.2 s per E5 round trip) during a long hold. That wait is the network, not a backlog of key events: after a 10 s hold, focus was on the same card right after the last key and again 3 s later (uiautomator bounds). Not tried: fewer views per card, and replacing the image views. Both change the card's design or ADR 0011's stale-image guard and need the owner.
+
+**Подписки grid (emulator, not the device).** An Android TV API 34 arm64 emulator (`tv_1080p`, host GPU) ran a debug build with the demo on, `DEMO_SUBSCRIPTIONS` temporarily 30 (uncommitted, reverted), and Metro dev JS. It showed 31 tiles («Мой блог» plus 30) in 11 rows.
+
+| Run | Janky | 99th | Frames ≥ 300 ms |
+|---|---|---|---|
+| 15 ↓ at 0.5 s | 7.1 % | 20 ms | none |
+| 15 ↑ at 0.5 s | 6.5 % | 21 ms | none |
+| Hold ↓ 8 s, then ↑ 8 s | 6.4 % | 17 ms | none |
+
+Column 1 kept on the way down, and column 3 kept for a burst of 12 ↓ and 12 ↑ at 0.15 s. The 30-author numbers are **emulator** numbers. The real account has 3 subscriptions, so the grid with 30 or more authors has not been measured on the device.
+
+**Time to first frame (OK → first rendered frame, including the E8 resolve).** `onReadyForDisplay` is Media3's `STATE_READY`. For a resume it fires at the first frame before the seek to the resume point, so «Продолжить» times exclude that seek.
+
+| Run | Starts | Median | Worst | Target (median ≤ 2 s, worst ≤ 4 s) |
+|---|---|---|---|---|
+| Post's video row, OK → 5 s → Back (no progress write, «Не начато» stayed) | 10, all `hls` | 1.29 s | 2.01 s | **pass** |
+| «Продолжить» card, OK → 5 s → Back | 10, all `hls` | 1.54 s | 2.20 s | **pass** |
+| «Смотреть» during the memory run (cold network and cache, different videos) | 11, all `hls` | 1.77 s | 2.86 s | pass |
+
+The individual times in ms: post row 1118–2006 (1118, 1158, 1240, 1250, 1280, 1293, 1314, 1344, 1495, 2006); Continue 1404–2201 (1404, 1413, 1415, 1432, 1477, 1593, 1609, 1621, 1637, 2201). Every start played: 31 `first frame` lines in total, and no `playback failed` line. The pulled log had no URL query, `Bearer`, token, phone or 7+ digit run. Capture was turned off afterwards, the folder is empty, and the local copies are deleted.
+
+**Memory, 1 hour (agent over adb, 2026-11-01 14:11–15:12).** One cold start, then a loop for 60 min: 3–12 ↓ on Главная, OK on the card, then OK on «Смотреть» or the video row, about 5 min of playback, then Back twice. That made 13 iterations: 11 played (about 55 min of video) and 2 text posts were opened and closed. The resume points and «Продолжить» changed, as the owner allowed. `dumpsys meminfo` ran every 2 min (31 samples).
+
+| Window | TOTAL PSS | Graphics |
+|---|---|---|
+| Start (cold) | 152 MB | 25 MB |
+| 10 min | 296 MB | 57 MB |
+| 20 min | 327 MB | 79 MB |
+| 30–60 min | 326–356 MB, no trend | 114–118 MB |
+| Last 40 min, linear slope | **−0.25 MB/min** (target < 1 MB/min) | +0.53 MB/min, all of it before 30 min; flat from 30 min |
+
+MB here means MiB (kB / 1024). The run kept Shell, Post and Player mounted together every iteration (the JS-stack risk above).
+
+**Result: PSS meets the criterion. Graphics is a deviation, accepted by the owner 2026-11-01 after the physical-remote check.**
+- PSS has no trend after 20 min, and its slope over the last 40 min is −0.25 MB/min.
+- The spec asks for Graphics to be stable after the first 10 min. Instead it rose from 57 MB to about 117 MB between 10 and 30 min, while new feed images were decoded.
+- From 30 min Graphics stayed flat at 114–118 MB. That is the image-cache plateau of about 115 MB also seen in Story 3.1, not a leak: it stopped growing while the browsing went on. Views stayed between 393 and 585, and Activities stayed at 1.
+
+**Found on the way (not caused by this story):** Главная has a «Продолжить» card as its remembered focus. Open Настройки from the sidebar, then press ← and ↑ to «Главная» and OK. Главная then shows the feed scrolled past its header, and nothing has focus (uiautomator shows no focused node). This happened twice on this build and once on a build with the old `drawDistance` 3. When a feed card is the remembered focus, the same path works. The problem is recorded in deferred work and is not fixed here.
+
+**Owner check (physical remote, 2026-11-01):** the owner scrolled Главная with the physical remote (single steps and ↓ held) and accepted both exceptions (held ↓, Graphics plateau).
+
+**Not verified:** the Автор grid (same component, not measured separately); TalkBack; the 55-author grid on the device; live and timestamp TTFF on the device (host-tested only).
 
 ### Story 9.2 — Update notice and in-app install from GitHub Releases, 2026-11-01
 

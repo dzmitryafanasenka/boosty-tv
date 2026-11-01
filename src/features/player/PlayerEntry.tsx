@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { BackHandler, StyleSheet, View } from 'react-native';
 import type { MediaRef } from '../../shared/entities/post';
 import { useLatestRef } from '../../shared/focus';
+import { playerOpenMark } from '../../shared/services/perfMark';
 import { t } from '../../shared/i18n';
 import { colors } from '../../shared/ui';
 import { ExternalHandoff, HandoffLoading } from './ExternalHandoff';
@@ -54,6 +55,14 @@ export function PlayerEntry(props: PlayerEntryProps) {
     return () => {
       alive = false;
     };
+  }, [step]);
+
+  // Story 9.3: a hand-off plays nothing here: its opening logs no first
+  // frame (a later built-in fallback is not timed from the opening press).
+  useEffect(() => {
+    if (step === 'handoff') {
+      playerOpenMark.take();
+    }
   }, [step]);
 
   const onExitRef = useLatestRef(onExit);

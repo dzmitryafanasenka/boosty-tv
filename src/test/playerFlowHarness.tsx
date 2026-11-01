@@ -234,7 +234,16 @@ export const playerText = (root: Root) => text(byTestId(root, 'player/page')[0])
 
 /** Engine events through the mocked port. */
 export async function fire<
-  K extends 'onLoad' | 'onProgress' | 'onBuffering' | 'onSeekDone' | 'onEnd' | 'onError' | 'onResolution' | 'onAudioFocusLost',
+  K extends
+    | 'onLoad'
+    | 'onProgress'
+    | 'onBuffering'
+    | 'onSeekDone'
+    | 'onEnd'
+    | 'onError'
+    | 'onResolution'
+    | 'onAudioFocusLost'
+    | 'onReadyForDisplay',
 >(
   name: K,
   ...args: Parameters<NonNullable<NonNullable<typeof engine.props>[K]>>

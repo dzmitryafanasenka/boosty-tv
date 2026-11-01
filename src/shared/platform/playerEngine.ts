@@ -66,6 +66,13 @@ export type PlayerEngineProps = {
    * on a full loss, the player pauses its own state for every loss.
    */
   onAudioFocusLost?: () => void;
+  /**
+   * Story 9.3: the engine has a frame to show. The Android adapter reads
+   * react-native-video's `onReadyForDisplay` (Media3 `STATE_READY`), which
+   * comes again after every rebuffer or seek; the player uses only the first
+   * one of an opening (the time-to-first-frame line).
+   */
+  onReadyForDisplay?: () => void;
   ref?: Ref<PlayerEngineHandle>;
 };
 

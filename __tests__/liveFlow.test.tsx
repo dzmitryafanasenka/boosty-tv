@@ -18,6 +18,7 @@ import { type FixtureReply } from '../src/shared/api/fixtureTransport';
 import { accountScope } from '../src/shared/account';
 import { t as translate } from '../src/shared/i18n';
 import { logger } from '../src/shared/services/logger';
+import { playerOpenMark } from '../src/shared/services/perfMark';
 import { StreamRepository } from '../src/shared/entities/stream';
 import { QUALITY_PREFERENCE_KEY, qualityPreference } from '../src/features/player';
 import { playbackArbiter } from '../src/shared/platform/playbackArbiter';
@@ -238,6 +239,21 @@ describe('Story 7.2: watch a live stream (LiveRef)', () => {
     expect(engine.props?.paused).toBe(false);
     expect(engine.seek).not.toHaveBeenCalled();
     noProgress();
+    await unmount(root);
+  });
+
+  it('Story 9.3 matrix «Live»: the first frame logs `kind: live`; the live-edge remount after a pause logs nothing more', async () => {
+    // Автор's LiveCard takes this mark (`AuthorRoute.onOpenLive`); the helper pushes the route itself.
+    playerOpenMark.mark('live');
+    const root = await openLive();
+    await act(async () => engine.props?.onReadyForDisplay?.());
+    await key('up');
+    await press(root, PLAYPAUSE);
+    await press(root, PLAYPAUSE);
+    await act(async () => engine.props?.onReadyForDisplay?.());
+    expect(logger.entries().filter(e => e.message === 'first frame').map(e => e.fields)).toEqual([
+      { ms: expect.any(String), origin: 'live', kind: 'live' },
+    ]);
     await unmount(root);
   });
 
