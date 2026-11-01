@@ -77,7 +77,7 @@ context:
 - [x] `CHANGELOG.md`, `CHANGELOG.ru.md` -- the `0.9.0` entry in both languages
 - [x] `docs/release.md` -- the keytool command, the properties template, build, `apksigner verify --print-certs`, install and update, tag, `gh release create`, the secret checklist; link it from `docs/testing.md`
 - [x] Device -- uninstall the debug-key build (approved), install the signed release, owner re-login, check the launcher banner and name; reinstall the same-key APK with `adb install -r` → the session is kept
-- [ ] GitHub -- after the owner's OK: tag and release with the APK and the changelog
+- [x] GitHub -- after the owner's OK: tag and release with the APK and the changelog
 
 **Acceptance Criteria:**
 - Given the owner's keystore and properties, when the documented build runs, then `apksigner verify --print-certs` shows the release certificate, not `CN=Android Debug`.
@@ -89,6 +89,8 @@ context:
 - 2026-11-01: implemented by a subagent; host checks green (lint, typecheck, 147 suites / 3112 tests, check:fixtures). `assembleRelease` (armeabi-v7a) with empty `-P` overrides gives `app-release-unsigned.apk` (`versionCode 900`, `0.9.0`). With the owner's properties it gives `app-release.apk`: `apksigner` verifies v2, and the certificate is the owner's (`CN=Dzmitry Afanasenka`, …, SHA-256 `b7b8b0f1…47d59eb`). A partial set fails and names only the missing keys. A temporary `versionName "1.0"` fails at configuration.
 - Owner approved the banner and the icon previews (2026-11-01). The owner keeps the certificate DN as is (name and city are visible to anyone who has the APK; accepted).
 - Order: the code review runs before the Device task, because review fixes may change the build. The GitHub task runs after the PR merge, so the tag points at `main`. The public APK is built for all ABIs (`./gradlew clean assembleRelease`); the device check may use armeabi-v7a.
+
+- 2026-11-01: published on the owner's explicit OK: tag `v0.9.0` on `a4030ce` (`main`), GitHub Release «Boosty TV 0.9.0» with the all-ABI APK (`boosty-tv-0.9.0.apk`, 83 962 932 bytes, SHA-256 `8ae55394…8b9e4d96`, GitHub asset digest matches). `releases/latest` returns `v0.9.0`.
 
 ## Spec Change Log
 

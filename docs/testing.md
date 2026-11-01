@@ -919,7 +919,7 @@ Host tests: `src/shared/services/progress/__tests__/progressRepository.test.ts` 
 
 ### Story 9.1 — Signed release on GitHub Releases, 2026-11-01
 
-**Status: implemented, host-checked and checked on the pinned device (agent over adb, the owner signed in with the physical remote); the GitHub Release step runs after the merge.** `spec-9-1-signed-release-on-github-releases.md`. Release signing from four owner-held Gradle properties (all set: signed; none or empty: unsigned; partial: `checkReleaseSigning` fails before packaging and names only the missing keys), `versionName` `0.9.0` validated as `MAJOR.MINOR.PATCH` with `versionCode` 900 derived from it, the final neutral banner (`drawable-xhdpi/tv_banner.png`, 320×180) and adaptive icon (`mipmap-anydpi-v26`, vector foreground, legacy PNGs) rendered by `android/branding/render.mjs` with headless Chrome, `CHANGELOG.md` / `CHANGELOG.ru.md`, and [release.md](release.md).
+**Status: implemented, host-checked and checked on the pinned device (agent over adb, the owner signed in with the physical remote); published as GitHub Release `v0.9.0` (below).** `spec-9-1-signed-release-on-github-releases.md`. Release signing from four owner-held Gradle properties (all set: signed; none or empty: unsigned; partial: `checkReleaseSigning` fails before packaging and names only the missing keys), `versionName` `0.9.0` validated as `MAJOR.MINOR.PATCH` with `versionCode` 900 derived from it, the final neutral banner (`drawable-xhdpi/tv_banner.png`, 320×180) and adaptive icon (`mipmap-anydpi-v26`, vector foreground, legacy PNGs) rendered by `android/branding/render.mjs` with headless Chrome, `CHANGELOG.md` / `CHANGELOG.ru.md`, and [release.md](release.md).
 
 Host tests: `__tests__/releaseSigning.test.js` (source guard: the four property names only, no literal secret, signing gated on all four, the partial-set check before `preReleaseBuild`, the demo guard kept, the version format and derived code); `__tests__/androidManifest.test.js` (the banner resolves to one 320×180 xhdpi PNG; the adaptive icon XML and the legacy PNG sizes).
 
@@ -938,6 +938,8 @@ Device (Chromecast with Google TV, API 34, 2026-11-01, `assembleRelease -PreactN
 | Launcher | Google TV home, «Ваши приложения»: the new «Boosty TV» banner (mark + wordmark) is shown; a fresh install is placed at the end of the grid, not in the first row | agent via adb (screenshot) |
 
 The adaptive icon is not shown by the Google TV launcher (it uses the banner); it was checked only as rendered PNGs.
+
+Release (2026-11-01, owner's explicit OK): built from `main` `a4030ce` with a clean tree after lint, typecheck, `npm test` (3112 passed) and `check:fixtures`; `./gradlew clean assembleRelease` (all four ABIs in `native-code`, `versionCode 900`, the release certificate). Tag `v0.9.0` → GitHub Release «Boosty TV 0.9.0» with one asset, `boosty-tv-0.9.0.apk` (83 962 932 bytes, SHA-256 `8ae553944244ba885b65663589057a55aad513c84f401eb7f218458b8b9e4d96`, equal to GitHub's asset digest); notes in the documented RU / `---` / EN format with both digests. `GET /repos/dzmitryafanasenka/boosty-tv/releases/latest` returns `v0.9.0`.
 
 ### Epic 8 retro A4 — playerFlow split, 2026-10-31
 
