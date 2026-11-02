@@ -1,0 +1,50 @@
+name: Ошибка / Bug report
+description: Что-то работает не так / Something does not work
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Не указывайте номер телефона, код входа, токены, cookies, ссылки на видео и скриншоты с личными данными.
+        Do not include a phone number, sign-in code, tokens, cookies, media links or screenshots with personal data.
+  - type: input
+    id: version
+    attributes:
+      label: Версия приложения / App version
+      description: Настройки → Версия / Settings → Version
+      placeholder: 1.2.0
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Устройство и версия Android TV / Device and Android TV version
+      placeholder: Chromecast with Google TV 4K, Android TV 14
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Шаги / Steps to reproduce
+      placeholder: |
+        1. Открыть …
+        2. Нажать …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Что ожидалось / Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Что произошло / Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Дополнительно / Additional context
+      description: Скриншот без личных данных, как часто повторяется и т. п. / A screenshot without personal data, how often it happens, etc.

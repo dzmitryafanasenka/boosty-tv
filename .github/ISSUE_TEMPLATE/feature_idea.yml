@@ -1,0 +1,27 @@
+name: Идея / Feature idea
+description: Предложить улучшение / Suggest an improvement
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Решение о реализации принимает автор проекта; pull request'ы не принимаются.
+        The maintainer decides whether to implement an idea; pull requests are not accepted.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Какую задачу это решает? / What problem does it solve?
+      placeholder: Когда я смотрю …, мне неудобно … / When I watch …, it is hard to …
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Что предлагаете? / What do you suggest?
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Дополнительно / Additional context
+      description: Как это сделано в других приложениях, примеры без личных данных. / How other apps do it, examples without personal data.
