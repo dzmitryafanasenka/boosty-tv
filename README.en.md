@@ -22,6 +22,10 @@ to; it does not bypass paywalls or DRM. The app interface is in Russian.
   (Continue watching) row, live streams and an «События» (Events) section.
 - In-app updates: Settings → «Версия».
 
+![Author page: blog search, filters and posts](docs/screenshots/readme/author.png)
+
+![Video post with description and timestamps](docs/screenshots/readme/post.png)
+
 ## Installation
 
 1. Download the APK of the latest release from
