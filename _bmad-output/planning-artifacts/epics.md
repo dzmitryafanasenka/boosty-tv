@@ -96,11 +96,19 @@ The full text and testable consequences are in `prd.md` §4.
 - FR49 [P1]: Finished = ≥ 95 % or < 30 s left. A finished item is marked and removed from the Continue history without interrupting playback. At the actual end, write the progress and return to the origin. No autoplay.
 - FR50 [P2]: «Системный видеоплеер» opens a quality pick, then the Android chooser. No progress is tracked in this mode. Falls back to the built-in player. *As built (Story 8.2, owner decision 2026-10-31): one real player opens directly; two or more get the chooser listing them as explicit intents. On the pinned Google TV `queryIntentActivities` with `MATCH_DEFAULT_ONLY` returned only the framework stub, and the plain system chooser listed no targets.*
 - FR51 [P1]: Lifecycle: on sleep or background, pause and write progress. On return, show the paused overlay and re-resolve the URL if needed. Release resources on exit.
-- FR52 [P2, gated]: Events list after E18 is verified. «Начался эфир» opens the Author with the live card focused. *As built (Story 7.5): E18 was verified live, and the gate is on.*
+- FR52 [P2, gated]: Events list after E18 is verified. «Начался эфир» opens the Author with the live card focused. *As built (Story 7.5): E18 was verified live, and the gate is on.* **Retired 2026-11-02 (owner decision): the section is removed in Story 12.3 and replaced by FR61.**
 - FR53 [P1 minimal / P2 full]: Настройки. P1: version and «Выйти из аккаунта». P2: «Системный видеоплеер».
 - FR54 [P2]: Diagnostics opens after 7 OK presses on «Версия». Redacted log capture, retrieved via adb.
 - FR55 [P3]: A signed release APK installs on Google TV with banner and launcher entry. It is published in a GitHub Release of the public repo. The key stays outside the repo.
 - FR56 [P3]: Update check against GitHub Releases: at most daily, plus on «Версия» at most once per 60 s. Shows a passive plaque and a «Версия» hint; the dialog offers «Скачать и установить» (owner decision 2026-11-01: download for the device ABI, SHA-256 check, the system installer; never silent), with a QR to the release page as the fallback.
+- FR59 [P2, improvement]: Remove from «Продолжить просмотр»: long OK on a card → «Убрать из списка» / «Отмена»; a «Очистить всё» tile ends the row (confirmed). Local only, no E9; gated on a long-OK device check.
+- FR60 [P2, improvement]: Feed cards show the local progress line and «Просмотрено» (several videos: only when all are finished). Completes FR14. No request per card.
+- FR61 [P2, improvement]: A «в эфире» plaque on Главная from one bounded live source (E18, or capped sequential E15 with a TTL ≥ 5 min). Silent on failure. Replaces the retired FR52.
+- FR62 [P2, improvement]: Пост header: a large 16:9 preview on the left, title, meta and «Продолжить / С начала / На телефоне» on the right (approved mockup). One video: no MediaRow; several: a compact row. «На телефоне» is a QR of the post's URL.
+- FR63 [P2, improvement]: Timestamp lines become one chip «▶ time title» (no duplicated text); a timestamp inside a paragraph gets a chip after it.
+- FR64 [P2, improvement]: Sleep timer in the player settings sheet; on fire, pause and write progress. Not persisted.
+- FR65 [P2, improvement]: The overlay shows the clock time the video ends (current speed), hidden for live and unknown durations.
+- FR66 [P2, improvement]: Настройки rows «О приложении» (unofficial, MIT, GitHub QR), «Сообщить о проблеме» (QR to a GitHub bug issue, version prefilled if supported), and the account name with «Выйти из аккаунта» (never the phone).
 
 ### NonFunctional Requirements
 
@@ -231,6 +239,14 @@ From DESIGN.md and EXPERIENCE.md:
 - FR56: Epic 9
 - FR57: Epic 6
 - FR58: Epic 11
+- FR59: Epic 12
+- FR60: Epic 12 (completes FR14)
+- FR61: Epic 12 (replaces FR52)
+- FR62: Epic 13
+- FR63: Epic 13
+- FR64: Epic 14
+- FR65: Epic 14
+- FR66: Epic 15
 - NFR1–4, NFR6–9: cross-cutting; they become acceptance criteria in every relevant story. NFR5: Epic 9 (with smoothness checks in Epics 3–4).
 - Phase 0 spike (Epic 1) validates the assumptions behind FR1–4, FR42–44, FR48 and FR51. It closes no FR by itself.
 
@@ -285,6 +301,22 @@ Additions the owner asked for beyond BoostBuddy parity, planned after Epic 9.
 ### Epic 11: Comments (read-only) (P2, parity COMM-01)
 A post's comments as in the reference: the list, «show more», replies with «show more replies», at the bottom of Пост, plus the comment count in the Пост header. No posting, likes or deletion (owner decision 2026-11-02, reversing the former exclusion).
 **FRs covered:** FR58; FR14 and FR32 amended
+
+### Epic 12: Home and feed polish (our improvements)
+Remove videos from «Продолжить просмотр», show progress on feed cards, replace the «События» section with a live plaque on Главная, and test the system Watch Next channel for third-party launchers (owner decisions 2026-11-02).
+**FRs covered:** FR59, FR60, FR61; FR14 completed; FR9, FR15 amended; FR52 retired
+
+### Epic 13: Post screen redesign (our improvements)
+A large preview with the actions beside it, the post's own QR, and timestamp chips without duplicated text (owner decisions 2026-11-02; approved mockup).
+**FRs covered:** FR62, FR63; FR32, FR33, FR35 amended
+
+### Epic 14: Player additions (our improvements)
+A sleep timer and the end time of the video in the overlay (owner decisions 2026-11-02).
+**FRs covered:** FR64, FR65; FR45 amended
+
+### Epic 15: Settings additions (our improvements)
+«Сообщить о проблеме», «О приложении» and the account name next to sign-out (owner decisions 2026-11-02).
+**FRs covered:** FR66; FR53 amended
 
 ## Epic 1: Prove it on the TV (P0)
 
@@ -1891,3 +1923,235 @@ So that I see the discussion as on the website.
 **Given** the release build on the pinned TV
 **When** the owner reads a thread and pages with the remote
 **Then** it works with the D-pad only, and the device check is labelled as the owner's.
+
+## Epic 12: Home and feed polish (our improvements)
+
+Everyday improvements to Главная and the post grids, from the owner's daily use (owner decisions 2026-11-02, `sprint-change-proposal-2026-11-02-post-1-2-0.md`). They are not parity obligations.
+
+### Story 12.1: Remove videos from «Продолжить просмотр»
+
+As the viewer,
+I want to remove a video I will not finish from «Продолжить просмотр»,
+So that the row shows only what I still want to watch.
+
+**Acceptance Criteria:**
+
+**Given** the pinned remote
+**When** a temporary `__DEV__` probe logs the key events of a long OK press on a focused card (key codes, `repeatCount` and timing only)
+**Then** the story records whether a long press is reliably detectable
+**And** if it is not, the story stops and the owner chooses an alternative before any UI work.
+
+**Given** a focused Continue card
+**When** OK is held
+**Then** a Dialog «Убрать из списка» / «Отмена» opens with focus on «Отмена», and a short OK still opens the player.
+
+**Given** «Убрать из списка»
+**When** it is confirmed
+**Then** the entry leaves the local Continue history and is written at once, and focus moves to the neighbour card (else the first feed card)
+**And** no request is sent and the server `timeCode` is unchanged, so Пост still offers «Продолжить» from the server position.
+
+**Given** the row has entries
+**When** focus reaches its end
+**Then** the last item is a «Очистить всё» tile; OK opens a confirmation Dialog with focus on «Отмена», and confirming clears the account's Continue history, hides the row and moves focus to the first feed card.
+
+**Given** the release-like build on the pinned TV
+**When** the owner removes a card and clears the row with the physical remote
+**Then** it works with the D-pad only, and the device check is labelled as the owner's.
+
+### Story 12.2: Progress and «Просмотрено» on feed cards
+
+As the viewer,
+I want to see on the feed which videos I have started or finished,
+So that I do not open posts just to check.
+
+**Acceptance Criteria:**
+
+**Given** a video post card on Главная, Автор or Поиск with a local progress entry
+**When** it is shown
+**Then** the preview shows a progress line as in ContinueCard, and a finished video (FR49 rule) shows the badge «Просмотрено».
+
+**Given** a post with several videos
+**When** its card is shown
+**Then** «Просмотрено» shows only when all of them are finished; otherwise the line shows the progress of the first unfinished video (the target of «Продолжить · Видео N»).
+
+**Given** no local entry
+**Then** the card is unchanged, and no request is sent per card.
+
+**Given** progress changed in the player
+**When** the user returns to the grid
+**Then** the card reflects it without a feed refetch, and focus is unchanged
+**And** the card's accessibility label includes «просмотрено» or «осталось N мин».
+
+### Story 12.3: Replace «События» with a live plaque on Главная
+
+As the viewer,
+I want to see on Главная when an author I follow is live,
+So that I do not miss rare streams, without a section I never open.
+
+**Acceptance Criteria:**
+
+**Given** the spec
+**When** the live source is chosen
+**Then** it is (a) E18, one request, if a live `video_stream_start` can be observed, otherwise (b) E15 for at most N subscribed authors per pass (N chosen at spec time), sequential, with a TTL of at least 5 minutes, refetched only on Главная focus or app resume after the TTL
+**And** the choice and its evidence are recorded in `docs/api-contract.md`.
+
+**Given** a subscribed author is live
+**When** Главная is shown
+**Then** a plaque above «Продолжить просмотр» shows the author, «в эфире» and the stream title, and OK opens the live player as from the Author page (FR22); several live authors give one plaque each, in a row.
+
+**Given** no author is live, or the check failed
+**Then** no plaque, no error and no placeholder are shown, and Главная's initial focus and the feed are never delayed by the check.
+
+**Given** this story's release
+**Then** the «События» sidebar item, its route, `features/events`, the `events` flag and the `['events']` query are removed; the sidebar is Главная, Поиск, Подписки, Настройки; `docs/focus-map.md` and EVT-01 («removed by owner decision 2026-11-02, replaced by the live plaque») are updated
+**And** a test asserts the request count per pass and the TTL (NFR3).
+
+### Story 12.4: Spike: the Continue history in the system Watch Next channel
+
+As the owner,
+I want to know whether my launcher (Aero TV) can show Boosty TV's Continue history,
+So that we build it only if it works.
+
+**Acceptance Criteria:**
+
+**Given** a debug build
+**When** a temporary native probe inserts one `WatchNextProgram` (title, a poster without a signed query, progress, a deep link) via `androidx.tvprovider`
+**Then** the story records, with screenshots, whether it appears in Aero TV (`tv.aero.home`) and in the stock launcher on the pinned TV
+**And** the probe uses synthetic data only and deletes the program afterwards.
+
+**Given** the result
+**Then** a research note in `docs/research/` gives a go or no-go
+**And** a go adds a follow-up story (sync with the Continue history including removal and «Очистить всё», the deep link with the cold-start session check and Back behaviour decided with the owner, the AccountScope wipe); Google TV certification for its own row is not a goal.
+
+## Epic 13: Post screen redesign (our improvements)
+
+A large preview with the actions beside it, the post's own QR, and timestamp chips without duplicated text (owner decisions 2026-11-02). The approved mockup is the Claude Design canvas «Пост — новый макет» (https://claude.ai/artifact/E16eGy7h7pJ8KC9ugJZoG8, private).
+
+### Story 13.1: Пост header with a large preview and the post's QR
+
+As the viewer,
+I want a large preview and clear actions at the top of a post,
+So that I recognise the video and start it in one press.
+
+**Acceptance Criteria:**
+
+**Given** a post with one video
+**When** Пост is shown
+**Then** the header follows the mockup: a 16:9 preview on the left at about 45 % of the content width (duration and progress line; not focusable), and on the right the title, the meta line, the media line (for example «Видео · 56:14 · осталось 44 мин») and the buttons «Продолжить · ЧЧ:ММ» / «Смотреть», «С начала» (progress > 0) and «На телефоне»
+**And** the MediaRow strip is not shown.
+
+**Given** a post with several videos
+**Then** the preview and the primary target the first unfinished video, and a compact row «Видео в посте · N» under the header shows each video (preview, «Видео N · title», status) as one focus stop each.
+
+**Given** a post without video
+**Then** the header has no preview and the rest is unchanged; a locked post keeps the teaser (FR37).
+
+**Given** «На телефоне»
+**When** OK is pressed
+**Then** a QrDialog shows the post's boosty.to URL, and Back returns focus to «На телефоне».
+
+**Given** the focus rules
+**Then** initial focus stays on the primary, the order is primary → «С начала» → «На телефоне», ↓ goes to the body, and Back and return-from-player behaviour is unchanged
+**And** the body below the header stays one column (supersedes only the header part of the 2026-10-27 one-column decision).
+
+### Story 13.2: Timestamp chips instead of a text line and a chip
+
+As the viewer,
+I want each timestamp to be one obvious button,
+So that I see the chapters and jump to one without reading everything twice.
+
+**Acceptance Criteria:**
+
+**Given** a text line that starts with a timestamp of a video in this post
+**When** the body is rendered
+**Then** the line is one chip «▶ time  title» (title = the rest of the line, one line, ellipsized), and the plain text line is not rendered.
+
+**Given** consecutive timestamp lines
+**Then** the chips form a tight list with no blank lines between them, and ↑↓ moves through them.
+
+**Given** a timestamp inside a paragraph
+**Then** the paragraph stays as text, and one chip «▶ time» per timestamp follows it.
+
+**Given** OK on a chip
+**Then** the player opens at that second with the Story 6.3 progress rules; chapters in the player (Story 10.1) and non-timestamp LinkChips are unchanged
+**And** hundreds of chips stay virtualized and focus-safe.
+
+## Epic 14: Player additions (our improvements)
+
+A sleep timer and the end time in the overlay (owner decisions 2026-11-02).
+
+### Story 14.1: «Закончится в ЧЧ:ММ» in the player overlay
+
+As the viewer,
+I want to see when the video ends,
+So that I know whether I will finish it tonight.
+
+**Acceptance Criteria:**
+
+**Given** a seekable video with a known duration
+**When** the overlay is shown
+**Then** it shows the clock time the video ends, computed from the remaining time at the current speed and the device clock (24-hour; exact copy at spec time)
+**And** it updates at least once a minute and after a seek or speed change.
+
+**Given** a live stream or an unknown duration
+**Then** no end time is shown.
+
+### Story 14.2: Sleep timer
+
+As the viewer,
+I want playback to stop by itself after a while,
+So that I do not lose my place when I fall asleep.
+
+**Acceptance Criteria:**
+
+**Given** the player settings sheet
+**Then** a «Таймер сна» row offers «Выкл», fixed durations and «До конца видео» (options chosen at spec time); the default is «Выкл», and the choice is not persisted across player sessions.
+
+**Given** an active timer
+**Then** the overlay shows the remaining time.
+
+**Given** the timer fires
+**Then** playback pauses and progress is written at that position (the existing pause write), and the overlay stays as on pause; on a live stream it pauses without a progress write.
+
+**Given** the video changes or the player is left
+**Then** the timer is cancelled.
+
+## Epic 15: Settings additions (our improvements)
+
+«О приложении», «Сообщить о проблеме» and the account name (owner decisions 2026-11-02). Separate rows, not one screen.
+
+### Story 15.1: «О приложении» and «Сообщить о проблеме»
+
+As a viewer who got the app from someone else,
+I want to see what the app is and where to report a problem,
+So that I can send a useful bug report.
+
+**Acceptance Criteria:**
+
+**Given** Настройки
+**Then** two new rows appear: «О приложении» and «Сообщить о проблеме».
+
+**Given** «О приложении»
+**When** OK is pressed
+**Then** it shows the app name, the version, «Неофициальный клиент Boosty, не связан с Boosty», «Лицензия MIT» and a QR to the GitHub repository.
+
+**Given** «Сообщить о проблеме»
+**When** OK is pressed
+**Then** a QrDialog links to a new GitHub issue with the bug template, with the version and device model prefilled only if GitHub supports it for `bug_report.yml` (checked at spec time)
+**And** the URL never carries account data, and Back returns focus to the row.
+
+### Story 15.2: Account name next to «Выйти из аккаунта»
+
+As the viewer,
+I want to see which account I am signed in to,
+So that I know what «Выйти» will sign out.
+
+**Acceptance Criteria:**
+
+**Given** a temporary probe of E1
+**When** it runs on the owner's session
+**Then** `docs/api-contract.md` records which field carries the display name (keys and types only; no value is logged), and if none exists the story stops for the owner's decision.
+
+**Given** the name
+**Then** the «Выйти из аккаунта» row shows it as secondary text; a missing or blank name leaves the row unchanged
+**And** the phone number is never shown, and the name is account-scoped and never logged.
