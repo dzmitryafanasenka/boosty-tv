@@ -1,5 +1,5 @@
 /* eslint-disable no-script-url -- Story 6.3: unsafe URLs are inputs the code must reject */
-import { boostyPostRef, boostyStreamUrl, fileTarget, timestampRef, safeHttpUrl, youtubeId, youtubeThumbnail } from '../externalUrls';
+import { boostyPostRef, boostyPostUrl, boostyStreamUrl, fileTarget, timestampRef, safeHttpUrl, youtubeId, youtubeThumbnail } from '../externalUrls';
 
 describe('safeHttpUrl (Story 6.3)', () => {
   it('keeps absolute http(s) URLs with a host (trimmed)', () => {
@@ -174,5 +174,29 @@ describe('boostyStreamUrl (Story 7.2)', () => {
     expect(boostyStreamUrl('')).toBeNull();
     expect(boostyStreamUrl('a/b')).toBeNull();
     expect(boostyStreamUrl('..')).toBeNull();
+  });
+});
+
+describe('boostyPostUrl (Story 13.1)', () => {
+  it('the post page of a valid blog and id, both encoded as one segment', () => {
+    expect(boostyPostUrl('synthetic-blog', 'abc-123')).toBe('https://boosty.to/synthetic-blog/posts/abc-123');
+    expect(boostyPostUrl('synthetic-blog', 'id+1&x=y')).toBe('https://boosty.to/synthetic-blog/posts/id%2B1%26x%3Dy');
+  });
+
+  it('reads back through boostyPostRef', () => {
+    const url = boostyPostUrl('synthetic-blog', 'f00d-1');
+    expect(boostyPostRef(url)).toEqual({ blogUrl: 'synthetic-blog', postId: 'f00d-1' });
+  });
+
+  it('an unsafe blog is null', () => {
+    for (const blog of ['', 'a/b', '..', 'a b']) {
+      expect(boostyPostUrl(blog, 'p1')).toBeNull();
+    }
+  });
+
+  it('an odd post id is null', () => {
+    for (const id of ['', '.', '..', 'a/b', 'a b', 'a?b', 'a#b', 'a%2F', 'a\\b', ' p1']) {
+      expect(boostyPostUrl('synthetic-blog', id)).toBeNull();
+    }
   });
 });

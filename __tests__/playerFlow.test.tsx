@@ -113,19 +113,36 @@ jest.mock('../src/shared/platform/PlayerEngineView', () => require('../src/test/
 const handlers = setupPlayerFlowHarness();
 
 describe('Пост: «Смотреть» and MediaRows (Story 4.1, owner decision option A)', () => {
-  it('«Смотреть» right under the header, before the rows; initial focus on it; ↑ the author, ↓ the rows', async () => {
+  it('«Смотреть» in the header (Story 13.1: beside the preview, then «На телефоне»); initial focus on it; ↑ the author, ↓ the tiles or the body', async () => {
     const root = await openPost();
     const column = byTestId(root, 'post/column')[0];
     const ids = column
       .queryAll(n => n.props.focusable === true)
       .map(n => n.props.testID as string);
-    expect(ids).toEqual([`post/${POST}/author`, PRIMARY, VIDEO('v1'), `post/${POST}/block/text@1`]);
+    // One video: no tile (the hero is its preview).
+    expect(ids).toEqual([`post/${POST}/author`, PRIMARY, `post/${POST}/phone`, `post/${POST}/block/text@1`]);
     expect(one(root, PRIMARY).props.accessibilityLabel).toBe('Смотреть');
     expect(one(root, PRIMARY).props.accessibilityRole).toBe('button');
     expect(lastFocusTarget()).toBe(PRIMARY);
-    // The rows are buttons now.
-    expect(one(root, VIDEO('v1')).props.accessibilityRole).toBe('button');
     await unmount(root);
+  });
+
+  it('several videos (Story 13.1): the tiles are buttons below the header', async () => {
+    withData(TWO);
+    const two = await openPost();
+    const twoIds = byTestId(two, 'post/column')[0]
+      .queryAll(n => n.props.focusable === true)
+      .map(n => n.props.testID as string);
+    expect(twoIds).toEqual([
+      `post/${POST}/author`,
+      PRIMARY,
+      `post/${POST}/phone`,
+      VIDEO('v1'),
+      VIDEO('v2'),
+      `post/${POST}/block/text@2`,
+    ]);
+    expect(one(two, VIDEO('v1')).props.accessibilityRole).toBe('button');
+    await unmount(two);
   });
 
   it('a two-video post: «Смотреть · Видео 1», and it opens the first video', async () => {
@@ -189,7 +206,7 @@ describe('open the player (matrix «Open from a row», «Source order», «Progr
 
   it('only DASH + 720p/1080p progressive → DASH', async () => {
     withData([okVideo('v1', [{ type: 'high', url: URL }, { type: 'dash', url: URL }, { type: 'full_hd', url: URL }])]);
-    const root = await openPlayer(VIDEO('v1'), { load: false });
+    const root = await openPlayer(PRIMARY, { load: false });
     expect(engine.props?.source).toEqual({ uri: URL, format: 'dash' });
     await unmount(root);
   });
@@ -202,7 +219,7 @@ describe('open the player (matrix «Open from a row», «Source order», «Progr
         { type: 'high', url: `${URL}-720` },
       ]),
     ]);
-    const root = await openPlayer(VIDEO('v1'), { load: false });
+    const root = await openPlayer(PRIMARY, { load: false });
     expect(engine.props?.source).toEqual({ uri: `${URL}-hd`, format: 'progressive' });
     await unmount(root);
   });
@@ -212,7 +229,7 @@ describe('open the player (matrix «Open from a row», «Source order», «Progr
     const root = await openPost();
     handlers.e8 = () => pending.promise;
     focusMock.mockClear();
-    await press(root, VIDEO('v1'));
+    await press(root, PRIMARY);
     expect(currentRoute()).toBe('Player');
     expect(visible(root, 'player/spinner')).toBe(true);
     expect(engine.props).toBeNull();
@@ -285,7 +302,7 @@ describe('a locked fresh E8 checks the session first (Epic 3 retro A6)', () => {
     expect(handlers.transport.callsTo(E1)).toHaveLength(1);
     dead = true;
     focusMock.mockClear();
-    await press(root, VIDEO('v1'), timers ? { settle: { timerRounds: 30 } } : undefined);
+    await press(root, PRIMARY, timers ? { settle: { timerRounds: 30 } } : undefined);
     return root;
   }
 
@@ -331,7 +348,7 @@ describe('a locked fresh E8 checks the session first (Epic 3 retro A6)', () => {
     expect(progressStore.get('v1')).toBeUndefined();
     await press(root, BACK);
     expect(currentRoute()).toBe('Post');
-    await press(root, VIDEO('v1'));
+    await press(root, PRIMARY);
     expect(playerText(root)).toContain('Нет доступа к этому видео');
     expect(handlers.transport.callsTo(E1)).toHaveLength(2);
     expect(e8Calls()).toHaveLength(4);
@@ -380,7 +397,7 @@ describe('error states (matrix «No usable URL», «Locked on fresh E8», «E8 f
       status: 200,
       body: postDetail(FEED_BLOG, POST, [okVideo('v1', [{ type: 'hls', url: '' }, { type: 'mp4', url: URL }])]),
     });
-    await press(root, VIDEO('v1'));
+    await press(root, PRIMARY);
     expect(playerText(root)).toContain('Не удалось воспроизвести видео');
     expect(engine.props).toBeNull();
     expect(byTestId(root, 'player/page')[0].queryAll(n => n.props.focusable === true).map(n => n.props.testID)).toEqual([
@@ -400,8 +417,8 @@ describe('error states (matrix «No usable URL», «Locked on fresh E8», «E8 f
   it('locked on the fresh E8: «Нет доступа к этому видео», only «Назад» (focused, no retry); OK → Пост, focus on the row', async () => {
     const root = await openPost();
     handlers.e8 = () => ({ status: 200, body: { ...e8Locked(), id: POST, user: { ...(e8Locked().user as object), blogUrl: FEED_BLOG } } });
-    await focusOn(root, VIDEO('v1'));
-    await press(root, VIDEO('v1'));
+    await focusOn(root, PRIMARY);
+    await press(root, PRIMARY);
     expect(playerText(root)).toContain('Нет доступа к этому видео');
     expect(visible(root, RETRY)).toBe(false);
     expect(lastFocusTarget()).toBe(BACK);
@@ -410,21 +427,21 @@ describe('error states (matrix «No usable URL», «Locked on fresh E8», «E8 f
     await press(root, BACK);
     expect(currentRoute()).toBe('Post');
     expect(e8Calls()).toHaveLength(before);
-    expect(lastFocusTarget()).toBe(VIDEO('v1'));
+    expect(lastFocusTarget()).toBe(PRIMARY);
     await unmount(root);
   });
 
   it('E8 404 or the video gone: «Видео недоступно» + «Назад»', async () => {
     const root = await openPost();
     handlers.e8 = () => e8MissingReply();
-    await press(root, VIDEO('v1'));
+    await press(root, PRIMARY);
     expect(playerText(root)).toContain('Видео недоступно');
     expect(visible(root, RETRY)).toBe(false);
     await back();
     expect(currentRoute()).toBe('Post');
     withData([okVideo('other', ALL)]);
     // The Пост still shows v1 (its own cache); the player's E8 no longer has it.
-    await press(root, VIDEO('v1'));
+    await press(root, PRIMARY);
     expect(playerText(root)).toContain('Видео недоступно');
     await unmount(root);
   });
@@ -432,7 +449,7 @@ describe('error states (matrix «No usable URL», «Locked on fresh E8», «E8 f
   it('E8 fails (Server): the error with «Повторить» (busy while it runs) / «Назад»; Повторить → E8 again → plays', async () => {
     const root = await openPost();
     handlers.e8 = () => ({ status: 503, body: {} });
-    await press(root, VIDEO('v1'), { settle: { timerRounds: 30 } });
+    await press(root, PRIMARY, { settle: { timerRounds: 30 } });
     expect(playerText(root)).toContain('Не удалось воспроизвести видео');
     expect(playerText(root)).toContain('Boosty сейчас не отвечает');
     expect(lastFocusTarget()).toBe(RETRY);
@@ -688,7 +705,7 @@ describe('overlay, keys and seeking (matrix «Seek», «Auto-hide», «Back», �
   });
 
   it('the entry guard also ignores OK on the surface inside the window', async () => {
-    const root = await openPlayer(VIDEO('v1'), { load: false });
+    const root = await openPlayer(PRIMARY, { load: false });
     await fire('onLoad', { durationSec: 600 });
     await focusOn(root, SURFACE);
     await press(root, SURFACE, { focus: false });
@@ -700,7 +717,7 @@ describe('overlay, keys and seeking (matrix «Seek», «Auto-hide», «Back», �
   });
 
   it('seek presses before the duration is known only show the overlay', async () => {
-    const root = await openPlayer(VIDEO('v1'), { load: false });
+    const root = await openPlayer(PRIMARY, { load: false });
     await advance(600);
     await key('right');
     expect(visible(root, 'player/overlay')).toBe(true);
@@ -1016,7 +1033,7 @@ describe('overlay, keys and seeking (matrix «Seek», «Auto-hide», «Back», �
   });
 
   it('the entry guard: the first key up right after focus lands on the player is ignored', async () => {
-    const root = await openPlayer(VIDEO('v1'), { load: false });
+    const root = await openPlayer(PRIMARY, { load: false });
     await fire('onLoad', { durationSec: 600 });
     await focusOn(root, SURFACE);
     await key('right');
@@ -1060,7 +1077,7 @@ describe('overlay, keys and seeking (matrix «Seek», «Auto-hide», «Back», �
     // The stack's pop transition runs on timers; then the player is gone.
     await advance(1_000);
     expect(engine.props).toBeNull();
-    expect(lastFocusTarget()).toBe(VIDEO('v1'));
+    expect(lastFocusTarget()).toBe(PRIMARY);
     await unmount(root);
   });
 
@@ -1195,7 +1212,7 @@ describe('overlay, keys and seeking (matrix «Seek», «Auto-hide», «Back», �
 
   it('Story 4.5: Back before the end still returns to the origin element', async () => {
     withData(TWO);
-    const root = await openPlayer();
+    const root = await openPlayer(VIDEO('v1'));
     focusMock.mockClear();
     await back();
     expect(currentRoute()).toBe('Post');
@@ -1245,7 +1262,7 @@ describe('PlaybackArbiter and logs (matrix «Arbiter», «CDN headers»)', () =>
       return { status: 200, body: { ...body, id: postId, user: { ...(body.user as object), blogUrl } } };
     };
     const root = await openPost();
-    await press(root, VIDEO('synthetic-id-7'));
+    await press(root, PRIMARY);
     expect(engine.props?.source).toEqual({ uri: URL, format: 'hls' });
     expect(focusTargets()).toContain(SURFACE);
     await unmount(root);
@@ -1273,7 +1290,7 @@ describe('review fixes (Story 4.1)', () => {
     const mountsBefore = engine.mounts;
     const pending = deferred();
     handlers.e8 = () => pending.promise;
-    await press(root, VIDEO('v1'));
+    await press(root, PRIMARY);
     expect(currentRoute()).toBe('Player');
     expect(engine.props).toBeNull();
     expect(visible(root, 'player/spinner')).toBe(true);
@@ -1307,7 +1324,7 @@ describe('review fixes (Story 4.1)', () => {
     await back();
     expect(currentRoute()).toBe('Post');
     expect(focusRestoration.peek(origin.routeKey, 'main')).toEqual({
-      focusId: VIDEO('v1'),
+      focusId: PRIMARY,
       scrollOffset: 345,
       index: 2,
     });
@@ -1323,7 +1340,7 @@ describe('review fixes (Story 4.1)', () => {
     });
     await settle();
     expect(currentRoute()).toBe('Post');
-    expect(focusRestoration.peek(origin.routeKey, 'main')?.focusId).toBe(VIDEO('v1'));
+    expect(focusRestoration.peek(origin.routeKey, 'main')?.focusId).toBe(PRIMARY);
     await unmount(root);
   });
 

@@ -251,6 +251,37 @@ export const components = {
     scaleFocus: focus['scale-row'],
   },
   /**
+   * Story 13.1 (our improvement, mockup «Пост — новый макет», px ÷ 2): the
+   * video post's header: a 16:9 preview (not focusable; a `plate` with the
+   * `glyph` when it has none) left of the title, meta, media line and the
+   * action row; `gap` between the preview and the text column, `buttonGap`
+   * between the buttons (also between wrapped rows).
+   */
+  'post-hero': {
+    previewWidth: 320,
+    previewHeight: 180,
+    radius: rounded.xl,
+    gap: 28,
+    buttonGap: 12,
+    /** The QR glyph on the icon-only «На телефоне». */
+    buttonIcon: 20,
+    /** The focused-only label under the icon-only «На телефоне». */
+    hintWidth: 120,
+    glyph: 48,
+    titleLines: 4,
+    plate: colors['surface-raised'],
+    glyphInk: colors['text-disabled'],
+    progress: colors.accent,
+  },
+  /** Story 13.1: one compact video tile of a multi-video post («Видео в посте · N»). */
+  'media-tile': {
+    width: 168,
+    thumbHeight: 95,
+    gap: 16,
+    radius: rounded.md,
+    scaleFocus: focus['scale-post-card'],
+  },
+  /**
    * Story 7.5 (События): the row spans the 720 dp content minus the focus
    * headroom on both sides (720 − 2 × 12), so the 1.02 scale and the ring
    * stay inside the content.

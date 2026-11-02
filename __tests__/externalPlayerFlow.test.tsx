@@ -51,7 +51,7 @@ import {
   FEED_BLOG,
   POST,
   FEED_CARD,
-  VIDEO,
+  PRIMARY,
   TIMELINE,
   URL,
   E9_RE,
@@ -119,7 +119,7 @@ describe('Story 8.2: the system video player (PLAY-13, SET-02)', () => {
     withData([okVideo('v1', sources), ...paragraph('Body')]);
     const root = await openPost();
     focusMock.mockClear();
-    await press(root, VIDEO('v1'));
+    await press(root, PRIMARY);
     expect(currentRoute()).toBe('Player');
     await advance(50);
     return root;
@@ -194,7 +194,7 @@ describe('Story 8.2: the system video player (PLAY-13, SET-02)', () => {
       const root = await openPost();
       handlers.e8 = () => pending.promise;
       focusMock.mockClear();
-      await press(root, VIDEO('v1'));
+      await press(root, PRIMARY);
       expect(currentRoute()).toBe('Player');
       expect(visible(root, LOADING)).toBe(true);
       expect(visible(root, SHEET)).toBe(false);
@@ -222,7 +222,7 @@ describe('Story 8.2: the system video player (PLAY-13, SET-02)', () => {
       // starts only after that (Story 8.2 device run: a restoration sent
       // while the external activity covered the app was lost).
       expect(currentRoute()).toBe('Post');
-      expect(lastFocusTarget()).toBe(VIDEO('v1'));
+      expect(lastFocusTarget()).toBe(PRIMARY);
       expect(launch).not.toHaveBeenCalled();
       let focusAtLaunch: string | undefined;
       launch.mockImplementation(async () => {
@@ -231,7 +231,7 @@ describe('Story 8.2: the system video player (PLAY-13, SET-02)', () => {
       });
       await advance(EXTERNAL_LAUNCH_DELAY_MS);
       expect(launch).toHaveBeenCalledTimes(1);
-      expect(focusAtLaunch).toBe(VIDEO('v1'));
+      expect(focusAtLaunch).toBe(PRIMARY);
       expect(engine.mounts).toBe(0);
       await advance(60_000);
       expect(e9Sent()).toHaveLength(0);
@@ -272,7 +272,7 @@ describe('Story 8.2: the system video player (PLAY-13, SET-02)', () => {
       focusMock.mockClear();
       await back();
       expect(currentRoute()).toBe('Post');
-      expect(lastFocusTarget()).toBe(VIDEO('v1'));
+      expect(lastFocusTarget()).toBe(PRIMARY);
       expect(prepare).not.toHaveBeenCalled();
       expect(engine.mounts).toBe(0);
       await advance(60_000);
@@ -347,12 +347,12 @@ describe('Story 8.2: the system video player (PLAY-13, SET-02)', () => {
       const root = await openPost();
       handlers.e8 = () => pending.promise;
       focusMock.mockClear();
-      await press(root, VIDEO('v1'));
+      await press(root, PRIMARY);
       await advance(50);
       expect(visible(root, LOADING)).toBe(true);
       await back();
       expect(currentRoute()).toBe('Post');
-      expect(lastFocusTarget()).toBe(VIDEO('v1'));
+      expect(lastFocusTarget()).toBe(PRIMARY);
       pending.resolve({ status: 200, body: postDetail(FEED_BLOG, POST, [okVideo('v1', MIXED), ...paragraph('Body')]) });
       await settle();
       expect(prepare).not.toHaveBeenCalled();
@@ -402,7 +402,7 @@ describe('Story 8.2: the system video player (PLAY-13, SET-02)', () => {
       await device().setItem(EXTERNAL_PLAYER_PREFERENCE_KEY, 'on');
       const root = await openPost();
       handlers.e8 = () => e8MissingReply();
-      await press(root, VIDEO('v1'));
+      await press(root, PRIMARY);
       await advance(50);
       expect(currentRoute()).toBe('Player');
       expect(visible(root, SHEET)).toBe(false);

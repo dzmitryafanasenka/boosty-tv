@@ -28,7 +28,7 @@ import {
   advance,
   key,
   FEED_CARD,
-  VIDEO,
+  PRIMARY,
   SURFACE,
   SETTINGS,
   FORWARD10,
@@ -222,7 +222,7 @@ describe('Story 8.1: playback speed (PLAY-07, SET-04)', () => {
   it('matrix «Next video»: stored `2` (after an app restart) → the new video starts at 2×; «Скорость · 2×»; «2×» in the overlay', async () => {
     await device().setItem(SPEED_PREFERENCE_KEY, '2');
     withData([okVideo('v1', MIXED)]);
-    const root = await openPlayer(VIDEO('v1'), { load: false });
+    const root = await openPlayer(PRIMARY, { load: false });
     // The first engine already has the stored rate (it waits for the read).
     expect(engine.mounts).toBe(1);
     expect(engine.props?.rate).toBe(2);
@@ -311,7 +311,7 @@ describe('Story 8.1: playback speed (PLAY-07, SET-04)', () => {
     const held = deferred<'2'>();
     jest.spyOn(speedPreference, 'read').mockReturnValue(held.promise.then(() => 2 as const));
     withData([okVideo('v1', MIXED)]);
-    const root = await openPlayer(VIDEO('v1'), { load: false });
+    const root = await openPlayer(PRIMARY, { load: false });
     expect(engine.mounts).toBe(0);
     await act(async () => held.resolve('2'));
     await settle();

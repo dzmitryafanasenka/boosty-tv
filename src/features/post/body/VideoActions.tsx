@@ -1,10 +1,20 @@
-import { memo, useCallback } from 'react';
+import { useCallback, type ReactNode, type RefObject } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import type { MediaRef, VideoRow } from '../../../shared/entities/post';
 import { useColumnStop, type StopFocusHandler, type StopViewHandler } from '../../../shared/focus';
 import { t, tf } from '../../../shared/i18n';
-import type { ProgressStatus } from '../../../shared/services/progress';
-import { Button, MediaRow, mediaRowLabel, spacing } from '../../../shared/ui';
+import { formatDuration } from '../../../shared/i18n/format';
+import {
+  Button,
+  FocusableSurface,
+  QrIcon,
+  Text,
+  buttonInk,
+  components,
+  mediaRowLabel,
+  type HostView,
+  type SurfaceState,
+} from '../../../shared/ui';
 
 /**
  * How the Player is opened (Story 4.2): `beginning` for «С начала»; Story
@@ -12,177 +22,136 @@ import { Button, MediaRow, mediaRowLabel, spacing } from '../../../shared/ui';
  */
 export type OpenPlayer = (ref: MediaRef, focusId: string, start?: 'beginning' | { atSec: number }) => void;
 
-type VideoRowStopProps = {
-  id: string;
-  row: VideoRow;
-  playable: boolean;
-  /** Story 4.2: the row's progress status (only while playable). */
-  status: ProgressStatus | null;
-  onView: StopViewHandler;
-  onFocus: StopFocusHandler;
-  /** OK (only while playable): the Player for `ref`, opened from the focus id `id`. */
-  onOpen: OpenPlayer;
+/** The play part of the action row (Story 4.1, 4.2); absent while the player is off. */
+export type PostPlayAction = {
+  /** The first unfinished video (all finished: the first one). */
+  target: VideoRow;
+  /** The post has several videos: the label names the target («· Видео N»). */
+  multi: boolean;
+  /** The target has progress > 0: «Продолжить» and «С начала». */
+  resume: boolean;
+  /**
+   * Story 13.1: the target's saved position (`useProgress`), shown on a
+   * single video's «Продолжить · 12:08»; null: «Продолжить» alone.
+   */
+  resumeAtSec: number | null;
 };
 
-/**
- * One MediaRow as a focus stop of the Post column (Story 3.5): a content
- * zone item, its host view reported by focus id. OK opens the Player for
- * this video (Story 4.1) while `phaseFlags.player` is on; otherwise it does
- * nothing.
- */
-const VideoRowStop = memo(function VideoRowStopView({
-  id,
-  row,
-  playable,
-  status,
-  onView,
-  onFocus,
-  onOpen,
-}: VideoRowStopProps) {
-  const { ref, handleFocus } = useColumnStop(id, onView, onFocus);
-  const mediaRef = row.ref;
-  const handlePress = useCallback(() => onOpen(mediaRef, id), [onOpen, mediaRef, id]);
-  return (
-    <MediaRow
-      ref={ref}
-      testID={id}
-      row={row}
-      playable={playable}
-      status={status}
-      onPress={handlePress}
-      onFocus={handleFocus}
-      style={styles.gap}
-    />
-  );
-});
-
-export type PostVideoRowsProps = {
-  rows: readonly VideoRow[];
-  /** `post/<postId>/video/` */
-  idPrefix: string;
-  /** `phaseFlags.player`, from the route (features cannot import `app`). */
-  playable: boolean;
-  /** Story 4.2: each row's progress status, by index (none while not playable). */
-  statuses: readonly (ProgressStatus | null)[];
-  onRowView: StopViewHandler;
-  onRowFocus: StopFocusHandler;
-  /** OK on a row (while playable): the Player for that video. */
-  onOpenPlayer: OpenPlayer;
-};
-
-/**
- * The post's MediaRows, in block order, under the header, full content
- * width (DESIGN.md Post screen). Keys and ids use the media id
- * (`post/<postId>/video/<mediaId>`), never the index or a URL.
- */
-export function PostVideoRows({
-  rows,
-  idPrefix,
-  playable,
-  statuses,
-  onRowView,
-  onRowFocus,
-  onOpenPlayer,
-}: PostVideoRowsProps) {
-  return (
-    <>
-      {rows.map((row, i) => (
-        <VideoRowStop
-          key={row.ref.mediaId}
-          id={`${idPrefix}${row.ref.mediaId}`}
-          row={row}
-          playable={playable}
-          status={playable ? statuses[i] ?? null : null}
-          onView={onRowView}
-          onFocus={onRowFocus}
-          onOpen={onOpenPlayer}
-        />
-      ))}
-    </>
-  );
-}
-
-export type PostPrimaryActionProps = {
+export type PostActionsProps = {
   /** `post/<postId>/primary` */
   id: string;
   /** `post/<postId>/restart` */
   restartId: string;
-  /** The post has several MediaRows: the label names the target («· Видео N»). */
-  multi: boolean;
-  /** The first unfinished video (all finished: the first one). */
-  target: VideoRow;
-  /** The target has progress > 0: «Продолжить» and «С начала». */
-  resume: boolean;
+  /** `post/<postId>/phone` */
+  phoneId: string;
+  /** «Смотреть» / «Продолжить» and «С начала»; null: none (the player is off, or no video). */
+  play: PostPlayAction | null;
+  /** Story 13.1: OK on «На телефоне» (its host view is the dialog's initiator); null: no button. */
+  onOpenPhone: ((initiator: RefObject<HostView | null>) => void) | null;
   onView: StopViewHandler;
   onFocus: StopFocusHandler;
   onOpenPlayer: OpenPlayer;
+  style?: StyleProp<ViewStyle>;
 };
 
 type ColumnButtonProps = {
   id: string;
   label: string;
   kind: 'primary' | 'secondary';
-  onPress: () => void;
+  onPress: (viewRef: RefObject<HostView | null>) => void;
   onView: StopViewHandler;
   onFocus: StopFocusHandler;
-  style?: StyleProp<ViewStyle>;
+  accessibilityLabel?: string;
+  icon?: ReactNode;
 };
 
 /** A button that is a content zone item and a column stop (like the rows). */
-function ColumnButton({ id, label, kind, onPress, onView, onFocus, style }: ColumnButtonProps) {
-  const { ref, handleFocus } = useColumnStop(id, onView, onFocus);
+function ColumnButton({ id, label, kind, onPress, onView, onFocus, accessibilityLabel, icon }: ColumnButtonProps) {
+  const { ref, viewRef, handleFocus } = useColumnStop(id, onView, onFocus);
+  const handlePress = useCallback(() => onPress(viewRef), [onPress, viewRef]);
   return (
     <Button
       ref={ref}
       testID={id}
       kind={kind}
       label={label}
-      onPress={onPress}
+      accessibilityLabel={accessibilityLabel}
+      icon={icon}
+      onPress={handlePress}
       onFocus={handleFocus}
-      style={style}
     />
   );
 }
 
 /**
- * The primary action under the header (Story 4.1, owner decision
- * 2026-10-27, option A): a primary Button in its own row, before the
- * MediaRows. Story 4.2: it targets the first unfinished video; «Продолжить»
- * when that one has progress, else «Смотреть» (all finished: «Смотреть» on
- * the first video, which starts at 0); several videos name the target
- * («Продолжить · Видео 2»). «С начала» (owner decision 2026-10-28) sits in
- * the same row, to its right, only when the target has progress; it starts
- * that video at 0. ← → move between them, ↓ from either reaches the first
- * MediaRow, ↑ the author (native focus in the one column).
+ * The primary's label (Stories 4.1, 4.2, 13.1): «Продолжить» when the
+ * target has progress (a single video names the time: «Продолжить ·
+ * 12:08»; several name the video: «Продолжить · Видео 2»), else «Смотреть»
+ * («Смотреть · Видео N» for several).
  */
-export function PostPrimaryAction({
+export function primaryLabel({ target, multi, resume, resumeAtSec }: PostPlayAction): string {
+  if (resume) {
+    if (multi) {
+      return tf('post.continueVideo', { label: mediaRowLabel(target) });
+    }
+    return resumeAtSec !== null && resumeAtSec > 0
+      ? tf('post.continueAt', { time: formatDuration(resumeAtSec) })
+      : t('post.continue');
+  }
+  return multi ? tf('post.watchVideo', { label: mediaRowLabel(target) }) : t('post.watch');
+}
+
+/**
+ * The header's action row (Story 4.1, owner decision 2026-10-27; Story
+ * 13.1 mockup «Пост — новый макет»): the primary Button targets the first
+ * unfinished video, «С начала» to its right only when that one has
+ * progress (owner decision 2026-10-28; it starts the video at 0), then
+ * «На телефоне» (Story 13.1, every post: the QrDialog with the post's
+ * boosty.to page). The row wraps when the column is narrow. Native focus:
+ * ← → move along the row, ↑ reaches the author, ↓ the tiles or the body.
+ */
+export function PostActions({
   id,
   restartId,
-  multi,
-  target,
-  resume,
+  phoneId,
+  play,
+  onOpenPhone,
   onView,
   onFocus,
   onOpenPlayer,
-}: PostPrimaryActionProps) {
-  const targetRef = target.ref;
-  const onPress = useCallback(() => onOpenPlayer(targetRef, id), [onOpenPlayer, targetRef, id]);
-  const onRestart = useCallback(
-    () => onOpenPlayer(targetRef, restartId, 'beginning'),
-    [onOpenPlayer, targetRef, restartId],
+  style,
+}: PostActionsProps) {
+  const targetRef = play?.target.ref ?? null;
+  const onPress = useCallback(() => {
+    if (targetRef !== null) {
+      onOpenPlayer(targetRef, id);
+    }
+  }, [onOpenPlayer, targetRef, id]);
+  const onRestart = useCallback(() => {
+    if (targetRef !== null) {
+      onOpenPlayer(targetRef, restartId, 'beginning');
+    }
+  }, [onOpenPlayer, targetRef, restartId]);
+  const onPhone = useCallback(
+    (viewRef: RefObject<HostView | null>) => onOpenPhone?.(viewRef),
+    [onOpenPhone],
   );
-  const video = mediaRowLabel(target);
-  const label = resume
-    ? multi
-      ? tf('post.continueVideo', { label: video })
-      : t('post.continue')
-    : multi
-      ? tf('post.watchVideo', { label: video })
-      : t('post.watch');
+  if (play === null && onOpenPhone === null) {
+    return null;
+  }
   return (
-    <View testID={`${id}-row`} style={styles.primaryRow}>
-      <ColumnButton id={id} kind="primary" label={label} onPress={onPress} onView={onView} onFocus={onFocus} />
-      {resume ? (
+    <View testID={`${id}-row`} style={[styles.row, style]}>
+      {play !== null ? (
+        <ColumnButton
+          id={id}
+          kind="primary"
+          label={primaryLabel(play)}
+          onPress={onPress}
+          onView={onView}
+          onFocus={onFocus}
+        />
+      ) : null}
+      {play !== null && play.resume ? (
         <ColumnButton
           id={restartId}
           kind="secondary"
@@ -190,24 +159,86 @@ export function PostPrimaryAction({
           onPress={onRestart}
           onView={onView}
           onFocus={onFocus}
-          style={styles.restart}
         />
+      ) : null}
+      {onOpenPhone !== null ? (
+        <PhoneButton id={phoneId} onPress={onPhone} onView={onView} onFocus={onFocus} />
       ) : null}
     </View>
   );
 }
 
+const HERO = components['post-hero'];
+const SECONDARY = components['button-secondary'];
+
+type PhoneButtonProps = {
+  id: string;
+  onPress: (viewRef: RefObject<HostView | null>) => void;
+  onView: StopViewHandler;
+  onFocus: StopFocusHandler;
+};
+
+/**
+ * «На телефоне» (Story 13.1, owner follow-up 2026-11-02): a square,
+ * icon-only secondary button in the same row as the play buttons, so it
+ * never wraps onto a row of its own. The label «На телефоне» shows under
+ * it only while it is focused, positioned absolutely (no reflow);
+ * TalkBack always reads the full label.
+ */
+function PhoneButton({ id, onPress, onView, onFocus }: PhoneButtonProps) {
+  const { ref, viewRef, handleFocus } = useColumnStop(id, onView, onFocus);
+  const handlePress = useCallback(() => onPress(viewRef), [onPress, viewRef]);
+  const surfaceStyle = ({ focused }: SurfaceState) => [
+    styles.phoneSurface,
+    { backgroundColor: focused ? SECONDARY.bgFocus : SECONDARY.bg },
+  ];
+  return (
+    <FocusableSurface
+      ref={ref}
+      testID={id}
+      radius={SECONDARY.radius}
+      scaleFocus={components['button-primary'].scaleFocus}
+      accessibilityRole="button"
+      accessibilityLabel={t('post.phoneA11y')}
+      onPress={handlePress}
+      onFocus={handleFocus}
+      surfaceStyle={surfaceStyle}
+    >
+      {({ focused }: SurfaceState) => (
+        <>
+          <QrIcon testID={`${id}/icon`} color={buttonInk({ kind: 'secondary' })} size={HERO.buttonIcon} />
+          {focused ? (
+            <Text testID={`${id}/hint`} variant="meta" color="text-secondary" numberOfLines={1} style={styles.phoneHint}>
+              {t('post.phone')}
+            </Text>
+          ) : null}
+        </>
+      )}
+    </FocusableSurface>
+  );
+}
+
 const styles = StyleSheet.create({
-  // The primary button's own row, left-aligned, above the MediaRows.
-  primaryRow: {
+  phoneSurface: {
+    width: SECONDARY.height,
+    height: SECONDARY.height,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Under the button, centred on it, outside the row's layout.
+  phoneHint: {
+    position: 'absolute',
+    top: SECONDARY.height + HERO.buttonGap / 2,
+    width: HERO.hintWidth,
+    left: (SECONDARY.height - HERO.hintWidth) / 2,
+    textAlign: 'center',
+  },
+  // The buttons left-aligned, wrapping onto a second row when narrow; the
+  // gap stays between wrapped rows too (the 1.04 focus scale never overlaps).
+  row: {
     flexDirection: 'row',
-    marginBottom: spacing['8'],
-  },
-  // «С начала» to the right of the primary (owner decision 2026-10-28).
-  restart: {
-    marginLeft: spacing['6'],
-  },
-  gap: {
-    marginBottom: spacing['6'],
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: HERO.buttonGap,
   },
 });

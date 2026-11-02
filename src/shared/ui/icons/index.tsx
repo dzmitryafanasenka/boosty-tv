@@ -229,3 +229,18 @@ export function FileIcon({ color, size, testID }: IconProps) {
     </Glyph>
   );
 }
+
+/**
+ * «На телефоне» (Story 13.1): a QR code sketch: three finder squares and a
+ * few modules, outlined in the button's ink (the button carries the label).
+ */
+export function QrIcon({ color, size, testID }: IconProps) {
+  return (
+    <Glyph size={size} testID={testID}>
+      <Rect x={3} y={3} width={7} height={7} rx={1} stroke={color} strokeWidth={2} fill="none" />
+      <Rect x={14} y={3} width={7} height={7} rx={1} stroke={color} strokeWidth={2} fill="none" />
+      <Rect x={3} y={14} width={7} height={7} rx={1} stroke={color} strokeWidth={2} fill="none" />
+      <Path d="M14 14 H17 V17 H14 Z M20 14 V15 M14 20 H15 M17 20 H21 V17" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </Glyph>
+  );
+}

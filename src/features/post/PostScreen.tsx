@@ -1,5 +1,5 @@
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -36,13 +36,14 @@ import {
   type ProgressSnapshot,
   type ProgressStatus,
 } from '../../shared/services/progress';
+import { boostyPostUrl } from '../../shared/entities/externalUrls';
 import { QrDialog, StateView, requestHostFocus, spacing, type HostView } from '../../shared/ui';
 import { pollFallbackOrder, pollFirstStopId, pollFocusIds } from '../polls';
 import {
+  PostActions,
   PostBody,
   PostBodySkeleton,
-  PostPrimaryAction,
-  PostVideoRows,
+  PostVideoTiles,
   TEASER_IMAGE_GAP,
   type OpenPost,
   type PlayAt,
@@ -57,6 +58,7 @@ import {
 import { LOCKED_NOTICE_GAP, LockedNotice } from './LockedNotice';
 import { ImageViewer, type OpenImages } from './ImageViewer';
 import { PostHeader, PostHeaderSkeleton } from './PostHeader';
+import { PostHero } from './PostHero';
 import { useAudioSource, useFileTarget, usePost } from './usePost';
 
 /** Focus ids (docs/focus-map.md §1.5). */
@@ -73,6 +75,8 @@ export const postVideoId = (postId: string, mediaId: string) =>
 export const postPrimaryId = (postId: string) => `post/${postId}/primary`;
 /** «С начала», to the right of the primary (Story 4.2, owner decision 2026-10-28). */
 export const postRestartId = (postId: string) => `post/${postId}/restart`;
+/** «На телефоне» (Story 13.1): the post's boosty.to page as a QR, on every post. */
+export const postPhoneId = (postId: string) => `post/${postId}/phone`;
 /**
  * Story 11.2: the «Комментарии» block's ids: rows are `post/<postId>/` +
  * `comment/<commentId>`; the actions `post/<postId>/` + `comments/more`,
@@ -109,8 +113,9 @@ export function primaryTarget(
 
 /**
  * Story 4.5 (focus-map G «Ended»): where focus lands on the Post after a
- * video played to its real end: the first unfinished MediaRow after the
- * ended one (post order, the 4.2 finished rule), else the primary button.
+ * video played to its real end: the first unfinished video tile after the
+ * ended one (post order, the 4.2 finished rule; Story 13.1: the tiles keep
+ * the MediaRow ids), else the primary button (a single video: always).
  * `snapshot` is the progress of a media id (local entry, else server).
  */
 export function endedReturnFocusId(
@@ -227,12 +232,21 @@ type Phase = 'unavailable' | 'error' | 'loading' | 'ready';
  * SessionCheck port (E1) whether a dead session hides behind it (Epic 3
  * retro A6).
  *
+ * Story 13.1 (our improvement, mockup «Пост — новый макет») supersedes the
+ * header and row parts above: a post with video rows shows the author row,
+ * then `PostHero` (the preview of the primary's target, not focusable; the
+ * title, meta, media line and the action row primary → «С начала» → «На
+ * телефоне»); one video has no MediaRow, several get `PostVideoTiles` (the
+ * old row ids) under it. Any other post (text, audio, poll, locked) keeps
+ * the plain header with «На телефоне» under the meta line. «На телефоне»
+ * opens the QrDialog with the post's boosty.to page (`boostyPostUrl`).
+ *
  * Focus:
  * - Skeleton: nothing focusable in content; focus goes to the sidebar's
  *   current item explicitly (it must leave the covered screen below).
- * - When the post arrives, «Смотреть» takes focus, else the first MediaRow,
- *   else the first paragraph (a locked post or one with neither: the
- *   author) only if the user has not moved (focus
+ * - When the post arrives, «Смотреть» takes focus, else the first video
+ *   tile, else the first paragraph, else «На телефоне» (a locked post or
+ *   one with none of them: the author) only if the user has not moved (focus
  *   still on the sidebar's current item, nothing yet, or the StateView
  *   action just pressed). A StateView action takes focus the same way, or
  *   when the focused content it replaces is gone.
@@ -275,6 +289,7 @@ export function PostScreen({
   const contentPrefix = postIdPrefix(postId);
   const primaryId = postPrimaryId(postId);
   const restartId = postRestartId(postId);
+  const phoneId = postPhoneId(postId);
   // Stories 6.6–6.7: the poll's stops, `post/<postId>/poll/…` (`features/polls`).
   const pollIds = useMemo(() => pollFocusIds(contentPrefix), [contentPrefix]);
   // Story 11.2: the «Комментарии» block (read-only), only for an accessible
@@ -334,19 +349,37 @@ export function PostScreen({
       }),
     [rows, snapshots],
   );
-  const primary = useMemo(() => primaryTarget(rows, statuses), [rows, statuses]);
+  // Statuses are shown only while the player is on (Story 4.2); off, the
+  // header's target is the first video and no progress is shown.
+  const shownStatuses = useMemo(
+    () => (playerEnabled ? statuses : rows.map(() => null)),
+    [playerEnabled, statuses, rows],
+  );
+  const primary = useMemo(() => primaryTarget(rows, shownStatuses), [rows, shownStatuses]);
   /** «С начала»: only when the primary's target has progress > 0. */
   const showRestart = showPrimary && primary !== null && primary.resume;
+  const targetIndex = primary === null ? -1 : rows.indexOf(primary.row);
+  const targetStatus = targetIndex < 0 ? null : shownStatuses[targetIndex] ?? null;
+  /** Story 13.1: a single video's «Продолжить · 12:08» (the saved position, `useProgress`). */
+  const resumeAtSec = showRestart && targetIndex >= 0 ? snapshots[targetIndex]?.positionSec ?? null : null;
+  /** Story 13.1: the hero header (an accessible post with video rows); several videos add tiles. */
+  const showHero = post !== null && post.hasAccess && primary !== null;
+  const showTiles = showHero && rows.length > 1;
+  /** Story 13.1: «На телефоне»'s QR target; null (invalid blog or id): no button. */
+  const phoneUrl = useMemo(
+    () => (post === null ? null : boostyPostUrl(post.author.blogUrl, post.id)),
+    [post],
+  );
 
   /**
-   * The first stop below the header: «Смотреть», else the first MediaRow,
-   * else the first paragraph.
+   * The first stop below the author: «Смотреть», else the first video tile
+   * (several videos), else the first paragraph, else «На телефоне».
    */
   const firstStopId = useMemo(() => {
     if (showPrimary) {
       return primaryId;
     }
-    if (rows.length > 0) {
+    if (showTiles) {
       return `${videoPrefix}${rows[0].ref.mediaId}`;
     }
     const first = items.find(isFocusStop);
@@ -355,8 +388,11 @@ export function PostScreen({
     if (pollStop !== null) {
       return pollStop;
     }
-    return first ? `${blockPrefix}${first.key}` : null;
-  }, [showPrimary, primaryId, rows, items, videoPrefix, blockPrefix, pollIds]);
+    if (first) {
+      return `${blockPrefix}${first.key}`;
+    }
+    return phoneUrl !== null ? phoneId : null;
+  }, [showPrimary, primaryId, showTiles, rows, items, videoPrefix, blockPrefix, pollIds, phoneUrl, phoneId]);
   // The column's measured viewport and content height (the ScrollView's
   // layout and content size).
   const [viewport, setViewport] = useState<{ width: number; height: number } | null>(null);
@@ -451,7 +487,7 @@ export function PostScreen({
   const { ref: authorRef, handleFocus: onAuthorFocus } = useColumnStop(authorId, onAuthorView, onStopFocus);
   useEffect(() => {
     refreshColumnTarget();
-  }, [rows, items, showPrimary, showRestart, initialId, refreshColumnTarget]);
+  }, [rows, items, showPrimary, showRestart, phoneUrl, initialId, refreshColumnTarget]);
 
   const stateAction = useZoneItem(POST_STATE_ACTION_ID);
   const stateActionView = useRef<HostView | null>(null);
@@ -620,7 +656,8 @@ export function PostScreen({
         current.startsWith(videoPrefix) ||
         current.startsWith(pollIds.prefix) ||
         current === primaryId ||
-        current === restartId) &&
+        current === restartId ||
+        current === phoneId) &&
       !views.current.has(current)
     ) {
       if (lastFocused.current === current) {
@@ -641,7 +678,7 @@ export function PostScreen({
       }
       focusAfterUnmount(current, focusInitial);
     }
-  }, [rows, items, showPrimary, showRestart, blockPrefix, videoPrefix, pollIds, primaryId, restartId, focusInitial, focusAfterUnmount, focusLaidOut, phaseRef, postId]);
+  }, [rows, items, showPrimary, showRestart, phoneUrl, blockPrefix, videoPrefix, pollIds, primaryId, restartId, phoneId, focusInitial, focusAfterUnmount, focusLaidOut, phaseRef, postId]);
 
   // Story 11.2: «Показать ещё», «Ещё ответы» and «Повторить» move focus
   // themselves once their load ends (`focusLaidOut`); the action row that
@@ -700,6 +737,16 @@ export function PostScreen({
       modal.open(<QrDialog title={title} value={value} onClose={() => modal.close()} />, initiator);
     },
     [modal],
+  );
+  // Story 13.1: OK on «На телефоне» → the QrDialog with the post's boosty.to
+  // page (never logged; Back returns focus to the button).
+  const onOpenPhone = useCallback(
+    (initiator: RefObject<HostView | null>) => {
+      if (phoneUrl !== null) {
+        onOpenQr(t('post.phoneQrTitle'), phoneUrl, initiator);
+      }
+    },
+    [onOpenQr, phoneUrl],
   );
   // Story 11.2 (owner decision 2026-11-02): OK on an image stop or a comment
   // with images → the full-screen viewer in the modal host (`fill`: focus
@@ -803,37 +850,77 @@ export function PostScreen({
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
           >
-            <PostHeader
-              post={post}
-              authorId={authorId}
-              authorRef={authorRef}
-              onAuthorFocus={onAuthorFocus}
-              onAuthorPress={onAuthorPress}
-            />
+            {showHero && primary !== null ? (
+              <>
+                <PostHeader
+                  post={post}
+                  authorId={authorId}
+                  authorRef={authorRef}
+                  onAuthorFocus={onAuthorFocus}
+                  onAuthorPress={onAuthorPress}
+                  authorOnly
+                />
+                <PostHero
+                  post={post}
+                  target={primary.row}
+                  count={rows.length}
+                  status={targetStatus}
+                  actions={
+                    <PostActions
+                      id={primaryId}
+                      restartId={restartId}
+                      phoneId={phoneId}
+                      play={
+                        showPrimary
+                          ? { target: primary.row, multi: rows.length > 1, resume: showRestart, resumeAtSec }
+                          : null
+                      }
+                      onOpenPhone={phoneUrl !== null ? onOpenPhone : null}
+                      onView={onStopView}
+                      onFocus={onStopFocus}
+                      onOpenPlayer={onOpenPlayer}
+                    />
+                  }
+                />
+                {showTiles ? (
+                  <PostVideoTiles
+                    rows={rows}
+                    idPrefix={videoPrefix}
+                    playable={playerEnabled}
+                    statuses={statuses}
+                    currentMediaId={showPrimary ? primary.row.ref.mediaId : null}
+                    onTileView={onStopView}
+                    onTileFocus={onStopFocus}
+                    onOpenPlayer={onOpenPlayer}
+                  />
+                ) : null}
+              </>
+            ) : (
+              <PostHeader
+                post={post}
+                authorId={authorId}
+                authorRef={authorRef}
+                onAuthorFocus={onAuthorFocus}
+                onAuthorPress={onAuthorPress}
+                actions={
+                  phoneUrl !== null ? (
+                    <PostActions
+                      id={primaryId}
+                      restartId={restartId}
+                      phoneId={phoneId}
+                      play={null}
+                      onOpenPhone={onOpenPhone}
+                      onView={onStopView}
+                      onFocus={onStopFocus}
+                      onOpenPlayer={onOpenPlayer}
+                    />
+                  ) : null
+                }
+              />
+            )}
             {post.hasAccess ? null : (
               <LockedNotice levelName={post.levelName} onLayout={onCopyLayout} />
             )}
-            {showPrimary && primary !== null ? (
-              <PostPrimaryAction
-                id={primaryId}
-                restartId={restartId}
-                multi={rows.length > 1}
-                target={primary.row}
-                resume={showRestart}
-                onView={onStopView}
-                onFocus={onStopFocus}
-                onOpenPlayer={onOpenPlayer}
-              />
-            ) : null}
-            <PostVideoRows
-              rows={rows}
-              idPrefix={videoPrefix}
-              playable={playerEnabled}
-              statuses={statuses}
-              onRowView={onStopView}
-              onRowFocus={onStopFocus}
-              onOpenPlayer={onOpenPlayer}
-            />
             <PostBody
               items={items}
               idPrefix={blockPrefix}

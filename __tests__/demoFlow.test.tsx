@@ -481,7 +481,7 @@ test('Story 6.7: the demo multiple-choice poll takes a multi-id vote and a retra
   });
 });
 
-test('Story 3.5: a demo post with two videos shows two MediaRows on top (the second without a title)', async () => {
+test('Story 3.5 / 13.1: a demo post with two videos shows two video tiles under the header (the second without a title)', async () => {
   fetchMock.mockClear();
   const root = await renderApp();
   const ids = () =>
@@ -495,8 +495,9 @@ test('Story 3.5: a demo post with two videos shows two MediaRows on top (the sec
   const label = (id: string) =>
     root.container.queryAll(n => n.props.testID === id && n.props.focusable === true)[0].props
       .accessibilityLabel;
-  // Story 4.2: the label ends with the progress status (nothing watched in the demo).
-  expect(label(rows[0])).toMatch(/^Видео 1\. Демо-ролик 5\. \d+:\d\d\. Не начато$/);
+  // Story 4.2: the label ends with the progress status (nothing watched in
+  // the demo); Story 13.1: the primary's target tile adds «Сейчас».
+  expect(label(rows[0])).toMatch(/^Видео 1\. Демо-ролик 5\. \d+:\d\d\. Не начато\. Сейчас$/);
   expect(label(rows[1])).toMatch(/^Видео 2\. \d+:\d\d\. Не начато$/);
   expect(fetchMock).not.toHaveBeenCalled();
   await act(async () => {

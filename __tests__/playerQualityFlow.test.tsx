@@ -32,7 +32,7 @@ import {
   key,
   FEED_BLOG,
   POST,
-  VIDEO,
+  PRIMARY,
   SURFACE,
   SETTINGS,
   BACK10,
@@ -255,7 +255,7 @@ describe('quality (Story 4.3)', () => {
       updatedAt: Date.now(),
       meta: { title: 'Title v1', postTitle: `Title of ${POST}`, authorName: 'redacted', previewUrl: null, durationSec: 600 },
     });
-    const root = await openPlayer(VIDEO('v1'), { load: false });
+    const root = await openPlayer(PRIMARY, { load: false });
     await focusOn(root, SURFACE);
     await advance(600);
     await key('menu');
@@ -271,7 +271,7 @@ describe('quality (Story 4.3)', () => {
 
   it('a pick while the initial resume seek is in flight starts the new source at that resume point', async () => {
     withData([okVideo('v1', MIXED, { timeCode: 300 })]);
-    const root = await openPlayer(VIDEO('v1'), { load: false });
+    const root = await openPlayer(PRIMARY, { load: false });
     await focusOn(root, SURFACE);
     await advance(600);
     await fire('onLoad', { durationSec: 600 });
@@ -387,14 +387,14 @@ describe('quality (Story 4.3)', () => {
   it('matrix «Stored pref»: `720` and the video has 720p → plays it; `720` and no 720p → default order (HLS), preference kept', async () => {
     await device().setItem(QUALITY_PREFERENCE_KEY, '720');
     withData([okVideo('v1', MIXED)]);
-    const has = await openPlayer(VIDEO('v1'), { load: false });
+    const has = await openPlayer(PRIMARY, { load: false });
     expect(engine.props?.source).toEqual({ uri: `${URL}-720`, format: 'progressive' });
     expect(engine.mounts).toBe(1);
     await unmount(has);
     qualityPreference.forget();
     engine.reset();
     withData([okVideo('v1', [{ type: 'hls', url: `${URL}-hls` }, { type: 'full_hd', url: `${URL}-1080` }])]);
-    const lacks = await openPlayer(VIDEO('v1'), { load: false });
+    const lacks = await openPlayer(PRIMARY, { load: false });
     expect(engine.props?.source).toEqual({ uri: `${URL}-hls`, format: 'hls' });
     expect(visible(lacks, 'player/state/error')).toBe(false);
     expect(await device().getItem(QUALITY_PREFERENCE_KEY)).toBe('720');
@@ -404,7 +404,7 @@ describe('quality (Story 4.3)', () => {
   it('a junk stored value is no preference (default order)', async () => {
     await device().setItem(QUALITY_PREFERENCE_KEY, 'https://example.invalid/x');
     withData([okVideo('v1', MIXED)]);
-    const root = await openPlayer(VIDEO('v1'), { load: false });
+    const root = await openPlayer(PRIMARY, { load: false });
     expect(engine.props?.source).toEqual({ uri: `${URL}-hls`, format: 'hls' });
     await unmount(root);
   });

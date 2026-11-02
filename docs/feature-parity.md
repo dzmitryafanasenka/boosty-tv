@@ -176,7 +176,7 @@ The reference renders the **full post inline in the feed card** (title, date, au
 
 ### 10.1 Planned improvements (owner decisions 2026-11-02)
 
-Not in the reference; our improvements from `_bmad-output/planning-artifacts/sprint-change-proposal-2026-11-02-post-1-2-0.md`. Status: planned.
+Not in the reference; our improvements from `_bmad-output/planning-artifacts/sprint-change-proposal-2026-11-02-post-1-2-0.md`. Status: planned unless a row says «As built».
 
 | ID | Capability | PRD | Story |
 |---|---|---|---|
@@ -184,7 +184,7 @@ Not in the reference; our improvements from `_bmad-output/planning-artifacts/spr
 | IMP-02 | Progress and «Просмотрено» on feed cards (completes FR-14) | FR-60 | 12.2 |
 | IMP-03 | «в эфире» plaque on Главная, replacing События (EVT-01) | FR-61 | 12.3 |
 | IMP-04 | Watch Next channel for third-party launchers (spike, Aero TV `tv.aero.home`) | — | 12.4 |
-| IMP-05 | Пост header with a large preview; «На телефоне» QR of the post | FR-62 | 13.1 |
+| IMP-05 | Пост header with a large preview; «На телефоне» QR of the post. **As built (Story 13.1, host-tested; the device check is the owner's):** a video post shows `PostHero` (16:9 preview, not focusable, plate fallback; title, meta, media line, buttons primary → «С начала» → «На телефоне»); one video has no MediaRow, several get compact tiles «Видео в посте · N» with the old row ids; «На телефоне» on every post opens the QrDialog with `https://boosty.to/<blog>/posts/<id>` (no new request or endpoint) | FR-62 | 13.1 |
 | IMP-06 | Timestamp chips «▶ time title» | FR-63 | 13.2 |
 | IMP-07 | End time in the player overlay | FR-65 | 14.1 |
 | IMP-08 | Sleep timer | FR-64 | 14.2 |

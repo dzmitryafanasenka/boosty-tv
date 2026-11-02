@@ -43,7 +43,7 @@ import {
   FEED_BLOG,
   POST,
   FEED_CARD,
-  VIDEO,
+  PRIMARY,
   SURFACE,
   TIMELINE,
   PLAYPAUSE,
@@ -314,7 +314,7 @@ describe('recovery (Story 4.4)', () => {
 
   it('matrix «Start failure»: an error before the first onLoad → the recovery starts at the pending start (the resume point)', async () => {
     withData([okVideo('v1', ALL, { timeCode: 300 }), ...paragraph('Body')]);
-    const root = await openPlayer(VIDEO('v1'), { load: false });
+    const root = await openPlayer(PRIMARY, { load: false });
     await focusOn(root, SURFACE);
     await advance(600);
     const before = e8Calls().length;
@@ -367,7 +367,7 @@ describe('recovery (Story 4.4)', () => {
     // The player's fresh E8, its one refetch after E1 ok, then the Post's own refetch.
     expect(e8Calls().length).toBeGreaterThanOrEqual(postE8Before + 3);
     expect(text(byTestId(root, 'post/page')[0])).toContain('Нет доступа. Этот пост доступен');
-    expect(visible(root, VIDEO('v1'))).toBe(false);
+    expect(visible(root, PRIMARY)).toBe(false);
     expect(lastFocusTarget()).toBe(AUTHOR);
     await unmount(root);
   });
@@ -465,7 +465,7 @@ describe('recovery (Story 4.4)', () => {
     await back();
     expect(currentRoute()).toBe('Post');
     expect(e9Sent().slice(sentBefore)).toEqual(['v1@312']);
-    expect(lastFocusTarget()).toBe(VIDEO('v1'));
+    expect(lastFocusTarget()).toBe(PRIMARY);
     pending.resolve({ status: 200, body: postDetail(FEED_BLOG, POST, ONE) });
     await settle();
     await unmount(root);
@@ -488,7 +488,7 @@ describe('debug-only broken next video URL (Story 4.4 device check)', () => {
     await press(root, 'nav/home');
     await focusOn(root, FEED_CARD);
     await press(root, FEED_CARD);
-    await press(root, VIDEO('v1'));
+    await press(root, PRIMARY);
     expect(currentRoute()).toBe('Player');
     // Пост's E8 is #1, the player's #2: only its URL is broken (its host becomes the reserved `boostytv-debug-broken.invalid`).
     expect(engine.props?.source.uri).toBe(`https://${BROKEN}.invalid/player-2`);
@@ -503,7 +503,7 @@ describe('debug-only broken next video URL (Story 4.4 device check)', () => {
       await advance(50);
     }
     // The next opening is not broken (one-shot).
-    await press(root, VIDEO('v1'));
+    await press(root, PRIMARY);
     expect(engine.props?.source.uri).toBe(`${URL}-4`);
     await unmount(root);
   });
