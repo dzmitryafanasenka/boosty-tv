@@ -13,6 +13,7 @@ import {
   GearIcon,
   HeartIcon,
   PollIcon,
+  QrIcon,
   SkipIcon,
   TextPhotoIcon,
   VideoIcon,
@@ -70,7 +71,8 @@ describe('SVG icons', () => {
     ['TextPhotoIcon', TextPhotoIcon],
     ['PollIcon', PollIcon],
     ['FileIcon', FileIcon],
-  ])('%s (PostCard placeholder, 2026-10-30): drawn in the ink, sized, hidden from a11y', async (_name, Icon) => {
+    ['QrIcon', QrIcon],
+  ])('%s (PostCard placeholder, 2026-10-30; QrIcon: «На телефоне», Story 13.1): drawn in the ink, sized, hidden from a11y', async (_name, Icon) => {
     const root = await render(<Icon testID="p" color="#b7b0a6" size={37} />);
     const nodes = all(root);
     const svg = nodes.find(n => n.props.testID === 'p');

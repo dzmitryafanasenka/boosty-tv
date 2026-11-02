@@ -130,6 +130,24 @@ export function boostyStreamUrl(blogUrl: string): string | null {
   return `https://boosty.to/${encodeURIComponent(blogUrl)}/streams/video_stream`;
 }
 
+/**
+ * Story 13.1 («На телефоне», our improvement): the post's own page,
+ * `https://boosty.to/{blog}/posts/{postId}`, the QR target on Пост. Both
+ * segments are encoded; null when the blog fails `blogUrlSchema` or the id
+ * is not a plain segment (empty, `.`/`..`, whitespace, `/ ? # % \\`), the
+ * same rule `boostyPostRef` reads such a link back with. Never a signed URL
+ * or account data.
+ */
+export function boostyPostUrl(blogUrl: string, postId: string): string | null {
+  if (!blogUrlSchema.safeParse(blogUrl).success) {
+    return null;
+  }
+  if (postId.length === 0 || /^\.{1,2}$/.test(postId) || /[\s/?#%\\]/.test(postId)) {
+    return null;
+  }
+  return `https://boosty.to/${encodeURIComponent(blogUrl)}/posts/${encodeURIComponent(postId)}`;
+}
+
 /** A Boosty post a link points to (Story 6.3, owner decision 2026-10-29). */
 export type BoostyPostRef = { blogUrl: string; postId: string };
 

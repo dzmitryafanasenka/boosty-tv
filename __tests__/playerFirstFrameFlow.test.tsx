@@ -22,7 +22,6 @@ import {
   key,
   FEED_BLOG,
   POST,
-  VIDEO,
   SURFACE,
   SETTINGS,
   URL,
@@ -65,7 +64,7 @@ const frame = () => act(async () => engine.props?.onReadyForDisplay?.());
 describe('Story 9.3: the `first frame` line', () => {
   it('matrix «TTFF from post»: one line, origin «post», the elapsed ms and the kind; no id, URL or title', async () => {
     const root = await openPost();
-    await press(root, VIDEO('v1'));
+    await press(root, PRIMARY);
     expect(currentRoute()).toBe('Player');
     await focusOn(root, SURFACE);
     await advance(800);
@@ -101,7 +100,7 @@ describe('Story 9.3: the `first frame` line', () => {
   it('an E8 failure (the error state), then «Повторить» and a first frame: no line (the error screen is never timed)', async () => {
     const root = await openPost();
     handlers.e8 = () => ({ status: 503, body: {} });
-    await press(root, VIDEO('v1'), { settle: { timerRounds: 30 } });
+    await press(root, PRIMARY, { settle: { timerRounds: 30 } });
     expect(lastFocusTarget()).toBe(RETRY);
     handlers.e8 = () => ({ status: 200, body: postDetail(FEED_BLOG, POST, ONE) });
     await press(root, RETRY);
@@ -189,7 +188,7 @@ describe('Story 9.3: the `first frame` line', () => {
 
   it('matrix «Back before first frame»: no line; the next opening is timed from its own press', async () => {
     const root = await openPost();
-    await press(root, VIDEO('v1'));
+    await press(root, PRIMARY);
     expect(currentRoute()).toBe('Player');
     await focusOn(root, SURFACE);
     await back();
@@ -198,7 +197,7 @@ describe('Story 9.3: the `first frame` line', () => {
     // The mark was taken by the closed player: nothing is left for a later one.
     expect(playerOpenMark.take()).toBeNull();
     await advance(5_000);
-    await press(root, VIDEO('v1'));
+    await press(root, PRIMARY);
     await advance(300);
     await frame();
     const lines = firstFrames();

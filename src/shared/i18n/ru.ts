@@ -426,6 +426,31 @@ export const ru = {
     continue: 'Продолжить',
     continueVideo: 'Продолжить · {label}',
     restart: 'С начала',
+    // Story 13.1: a single video in progress names the resume time.
+    continueAt: 'Продолжить · {time}',
+    // Story 13.1 (our improvement, owner decision 2026-11-02): «На телефоне»
+    // on every post opens a QR of the post's boosty.to page.
+    phone: 'На телефоне',
+    phoneA11y: 'На телефоне. Показать QR-код поста',
+    phoneQrTitle: 'Пост на Boosty',
+    // Story 13.1: the video post's header (PostHero). The media line joins
+    // its parts with « · »: «Видео · 56:14 · осталось 44 мин».
+    hero: {
+      video: 'Видео',
+      quoted: '«{title}»',
+      join: '{head} · {part}',
+      left: 'осталось {n} мин',
+      watched: 'просмотрено',
+      ofCount: 'Видео {n} из {m}',
+    },
+    // Story 13.1: the compact video tiles of a multi-video post.
+    tiles: {
+      title: 'Видео в посте · {n}',
+      now: 'Сейчас',
+      tileLabel: '{label} · {title}',
+      notStartedDuration: 'Не начато · {duration}',
+      a11yNow: '{base}. Сейчас',
+    },
     // Story 11.2 (our improvement, owner decision 2026-11-02): the full-screen
     // image viewer for post and comment images. `{n}` / `{m}`: position and count.
     imageViewer: {

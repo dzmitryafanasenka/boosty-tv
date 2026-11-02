@@ -276,8 +276,11 @@ export async function openPost(): Promise<Root> {
   return root;
 }
 
-/** Пост → OK on `from` → Player; the engine loaded (600 s), past the entry guard. */
-export async function openPlayer(from = VIDEO('v1'), { load = true } = {}): Promise<Root> {
+/**
+ * Пост → OK on `from` → Player; the engine loaded (600 s), past the entry
+ * guard. Default: the primary (Story 13.1: a single video has no tile).
+ */
+export async function openPlayer(from = PRIMARY, { load = true } = {}): Promise<Root> {
   const root = await openPost();
   focusMock.mockClear();
   await press(root, from);

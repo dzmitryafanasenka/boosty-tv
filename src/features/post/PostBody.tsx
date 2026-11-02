@@ -17,12 +17,13 @@ export type { OpenPost, OpenQr, PlayAt, ResolveFileTarget } from './body/chipPar
 export { IMAGE_STOP_MAX_HEIGHT, TEASER_IMAGE_GAP } from './body/ImageBlocks';
 export { PostBodySkeleton } from './body/PostBodySkeleton';
 export {
-  PostPrimaryAction,
-  PostVideoRows,
+  PostActions,
+  primaryLabel,
   type OpenPlayer,
-  type PostPrimaryActionProps,
-  type PostVideoRowsProps,
+  type PostActionsProps,
+  type PostPlayAction,
 } from './body/VideoActions';
+export { PostVideoTiles, videoTileLabel, videoTileStatusText, type PostVideoTilesProps } from './body/VideoTiles';
 
 export type PostBodyProps = {
   items: readonly PostBodyItem[];

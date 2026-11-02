@@ -152,6 +152,8 @@ const TILE = (n: number) => `subs/tile/${blogUrlOf(n)}`;
 const AUTHOR = (postId: string) => `post/${postId}/author`;
 const BLOCK = (postId: string, key: string) => `post/${postId}/block/${key}`;
 const VIDEO = (postId: string, mediaId: string) => `post/${postId}/video/${mediaId}`;
+/** Story 13.1: «На телефоне» (every post). */
+const PHONE = (postId: string) => `post/${postId}/phone`;
 /** Story 6.6: an open single-choice poll's option stop. */
 const OPTION = (postId: string, optionId: string) => `post/${postId}/poll/option/${optionId}`;
 const ACTION = 'state/post/action';
@@ -293,6 +295,7 @@ describe('open from Главная (matrix «Text post», «Likes»)', () => {
     // Right: three paragraphs, each a focus stop, in order.
     expect(contentIds(root)).toEqual([
       AUTHOR(id),
+      PHONE(id),
       BLOCK(id, 'text@0'),
       BLOCK(id, 'text@2'),
       BLOCK(id, 'text@4'),
@@ -376,7 +379,7 @@ describe('open from Главная (matrix «Text post», «Likes»)', () => {
 });
 
 describe('blocks (matrix «Mixed blocks», «Malformed block»)', () => {
-  it('image, audio (the player off, Story 6.4), poll, unknown: one non-focusable placeholder each, in order; text (and a standalone link\'s text, with its chip) and a file chip (Story 6.3) between them; the video is a MediaRow on top', async () => {
+  it('image, audio (the player off, Story 6.4), poll, unknown: one non-focusable placeholder each, in order; text (and a standalone link\'s text, with its chip) and a file chip (Story 6.3) between them; the video is the header preview (Story 13.1: no MediaRow)', async () => {
     e8 = (_req, blogUrl, postId) => ({
       status: 200,
       body: postDetail(blogUrl, postId, [
@@ -413,7 +416,7 @@ describe('blocks (matrix «Mixed blocks», «Malformed block»)', () => {
     }
     expect(contentIds(root)).toEqual([
       AUTHOR(id),
-      VIDEO(id, 'v1'),
+      PHONE(id),
       BLOCK(id, 'text@1'),
       BLOCK(id, 'link@4'),
       BLOCK(id, 'link@4/link/0'),
@@ -442,6 +445,9 @@ describe('blocks (matrix «Mixed blocks», «Malformed block»)', () => {
       .map(n => n.props.testID);
     expect([...new Set(images)]).toEqual([`${AUTHOR(id)}/avatar`]);
     expect(pageText(root)).not.toContain('Смотреть');
+    // Story 13.1: one video → the hero (its preview a plate, no preview URL), no tiles.
+    expect(visible(root, 'post/hero/plate')).toBe(true);
+    expect(visible(root, 'post/tiles')).toBe(false);
     await unmount(root);
   });
 
@@ -457,7 +463,7 @@ describe('blocks (matrix «Mixed blocks», «Malformed block»)', () => {
     });
     const root = await openFromHome();
     const id = FEED_ID(0);
-    expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, 'text@0'), BLOCK(id, 'text@0/link/0')]);
+    expect(contentIds(root)).toEqual([AUTHOR(id), PHONE(id), BLOCK(id, 'text@0'), BLOCK(id, 'text@0/link/0')]);
     expect(one(root, BLOCK(id, 'text@0')).props.accessibilityLabel).toBe('Подробнее здесь и ниже.');
     expect(pageText(root)).not.toContain('Ссылка');
     await unmount(root);
@@ -478,7 +484,7 @@ describe('blocks (matrix «Mixed blocks», «Malformed block»)', () => {
     const root = await openFromHome();
     const id = FEED_ID(0);
     const block = BLOCK(id, 'text@0');
-    expect(contentIds(root)).toEqual([AUTHOR(id), block, `${block}/link/0`]);
+    expect(contentIds(root)).toEqual([AUTHOR(id), PHONE(id), block, `${block}/link/0`]);
     // The accessibility label stays the plain text (the emoji left out).
     expect(one(root, block).props.accessibilityLabel).toBe('Привет мир ссылка хвост');
     const node = byTestId(root, block)[0];
@@ -501,7 +507,7 @@ describe('blocks (matrix «Mixed blocks», «Malformed block»)', () => {
     expect(byTestId(root, emojiId)).toHaveLength(0);
     expect(one(root, block).props.accessibilityLabel).toBe('Привет мир ссылка хвост');
     expect(text(byTestId(root, block)[0])).toContain('хвост');
-    expect(contentIds(root)).toEqual([AUTHOR(id), block, `${block}/link/0`]);
+    expect(contentIds(root)).toEqual([AUTHOR(id), PHONE(id), block, `${block}/link/0`]);
     await unmount(root);
   });
 
@@ -519,10 +525,10 @@ describe('blocks (matrix «Mixed blocks», «Malformed block»)', () => {
     const emojiId = `${BLOCK(id, 'smile@0')}/emoji/smile@0`;
     expect(byTestId(root, emojiId)).toHaveLength(1);
     expect(byTestId(root, BLOCK(id, 'smile@0'))[0].props.focusable).toBe(false);
-    expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, 'text@2')]);
+    expect(contentIds(root)).toEqual([AUTHOR(id), PHONE(id), BLOCK(id, 'text@2')]);
     await act(async () => byTestId(root, emojiId)[0].props.onError({ nativeEvent: {} }));
     expect(byTestId(root, emojiId)).toHaveLength(0);
-    expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, 'text@2')]);
+    expect(contentIds(root)).toEqual([AUTHOR(id), PHONE(id), BLOCK(id, 'text@2')]);
     await unmount(root);
   });
 
@@ -542,19 +548,19 @@ describe('blocks (matrix «Mixed blocks», «Malformed block»)', () => {
     const root = await openFromHome();
     const id = FEED_ID(0);
     expect(visible(root, 'post/error')).toBe(false);
-    expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, 'list@4'), BLOCK(id, 'text@5')]);
+    expect(contentIds(root)).toEqual([AUTHOR(id), PHONE(id), BLOCK(id, 'list@4'), BLOCK(id, 'text@5')]);
     expect(text(byTestId(root, BLOCK(id, 'list@4'))[0])).toContain('Item');
     await unmount(root);
   });
 
-  it('a post with neither a video row nor text: focus on the author; → has no destination', async () => {
+  it('a post with neither a video row nor text: focus on «На телефоне» (Story 13.1, the only stop below the author)', async () => {
     e8 = (_req, blogUrl, postId) => ({
       status: 200,
       body: postDetail(blogUrl, postId, [{ type: 'image', id: 'i1' }, { type: 'ok_video', title: 'no id' }]),
     });
     const root = await openFromHome();
-    expect(lastFocusTarget()).toBe(AUTHOR(FEED_ID(0)));
-    expect(destinationIds('post/column')).toEqual([AUTHOR(FEED_ID(0))]);
+    expect(lastFocusTarget()).toBe(PHONE(FEED_ID(0)));
+    expect(destinationIds('post/column')).toEqual([PHONE(FEED_ID(0))]);
     await unmount(root);
   });
 });
@@ -627,7 +633,7 @@ describe('locked, missing, errors (matrix «Locked», «Not found», «Error»)'
     expect(byTestId(root, BLOCK(id, 'image:synthetic-id-107'))[0].props.accessibilityLabel).toBe(
       'Изображение',
     );
-    expect(contentIds(root)).toEqual([AUTHOR(id)]);
+    expect(contentIds(root)).toEqual([AUTHOR(id), PHONE(id)]);
     expect(lastFocusTarget()).toBe(AUTHOR(id));
     // Still signed in: no A11. The session check (A6, below) ran one E1 and
     // its one refetch, which is locked again: nothing more.
@@ -889,7 +895,7 @@ describe('focus (focus-map §4 F)', () => {
     focusMock.mockClear();
     reply.resolve({ status: 200, body: postDetail(FEED_BLOG, FEED_ID(0), THREE) });
     await settle();
-    expect(contentIds(root)).toHaveLength(4);
+    expect(contentIds(root)).toHaveLength(5);
     expect(focusTargets()).toEqual([]);
     await unmount(root);
   });
@@ -910,6 +916,7 @@ describe('focus (focus-map §4 F)', () => {
     expect(scroll.props.stickyHeaderIndices).toBeUndefined();
     expect(focusableIds(column)).toEqual([
       AUTHOR(id),
+      PHONE(id),
       BLOCK(id, 'text@0'),
       BLOCK(id, 'text@2'),
       BLOCK(id, 'text@4'),
@@ -955,7 +962,7 @@ describe('focus (focus-map §4 F)', () => {
     expect(within(scroll, 'post/header')).toHaveLength(1);
     expect(scroll.props.stickyHeaderIndices).toBeUndefined();
     const stops = focusableIds(byTestId(root, 'post/column')[0]);
-    expect(stops).toEqual([AUTHOR(id), ...Array.from({ length: 30 }, (_, i) => BLOCK(id, `text@${i * 2}`))]);
+    expect(stops).toEqual([AUTHOR(id), PHONE(id), ...Array.from({ length: 30 }, (_, i) => BLOCK(id, `text@${i * 2}`))]);
     for (const stop of stops.slice(1)) {
       await focusOn(root, stop);
       expect(destinationIds('post/column')).toEqual([stop]);
@@ -1302,52 +1309,59 @@ describe('media rows (Story 3.5, focus-map §4 F)', () => {
       x => x.startsWith(`post/${id}/`) && x !== AUTHOR(id),
     );
 
-  it('two videos + text (matrix «Two videos»): «Видео 1», «Видео 2» on top in block order, then the paragraphs; focus on row 1', async () => {
+  it('two videos + text (matrix «Two videos», Story 13.1): the hero on «Видео 1 из 2», then «Видео в посте · 2» tiles in block order, then the paragraphs; focus on tile 1 (the player off)', async () => {
     withData(TWO);
     const root = await openFromHome();
     const id = FEED_ID(0);
     expect(bodyStops(root, id)).toEqual([
+      PHONE(id),
       VIDEO(id, 'v1'),
       VIDEO(id, 'v2'),
       BLOCK(id, 'text@1'),
       BLOCK(id, 'text@4'),
     ]);
     expect(contentIds(root)[0]).toBe(AUTHOR(id));
-    expect(lineOf(root, `${VIDEO(id, 'v1')}/label`)).toBe('Видео 1');
-    expect(lineOf(root, `${VIDEO(id, 'v2')}/label`)).toBe('Видео 2');
-    expect(lineOf(root, `${VIDEO(id, 'v1')}/title`)).toBe('Часть первая');
-    // Matrix «Duration»: 754 s → «12:34»; missing → nothing.
-    expect(lineOf(root, `${VIDEO(id, 'v1')}/duration`)).toBe('12:34');
-    expect(visible(root, `${VIDEO(id, 'v2')}/duration`)).toBe(false);
+    // The hero: the target (the player off: the first video), its position and duration.
+    expect(text(byTestId(root, 'post/hero/position')[0])).toContain('Видео 1 из 2');
+    expect(text(byTestId(root, 'post/hero/duration')[0])).toContain('12:34');
+    expect(lineOf(root, 'post/hero/media')).toBe('Видео 1 · «Часть первая» · 12:34');
+    expect(byTestId(root, 'post/hero/preview')[0].props.focusable).toBe(false);
+    expect(lineOf(root, 'post/tiles/title')).toBe('Видео в посте · 2');
+    expect(lineOf(root, `${VIDEO(id, 'v1')}/label`)).toBe('Видео 1 · Часть первая');
     // Matrix «No title»: «Видео N» only.
-    expect(visible(root, `${VIDEO(id, 'v2')}/title`)).toBe(false);
+    expect(lineOf(root, `${VIDEO(id, 'v2')}/label`)).toBe('Видео 2');
+    // Matrix «Duration»: 754 s → «12:34»; missing → nothing (no status while the player is off).
+    expect(lineOf(root, `${VIDEO(id, 'v1')}/status`)).toBe('12:34');
+    expect(visible(root, `${VIDEO(id, 'v2')}/status`)).toBe(false);
     expect(one(root, VIDEO(id, 'v1')).props.accessibilityLabel).toBe('Видео 1. Часть первая. 12:34');
     expect(one(root, VIDEO(id, 'v2')).props.accessibilityLabel).toBe('Видео 2');
-    // No video placeholders, no action, status or progress (Epic 4).
+    // No video placeholders, no play action, status, «Сейчас» or progress (the player is off).
     expect(visible(root, BLOCK(id, 'ok_video:v1'))).toBe(false);
+    expect(visible(root, `${VIDEO(id, 'v1')}/now`)).toBe(false);
     for (const forbidden of ['Смотреть', 'Продолжить', 'С начала', 'Не начато', 'Осталось', 'Просмотрено']) {
       expect(pageText(root)).not.toContain(forbidden);
     }
-    // Initial focus: the first row (after the skeleton's sidebar item).
+    // Initial focus: the first tile (after the skeleton's sidebar item).
     expect(focusTargets()).toEqual(['post/nav/home', VIDEO(id, 'v1')]);
     expect(destinationIds('post/column')).toEqual([VIDEO(id, 'v1')]);
-    // Layout: the header first, then the rows at full width, then the text capped at the measure.
     const [scroll] = byTestId(root, 'post/body');
     expect(focusableIds(scroll)[0]).toBe(AUTHOR(id));
     const outer = (testID: string) =>
       StyleSheet.flatten(byTestId(root, testID)[0].props.style) as Record<string, unknown>;
-    expect(outer(VIDEO(id, 'v1')).maxWidth).toBeUndefined();
     expect(outer(BLOCK(id, 'text@1')).maxWidth).toBe(spacing['text-measure']);
     await unmount(root);
   });
 
-  it('one video (matrix «One video»): one row «Видео 1», focused', async () => {
+  it('one video (matrix «One video», Story 13.1): the hero, no MediaRow or tile; «Видео · 1:00»; the player off: focus on «На телефоне»', async () => {
     withData([okVideo('solo', { title: 'Solo', duration: 60 })]);
     const root = await openFromHome();
     const id = FEED_ID(0);
-    expect(bodyStops(root, id)).toEqual([VIDEO(id, 'solo')]);
-    expect(lineOf(root, `${VIDEO(id, 'solo')}/label`)).toBe('Видео 1');
-    expect(lastFocusTarget()).toBe(VIDEO(id, 'solo'));
+    expect(bodyStops(root, id)).toEqual([PHONE(id)]);
+    expect(visible(root, VIDEO(id, 'solo'))).toBe(false);
+    expect(visible(root, 'post/tiles')).toBe(false);
+    expect(visible(root, 'post/hero/position')).toBe(false);
+    expect(lineOf(root, 'post/hero/media')).toBe('Видео · 1:00');
+    expect(lastFocusTarget()).toBe(PHONE(id));
     await unmount(root);
   });
 
@@ -1368,25 +1382,26 @@ describe('media rows (Story 3.5, focus-map §4 F)', () => {
     await unmount(root);
   });
 
-  it('a video without an id (matrix «No id»): a neutral placeholder, no row; it does not count for «Видео N»', async () => {
-    withData([okVideo(undefined, { title: 'No id' }), okVideo('v2'), ...paragraph('Text')]);
+  it('a video without an id (matrix «No id»): a neutral placeholder, no tile; it does not count for «Видео N»', async () => {
+    withData([okVideo(undefined, { title: 'No id' }), okVideo('v2'), okVideo('v3'), ...paragraph('Text')]);
     const root = await openFromHome();
     const id = FEED_ID(0);
     const [placeholder] = byTestId(root, BLOCK(id, 'ok_video@0'));
     expect(placeholder.props.focusable).toBe(false);
     expect(placeholder.props.accessibilityLabel).toBe('Видео');
-    expect(bodyStops(root, id)).toEqual([VIDEO(id, 'v2'), BLOCK(id, 'text@2')]);
+    expect(bodyStops(root, id)).toEqual([PHONE(id), VIDEO(id, 'v2'), VIDEO(id, 'v3'), BLOCK(id, 'text@3')]);
     expect(lineOf(root, `${VIDEO(id, 'v2')}/label`)).toBe('Видео 1');
+    expect(lineOf(root, 'post/tiles/title')).toBe('Видео в посте · 2');
     await unmount(root);
   });
 
-  it('a duplicate id (matrix «Duplicate id»): one row (the first)', async () => {
-    withData([okVideo('v1', { title: 'A' }), okVideo('v1', { title: 'B' }), ...paragraph('Text')]);
+  it('a duplicate id (matrix «Duplicate id»): one video (the first), so the hero and no tiles', async () => {
+    withData([okVideo('v1', { title: 'A', duration: 60 }), okVideo('v1', { title: 'B', duration: 120 }), ...paragraph('Text')]);
     const root = await openFromHome();
     const id = FEED_ID(0);
-    expect(bodyStops(root, id)).toEqual([VIDEO(id, 'v1'), BLOCK(id, 'text@2')]);
-    expect(byTestId(root, VIDEO(id, 'v1')).filter(n => n.props.focusable === true)).toHaveLength(1);
-    expect(lineOf(root, `${VIDEO(id, 'v1')}/title`)).toBe('A');
+    expect(bodyStops(root, id)).toEqual([PHONE(id), BLOCK(id, 'text@2')]);
+    expect(visible(root, 'post/tiles')).toBe(false);
+    expect(lineOf(root, 'post/hero/media')).toBe('Видео · 1:00');
     await unmount(root);
   });
 
@@ -1408,7 +1423,7 @@ describe('media rows (Story 3.5, focus-map §4 F)', () => {
     expect(focusableIds(root).filter(x => x.startsWith(`post/${id}/video/`))).toEqual([]);
     // A teaser video is a neutral placeholder, not a row.
     expect(byTestId(root, BLOCK(id, 'ok_video:teaser-video'))[0].props.focusable).toBe(false);
-    expect(contentIds(root)).toEqual([AUTHOR(id)]);
+    expect(contentIds(root)).toEqual([AUTHOR(id), PHONE(id)]);
     expect(lastFocusTarget()).toBe(AUTHOR(id));
     await unmount(root);
   });
@@ -1420,9 +1435,9 @@ describe('media rows (Story 3.5, focus-map §4 F)', () => {
     };
     const root = await openFromHome();
     const id = FEED_ID(0);
-    const rows = bodyStops(root, id).filter(x => x.includes('/video/'));
-    expect(rows).toEqual([VIDEO(id, 'synthetic-id-7')]);
-    expect(lineOf(root, `${VIDEO(id, 'synthetic-id-7')}/duration`)).toBe('1:06:00');
+    // Story 13.1: one video → the hero, no tile.
+    expect(bodyStops(root, id).filter(x => x.includes('/video/'))).toEqual([]);
+    expect(lineOf(root, 'post/hero/media')).toBe('Видео · 1:06:00');
     const forbidden = /timeCode|playerUrls|signedQuery|example\.invalid\/player/;
     const cached = queryClient.getQueryData(queryKeys.post(FEED_BLOG, id));
     expect(JSON.stringify(cached)).not.toMatch(forbidden);
@@ -1432,7 +1447,7 @@ describe('media rows (Story 3.5, focus-map §4 F)', () => {
     const post = (cached as { post: Post }).post;
     expect(JSON.stringify(videoRowsOf(post))).not.toMatch(forbidden);
     const rowNodes = root.container.queryAll(
-      n => typeof n.props.testID === 'string' && n.props.testID.startsWith(`post/${id}/video/`),
+      n => typeof n.props.testID === 'string' && n.props.testID.startsWith('post/hero'),
     );
     expect(rowNodes.length).toBeGreaterThan(0);
     for (const node of rowNodes) {
@@ -1451,6 +1466,7 @@ describe('media rows (Story 3.5, focus-map §4 F)', () => {
     // One trapped column: ↑ from the first row reaches the author above it.
     expect(focusableIds(column)).toEqual([
       AUTHOR(id),
+      PHONE(id),
       VIDEO(id, 'v1'),
       VIDEO(id, 'v2'),
       BLOCK(id, 'text@1'),
@@ -1501,6 +1517,9 @@ describe('media rows (Story 3.5, focus-map §4 F)', () => {
       expect(pageText(root)).not.toContain(forbidden);
     }
     expect(visible(root, `${VIDEO(id, 'v1')}/progress`)).toBe(false);
+    // Story 13.1: the player off ignores progress, so the hero targets the first video.
+    expect(text(byTestId(root, 'post/hero/position')[0])).toContain('Видео 1 из 2');
+    expect(lineOf(root, 'post/hero/media')).toMatch(/^Видео 1 · /);
     await unmount(root);
     mockPlayerFlag.on = true;
     try {
@@ -1518,17 +1537,18 @@ describe('media rows (Story 3.5, focus-map §4 F)', () => {
     }
   });
 
-  it('Story 4.2: a started video without a duration: «Продолжить» and «С начала», no status, no line, no status in the label', async () => {
+  it('Story 4.2: a started video without a duration: «Продолжить · 2:00» and «С начала», no status, no line', async () => {
     withData([{ type: 'ok_video', id: 'v1', title: 'Часть первая', timeCode: 120 }, ...paragraph('Текст')]);
     mockPlayerFlag.on = true;
     try {
       const root = await openFromHome();
       const id = FEED_ID(0);
-      expect(one(root, `post/${id}/primary`).props.accessibilityLabel).toBe('Продолжить');
+      // Story 13.1: a single video names the resume time.
+      expect(one(root, `post/${id}/primary`).props.accessibilityLabel).toBe('Продолжить · 2:00');
       expect(visible(root, `post/${id}/restart`)).toBe(true);
-      expect(visible(root, `${VIDEO(id, 'v1')}/status`)).toBe(false);
-      expect(visible(root, `${VIDEO(id, 'v1')}/progress`)).toBe(false);
-      expect(one(root, VIDEO(id, 'v1')).props.accessibilityLabel).toBe('Видео 1. Часть первая');
+      expect(visible(root, 'post/hero/progress')).toBe(false);
+      expect(visible(root, 'post/hero/duration')).toBe(false);
+      expect(lineOf(root, 'post/hero/media')).toBe('Видео');
       await unmount(root);
     } finally {
       mockPlayerFlag.on = false;
@@ -1572,7 +1592,7 @@ describe('media rows (Story 3.5, focus-map §4 F)', () => {
     await unmount(root);
   });
 
-  it('a refetch that drops the focused row: the initial target (the first row)', async () => {
+  it('a refetch that drops the focused tile: the initial target', async () => {
     withData(TWO);
     const root = await openFromHome();
     const id = FEED_ID(0);
@@ -1588,8 +1608,10 @@ describe('media rows (Story 3.5, focus-map §4 F)', () => {
       }));
     });
     await settle();
+    // Story 13.1: one video left → no tiles at all; the initial target (the first paragraph, the player off).
     expect(visible(root, VIDEO(id, 'v2'))).toBe(false);
-    expect(focusTargets()).toEqual([VIDEO(id, 'v1')]);
+    expect(visible(root, 'post/tiles')).toBe(false);
+    expect(focusTargets()).toEqual([BLOCK(id, 'text@1')]);
     await unmount(root);
   });
 
@@ -1650,7 +1672,7 @@ describe('locked posts (Story 3.6, focus-map §4 F)', () => {
     expect(text(copy)).toContain(COPY_WITH(level));
     expect(columnOrder(root, id)).toEqual(['post/header', 'post/locked', BLOCK(id, TEASER_IMAGE)]);
     // The copy is not a focus stop; the author is the only one.
-    expect(contentIds(root)).toEqual([AUTHOR(id)]);
+    expect(contentIds(root)).toEqual([AUTHOR(id), PHONE(id)]);
     expect(lastFocusTarget()).toBe(AUTHOR(id));
     expect(destinationIds('post/column')).toEqual([AUTHOR(id)]);
     await unmount(root);
@@ -1771,16 +1793,14 @@ describe('locked posts (Story 3.6, focus-map §4 F)', () => {
       await unmount(root);
     });
 
-    it('a locked post whose content fits with nothing focusable below the author: no scrolling, not focusable', async () => {
+    it('a locked post whose content fits: «На телефоне» (Story 13.1) is a stop below the author, so scrolling stays on', async () => {
       withLocked();
       const root = await openFromHome();
       // Not measured yet: scrolling stays on.
       expect(scroll(root).props.scrollEnabled).toBe(true);
       await layoutColumn(root, VIEWPORT);
       await contentSize(root, VIEWPORT.height);
-      // RN Android: `scrollEnabled={false}` makes the ScrollView non-focusable.
-      expect(scroll(root).props.scrollEnabled).toBe(false);
-      expect(focusableIds(root)).not.toContain('post/body');
+      expect(scroll(root).props.scrollEnabled).toBe(true);
       expect(destinationIds('post/column')).toEqual([AUTHOR(FEED_ID(0))]);
       await unmount(root);
     });
@@ -1800,7 +1820,7 @@ describe('locked posts (Story 3.6, focus-map §4 F)', () => {
       await unmount(root);
     });
 
-    it('a placeholder-only post: scrolls when it overflows, not when it fits', async () => {
+    it('a placeholder-only post: «На телефоне» (Story 13.1) keeps scrolling on, overflowing or not', async () => {
       e8 = (_req, blogUrl, postId) => ({
         status: 200,
         // Placeholders only (a file is a chip stop since Story 6.3, audio an AudioBlock since 6.4).
@@ -1811,7 +1831,7 @@ describe('locked posts (Story 3.6, focus-map §4 F)', () => {
       await contentSize(root, 900);
       expect(scroll(root).props.scrollEnabled).toBe(true);
       await contentSize(root, 300);
-      expect(scroll(root).props.scrollEnabled).toBe(false);
+      expect(scroll(root).props.scrollEnabled).toBe(true);
       await unmount(root);
     });
 
@@ -1849,7 +1869,7 @@ describe('locked posts (Story 3.6, focus-map §4 F)', () => {
     const id = FEED_ID(0);
     expect(copyOf(root).props.accessibilityLabel).toBe(COPY_WITH(LIVE_LEVEL));
     expect(visible(root, BLOCK(id, TEASER_IMAGE))).toBe(true);
-    expect(contentIds(root)).toEqual([AUTHOR(id)]);
+    expect(contentIds(root)).toEqual([AUTHOR(id), PHONE(id)]);
     expect(lastFocusTarget()).toBe(AUTHOR(id));
     await unmount(root);
   });
@@ -1867,7 +1887,7 @@ describe('locked posts (Story 3.6, focus-map §4 F)', () => {
     expect(placeholder.props.focusable).toBe(false);
     expect(placeholder.props.accessibilityLabel).toBe(t('post.block.image'));
     expect(text(placeholder)).toContain('Изображение');
-    expect(contentIds(root)).toEqual([AUTHOR(id)]);
+    expect(contentIds(root)).toEqual([AUTHOR(id), PHONE(id)]);
     await unmount(root);
   });
 
@@ -1887,7 +1907,7 @@ describe('locked posts (Story 3.6, focus-map §4 F)', () => {
     expect(one(root, BLOCK(id, 'text@1')).props.accessibilityLabel).toBe('Teaser text');
     expect(byTestId(root, BLOCK(id, 'ok_video:teaser-video'))[0].props.focusable).toBe(false);
     expect(focusableIds(root).filter(x => x.startsWith(`post/${id}/video/`))).toEqual([]);
-    expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, 'text@1')]);
+    expect(contentIds(root)).toEqual([AUTHOR(id), PHONE(id), BLOCK(id, 'text@1')]);
     expect(columnOrder(root, id)).toEqual([
       'post/header',
       'post/locked',
@@ -1905,7 +1925,7 @@ describe('locked posts (Story 3.6, focus-map §4 F)', () => {
     const root = await openFromHome();
     const id = FEED_ID(0);
     expect(columnOrder(root, id)).toEqual(['post/header', 'post/locked']);
-    expect(contentIds(root)).toEqual([AUTHOR(id)]);
+    expect(contentIds(root)).toEqual([AUTHOR(id), PHONE(id)]);
     await unmount(root);
   });
 
@@ -1915,17 +1935,22 @@ describe('locked posts (Story 3.6, focus-map §4 F)', () => {
     const id = FEED_ID(0);
     const e1Calls = transport.callsTo(E1).length;
     const page = pageText(root);
-    for (const forbidden of ['990', '₽', 'RUB', 'USD', 'EUR', 'руб', 'Подписаться', 'QR']) {
+    for (const forbidden of ['990', '₽', 'RUB', 'USD', 'EUR', 'руб', 'Подписаться']) {
       expect(page).not.toContain(forbidden);
     }
     // Story 11.2: no «Комментарии» block and no E19 request on a locked post.
     expect(visible(root, 'post/comments')).toBe(false);
     expect(transport.calls.filter(c => /comment/.test(c.path))).toHaveLength(0);
-    // The only button on the page is the author row; the copy is text.
+    // The only buttons on the page are the author row and «На телефоне»
+    // (Story 13.1: the post page's QR, never a price or a subscribe action);
+    // the copy is text.
     const buttons = byTestId(root, 'post/page')[0]
       .queryAll((n: any) => typeof n.type === 'string' && n.props.accessibilityRole === 'button')
       .map((n: any) => n.props.testID);
-    expect(buttons).toEqual([AUTHOR(id)]);
+    expect(buttons).toEqual([AUTHOR(id), PHONE(id)]);
+    await press(root, PHONE(id));
+    expect(mockQrValues.at(-1)).toBe(`https://boosty.to/${FEED_BLOG}/posts/${id}`);
+    await back();
     expect(copyOf(root).props.accessibilityRole).toBe('text');
     expect(transport.callsTo('/oauth/token/')).toHaveLength(0);
     expect(visible(root, 'auth/expired')).toBe(false);
@@ -1973,7 +1998,7 @@ describe('Story 6.2: images in a post', () => {
     const root = await openFromHome();
     const id = FEED_ID(0);
     const image = BLOCK(id, 'image:i1');
-    expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, 'text@0'), image, BLOCK(id, 'text@3')]);
+    expect(contentIds(root)).toEqual([AUTHOR(id), PHONE(id), BLOCK(id, 'text@0'), image, BLOCK(id, 'text@3')]);
     expect(lastFocusTarget()).toBe(BLOCK(id, 'text@0'));
     expect(one(root, image).props.accessibilityLabel).toBe('Изображение. Открыть на весь экран');
     const img = byTestId(root, `${image}/image`)[0];
@@ -2013,7 +2038,7 @@ describe('Story 6.2: images in a post', () => {
     const failedBox = flat(byTestId(root, `${image}/box`)[0]);
     expect(failedBox.backgroundColor).toBe(colors.surface);
     expect(failedBox.height as number).toBeGreaterThanOrEqual(96);
-    expect(contentIds(root)).toEqual([AUTHOR(id), image, BLOCK(id, 'text@1')]);
+    expect(contentIds(root)).toEqual([AUTHOR(id), PHONE(id), image, BLOCK(id, 'text@1')]);
     expect(focusTargets()).toEqual([]);
     await unmount(root);
   });
@@ -2094,7 +2119,7 @@ describe('Story 6.3: links, files and external videos via QR', () => {
     const root = await openFromHome();
     const id = FEED_ID(0);
     const b = ids(id);
-    expect(contentIds(root)).toEqual([AUTHOR(id), b.para, b.linkA, b.linkB, b.after, b.file, b.youtube, b.other]);
+    expect(contentIds(root)).toEqual([AUTHOR(id), PHONE(id), b.para, b.linkA, b.linkB, b.after, b.file, b.youtube, b.other]);
     expect(one(root, b.para).props.accessibilityLabel).toBe('Читайте тут, там и снова тут ещё скрипт');
     expect(one(root, b.linkA).props.accessibilityLabel).toBe('тут. Показать QR-код');
     expect(one(root, b.linkB).props.accessibilityLabel).toBe('там. Показать QR-код');
@@ -2415,7 +2440,7 @@ describe('Story 6.3: links, files and external videos via QR', () => {
     });
     const root = await openFromHome();
     const id = FEED_ID(0);
-    expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, 'text@0')]);
+    expect(contentIds(root)).toEqual([AUTHOR(id), PHONE(id), BLOCK(id, 'text@0')]);
     expect(visible(root, BLOCK(id, 'text@0/link/0'))).toBe(false);
     await unmount(root);
   });
@@ -2458,7 +2483,7 @@ describe('Story 6.4: inline audio', () => {
     const [node] = byTestId(root, BLOCK(id, 'audio_file:a1'));
     expect(node.props.focusable).toBe(false);
     expect(node.props.accessibilityLabel).toBe('Аудио');
-    expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, 'text@0'), BLOCK(id, 'text@3')]);
+    expect(contentIds(root)).toEqual([AUTHOR(id), PHONE(id), BLOCK(id, 'text@0'), BLOCK(id, 'text@3')]);
     await unmount(root);
   });
 
@@ -2501,7 +2526,7 @@ describe('Story 6.4: inline audio', () => {
     const root = await openFromHome();
     const id = FEED_ID(0);
     const audio = BLOCK(id, 'audio_file:a1');
-    expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, 'text@0'), audio, BLOCK(id, 'text@3')]);
+    expect(contentIds(root)).toEqual([AUTHOR(id), PHONE(id), BLOCK(id, 'text@0'), audio, BLOCK(id, 'text@3')]);
     expect(one(root, audio).props.accessibilityLabel).toBe('Аудио. Метроном. 0:00 / 3:12. Воспроизвести');
     // Initial focus is unchanged: the first paragraph.
     expect(lastFocusTarget()).toBe(BLOCK(id, 'text@0'));
@@ -2618,7 +2643,7 @@ describe('Story 6.5: poll display', () => {
     withPoll(POLL);
     const root = await openFromHome();
     const id = FEED_ID(0);
-    expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, 'text@0'), BLOCK(id, 'text@2'), OPTION(id, '1'), OPTION(id, '2'), OPTION(id, '3')]);
+    expect(contentIds(root)).toEqual([AUTHOR(id), PHONE(id), BLOCK(id, 'text@0'), BLOCK(id, 'text@2'), OPTION(id, '1'), OPTION(id, '2'), OPTION(id, '3')]);
     expect(lastFocusTarget()).toBe(BLOCK(id, 'text@0'));
     const page = pageText(root);
     for (const s of ['Какой формат удобнее?', 'Длинные', 'Короткие', 'Эфиры', '48\u00A0% · 10', '38\u00A0% · 8', '14\u00A0% · 3', 'Проголосовали: 21']) {
@@ -2662,7 +2687,7 @@ describe('Story 6.5: poll display', () => {
     withPoll({ ...POLL, options: [option(1, 'Длинные', 10, 48), broken, option(3, 'Эфиры', 3, 14)] });
     const root = await openFromHome();
     const id = FEED_ID(0);
-    expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, 'text@0'), BLOCK(id, 'text@2'), OPTION(id, '1'), OPTION(id, '3')]);
+    expect(contentIds(root)).toEqual([AUTHOR(id), PHONE(id), BLOCK(id, 'text@0'), BLOCK(id, 'text@2'), OPTION(id, '1'), OPTION(id, '3')]);
     expect(byTestId(root, `${BLOCK(id, POLL_KEY)}/option/1`)).toHaveLength(1);
     expect(byTestId(root, `${BLOCK(id, POLL_KEY)}/option/2`)).toHaveLength(0);
     expect(byTestId(root, `${BLOCK(id, POLL_KEY)}/option/3`)).toHaveLength(1);
@@ -2677,7 +2702,7 @@ describe('Story 6.5: poll display', () => {
     withPoll({ ...POLL, options: [broken, { id: 3, text: 'Эфиры', fraction: 14 }] });
     const root = await openFromHome();
     const id = FEED_ID(0);
-    expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, 'text@0'), BLOCK(id, 'text@2')]);
+    expect(contentIds(root)).toEqual([AUTHOR(id), PHONE(id), BLOCK(id, 'text@0'), BLOCK(id, 'text@2')]);
     const [placeholder] = byTestId(root, BLOCK(id, 'poll@4'));
     expect(placeholder.props.focusable).toBe(false);
     expect(placeholder.props.accessibilityLabel).toBe(t('post.block.poll'));
@@ -2707,7 +2732,7 @@ describe('Story 6.5: poll display', () => {
     };
     const root = await openFromHome();
     const id = FEED_ID(0);
-    expect(contentIds(root)).toEqual([AUTHOR(id)]);
+    expect(contentIds(root)).toEqual([AUTHOR(id), PHONE(id)]);
     expect(lastFocusTarget()).toBe(AUTHOR(id));
     expect(byTestId(root, BLOCK(id, POLL_KEY))).toHaveLength(0);
     expect(pageText(root)).not.toContain('Проголосовали');
@@ -2718,7 +2743,7 @@ describe('Story 6.5: poll display', () => {
     withPoll({ ...POLL, isFinished: true }, [{ type: 'header', content: JSON.stringify(['Опрос недели', 'unstyled', []]), modificator: '' }]);
     const root = await openFromHome();
     const id = FEED_ID(0);
-    expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, POLL_KEY)]);
+    expect(contentIds(root)).toEqual([AUTHOR(id), PHONE(id), BLOCK(id, POLL_KEY)]);
     expect(lastFocusTarget()).toBe(BLOCK(id, POLL_KEY));
     await unmount(root);
   });
@@ -3506,7 +3531,7 @@ describe('Story 11.2: the «Комментарии» block (read-only)', () => {
     const expected = range(26, 45).reverse().map(k => ROW(`c-${k}`));
     expect(rowIds(root)).toEqual([...expected, MORE]);
     // After every block, in the one column.
-    expect(contentIds(root)).toEqual([AUTHOR(POST0), BLOCK(POST0, 'text@0'), BLOCK(POST0, 'text@2'), BLOCK(POST0, 'text@4'), ...expected, MORE]);
+    expect(contentIds(root)).toEqual([AUTHOR(POST0), PHONE(POST0), BLOCK(POST0, 'text@0'), BLOCK(POST0, 'text@2'), BLOCK(POST0, 'text@4'), ...expected, MORE]);
     const row = one(root, ROW('c-45'));
     expect(row.props.accessibilityLabel).toMatch(/^User 45\. Comment 45\. .+$/);
     expect(text(row)).toContain('User 45');
@@ -4057,6 +4082,216 @@ describe('Story 11.2: the full-screen image viewer (owner decision 2026-11-02, o
     expect(teaser.props.focusable).toBe(false);
     expect(teaser.props.onClick).toBeUndefined();
     expect(visible(root, 'post/image-viewer')).toBe(false);
+    await unmount(root);
+  });
+});
+
+describe('Story 13.1: the Пост header with a large preview and «На телефоне»', () => {
+  const PREVIEW = 'https://example.invalid/hero-preview';
+  const PRIMARY = (postId: string) => `post/${postId}/primary`;
+  const RESTART = (postId: string) => `post/${postId}/restart`;
+  /** 56:14 */
+  const LONG = 3374;
+  const withData = (data: unknown[]) => {
+    e8 = (_req, blogUrl, postId) => ({ status: 200, body: postDetail(blogUrl, postId, data) });
+  };
+  const lineOf = (root: Root, testID: string) => byTestId(root, testID)[0]?.props.children;
+  const withPlayer = async (run: () => Promise<void>) => {
+    mockPlayerFlag.on = true;
+    try {
+      await run();
+    } finally {
+      mockPlayerFlag.on = false;
+    }
+  };
+
+  it('matrix «One video, not started»: the preview with its duration, «Видео · 56:14», «Смотреть» and «На телефоне»; no MediaRow; focus on the primary', async () => {
+    withData([{ type: 'ok_video', id: 'v1', title: 'Выпуск', duration: LONG, preview: PREVIEW }, ...paragraph('Текст')]);
+    await withPlayer(async () => {
+      const root = await openFromHome();
+      const id = FEED_ID(0);
+      expect(focusableIds(byTestId(root, 'post/column')[0])).toEqual([
+        AUTHOR(id),
+        PRIMARY(id),
+        PHONE(id),
+        BLOCK(id, 'text@1'),
+      ]);
+      expect(visible(root, VIDEO(id, 'v1'))).toBe(false);
+      expect(visible(root, 'post/tiles')).toBe(false);
+      expect(one(root, PRIMARY(id)).props.accessibilityLabel).toBe('Смотреть');
+      expect(visible(root, RESTART(id))).toBe(false);
+      expect(one(root, PHONE(id)).props.accessibilityLabel).toBe('На телефоне. Показать QR-код поста');
+      expect(text(byTestId(root, PHONE(id))[0])).toContain('На телефоне');
+      expect(text(byTestId(root, 'post/hero/duration')[0])).toContain('56:14');
+      expect(visible(root, 'post/hero/progress')).toBe(false);
+      expect(lineOf(root, 'post/hero/media')).toBe('Видео · 56:14');
+      // The title moved into the hero (one title on the page), the meta line with it.
+      expect(byTestId(root, 'post/title')).toHaveLength(1);
+      expect(within(byTestId(root, 'post/hero')[0], 'post/title')).toHaveLength(1);
+      expect(within(byTestId(root, 'post/hero')[0], 'post/meta')).toHaveLength(1);
+      // The preview: a plain Image without headers, never a focus stop.
+      const [image] = byTestId(root, 'post/hero/image');
+      expect(image.props.source).toEqual({ uri: PREVIEW });
+      expect(byTestId(root, 'post/hero/preview')[0].props.focusable).toBe(false);
+      expect(lastFocusTarget()).toBe(PRIMARY(id));
+      await unmount(root);
+    });
+  });
+
+  it('matrix «One video, in progress»: «Продолжить · 12:08», «С начала», «На телефоне» in that order; the progress line; «осталось 45 мин»', async () => {
+    withData([{ type: 'ok_video', id: 'v1', title: '', duration: LONG, timeCode: 728 }, ...paragraph('Текст')]);
+    await withPlayer(async () => {
+      const root = await openFromHome();
+      const id = FEED_ID(0);
+      expect(contentIds(root)).toEqual([AUTHOR(id), PRIMARY(id), RESTART(id), PHONE(id), BLOCK(id, 'text@1')]);
+      expect(one(root, PRIMARY(id)).props.accessibilityLabel).toBe('Продолжить · 12:08');
+      expect(one(root, RESTART(id)).props.accessibilityLabel).toBe('С начала');
+      expect(visible(root, 'post/hero/progress')).toBe(true);
+      expect(lineOf(root, 'post/hero/media')).toBe('Видео · 56:14 · осталось 45 мин');
+      expect(lastFocusTarget()).toBe(PRIMARY(id));
+      await unmount(root);
+    });
+  });
+
+  it('matrix «Several videos»: the preview of video 2 «Видео 2 из 3», «Продолжить · Видео 2», tiles with the MediaRow ids, «Сейчас» on video 2', async () => {
+    withData([
+      { type: 'ok_video', id: 'v1', title: 'Первая часть', duration: 1082, timeCode: 1080 },
+      { type: 'ok_video', id: 'v2', title: 'Вторая часть', duration: 1470, timeCode: 588 },
+      { type: 'ok_video', id: 'v3', title: 'Финал', duration: 1300 },
+      ...paragraph('Текст'),
+    ]);
+    await withPlayer(async () => {
+      const root = await openFromHome();
+      const id = FEED_ID(0);
+      expect(contentIds(root)).toEqual([
+        AUTHOR(id),
+        PRIMARY(id),
+        RESTART(id),
+        PHONE(id),
+        VIDEO(id, 'v1'),
+        VIDEO(id, 'v2'),
+        VIDEO(id, 'v3'),
+        BLOCK(id, 'text@3'),
+      ]);
+      expect(text(byTestId(root, 'post/hero/position')[0])).toContain('Видео 2 из 3');
+      expect(text(byTestId(root, 'post/hero/duration')[0])).toContain('24:30');
+      expect(lineOf(root, 'post/hero/media')).toBe('Видео 2 · «Вторая часть» · 24:30 · осталось 15 мин');
+      expect(one(root, PRIMARY(id)).props.accessibilityLabel).toBe('Продолжить · Видео 2');
+      expect(lineOf(root, 'post/tiles/title')).toBe('Видео в посте · 3');
+      expect(lineOf(root, `${VIDEO(id, 'v1')}/label`)).toBe('Видео 1 · Первая часть');
+      expect(lineOf(root, `${VIDEO(id, 'v1')}/status`)).toBe('Просмотрено');
+      expect(lineOf(root, `${VIDEO(id, 'v2')}/status`)).toBe('Осталось 15 мин');
+      expect(lineOf(root, `${VIDEO(id, 'v3')}/status`)).toBe('Не начато · 21:40');
+      expect(visible(root, `${VIDEO(id, 'v2')}/now`)).toBe(true);
+      expect(visible(root, `${VIDEO(id, 'v1')}/now`)).toBe(false);
+      expect(one(root, VIDEO(id, 'v2')).props.accessibilityLabel).toBe(
+        'Видео 2. Вторая часть. 24:30. Осталось 15 мин. Сейчас',
+      );
+      expect(visible(root, `${VIDEO(id, 'v1')}/progress`)).toBe(true);
+      expect(lastFocusTarget()).toBe(PRIMARY(id));
+      // A tile opens the Player from its own id (the Player's return target).
+      await press(root, VIDEO(id, 'v3'));
+      expect(currentRoute()).toBe('Player');
+      await unmount(root);
+    });
+  });
+
+  it('matrix «Missing / failed preview»: no preview URL → the plate; a failed load → the plate, same size', async () => {
+    withData([{ type: 'ok_video', id: 'v1', duration: 60, preview: PREVIEW }]);
+    const root = await openFromHome();
+    const [image] = byTestId(root, 'post/hero/image');
+    const size = (testID: string) => {
+      const style = StyleSheet.flatten(byTestId(root, testID)[0].props.style) as Record<string, unknown>;
+      return [style.width, style.height];
+    };
+    const imageSize = size('post/hero/image');
+    expect(imageSize).toEqual([320, 180]);
+    await act(async () => image.props.onError({ nativeEvent: {} }));
+    expect(visible(root, 'post/hero/image')).toBe(false);
+    expect(visible(root, 'post/hero/plate')).toBe(true);
+    expect(size('post/hero/plate')).toEqual(imageSize);
+    await unmount(root);
+  });
+
+  it('matrix «Player off»: the preview and the media line; no play buttons; «На телефоне» stays', async () => {
+    withData([{ type: 'ok_video', id: 'v1', duration: LONG, timeCode: 728 }, ...paragraph('Текст')]);
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    expect(visible(root, 'post/hero/preview')).toBe(true);
+    expect(lineOf(root, 'post/hero/media')).toBe('Видео · 56:14');
+    expect(visible(root, PRIMARY(id))).toBe(false);
+    expect(visible(root, RESTART(id))).toBe(false);
+    expect(visible(root, 'post/hero/progress')).toBe(false);
+    expect(contentIds(root)).toEqual([AUTHOR(id), PHONE(id), BLOCK(id, 'text@1')]);
+    await unmount(root);
+  });
+
+  it('matrix «No video»: today\'s header (author, title, meta) with «На телефоне» under the meta; no preview', async () => {
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    expect(visible(root, 'post/hero')).toBe(false);
+    const [header] = byTestId(root, 'post/header');
+    expect(within(header, 'post/title')).toHaveLength(1);
+    expect(within(header, 'post/meta')).toHaveLength(1);
+    expect(within(header, PHONE(id)).length).toBeGreaterThan(0);
+    // Initial focus stays on the first paragraph (reading first).
+    expect(lastFocusTarget()).toBe(BLOCK(id, 'text@0'));
+    await unmount(root);
+  });
+
+  it('«На телефоне»: OK → the QrDialog «Пост на Boosty» with the post\'s boosty.to page (never logged); Back → focus on «На телефоне»', async () => {
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    await focusOn(root, PHONE(id));
+    focusMock.mockClear();
+    await press(root, PHONE(id));
+    expect(visible(root, 'dialog/qr')).toBe(true);
+    const url = `https://boosty.to/${FEED_BLOG}/posts/${id}`;
+    expect(mockQrValues.at(-1)).toBe(url);
+    const [content] = byTestId(root, 'modal/content');
+    expect(text(content)).toContain('Пост на Boosty');
+    // The URL is never printed in the dialog, nor logged.
+    expect(text(content)).not.toContain(url);
+    expect(JSON.stringify(logger.entries())).not.toContain(url);
+    expect(e8Calls()).toHaveLength(1);
+    focusMock.mockClear();
+    await back();
+    expect(visible(root, 'dialog/qr')).toBe(false);
+    expect(currentRoute()).toBe('Post');
+    expect(lastFocusTarget()).toBe(PHONE(id));
+    await unmount(root);
+  });
+
+  it('matrix «Invalid blog/post id»: the E8 post id is not a plain path segment → `boostyPostUrl` is null → no «На телефоне»; the rest of the header renders', async () => {
+    // The mapper keeps any non-empty id; `boostyPostUrl` rejects whitespace and `%`.
+    e8 = (_req, blogUrl) => ({ status: 200, body: postDetail(blogUrl, 'odd id%', THREE) });
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    expect(visible(root, 'post/header')).toBe(true);
+    expect(visible(root, 'post/title')).toBe(true);
+    expect(visible(root, 'post/meta')).toBe(true);
+    const ids = focusableIds(byTestId(root, 'post/column')[0]);
+    expect(ids.some(x => x.endsWith('/phone'))).toBe(false);
+    expect(visible(root, PHONE(id))).toBe(false);
+    expect(visible(root, PHONE('odd id%'))).toBe(false);
+    expect(ids).toContain(AUTHOR(id));
+    expect(ids.filter(x => x.includes('/block/'))).toHaveLength(3);
+    await unmount(root);
+  });
+
+  it('a refetch while «На телефоне» is focused keeps focus there', async () => {
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    await focusOn(root, PHONE(id));
+    focusMock.mockClear();
+    await act(async () => {
+      queryClient.setQueryData(queryKeys.post(FEED_BLOG, id), (data: any) => ({
+        ...data,
+        post: { ...data.post, likeCount: 9 },
+      }));
+    });
+    await settle();
+    expect(focusTargets()).toEqual([]);
     await unmount(root);
   });
 });

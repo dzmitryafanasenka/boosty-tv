@@ -1,4 +1,4 @@
-import type { Ref } from 'react';
+import type { ReactNode, Ref } from 'react';
 import { StyleSheet, View } from 'react-native';
 import type { Post } from '../../shared/entities/post';
 import { tf, tp } from '../../shared/i18n';
@@ -93,6 +93,13 @@ export type PostHeaderProps = {
   onAuthorPress: () => void;
   authorRef?: Ref<HostView>;
   nowMs?: number;
+  /**
+   * Story 13.1: the author row only (a video post: the title and the meta
+   * line move into `PostHero`).
+   */
+  authorOnly?: boolean;
+  /** Story 13.1: the action row under the meta line («На телефоне»). */
+  actions?: ReactNode;
 };
 
 /**
@@ -103,7 +110,9 @@ export type PostHeaderProps = {
  * (≤ 6 lines; fallback: the first text, then «Без названия», as PostCard)
  * and the meta line «date · N лайков · M комментариев» (Story 11.2; both
  * counts are read-only and never focusable; each is left out when the API
- * gives none).
+ * gives none). Story 13.1: a video post shows the author row only
+ * (`authorOnly`; `PostHero` follows), any other post its `actions` («На
+ * телефоне») under the meta line.
  */
 export function PostHeader({
   post,
@@ -112,6 +121,8 @@ export function PostHeader({
   onAuthorPress,
   authorRef,
   nowMs,
+  authorOnly = false,
+  actions,
 }: PostHeaderProps) {
   return (
     <View testID="post/header" style={styles.header}>
@@ -122,18 +133,23 @@ export function PostHeader({
         onFocus={onAuthorFocus}
         onPress={onAuthorPress}
       />
-      <Text
-        testID="post/title"
-        variant="title-s"
-        accessibilityRole="header"
-        numberOfLines={POST_TITLE_LINES}
-        style={styles.title}
-      >
-        {postCardTitle(post)}
-      </Text>
-      <Text testID="post/meta" variant="meta" color="text-meta" style={styles.meta}>
-        {postMetaLine(post, nowMs)}
-      </Text>
+      {authorOnly ? null : (
+        <>
+          <Text
+            testID="post/title"
+            variant="title-s"
+            accessibilityRole="header"
+            numberOfLines={POST_TITLE_LINES}
+            style={styles.title}
+          >
+            {postCardTitle(post)}
+          </Text>
+          <Text testID="post/meta" variant="meta" color="text-meta" style={styles.meta}>
+            {postMetaLine(post, nowMs)}
+          </Text>
+          {actions ? <View style={styles.actions}>{actions}</View> : null}
+        </>
+      )}
     </View>
   );
 }
@@ -180,6 +196,9 @@ const styles = StyleSheet.create({
   },
   meta: {
     marginTop: spacing['6'],
+  },
+  actions: {
+    marginTop: spacing['8'],
   },
   skeletonAvatar: {
     width: AVATAR,

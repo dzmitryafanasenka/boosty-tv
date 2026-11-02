@@ -80,7 +80,21 @@ describe('progress and resume (Story 4.2)', () => {
   const e9Calls = () => handlers.transport.calls.filter(c => c.method === 'PUT' && E9_RE.test(c.path));
   /** E9 positions sent, with their media ids. */
   const e9Sent = () => e9Calls().map(c => `${E9_RE.exec(c.path)?.[1]}@${c.form.time_code}`);
-  const statusOf = (root: Root, mediaId: string) => text(byTestId(root, `${VIDEO(mediaId)}/status`)[0] ?? null);
+  /**
+   * A video's status, lower-cased: its tile's status line when the post has
+   * tiles (several videos; a missing status then fails), else the hero's
+   * media line (Story 13.1: a single video has no tile).
+   */
+  const statusOf = (root: Root, mediaId: string) => {
+    if (visible(root, 'post/tiles')) {
+      const [status] = byTestId(root, `${VIDEO(mediaId)}/status`);
+      if (status === undefined) {
+        throw new Error(`no status on the tile of ${mediaId}`);
+      }
+      return text(status).toLowerCase();
+    }
+    return text(byTestId(root, 'post/hero/media')[0]).toLowerCase();
+  };
   const label = (root: Root, id: string) => one(root, id).props.accessibilityLabel as string;
   const columnStops = (root: Root) =>
     byTestId(root, 'post/column')[0]
@@ -104,17 +118,19 @@ describe('progress and resume (Story 4.2)', () => {
   it('matrix «Server only»: `timeCode` 300 → «Продолжить», «С начала», «Осталось 5 мин»; the player seeks to 300 and never writes the pre-seek t=0', async () => {
     withData([okVideo('v1', ALL, { timeCode: 300 }), ...paragraph('Body')]);
     const root = await openPost();
-    expect(label(root, PRIMARY)).toBe('Продолжить');
+    expect(label(root, PRIMARY)).toBe('Продолжить · 5:00');
     expect(label(root, RESTART)).toBe('С начала');
     // «С начала» is in the primary's row, to its right (owner decision 2026-10-28).
-    expect(columnStops(root)).toEqual([`post/${POST}/author`, PRIMARY, RESTART, VIDEO('v1'), `post/${POST}/block/text@1`]);
+    // Story 13.1: then «На телефоне»; one video has no tile.
+    expect(columnStops(root)).toEqual([`post/${POST}/author`, PRIMARY, RESTART, `post/${POST}/phone`, `post/${POST}/block/text@1`]);
     expect(byTestId(root, `${PRIMARY}-row`)[0].queryAll(n => n.props.focusable === true).map(n => n.props.testID)).toEqual([
       PRIMARY,
       RESTART,
+      `post/${POST}/phone`,
     ]);
-    expect(statusOf(root, 'v1')).toContain('Осталось 5 мин');
-    expect(visible(root, `${VIDEO('v1')}/progress`)).toBe(true);
-    expect(label(root, VIDEO('v1'))).toBe('Видео 1. Title v1. 10:00. Осталось 5 мин');
+    expect(statusOf(root, 'v1')).toContain('осталось 5 мин');
+    expect(visible(root, 'post/hero/progress')).toBe(true);
+    expect(text(byTestId(root, 'post/hero/media')[0])).toContain('Видео · 10:00 · осталось 5 мин');
     // The server value never enters the route or the query cache.
     const cached = JSON.stringify(queryClient.getQueryData(queryKeys.post(FEED_BLOG, POST)));
     expect(cached).not.toContain('timeCode');
@@ -148,7 +164,7 @@ describe('progress and resume (Story 4.2)', () => {
     expect(currentRoute()).toBe('Post');
     expect(e9Sent()).toEqual(['v1@310', 'v1@312']);
     // The Post now reads the local entry: 312 of 600 → «Осталось 5 мин».
-    expect(statusOf(root, 'v1')).toContain('Осталось 5 мин');
+    expect(statusOf(root, 'v1')).toContain('осталось 5 мин');
     expect(lastFocusTarget()).toBe(PRIMARY);
     await unmount(root);
   });
@@ -157,7 +173,7 @@ describe('progress and resume (Story 4.2)', () => {
     withData([okVideo('v1', ALL, { timeCode: 300 }), ...paragraph('Body')]);
     progressStore.put({ ref: REF1, positionSec: 120, durationSec: 600, updatedAt: Date.now(), meta: META });
     const root = await openPost();
-    expect(statusOf(root, 'v1')).toContain('Осталось 8 мин');
+    expect(statusOf(root, 'v1')).toContain('осталось 8 мин');
     await enterPlayer(root, PRIMARY);
     await fire('onLoad', { durationSec: 600 });
     expect(engine.seek).toHaveBeenCalledWith(120);
@@ -168,7 +184,7 @@ describe('progress and resume (Story 4.2)', () => {
   it('matrix «Finished»: local 590 of 600 → «Просмотрено», «Смотреть», no «С начала»; starts at 0', async () => {
     progressStore.put({ ref: REF1, positionSec: 590, durationSec: 600, updatedAt: Date.now(), meta: META });
     const root = await openPost();
-    expect(statusOf(root, 'v1')).toContain('Просмотрено');
+    expect(statusOf(root, 'v1')).toContain('просмотрено');
     expect(label(root, PRIMARY)).toBe('Смотреть');
     expect(visible(root, RESTART)).toBe(false);
     await enterPlayer(root, PRIMARY);
@@ -191,9 +207,9 @@ describe('progress and resume (Story 4.2)', () => {
     const root = await openPost();
     expect(label(root, PRIMARY)).toBe('Продолжить · Видео 2');
     expect(label(root, RESTART)).toBe('С начала');
-    expect(statusOf(root, 'v1')).toContain('Просмотрено');
-    expect(statusOf(root, 'v2')).toContain('Осталось 9 мин');
-    expect(label(root, VIDEO('v2'))).toBe('Видео 2. 10:00. Осталось 9 мин');
+    expect(statusOf(root, 'v1')).toContain('просмотрено');
+    expect(statusOf(root, 'v2')).toContain('осталось 9 мин');
+    expect(label(root, VIDEO('v2'))).toBe('Видео 2. 10:00. Осталось 9 мин. Сейчас');
     // The primary targets v2.
     await enterPlayer(root, PRIMARY);
     expect(navigationRef.getCurrentRoute()?.params).toMatchObject({ ref: { mediaId: 'v2' } });
@@ -280,7 +296,7 @@ describe('progress and resume (Story 4.2)', () => {
     expect(e9Sent()).toEqual(['v1@10', 'v1@14', 'v1@598', 'v1@600']);
     // Story 4.5: the end exits to the Post by itself.
     expect(currentRoute()).toBe('Post');
-    expect(statusOf(root, 'v1')).toContain('Просмотрено');
+    expect(statusOf(root, 'v1')).toContain('просмотрено');
     expect(label(root, PRIMARY)).toBe('Смотреть');
     await unmount(root);
   });
@@ -324,8 +340,8 @@ describe('progress and resume (Story 4.2)', () => {
         JSON.stringify({ v: 1, entries: [{ ref: REF1, positionSec: 120, durationSec: 600, updatedAt: 1, meta: META }] }),
       );
     const root = await openPost();
-    expect(label(root, PRIMARY)).toBe('Продолжить');
-    expect(statusOf(root, 'v1')).toContain('Осталось 8 мин');
+    expect(label(root, PRIMARY)).toBe('Продолжить · 2:00');
+    expect(statusOf(root, 'v1')).toContain('осталось 8 мин');
     await enterPlayer(root, PRIMARY);
     await fire('onLoad', { durationSec: 600 });
     expect(engine.seek).toHaveBeenCalledWith(120);
@@ -348,7 +364,7 @@ describe('progress and resume (Story 4.2)', () => {
   it('short visit (owner decision 2026-10-28): a finished video → «Смотреть» → Back after 2 s: still «Просмотрено», no E9', async () => {
     progressStore.put({ ref: REF1, positionSec: 600, durationSec: 600, updatedAt: Date.now(), meta: META });
     const root = await openPost();
-    expect(statusOf(root, 'v1')).toContain('Просмотрено');
+    expect(statusOf(root, 'v1')).toContain('просмотрено');
     await enterPlayer(root, PRIMARY);
     await fire('onLoad', { durationSec: 600 });
     expect(engine.seek).not.toHaveBeenCalled();
@@ -356,7 +372,7 @@ describe('progress and resume (Story 4.2)', () => {
     await back();
     expect(currentRoute()).toBe('Post');
     expect(e9Sent()).toEqual([]);
-    expect(statusOf(root, 'v1')).toContain('Просмотрено');
+    expect(statusOf(root, 'v1')).toContain('просмотрено');
     expect(progressStore.get('v1')?.positionSec).toBe(600);
     await unmount(root);
   });
