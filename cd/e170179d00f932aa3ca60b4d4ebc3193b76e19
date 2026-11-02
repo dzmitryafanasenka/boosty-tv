@@ -1,0 +1,29 @@
+__tests__/postFlow.test.tsx
+  s_12c741f764bd7c::t_07b0b0386774c5 4245-4247,4249
+_bmad-output/planning-artifacts/ux-designs/ux-boosty-tv-2026-10-25/DESIGN.md
+  s_12c741f764bd7c::t_5b7ffb776294f5 131,272
+docs/focus-map.md
+  s_12c741f764bd7c::t_55e077d2239ed4 388
+docs/testing.md
+  s_12c741f764bd7c::t_3e77a463a883d9 937,2173-2175
+src/features/post/body/VideoActions.tsx
+  s_12c741f764bd7c::t_b792ea0ec18ff0 7-17,165,172-219,222-235
+src/shared/ui/tokens.ts
+  s_12c741f764bd7c::t_b8812408b27eb5 266-269
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "cde170179d00f932aa3ca60b4d4ebc3193b76e19",
+  "prompts": {},
+  "sessions": {
+    "s_12c741f764bd7c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "56fa7fd7-cf2f-4d38-a3e7-0220eb9f612d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
