@@ -1,0 +1,25 @@
+CONTRIBUTING.md
+  s_12c741f764bd7c::t_d9178d8431af35 1-22
+SECURITY.md
+  s_12c741f764bd7c::t_1f3f3c34e15e36 1,8-17
+README.en.md
+  s_12c741f764bd7c::t_8a318aecda1eeb 1-103
+README.md
+  s_12c741f764bd7c::t_c4d319b9a6d26e 3-43,45,47-49,51,53,55-58,60,62,66,69,72-73,76-77,82,85-87,89,92-93,95,97-99,101
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "3bb4723892ead7d16128f33e147b2700ca063a3c",
+  "prompts": {},
+  "sessions": {
+    "s_12c741f764bd7c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "56fa7fd7-cf2f-4d38-a3e7-0220eb9f612d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
