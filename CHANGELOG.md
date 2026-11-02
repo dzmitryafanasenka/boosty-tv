@@ -6,8 +6,15 @@ The Russian version of this file is [CHANGELOG.ru.md](CHANGELOG.ru.md); both lis
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-02
+
+Chapters in the player (Epic 10, Story 10.1).
+
 ### Added
 - Player: chapters from a post's timestamps («Таймкоды»). The timeline shows a mark for each timestamp of the playing video, and the current chapter's name appears next to the elapsed time (it follows the target while you seek). Press ↑ on the timeline to open the chapter list: ← → pick a chapter, OK jumps to it, Back or ↓ closes the list. On remotes with media keys, Next and Previous jump between chapters. Videos without timestamps, live streams and the system video player are unchanged.
+
+### Notes
+- Install from the app on 1.0.0: Settings → «Версия» → «Скачать и установить». The session is kept.
 
 ## [1.0.0] - 2026-11-01
 
