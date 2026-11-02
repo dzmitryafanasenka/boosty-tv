@@ -9,6 +9,7 @@ Build an independent, unofficial Boosty client for television. Working title: Bo
 - Product scope: feature parity with BoostBuddy, including read-only comments (owner decision 2026-11-02). No comment writing: no posting, replying, liking or deleting comments. Do not silently reduce parity to a video-only MVP.
 - Do not copy BoostBuddy's interface. Its behavior/API implementation is a reference, not the UX target.
 - Communicate with the owner in Russian. Code identifiers and technical documentation in English; initial application copy in Russian, with an i18n-ready structure.
+- Public project pages are bilingual with Russian as the primary language (owner decision 2026-11-02): `README.md` is Russian and links `README.en.md`; `CONTRIBUTING.md` and `SECURITY.md` put the Russian section first. Keep both languages in sync when either changes. The changelog keeps its existing pair (`CHANGELOG.md` English, `CHANGELOG.ru.md` Russian).
 
 ## Sources and evidence
 Reference repository: https://github.com/slartus/BoostBuddy
