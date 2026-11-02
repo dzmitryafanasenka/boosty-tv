@@ -1,0 +1,258 @@
+{
+  "case": "e19-replies",
+  "synthetic": true,
+  "status": 200,
+  "body": {
+    "data": [
+      {
+        "id": "synthetic-id-1311",
+        "intId": 1311,
+        "author": {
+          "id": 1031,
+          "name": "redacted",
+          "avatarUrl": "https://example.invalid/avatar",
+          "hasAvatar": true,
+          "isOfficial": false
+        },
+        "createdAt": 1700039600,
+        "data": [
+          {
+            "type": "text",
+            "content": "[\"Sample text\",\"unstyled\",[]]",
+            "modificator": ""
+          },
+          {
+            "type": "text",
+            "content": "",
+            "modificator": "BLOCK_END"
+          }
+        ],
+        "isBlocked": false,
+        "isDeleted": false,
+        "isUpdated": false,
+        "post": {
+          "id": "synthetic-id-1001"
+        },
+        "replyCount": 0,
+        "replies": {
+          "data": [],
+          "extra": {
+            "isFirst": true,
+            "isLast": true
+          }
+        },
+        "reactions": {},
+        "reactionCounters": [],
+        "parentId": 1203,
+        "replyId": 1203,
+        "replyToUser": {
+          "id": 1021,
+          "name": "redacted",
+          "avatarUrl": "https://example.invalid/avatar",
+          "hasAvatar": true,
+          "isOfficial": false
+        }
+      },
+      {
+        "id": "synthetic-id-1312",
+        "intId": 1312,
+        "author": {
+          "id": 1032,
+          "name": "redacted",
+          "avatarUrl": "https://example.invalid/avatar",
+          "hasAvatar": true,
+          "isOfficial": false
+        },
+        "createdAt": 1700043200,
+        "data": [
+          {
+            "type": "text",
+            "content": "[\"Sample text\",\"unstyled\",[]]",
+            "modificator": ""
+          },
+          {
+            "type": "text",
+            "content": "",
+            "modificator": "BLOCK_END"
+          }
+        ],
+        "isBlocked": false,
+        "isDeleted": false,
+        "isUpdated": false,
+        "post": {
+          "id": "synthetic-id-1001"
+        },
+        "replyCount": 0,
+        "replies": {
+          "data": [],
+          "extra": {
+            "isFirst": true,
+            "isLast": true
+          }
+        },
+        "reactions": {},
+        "reactionCounters": [],
+        "parentId": 1203,
+        "replyId": 1203,
+        "replyToUser": {
+          "id": 1021,
+          "name": "redacted",
+          "avatarUrl": "https://example.invalid/avatar",
+          "hasAvatar": true,
+          "isOfficial": false
+        }
+      },
+      {
+        "id": "synthetic-id-1313",
+        "intId": 1313,
+        "author": {
+          "id": 1033,
+          "name": "redacted",
+          "avatarUrl": "https://example.invalid/avatar",
+          "hasAvatar": true,
+          "isOfficial": false
+        },
+        "createdAt": 1700046800,
+        "data": [
+          {
+            "type": "text",
+            "content": "[\"Sample text\",\"unstyled\",[]]",
+            "modificator": ""
+          },
+          {
+            "type": "text",
+            "content": "",
+            "modificator": "BLOCK_END"
+          }
+        ],
+        "isBlocked": false,
+        "isDeleted": false,
+        "isUpdated": false,
+        "post": {
+          "id": "synthetic-id-1001"
+        },
+        "replyCount": 0,
+        "replies": {
+          "data": [],
+          "extra": {
+            "isFirst": true,
+            "isLast": true
+          }
+        },
+        "reactions": {},
+        "reactionCounters": [],
+        "parentId": 1203,
+        "replyId": 1203,
+        "replyToUser": {
+          "id": 1021,
+          "name": "redacted",
+          "avatarUrl": "https://example.invalid/avatar",
+          "hasAvatar": true,
+          "isOfficial": false
+        }
+      },
+      {
+        "id": "synthetic-id-1314",
+        "intId": 1314,
+        "author": {
+          "id": 1034,
+          "name": "redacted",
+          "avatarUrl": "https://example.invalid/avatar",
+          "hasAvatar": true,
+          "isOfficial": false
+        },
+        "createdAt": 1700050400,
+        "data": [
+          {
+            "type": "text",
+            "content": "[\"Sample text\",\"unstyled\",[]]",
+            "modificator": ""
+          },
+          {
+            "type": "text",
+            "content": "",
+            "modificator": "BLOCK_END"
+          }
+        ],
+        "isBlocked": false,
+        "isDeleted": false,
+        "isUpdated": false,
+        "post": {
+          "id": "synthetic-id-1001"
+        },
+        "replyCount": 0,
+        "replies": {
+          "data": [],
+          "extra": {
+            "isFirst": true,
+            "isLast": true
+          }
+        },
+        "reactions": {},
+        "reactionCounters": [],
+        "parentId": 1203,
+        "replyId": 1203,
+        "replyToUser": {
+          "id": 1021,
+          "name": "redacted",
+          "avatarUrl": "https://example.invalid/avatar",
+          "hasAvatar": true,
+          "isOfficial": false
+        }
+      },
+      {
+        "id": "synthetic-id-1315",
+        "intId": 1315,
+        "author": {
+          "id": 1035,
+          "name": "redacted",
+          "avatarUrl": "https://example.invalid/avatar",
+          "hasAvatar": true,
+          "isOfficial": false
+        },
+        "createdAt": 1700054000,
+        "data": [
+          {
+            "type": "text",
+            "content": "[\"Sample text\",\"unstyled\",[]]",
+            "modificator": ""
+          },
+          {
+            "type": "text",
+            "content": "",
+            "modificator": "BLOCK_END"
+          }
+        ],
+        "isBlocked": false,
+        "isDeleted": false,
+        "isUpdated": false,
+        "post": {
+          "id": "synthetic-id-1001"
+        },
+        "replyCount": 0,
+        "replies": {
+          "data": [],
+          "extra": {
+            "isFirst": true,
+            "isLast": true
+          }
+        },
+        "reactions": {},
+        "reactionCounters": [],
+        "parentId": 1203,
+        "replyId": 1203,
+        "replyToUser": {
+          "id": 1021,
+          "name": "redacted",
+          "avatarUrl": "https://example.invalid/avatar",
+          "hasAvatar": true,
+          "isOfficial": false
+        }
+      }
+    ],
+    "extra": {
+      "isFirst": true,
+      "isLast": true
+    }
+  }
+}

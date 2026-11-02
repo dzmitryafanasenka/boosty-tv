@@ -127,6 +127,20 @@ export const queryKeys = {
    * every key (the cache is cleared on sign-out and account switch).
    */
   events: () => ['events'] as const,
+  /**
+   * E19 a post's comments (Story 11.1, `entities/comment`), an infinite
+   * query by the post identity only: the cursor stays a page param, never in
+   * the key. Its own root: never a prefix of `post` or `commentReplies`.
+   * Account-scoped and never persisted (personal data).
+   */
+  comments: (blogUrl: string, postId: string) => ['comments', blogUrl, postId] as const,
+  /**
+   * E19 one comment's replies (`parent_id`, Story 11.1), by ids only: the
+   * post identity and the comment's `id`. Its own root: never a prefix of
+   * `comments`.
+   */
+  commentReplies: (blogUrl: string, postId: string, commentId: string) =>
+    ['commentReplies', blogUrl, postId, commentId] as const,
 } as const;
 
 /**

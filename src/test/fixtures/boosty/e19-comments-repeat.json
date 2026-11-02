@@ -1,0 +1,93 @@
+{
+  "case": "e19-comments-repeat",
+  "synthetic": true,
+  "status": 200,
+  "body": {
+    "data": [
+      {
+        "id": "synthetic-id-1103",
+        "intId": 1103,
+        "author": {
+          "id": 1024,
+          "name": "redacted",
+          "avatarUrl": "https://example.invalid/avatar",
+          "hasAvatar": true,
+          "isOfficial": false
+        },
+        "createdAt": 1700003600,
+        "data": [
+          {
+            "type": "text",
+            "content": "[\"Sample text\",\"unstyled\",[]]",
+            "modificator": ""
+          },
+          {
+            "type": "text",
+            "content": "",
+            "modificator": "BLOCK_END"
+          }
+        ],
+        "isBlocked": false,
+        "isDeleted": false,
+        "isUpdated": false,
+        "post": {
+          "id": "synthetic-id-1001"
+        },
+        "replyCount": 0,
+        "replies": {
+          "data": [],
+          "extra": {
+            "isFirst": true,
+            "isLast": true
+          }
+        },
+        "reactions": {},
+        "reactionCounters": []
+      },
+      {
+        "id": "synthetic-id-1201",
+        "intId": 1201,
+        "author": {
+          "id": 1021,
+          "name": "redacted",
+          "avatarUrl": "https://example.invalid/avatar",
+          "hasAvatar": true,
+          "isOfficial": false
+        },
+        "createdAt": 1700007200,
+        "data": [
+          {
+            "type": "text",
+            "content": "[\"Sample text\",\"unstyled\",[]]",
+            "modificator": ""
+          },
+          {
+            "type": "text",
+            "content": "",
+            "modificator": "BLOCK_END"
+          }
+        ],
+        "isBlocked": false,
+        "isDeleted": false,
+        "isUpdated": false,
+        "post": {
+          "id": "synthetic-id-1001"
+        },
+        "replyCount": 0,
+        "replies": {
+          "data": [],
+          "extra": {
+            "isFirst": true,
+            "isLast": true
+          }
+        },
+        "reactions": {},
+        "reactionCounters": []
+      }
+    ],
+    "extra": {
+      "isFirst": false,
+      "isLast": true
+    }
+  }
+}

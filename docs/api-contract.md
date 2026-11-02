@@ -260,7 +260,7 @@ All of these are under `https://api.boosty.to` and use a Bearer token.
 | E16 | `PUT /v1/blog/{blogUrl}/video_stream/heartbeat/viewer` | Live viewer heartbeat (every 30 s; Story 7.3: the live player, see «E16 heartbeat (Story 7.3)»; `REF`, never sent live) | `stop=true` query param on exit or end | body discarded |
 | E17 | `POST` / `DELETE /v1/blog/{blogUrl}/video_stream/like` | Like / unlike a stream (Story 7.4: «Нравится» on the Author LiveCard, see «E17 like (Story 7.4)»; `REF`, never sent live) | — | body discarded |
 | E18 | `GET /v1/notification/standalone/event/` | Events (`REF-DEAD`: not reachable from the reference UI; approved for Boosty TV as our addition; shape `LIVE` in Story 1.5, re-probed in Story 7.5; Story 7.5: the События section, content profile, see «E18 (LIVE, Story 7.5)») | None sent. Pagination params unknown (no cursor seen in either probe) | `data.notificationStandalone{events[]{id, isRead, type, eventTime (epoch s), blog{blogUrl}, author?, aggregation?}, count{total, unread, byEventType[]}, updateTime}`. The full type list is in «Live evidence (Story 1.5)» below. The observed `target_new` event had `target{…}` and no `blog`. |
-| E19 | `GET /v1/blog/{blogUrl}/post/{postId}/comment/` | Read-only comments of a post and replies to a comment (FR-58, COMM-01; Epic 11). **UNVERIFIED**: path and param names come from the reference code only (`CommentsRepository.getComments`, BoostBuddy `develop` at `87c0852`); never sent by this project. Story 11.1 records it `LIVE` (status codes, shape, paging, replies, locked post). GET only; no comment writing | `limit`, `reply_limit`, `order=top`, `offset?`, `parent_id?` (replies of one comment) | Unverified. Reference model: `Comment{id, intId, author{name, avatarUrl}, content[], replies{comments, hasMore}, replyCount, replyToUser, createdAt}`. Parse defensively until Story 11.1 |
+| E19 | `GET /v1/blog/{blogUrl}/post/{postId}/comment/` | Read-only comments of a post and replies to a comment (FR-58, COMM-01; Epic 11). **`LIVE`** (Story 11.1, 2026-11-02): see «E19 (LIVE)» below. GET only; no comment writing | `limit` (20), `reply_limit` (2), `order=top`, `offset?` (an `intId`), `parent_id?` (a comment's `intId`: its replies) | `{data: Comment[], extra{isFirst, isLast}}`; no cursor in `extra`. 403 for a locked post |
 
 #### Live evidence (Story 1.5)
 
@@ -499,6 +499,61 @@ Synthetic shape fixtures (labelled `"synthetic": true`, built from the reference
 - No read or unread mutation is sent. OK on a row marks it read locally for the app run only (an account-scoped in-memory set, cleared on sign-out and account switch), and only when Автор really opens (a press dropped during a transition marks nothing).
 - Demo mode: the demo transport answers E18 with synthetic events (a `video_stream_start` of the live demo blog, a `post_new`, a `promo_new`, an unknown type, a row without a blog, and a hidden comment and owner-side event); nothing reaches Boosty.
 
+### E19 (`LIVE`, Story 11.1)
+
+**Live probe (2026-11-02):** the pinned device (Chromecast with Google TV 4K), a temporary owner-signed `assembleRelease` armeabi-v7a build with a counts-only probe with a temporary marker (removed; a grep of `src` for the marker and of the release Hermes bundle both found 0), installed with `adb install -r` (session kept), the owner's session, two runs with the owner's OK each. The probe wrote through the hidden diagnostics capture (Story 8.3), which was then turned off and cleared; a clean owner-signed build was installed over it with `adb install -r`. Logged: status codes, key names, value types, counts and booleans only (no text, names, ids, URLs, avatars or dates). Covered: an accessible post with comments (first page), its second page, one comment's replies via `parent_id`, an accessible post without comments, and a locked post.
+
+**Request as sent** (content profile): `GET /v1/blog/{blogUrl}/post/{postId}/comment/?limit=20&reply_limit=2&order=top[&offset=<intId>][&parent_id=<intId>]`.
+
+**Status codes:** **200** for an accessible post (with or without comments); **403** for a locked post (`hasAccess: false`; the HttpClient's `AppError` `Client` with status 403). 404 was not observed.
+
+**200 body (key tree with types):**
+
+```text
+{
+  data: Comment[]
+  extra: { isFirst: bool, isLast: bool }        // no cursor field
+}
+Comment {
+  id: str                                       // the identity
+  intId: num                                    // the paging cursor and parent_id
+  author: { id: num, name: str, avatarUrl: str, hasAvatar: bool, isOfficial: bool }
+  createdAt: num                                // epoch s (inferred, as posts)
+  data: Block[]                                 // {type: str, content: str, modificator: str}: the post block shape (§4.1)
+  isBlocked: bool, isDeleted: bool, isUpdated: bool
+  post: { id: str }
+  replyCount: num
+  replies: { data: Comment[], extra: { isFirst: bool, isLast: bool } }
+  reactions: {...}, reactionCounters: [...]
+}
+Reply = Comment + { parentId: num, replyId: num, replyToUser: { id, name, avatarUrl, hasAvatar, isOfficial } }
+```
+
+**Paging (a post with 75 comments):**
+- Page 1 holds the newest 20, ordered by `intId` ascending (oldest to newest within the page), `isLast: false`.
+- `offset=<the smallest intId of page 1>` returned the next 20 older comments: no overlap with page 1, every `intId` below the offset, ascending, `isLast: false`.
+- `offset=<the largest intId of page 1>` returned 19 of page 1 again, so the offset is «below this `intId`», not a page cursor.
+- Rule: the cursor is the smallest `intId` loaded; «has more» is `extra.isLast == false`. «Show more» loads older comments, placed before the loaded ones. This matches the reference (`offsetId = comments.firstOrNull().intId`). `order=top` and no `order` gave the same result.
+
+**Replies:**
+- Inline: up to `reply_limit` (2) under each comment, with `replies.extra.isLast` false when there are more.
+- `parent_id=<comment intId>` returned all 5 replies of a comment with `replyCount` 5 and `isLast: true`.
+- Paging of replies past one page was not seen. By the reference's rule (`offset` = the first reply's `intId`) it is the same scheme: **unverified**.
+
+**No comments:** 200 with `data: []` and `extra: {isFirst: true, isLast: true}`.
+
+**Not seen:** a 404; a deleted or blocked comment's content (`isDeleted` / `isBlocked` true); non-text block types in comments (the shared block mapper handles them); whether a dead token answers E19 as anonymous (as E8 does, §7).
+
+**Production client (Story 11.1):** `CommentRepository` (`src/shared/entities/comment`) is the only caller of E19 and the only comment request in the app; GET only, the active session's HttpClient (a 401 goes through the single-flight refresh, one retry; network failures and 5xx get the shared GET retries).
+- `page(http, blogUrl, postId, cursor)`: one page of a post's comments (`cursor` null: the newest page). `replies(http, blogUrl, postId, parentIntId, cursor)`: one page of a comment's replies (`parent_id`). `blogUrl` must pass `blogUrlSchema`, `postId` must be a plain segment and a cursor must be an integer, else an `error(Client)` outcome before a request.
+- Outcomes per page, never a rejection: `ok{comments, nextCursor}`, `denied` (HTTP 403; never a session expiry, not retried), `notFound` (404), `error(AppError)` (`Parse` for a shape the schema rejects, `Network`, `Server`, `RateLimited`, `Client`).
+- `nextCursor` = the smallest `intId` of the page's raw items (a dropped item included), as a string, only when `extra.isLast` is exactly `false`; null otherwise (`true`, malformed, no `extra`). When a cursor was sent, a next cursor not strictly below it is null (a server ignoring `offset` never loops). `isLast: false` without a usable `intId` ends the paging with a counts-only warning (`comment` / `no cursor`).
+- Lenient Zod (`src/shared/api/dto/comments.ts`): a missing `data` array → `Parse`. Each comment is parsed on its own (`mapComments`). Required: `id` (a non-empty string), `intId` (an integer), `author.name` (a string), `createdAt` (a finite number). A malformed comment is dropped alone (one counts-only warning); a repeated id keeps the first occurrence.
+- Read: `author.name`, `author.avatarUrl` (http(s) only, none when `hasAvatar: false`), `replyToUser.name` (on a reply), `data` through the shared post block mapper (`mapBlocks`; an unknown block becomes `{type: 'unknown'}`), `createdAt`, `replyCount` (never below the inline replies), `replies` (one level) and `hasMoreReplies` (`replies.extra.isLast == false`; without `extra`, `replyCount` > the inline replies). Never read: `reactions`, `reactionCounters` (no comment likes), `isBlocked`, `isDeleted`, `isUpdated`, `post`, `parentId`, `replyId`, user ids and `isOfficial`.
+- Query keys `['comments', blogUrl, postId]` and `['commentReplies', blogUrl, postId, commentId]` (ids only, never a cursor or URL); pages merge by comment id with `mergeCommentPages(pagesInLoadOrder)`: oldest page first, the first occurrence in that order kept. Account-scoped, never persisted. No UI yet (Story 11.2).
+- E4–E8 keep `comments_limit=0`.
+- Demo mode: the demo transport answers E19 with synthetic comments (none, 45 or 3 per post, every fourth comment with 5 replies of which 2 inline, the live paging rule, 403 for a locked post, 404 for the missing one); nothing reaches Boosty.
+
 ## 4. Post object (`REF`)
 
 ```text
@@ -674,6 +729,7 @@ Boosty TV (Story 6.7, multiple choice; **unverified live**, no sample): E11 send
 - End of list: `extra.isLast == true`. When `extra` or `extra.offset` is missing, the reference treats it as having no next page.
 - Page sizes used: feed 10, blog 20, blog search 20, feed tags 100 (blog tags: one page).
 - Merge rule (reference): append, then deduplicate by post `id`, keeping the first occurrence.
+- E19 comments (`LIVE`, Story 11.1) page differently: `extra` has no cursor; the next (older) page is `offset=<the smallest intId loaded>`, more pages only when `extra.isLast == false` and the new cursor is strictly below the one sent; each older page is **placed before** the loaded ones (not appended), deduplicated by comment `id`, keeping the first occurrence in that order (`mergeCommentPages`; §3 «E19 (LIVE)»).
 - `LIVE` (Story 1.7): E4 pages 2 and 3 fetched with the previous `extra.offset` (URL-encoded) returned the next posts, HTTP 200, for 3 blogs.
 - Unverified: whether the cursor stays stable while new posts arrive, and how long a cursor is valid.
 - Subscriptions (E2): no pagination in the reference. Whether `offset` is supported is unverified.
@@ -769,7 +825,8 @@ These are not `playerUrls`: the URL is the block `url` plus `Post.signedQuery` (
 | Accessible post with empty `data` (`hasAccess: true`, `data: []`) | **Not observed.** Debug-build counter (count and post ids only, removed afterwards) over 37 E5 pages (`limit=10`) and 23 E4 pages (`limit=20`) of the 3 subscribed blogs, owner's session, 2026-10-27: 0 posts with `hasAccess: true` and an empty or missing `data`. The mapper keeps treating such a post as locked (`hasAccess = dto.hasAccess !== false && blocks.length > 0`), except (Story 6.5) when it carries a usable top-level `poll`: a poll is content too, so a post whose only content is a poll is accessible (not observed live; the one live poll post had `text` blocks) | not observed (60 pages, one account; Epic 3 retro A6) |
 | Nonexistent post | E8 with a random UUID: HTTP **404** `{error: "not_found", error_description}` | `LIVE` (Story 1.5) |
 | Nonexistent blog | E3 with a random slug: HTTP **404** `{error: "blog_not_found", error_description}` | `LIVE` (Story 1.5) |
-| 403, 410, 429 (content), 5xx | **Not observed.** A locked post is a 200 with `hasAccess=false`, not a 403. 429 was seen only on the phone-auth send (§2.2) | unverified. **Do not treat 403 as an expired session.** Map unobserved 4xx to a generic non-retried error |
+| Comments of a locked post | E19 for a post with `hasAccess: false`: HTTP **403** (body not recorded). The comment repository maps it to `denied`, never to an expired session | `LIVE` (Story 11.1) |
+| 403, 410, 429 (content), 5xx | **Not observed** on the post endpoints (E19's 403 for a locked post is the only one seen). A locked post is a 200 with `hasAccess=false`, not a 403. 429 was seen only on the phone-auth send (§2.2) | unverified. **Do not treat 403 as an expired session.** Map unobserved 4xx to a generic non-retried error |
 | Network failure | Generic | — |
 
 Client handling of «locked» (Epic 3 retro A6, `src/shared/api/sessionCheck.ts`): because a dead token answers 200 as anonymous, three trigger points run E1 (`SessionManager.validate()`, single-flight) before they trust a locked answer: the player's fresh E8, the Post screen's E8, and Главная's page 1 when it has posts and every one is `hasAccess: false` (owner decision 2026-10-27; the Author page is excluded, a blog whose posts are all locked is ordinary; Story 5.3: only under the «Доступные мне» Filter, an all-locked page under «Все посты» or «Только купленные» is ordinary). E1 → 401 → refresh 400 `invalid_grant` → `expired` → A11. E1 200 (also after a silent refresh) → the locked query is refetched **once**. A failure (`Network`, 5xx…) → the locked state as before. A window (at most one E1 per trigger point per 5 min, one refetch per window, handed only to a caller that is still mounted) is kept only after `ok` or `expired`; a failed or skipped E1 drops it, so the next locked answer checks again. A clock that moved back ends the window; every session status change resets the windows. A failed post-`ok` refetch keeps the locked state (no error copy). The locked UI stays on screen while E1 runs. `hasAccess: false` or a 403 alone is never treated as an expired session. **Known gap:** the window is per trigger point, so a session that dies within 5 min after an `ok` at that trigger point is noticed only after the window (or on the next resume E1). E5 with a dead token is still inferred, not observed (only E8 was checked live).
@@ -787,6 +844,7 @@ Retry policy for Boosty TV (our policy, not the reference's):
 4. Events (E18): shape and event types resolved (§3 «Live evidence (Story 1.5)»), shape re-confirmed in Story 7.5 (§3 «E18 (LIVE, Story 7.5)»). Open: pagination (no cursor field in either 1-event response) and a live `video_stream_start` sample.
 5. ~~E8 with `comments_limit=0`~~: accepted, HTTP 200 (Story 1.5).
 6. ~~Signed media URL TTL~~: 24 h by `expires` (Story 1.6, §6). Still open: the CDN error after a real expiry (needs a pause over 24 h), and whether `signedQuery` for audio and files expires. Story 1.7: `Post.signedQuery` carries `expire_time` (epoch s) = **24 h** after the response on every accessible post (§4.1 «Live evidence (Story 1.7)»). Still open: whether audio/file hosts enforce it. No accessible `audio_file` or `file` block was found in the 60 newest posts of each of the 3 subscribed blogs, so audio playback, the file QR and the enforcement stay unverified.
-7. 401 and 404 bodies resolved (§7). 403 was not observed: locked content is a 200 with `hasAccess=false`.
+7. 401 and 404 bodies resolved (§7). 403 was not observed on the post endpoints: locked content is a 200 with `hasAccess=false`. E19 answers 403 for a locked post (Story 11.1, §3 «E19 (LIVE)»).
 8. ~~Whether E9 progress is reflected in `timeCode` on the next E8 and on the web~~: yes, exact round-trip on E8 and the website (Story 1.6, §6).
 9. Subscriptions pagination beyond 30: E2 returns top-level `offset`, `limit`, `total`; whether `offset` pages further was not tested (3 subscriptions).
+10. E19 with a dead token (Story 11.1 did not test it): whether it answers 401 (the refresh path), 200 as anonymous (as E8, §7) or 403. A 403 would read as `denied` («comments are closed»), not as a session problem. To settle in Story 11.2.

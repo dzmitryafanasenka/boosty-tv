@@ -1,0 +1,316 @@
+{
+  "case": "e19-comments-1",
+  "synthetic": true,
+  "status": 200,
+  "body": {
+    "data": [
+      {
+        "intId": 1200,
+        "author": {
+          "id": 1020,
+          "name": "redacted",
+          "avatarUrl": "https://example.invalid/avatar",
+          "hasAvatar": true,
+          "isOfficial": false
+        },
+        "createdAt": 1700003600,
+        "data": [
+          {
+            "type": "text",
+            "content": "[\"Sample text\",\"unstyled\",[]]",
+            "modificator": ""
+          },
+          {
+            "type": "text",
+            "content": "",
+            "modificator": "BLOCK_END"
+          }
+        ],
+        "isBlocked": false,
+        "isDeleted": false,
+        "isUpdated": false,
+        "post": {
+          "id": "synthetic-id-1001"
+        },
+        "replyCount": 0,
+        "replies": {
+          "data": [],
+          "extra": {
+            "isFirst": true,
+            "isLast": true
+          }
+        },
+        "reactions": {},
+        "reactionCounters": []
+      },
+      {
+        "id": "synthetic-id-1201",
+        "intId": 1201,
+        "author": {
+          "id": 1021,
+          "name": "redacted",
+          "avatarUrl": "https://example.invalid/avatar",
+          "hasAvatar": true,
+          "isOfficial": false
+        },
+        "createdAt": 1700007200,
+        "data": [
+          {
+            "type": "text",
+            "content": "[\"Sample text\",\"unstyled\",[]]",
+            "modificator": ""
+          },
+          {
+            "type": "text",
+            "content": "",
+            "modificator": "BLOCK_END"
+          }
+        ],
+        "isBlocked": false,
+        "isDeleted": false,
+        "isUpdated": false,
+        "post": {
+          "id": "synthetic-id-1001"
+        },
+        "replyCount": 0,
+        "replies": {
+          "data": [],
+          "extra": {
+            "isFirst": true,
+            "isLast": true
+          }
+        },
+        "reactions": {},
+        "reactionCounters": []
+      },
+      {
+        "id": "synthetic-id-1202",
+        "intId": 1202,
+        "author": {
+          "id": 1022,
+          "name": "redacted",
+          "avatarUrl": "https://example.invalid/avatar",
+          "hasAvatar": true,
+          "isOfficial": false
+        },
+        "createdAt": 1700010800,
+        "data": [
+          {
+            "type": "synthetic_new_block",
+            "content": "",
+            "modificator": ""
+          },
+          {
+            "type": "text",
+            "content": "[\"Sample text\",\"unstyled\",[]]",
+            "modificator": ""
+          },
+          {
+            "type": "text",
+            "content": "",
+            "modificator": "BLOCK_END"
+          }
+        ],
+        "isBlocked": false,
+        "isDeleted": false,
+        "isUpdated": false,
+        "post": {
+          "id": "synthetic-id-1001"
+        },
+        "replyCount": 0,
+        "replies": {
+          "data": [],
+          "extra": {
+            "isFirst": true,
+            "isLast": true
+          }
+        },
+        "reactions": {},
+        "reactionCounters": []
+      },
+      {
+        "id": "synthetic-id-1203",
+        "intId": 1203,
+        "author": {
+          "id": 1021,
+          "name": "redacted",
+          "avatarUrl": "https://example.invalid/avatar",
+          "hasAvatar": true,
+          "isOfficial": false
+        },
+        "createdAt": 1700014400,
+        "data": [
+          {
+            "type": "text",
+            "content": "[\"Sample text\",\"unstyled\",[]]",
+            "modificator": ""
+          },
+          {
+            "type": "text",
+            "content": "",
+            "modificator": "BLOCK_END"
+          }
+        ],
+        "isBlocked": false,
+        "isDeleted": false,
+        "isUpdated": false,
+        "post": {
+          "id": "synthetic-id-1001"
+        },
+        "replyCount": 5,
+        "replies": {
+          "data": [
+            {
+              "id": "synthetic-id-1311",
+              "intId": 1311,
+              "author": {
+                "id": 1031,
+                "name": "redacted",
+                "avatarUrl": "https://example.invalid/avatar",
+                "hasAvatar": true,
+                "isOfficial": false
+              },
+              "createdAt": 1700039600,
+              "data": [
+                {
+                  "type": "text",
+                  "content": "[\"Sample text\",\"unstyled\",[]]",
+                  "modificator": ""
+                },
+                {
+                  "type": "text",
+                  "content": "",
+                  "modificator": "BLOCK_END"
+                }
+              ],
+              "isBlocked": false,
+              "isDeleted": false,
+              "isUpdated": false,
+              "post": {
+                "id": "synthetic-id-1001"
+              },
+              "replyCount": 0,
+              "replies": {
+                "data": [],
+                "extra": {
+                  "isFirst": true,
+                  "isLast": true
+                }
+              },
+              "reactions": {},
+              "reactionCounters": [],
+              "parentId": 1203,
+              "replyId": 1203,
+              "replyToUser": {
+                "id": 1021,
+                "name": "redacted",
+                "avatarUrl": "https://example.invalid/avatar",
+                "hasAvatar": true,
+                "isOfficial": false
+              }
+            },
+            {
+              "id": "synthetic-id-1312",
+              "intId": 1312,
+              "author": {
+                "id": 1032,
+                "name": "redacted",
+                "avatarUrl": "https://example.invalid/avatar",
+                "hasAvatar": true,
+                "isOfficial": false
+              },
+              "createdAt": 1700043200,
+              "data": [
+                {
+                  "type": "text",
+                  "content": "[\"Sample text\",\"unstyled\",[]]",
+                  "modificator": ""
+                },
+                {
+                  "type": "text",
+                  "content": "",
+                  "modificator": "BLOCK_END"
+                }
+              ],
+              "isBlocked": false,
+              "isDeleted": false,
+              "isUpdated": false,
+              "post": {
+                "id": "synthetic-id-1001"
+              },
+              "replyCount": 0,
+              "replies": {
+                "data": [],
+                "extra": {
+                  "isFirst": true,
+                  "isLast": true
+                }
+              },
+              "reactions": {},
+              "reactionCounters": [],
+              "parentId": 1203,
+              "replyId": 1311,
+              "replyToUser": {
+                "id": 1031,
+                "name": "redacted",
+                "avatarUrl": "https://example.invalid/avatar",
+                "hasAvatar": true,
+                "isOfficial": false
+              }
+            }
+          ],
+          "extra": {
+            "isFirst": true,
+            "isLast": false
+          }
+        },
+        "reactions": {},
+        "reactionCounters": []
+      },
+      {
+        "id": "synthetic-id-1204",
+        "intId": 1204,
+        "author": {
+          "id": 1023,
+          "name": "redacted",
+          "avatarUrl": "https://example.invalid/avatar",
+          "hasAvatar": true,
+          "isOfficial": false
+        },
+        "createdAt": 1700018000,
+        "data": [
+          {
+            "type": "text",
+            "content": "[\"Sample text\",\"unstyled\",[]]",
+            "modificator": ""
+          },
+          {
+            "type": "text",
+            "content": "",
+            "modificator": "BLOCK_END"
+          }
+        ],
+        "isBlocked": false,
+        "isDeleted": false,
+        "isUpdated": false,
+        "post": {
+          "id": "synthetic-id-1001"
+        },
+        "replyCount": 0,
+        "replies": {
+          "data": [],
+          "extra": {
+            "isFirst": true,
+            "isLast": true
+          }
+        },
+        "reactions": {},
+        "reactionCounters": []
+      }
+    ],
+    "extra": {
+      "isFirst": true,
+      "isLast": false
+    }
+  }
+}

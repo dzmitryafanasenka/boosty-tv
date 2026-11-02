@@ -233,7 +233,12 @@ function mapBlock(raw: unknown, depth: number): Block {
   }
 }
 
-function mapBlocks(raw: readonly unknown[] | null | undefined, depth = 0): Block[] {
+/**
+ * The one post block mapper: raw blocks → `Block[]`, an unknown or malformed
+ * block → `{type: 'unknown'}`. Also used for comment content (Story 11.1);
+ * there is no second block parser.
+ */
+export function mapBlocks(raw: readonly unknown[] | null | undefined, depth = 0): Block[] {
   return raw ? raw.map(block => mapBlock(block, depth)) : [];
 }
 

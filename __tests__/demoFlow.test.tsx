@@ -20,6 +20,7 @@ import {
 } from '../src/features/player';
 import { focusRestoration } from '../src/shared/focus';
 import { DEFAULT_FILTER, filtersStore, formatDayKey, periodBounds } from '../src/shared/filters';
+import { CommentRepository, mergeComments, type CommentPageResult } from '../src/shared/entities/comment';
 import { PostRepository } from '../src/shared/entities/post';
 import { StreamRepository } from '../src/shared/entities/stream';
 import { TagRepository } from '../src/shared/entities/tag';
@@ -646,6 +647,51 @@ test('Story 5.7: the demo E4 honours is_only_allowed (only_bought ignored), E7 i
     expect(found.nextCursor).toBeNull();
     const tags = await wait(TagRepository.blogTags(session.http, blog));
     expect(tags.map(tag => tag.id).sort()).toEqual(['1', '2', '3', '4', '5', '6', '7']);
+  } finally {
+    await act(async () => {
+      root.unmount();
+    });
+  }
+});
+
+test('Story 11.1: the demo E19 answers synthetic comments with the live paging rule, replies via parent_id, 403 for a locked post', async () => {
+  const root = await renderApp();
+  try {
+    const wait = async <T,>(pending: Promise<T>): Promise<T> => {
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(1000);
+      });
+      return pending;
+    };
+    const ok = (result: CommentPageResult) => {
+      if (result.kind !== 'ok') {
+        throw new Error(`expected ok, got ${result.kind}`);
+      }
+      return result.page;
+    };
+    // demo-post-1 (demo-blog-2): 45 comments, three pages of the newest first.
+    const first = ok(await wait(CommentRepository.page(session.http, 'demo-blog-2', 'demo-post-1', null)));
+    expect(first.comments).toHaveLength(20);
+    expect(first.comments[0].id).toBe('demo-comment-26');
+    expect(first.nextCursor).toBe(String(first.comments[0].intId));
+    const second = ok(await wait(CommentRepository.page(session.http, 'demo-blog-2', 'demo-post-1', first.nextCursor)));
+    expect(second.comments.map(c => c.id)).toEqual(Array.from({ length: 20 }, (_, i) => `demo-comment-${i + 6}`));
+    const third = ok(await wait(CommentRepository.page(session.http, 'demo-blog-2', 'demo-post-1', second.nextCursor)));
+    expect(third.comments).toHaveLength(5);
+    expect(third.nextCursor).toBeNull();
+    expect(mergeComments(third.comments, second.comments, first.comments)).toHaveLength(45);
+    // Comment 28: 5 replies, 2 inline; parent_id returns all 5.
+    const full = await wait(CommentRepository.page(session.http, 'demo-blog-2', 'demo-post-1', null));
+    const thread = full.kind === 'ok' ? full.page.comments.find(c => c.id === 'demo-comment-28') : undefined;
+    expect(thread?.replies).toHaveLength(2);
+    expect(thread?.hasMoreReplies).toBe(true);
+    const replies = ok(await wait(CommentRepository.replies(session.http, 'demo-blog-2', 'demo-post-1', thread?.intId ?? 0, null)));
+    expect(replies.comments).toHaveLength(5);
+    expect(replies.nextCursor).toBeNull();
+    // demo-post-0: no comments; demo-post-6: locked (403 → denied); demo-post-9: missing (404).
+    expect(ok(await wait(CommentRepository.page(session.http, 'demo-blog-1', 'demo-post-0', null))).comments).toEqual([]);
+    expect(await wait(CommentRepository.page(session.http, 'demo-blog-1', 'demo-post-6', null))).toEqual({ kind: 'denied' });
+    expect(await wait(CommentRepository.page(session.http, 'demo-blog-1', 'demo-post-9', null))).toEqual({ kind: 'notFound' });
   } finally {
     await act(async () => {
       root.unmount();

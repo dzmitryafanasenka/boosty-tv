@@ -919,6 +919,30 @@ Review fixes (2026-10-28, host-tested only): short visits write nothing (owner d
 
 Host tests: `src/shared/services/progress/__tests__/progressRepository.test.ts` (29: the finished rule and status, resume precedence, the 10 s cadence, one write in flight with the latest position, forced events, start over, seeks as movement, failure gating ≥ 10 s and the bounded automatic retry, expired hold/flush/drop, sign-out wipe, a late write after a reset, the debounced/forced disk write, cold-start load, corrupt disk, the 200-entry cap, the stale disk write undone, a load after a reset dropped, stable snapshots); `__tests__/playerProgressFlow.test.tsx` «progress and resume (Story 4.2)» (10: server only with no pre-seek t=0 and the E9 request shape, local wins, finished, multi-video + start over, hold-scrub, background and end, the vanished «С начала» fallback, failure retry, cold start from the persisted entry, log hygiene); `__tests__/postFlow.test.tsx` (status and «Продолжить» only while the player is on); `__tests__/accountScopeRegistry.test.js` (`progress` registered); `demoFlow` (the row label now ends with the status). Lint (`--max-warnings 0`), typecheck, `check:fixtures` clean; `npm test` ×3: 1494 passed each; `playerFlow` + `postFlow` + the progress suite 30/30 (187 tests each run).
 
+### Story 11.1 — Comments endpoint probe and the comment entity, 2026-11-02
+
+**Status: E19 verified live (probe, agent over adb, owner's OK for each run); the GET-only comment entity is implemented and host-tested. No UI (Story 11.2).** `spec-11-1-comments-endpoint-probe-and-entity.md`, parity COMM-01 (FR-58, owner decision 2026-11-02: read-only comments).
+
+**Probe environment (owner decision 2026-11-02):** the pinned TV (Chromecast with Google TV 4K); a temporary owner-signed `assembleRelease` armeabi-v7a build with a counts-only probe (temporary marker), installed with `adb install -r` with the session kept; the owner's session (no second sign-in); two runs, each after the owner's OK. The probe ran on the release build path (not gated on `__DEV__`) and wrote through the hidden diagnostics capture (Story 8.3): the agent turned capture on, read `boostytv.log` with `adb pull`, then turned capture off and cleared it. Logged: status codes, key names, value types, counts and booleans only. Afterwards the probe was removed (a grep of `src` for the marker: 0; the release Hermes bundle: 0) and a clean owner-signed build was installed over it with `adb install -r` (session kept). No debug-key APK; nothing uninstalled or cleared; no sign-out; GET requests only.
+
+| Probe row | Result | By |
+|---|---|---|
+| Accessible post with comments, first page | 200; `{data, extra{isFirst, isLast}}`, no cursor field; the newest 20, `intId` ascending, `isLast: false` | agent, adb + diagnostics file |
+| Second page (`offset` = the smallest `intId` of page 1) | 200; 20 older comments, no overlap, all below the offset, `isLast: false`. `offset` = the largest `intId` returned 19 of page 1 again (not a cursor) | agent, adb + diagnostics file |
+| One comment's replies (`parent_id` = its `intId`) | 200; all 5 replies (`replyCount` 5), `isLast: true`; inline: up to 2 under `reply_limit=2`, `replies.extra.isLast` false when more | agent, adb + diagnostics file |
+| Accessible post without comments | 200; `data: []`, `extra{isFirst: true, isLast: true}` | agent, adb + diagnostics file |
+| Locked post (`hasAccess: false`) | **403** | agent, adb + diagnostics file |
+| 404, a deleted / blocked comment, non-text blocks in comments, replies past one page, a dead token | **Not seen** | — |
+
+Full shape: `docs/api-contract.md` §3 «E19 (LIVE)».
+
+Host tests (host only; no device run of the entity, it has no UI yet): `src/shared/entities/comment/__tests__/commentRepository.test.ts` (55: the request as sent, path validation before a request (the trimmed blogUrl, positive safe-integer cursor and parent), the paging stops (`isLast` not exactly false, a cursor not below the one sent, no usable intId with a counts-only warning), `mergeCommentPages` (oldest page first), every row of the spec's I/O matrix: first page with the entity shape and the cursor, inline replies with `replyTo` and `hasMoreReplies`, the unknown block via `mapBlocks`, last page, no `extra`, no comments, merge keeping the first occurrence, replies via `parent_id` with their own cursor, `denied` for 403 with no retry and no refresh, `notFound`, `error(Parse)`, `error(Network)` after the bounded retries, a 401 through the refresh, 500 / 429 / 400; each malformed field dropped alone with a counts-only warning, avatars, reply counts, no raw DTO field in the domain); `__tests__/commentsReadOnly.test.js` (3: no comment path outside `entities/comment`, the repository sends GET only); `queryKeys.test.ts` (the two keys, ids only); `demoFlow` (the demo E19: three pages of 45, replies, empty, 403, 404). The existing exclusion guards (`postRepository.test.ts`, `mapPost.test.ts`, `PostCard.test.tsx`, `AuthorCard.test.tsx`, `eventRepository.test.ts`) are unchanged and pass. Fixtures: `src/test/fixtures/boosty/e19-*.json` (8, synthetic).
+
+Checks run:
+- `npm run lint -- --max-warnings 0`, `npm run typecheck`, `npm run check:fixtures` (38): clean.
+- `npm test`: 165 suites, 3375 tests passed (after the review patches).
+- A `git grep` for the probe marker: no output.
+
 ### Release 1.1.0 on the TV, 2026-11-02
 
 `1.1.0` (versionCode 10100) was published from `main` `0269833` (PR #97) with the Story 10.1 chapters. The owner updated the pinned TV in the app over the unpublished Story 10.1 build (versionCode 10000) and reported version 1.1.0 (owner). Over adb: `versionName` 1.1.0, `versionCode` 10100, and the installed `base.apk` SHA-256 `a26ccdd3…10c7` equals the armeabi-v7a asset digest, so the per-ABI in-app update picked the right APK; the app opened on Главная with the session kept (agent over adb). The TV now runs a published release again.

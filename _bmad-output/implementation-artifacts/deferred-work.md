@@ -393,3 +393,14 @@
   summary: Medium, unverified — a sidebar fallback focus event delivered after the filter sheet's `close()` could still make the Поиск/Автор chip unfocusable.
   evidence: `SearchScreen.tsx` and `useAuthorActionRowFocus` ignore focus only while `isOpen()`; settle with a device trace of the focus-event order around close after a level change.
   status: Done 2026-11-01 (Story 9.5, agent over adb). Not reproduced: «Фильтры» → «Период» → list → Back → gap → Back, with gaps from 0.2 s to 1.5 s. 9 runs on Поиск and 8 on Автор over the 9.4 build and `0.9.2`; focus was on the chip every time, and the chip stayed focusable. No code change.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-11-1-comments-endpoint-probe-and-entity.md`
+  summary: Story 11.2 must define how «Ещё ответы» merges the inline replies with the `parent_id` list (the live `parent_id` page returned all replies, the inline ones included).
+  evidence: Story 11.1 review BH5; the entity returns both lists separately.
+- source_spec: `_bmad-output/implementation-artifacts/spec-11-1-comments-endpoint-probe-and-entity.md`
+  summary: Story 11.2 decides how a deleted or blocked comment is shown (`isDeleted` / `isBlocked` are in the live shape but were never seen true, and the entity does not read them).
+  evidence: Story 11.1 review BH8 (medium, unverified).
+- source_spec: `_bmad-output/implementation-artifacts/spec-11-1-comments-endpoint-probe-and-entity.md`
+  summary: Story 11.2 checks whether every E19 403 means «denied» (only a locked post was probed; an author-disabled thread, `isCommentsDenied`, was not), and whether a dead token answers 403 rather than 401.
+  evidence: Story 11.1 review BH6 / BH7 (maybe-false); settle by a counts-only check or the device pass.
+
