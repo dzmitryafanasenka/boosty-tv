@@ -1,0 +1,33 @@
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_12c741f764bd7c::t_eeba93a530e248 32,129-150
+_bmad-output/planning-artifacts/architecture/architecture-boosty-tv-2026-10-25/ARCHITECTURE-SPINE.md
+  s_12c741f764bd7c::t_f3d7a8d0a3aa07 11,194-195,229,241-242,473-477,501
+_bmad-output/planning-artifacts/epics.md
+  s_12c741f764bd7c::t_4968fef614b8ec 99,104-111,242-249,305-320,1926-2157
+_bmad-output/planning-artifacts/prds/prd-boosty-tv-2026-10-25/prd.md
+  s_12c741f764bd7c::t_eef5112d7fd61e 5,141,172,180-198,275,280,289,307-318,370,388-395,404-406,408,416,422-427,481,523,532,576-579
+_bmad-output/planning-artifacts/sprint-change-proposal-2026-11-02-post-1-2-0.md
+  s_12c741f764bd7c::t_6d0c83b3c088a8 1-311
+_bmad-output/planning-artifacts/ux-designs/ux-boosty-tv-2026-10-25/DESIGN.md
+  s_12c741f764bd7c::t_22ea58ec7eb0ae 7,248,251,254,269-272
+_bmad-output/planning-artifacts/ux-designs/ux-boosty-tv-2026-10-25/EXPERIENCE.md
+  s_12c741f764bd7c::t_fb57570f621471 6,36,40,42,47,130,173,232,295
+docs/feature-parity.md
+  s_12c741f764bd7c::t_a651a8808ca4d8 110,120,149,177-195
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "cf6729fe1540c3e7004e5b8104ed3a28a1e205e7",
+  "prompts": {},
+  "sessions": {
+    "s_12c741f764bd7c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "56fa7fd7-cf2f-4d38-a3e7-0220eb9f612d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
