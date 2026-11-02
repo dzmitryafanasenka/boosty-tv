@@ -333,6 +333,21 @@ export const components = {
     /** The external-video chip's preview. */
     thumbWidth: 96,
     thumbHeight: 54,
+    /**
+     * Story 13.2, the timestamp chip «▶ time title» (mockup `Chapters`):
+     * left/right padding, the gap between the glyph, time and title, the
+     * play glyph, the time's minimum width in a chapter list, the gap
+     * between chips of a list and above a paragraph's chips; focused, the
+     * chip inverts (light fill, dark ink).
+     */
+    timePadLeft: 12,
+    timePadRight: 16,
+    timeGap: 8,
+    playSize: 11,
+    timeMinWidth: 32,
+    listGap: 6,
+    bgFocusTime: colors.text,
+    inkFocusTime: colors.bg,
   },
   'player-control': {
     size: 40,

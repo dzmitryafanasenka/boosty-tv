@@ -7,6 +7,7 @@ import {
   type TimestampRef,
 } from '../externalUrls';
 import type { Poll } from '../poll/types';
+import { chapterTitle } from './chapters';
 import type { Block, ListItem, TextSpan } from './types';
 
 /**
@@ -73,11 +74,22 @@ import type { Block, ListItem, TextSpan } from './types';
  *   block of its id (or id-less), an «Опрос» placeholder goes after the body. Every other `poll`
  *   block stays a placeholder. A teaser never passes a poll.
  *
+ * - Story 13.2 (our improvement, with `qr` and `selfPost`): a text line (a
+ *   paragraph's `\n`-separated line, or a list item) that starts with a
+ *   timestamp link to a video of this post and has no other link is a
+ *   `timestamp` item (one chip «▶ time title») instead of text: the title is
+ *   the Story 10.1 chapter-name rule (`chapterTitle`) on the rest of the
+ *   line. The paragraph's other lines keep their stops (and keys) around
+ *   it, in post order. A timestamp anywhere else stays inline text with its
+ *   link chip.
+ *
  * Keys (focus-map §1.5, block keys): `<type>:<id>` when the block has an
  * id, else `<type>@<index in data[]>`; a paragraph uses its first fragment's
  * key; the parts after the first of a split stop (or of a list's items)
  * are `<key>#<n>` (n from 1); a link chip is `<key>/link/<n>` (n from 0,
- * `<key>` the paragraph's first stop). Pure and total: no block shape throws.
+ * `<key>` the paragraph's first stop); a timestamp line is `<base>/time/<n>`
+ * (n from 0 within the paragraph or list, `<base>` its key before any
+ * split). Pure and total: no block shape throws.
  */
 
 /**
@@ -227,6 +239,13 @@ export type PostBodyItem =
   /** A heading line (Story 6.3, `header` block): bold text, never a focus stop. */
   | { kind: 'heading'; key: string; text: string }
   | { kind: 'placeholder'; key: string; block: PlaceholderKind }
+  /**
+   * Story 13.2: a text line that starts with a timestamp link to a video of
+   * this post (and has no other link): one chip «▶ time title», a focus
+   * stop. OK plays `mediaId` from `seconds`; with the player off, the QR of
+   * `url`. `title` is never empty (the time when the line has no name).
+   */
+  | { kind: 'timestamp'; key: string; mediaId: string; seconds: number; title: string; url: string }
   /** The post's poll (Story 6.5): one focus stop; key `poll:<id>`. */
   | { kind: 'poll'; key: string; poll: Poll }
   /**
@@ -306,19 +325,21 @@ type Line = {
   offset: number;
   /** Story 6.3: the line's safe link targets in order, deduped by URL. */
   links: { text: string; url: string }[];
+  /**
+   * Story 13.2: every `link` fragment with text, in order: its `[start, end)`
+   * in `plain`, its trimmed text and its raw URL.
+   */
+  fragments: { start: number; end: number; text: string; url: string | null }[];
 };
 
-const emptyLine = (): Line => ({ segments: [], plain: '', offset: 0, links: [] });
+const emptyLine = (): Line => ({ segments: [], plain: '', offset: 0, links: [], fragments: [] });
 
-/** Records a `link` fragment's chip on its line (http(s) URL and text only, one per URL). */
-function addLink(line: Line, block: Block): void {
-  if (block.type !== 'link') {
-    return;
-  }
-  const url = safeHttpUrl(block.url);
-  const text = block.text.trim();
-  if (url !== null && text.length > 0 && !line.links.some(link => link.url === url)) {
-    line.links.push({ text, url });
+/** Records a link chip on `links` (http(s) URL and text only, one per URL). */
+function addLink(links: Line['links'], rawUrl: string | null, rawText: string): void {
+  const url = safeHttpUrl(rawUrl);
+  const text = rawText.trim();
+  if (url !== null && text.length > 0 && !links.some(link => link.url === url)) {
+    links.push({ text, url });
   }
 }
 
@@ -386,10 +407,15 @@ function appendInline(line: Line, block: Block, index: number): boolean {
     case 'text':
       appendFragment(line, block.text, block.spans);
       return true;
-    case 'link':
+    case 'link': {
+      const start = line.plain.length;
       appendFragment(line, block.text, block.spans);
-      addLink(line, block);
+      addLink(line.links, block.url, block.text);
+      if (block.text.trim().length > 0) {
+        line.fragments.push({ start, end: line.plain.length, text: block.text, url: block.url });
+      }
       return true;
+    }
     case 'smile':
       // One offset unit per smile, as the reference's inline content (unverified live).
       line.offset += 1;
@@ -444,6 +470,99 @@ function lineStops(line: Line): Segment[][] {
   );
 }
 
+/** What a timestamp link of this post is checked against (`timestampRef`). */
+type TimestampSelf = { blogUrl: string; postId: string; mediaIds: readonly string[] };
+
+/** A part of a line (Story 13.2): text lines kept as a line, or one timestamp line. */
+type LinePart =
+  | { kind: 'line'; line: Line }
+  | { kind: 'chapter'; mediaId: string; seconds: number; title: string; url: string };
+
+/** `line` within `[start, end)` of its plain text, with the links whose fragment starts there. */
+function subLine(line: Line, start: number, end: number): Line {
+  const fragments = line.fragments.filter(f => f.start >= start && f.start < end);
+  const links: Line['links'] = [];
+  for (const f of fragments) {
+    addLink(links, f.url, f.text);
+  }
+  return {
+    segments: sliceLine(line, start, end),
+    plain: line.plain.slice(start, end),
+    offset: 0,
+    links,
+    fragments: fragments.map(f => ({ ...f, start: f.start - start, end: f.end - start })),
+  };
+}
+
+/** A time at the start of a timestamp link's text («0:20», «1:02:03»). */
+const LEADING_TIME = /^\s*\d{1,3}(?::\d{2}){1,2}/;
+
+/** The timestamp line `[start, end)` of `line` as a chapter, or null (not one). */
+function chapterOf(line: Line, start: number, end: number, self: TimestampSelf): LinePart | null {
+  const [a, b] = trimmedBounds(line.plain, start, end);
+  if (b <= a) {
+    return null;
+  }
+  const inLine = line.fragments.filter(f => f.end > a && f.start < b);
+  if (inLine.length !== 1) {
+    // No link, or another link on the line: it stays text with its chips.
+    return null;
+  }
+  const [link] = inLine;
+  if (link.start < start || link.end > end || trimmedBounds(line.plain, link.start, link.end)[0] !== a) {
+    return null;
+  }
+  const url = safeHttpUrl(link.url);
+  const ref = url === null ? null : timestampRef(url, self);
+  if (url === null || ref === null) {
+    return null;
+  }
+  // The link's own words after its leading time («[0:20 Что тут]») belong to the title too.
+  const linkRest = line.plain.slice(link.start, link.end).replace(LEADING_TIME, '');
+  const rest = (linkRest + line.plain.slice(link.end, b)).split(EMOJI_CHAR).join('');
+  return { kind: 'chapter', mediaId: ref.mediaId, seconds: ref.seconds, title: chapterTitle(rest, ref.seconds), url };
+}
+
+/**
+ * Story 13.2: `line` split at its `\n`-separated text lines: each timestamp
+ * line is a chapter, the runs of other lines stay lines (in order). A line
+ * without a timestamp line is returned as is.
+ */
+function lineParts(line: Line, self: TimestampSelf | null): LinePart[] {
+  if (self === null || line.fragments.length === 0) {
+    return [{ kind: 'line', line }];
+  }
+  const parts: LinePart[] = [];
+  let runStart = 0;
+  let runEnd = 0;
+  let found = false;
+  let start = 0;
+  while (start <= line.plain.length) {
+    const nl = line.plain.indexOf('\n', start);
+    const end = nl < 0 ? line.plain.length : nl;
+    const chapter = chapterOf(line, start, end, self);
+    if (chapter !== null) {
+      found = true;
+      if (runEnd > runStart) {
+        parts.push({ kind: 'line', line: subLine(line, runStart, runEnd) });
+      }
+      parts.push(chapter);
+      runStart = end + 1;
+      runEnd = runStart;
+    } else {
+      runEnd = end;
+    }
+    start = end + 1;
+  }
+  if (!found) {
+    return [{ kind: 'line', line }];
+  }
+  if (runEnd > runStart) {
+    parts.push({ kind: 'line', line: subLine(line, runStart, runEnd) });
+  }
+  return parts;
+}
+
 /** A list item's own blocks (inline fragments, merged) as one line. */
 function itemLine(blocks: readonly Block[]): Line {
   const line = emptyLine();
@@ -490,7 +609,8 @@ export function isFocusStop(item: PostBodyItem): boolean {
     item.kind === 'file' ||
     item.kind === 'audio' ||
     item.kind === 'externalVideo' ||
-    item.kind === 'poll'
+    item.kind === 'poll' ||
+    item.kind === 'timestamp'
   );
 }
 
@@ -559,11 +679,21 @@ export function postBodyItems(
   /**
    * Stops for `lines` (each split by the budget): `key`, then `key#1`,
    * `key#2`, … Story 6.3: each line's link chips go on its last stop, keyed
-   * by its first stop (`<key>/link/<n>`).
+   * by its first stop (`<key>/link/<n>`). Story 13.2: a timestamp line is a
+   * `timestamp` item (`<key>/time/<n>`) in its place.
    */
   const pushStops = (base: string, lines: readonly Line[], index: number) => {
     let n = 0;
-    for (const line of lines) {
+    let time = 0;
+    const parts = lines.flatMap(whole => lineParts(whole, qr ? timestampSelf : null));
+    for (const part of parts) {
+      if (part.kind === 'chapter') {
+        const { mediaId, seconds, title, url } = part;
+        push({ kind: 'timestamp', key: `${base}/time/${time}`, mediaId, seconds, title, url }, index);
+        time += 1;
+        continue;
+      }
+      const { line } = part;
       const stops = lineStops(line);
       let lineKey: string | null = null;
       stops.forEach((segments, i) => {
@@ -597,6 +727,8 @@ export function postBodyItems(
   };
   /** The current post's videos with an id (a timestamp link's targets). */
   const selfMediaIds = blocks.flatMap(b => (b.type === 'ok_video' && b.id.length > 0 ? [b.id] : []));
+  const timestampSelf: TimestampSelf | null =
+    selfPost === undefined ? null : { ...selfPost, mediaIds: selfMediaIds };
   /** The Boosty post a link opens in the app (not the current one), else null. */
   const otherPost = (url: string): BoostyPostRef | null => {
     const ref = boostyPostRef(url);

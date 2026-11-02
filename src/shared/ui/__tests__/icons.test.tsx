@@ -12,6 +12,7 @@ import {
   FileIcon,
   GearIcon,
   HeartIcon,
+  PlayIcon,
   PollIcon,
   QrIcon,
   SkipIcon,
@@ -72,7 +73,8 @@ describe('SVG icons', () => {
     ['PollIcon', PollIcon],
     ['FileIcon', FileIcon],
     ['QrIcon', QrIcon],
-  ])('%s (PostCard placeholder, 2026-10-30; QrIcon: «На телефоне», Story 13.1): drawn in the ink, sized, hidden from a11y', async (_name, Icon) => {
+    ['PlayIcon', PlayIcon],
+  ])('%s (PostCard placeholder, 2026-10-30; QrIcon: «На телефоне», Story 13.1; PlayIcon: the timestamp chip, Story 13.2): drawn in the ink, sized, hidden from a11y', async (_name, Icon) => {
     const root = await render(<Icon testID="p" color="#b7b0a6" size={37} />);
     const nodes = all(root);
     const svg = nodes.find(n => n.props.testID === 'p');

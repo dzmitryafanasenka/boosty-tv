@@ -919,6 +919,29 @@ Review fixes (2026-10-28, host-tested only): short visits write nothing (owner d
 
 Host tests: `src/shared/services/progress/__tests__/progressRepository.test.ts` (29: the finished rule and status, resume precedence, the 10 s cadence, one write in flight with the latest position, forced events, start over, seeks as movement, failure gating ≥ 10 s and the bounded automatic retry, expired hold/flush/drop, sign-out wipe, a late write after a reset, the debounced/forced disk write, cold-start load, corrupt disk, the 200-entry cap, the stale disk write undone, a load after a reset dropped, stable snapshots); `__tests__/playerProgressFlow.test.tsx` «progress and resume (Story 4.2)» (10: server only with no pre-seek t=0 and the E9 request shape, local wins, finished, multi-video + start over, hold-scrub, background and end, the vanished «С начала» fallback, failure retry, cold start from the persisted entry, log hygiene); `__tests__/postFlow.test.tsx` (status and «Продолжить» only while the player is on); `__tests__/accountScopeRegistry.test.js` (`progress` registered); `demoFlow` (the row label now ends with the status). Lint (`--max-warnings 0`), typecheck, `check:fixtures` clean; `npm test` ×3: 1494 passed each; `playerFlow` + `postFlow` + the progress suite 30/30 (187 tests each run).
 
+### Story 13.2 — Timestamp chips instead of a text line and a chip, 2026-11-02
+
+**Status: implemented and host-tested; checked on the pinned TV by the agent over adb (screenshots); the remote check against the mockup is the owner's.** `spec-13-2-timestamp-chips.md`, our improvement IMP-06 (FR-63). Focus ids and moves: `docs/focus-map.md` «F Пост» «Story 13.2».
+
+Host tests:
+- `src/shared/entities/post/__tests__/postBody.test.ts` «Story 13.2» (11): every matrix row at entity level (chapter line; consecutive lines as separate paragraphs and as `\n` lines; mixed paragraph with an intro and a closing line keeping their keys; empty title → the time; a timestamp inside a paragraph keeps its link chip; a line with another link; two timestamps on a line; another post, an unknown `tmid`, no `selfPost` or no `qr`), a list item, 300 chapter lines (unique, stable keys, post order) and the chip titles equal to `postChapters` (one `chapterTitle` rule).
+- `src/features/post/__tests__/linkChip.test.tsx`: the inline timestamp chip reads «▶ 3:45» (label «Смотреть с 3:45»); «Story 13.2» (3): consecutive chapters grouped in one list, time / title / labels; the focused chip inverts (light fill, dark ink, ring); OK → `onPlayAt` with the chip id, player off → the link QR.
+- `__tests__/postFlow.test.tsx` «Story 13.2» (4): focus order author → primary → «На телефоне» → paragraph → chips → paragraph → its «▶ 42:10» chip; no chapter text in any paragraph, no «· Смотреть»; OK → Player `{atSec: 20}` with the chip as origin, Back → the chip; player off → the QR of the link; a line with another link and links to another post or video unchanged. `__tests__/playerFlow.test.tsx` «Story 6.3: timestamp link chips» updated for «▶ 3:45». `icons.test.tsx` covers `PlayIcon`; `tokens.test.js` the new `link-chip` tokens.
+
+Lint (`--max-warnings 0`), typecheck clean; `npm test -- --ci` 3457 passed (166 suites).
+
+**Build:** `./gradlew assembleRelease -PreactNativeArchitectures=armeabi-v7a` (JDK 17) BUILD SUCCESSFUL, versionName still 1.2.0 / 10200, installed with `adb install -r` over the Story 13.1 build (session kept). The foreground activity was checked before every key batch.
+
+Device checks (pinned Chromecast with Google TV 4K, release-like build, the owner's session, 1080p screencaps):
+
+| Check | Result | Method |
+|---|---|---|
+| Chapters of «Философский выпуск по вашим заявкам №2» (Подписки → Стас Асафьев → the post) | The intro paragraph, then one chip per line: «▶ 0:00 Приветики!», «▶ 0:20 Что тут происходит?», «▶ 1:58 Как не переживать?», «▶ 17:34 Как там здоровье?», … «▶ 50:17 Как понять, что ты молодец?»; no duplicate text line, a tight list | agent, adb + screencap |
+| Focus | ↓ from «Продолжить · 0:29» → the paragraph → «0:00» → «0:20» (inverted light chip with the ring); ↓ walks the list and scrolls with it | agent, adb + screencap |
+| OK → Player → Back | OK on «0:20» opened the Player (still loading); Back after ≈ 3 s → Пост with focus on «0:20»; «Продолжить · 0:29» unchanged (no write under 10 s) | agent, adb + screencap |
+| Inline «▶ time» chip, player off | Not found on the device in this post; host-tested only | — |
+| Physical remote | The owner's | — |
+
 ### Story 13.1 — Пост header with a large preview and the post QR, 2026-11-02
 
 **Status: implemented and host-tested; the header checked on the pinned TV by the agent over adb (screenshots); the remote check against the mockup is the owner's.** `spec-13-1-post-header-large-preview-and-qr.md`, our improvement IMP-05 (FR-62). Focus ids and moves: `docs/focus-map.md` «F Пост» «Story 13.1».

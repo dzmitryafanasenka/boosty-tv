@@ -4299,3 +4299,152 @@ describe('Story 13.1: the Пост header with a large preview and «На тел
     await unmount(root);
   });
 });
+
+describe('Story 13.2: timestamp chips instead of a text line and a chip', () => {
+  const PRIMARY = (postId: string) => `post/${postId}/primary`;
+  const link = (s: string, url: string) => ({ type: 'link', content: JSON.stringify([s, 'unstyled', []]), url });
+  const ts = (label: string, sec: number, tmid = 'v1') => ({
+    make: (blogUrl: string, postId: string) => link(label, `https://boosty.to/${blogUrl}/posts/${postId}?t=${sec}&tmid=${tmid}`),
+  });
+  type Part = unknown | { make: (blogUrl: string, postId: string) => unknown };
+  const withData = (data: Part[]) => {
+    e8 = (_req, blogUrl, postId) => ({
+      status: 200,
+      body: postDetail(
+        blogUrl,
+        postId,
+        data.map(part =>
+          part !== null && typeof part === 'object' && 'make' in part
+            ? (part as { make: (b: string, p: string) => unknown }).make(blogUrl, postId)
+            : part,
+        ),
+      ),
+    });
+  };
+  const VIDEO_BLOCK = { type: 'ok_video', id: 'v1', title: 'Философский выпуск', duration: 3374 };
+  const CHAPTERS: Part[] = [
+    VIDEO_BLOCK,
+    textBlock('Продолжаем философские разговоры.'),
+    blockEnd(),
+    ts('0:00', 0),
+    textBlock(' Приветики!\n'),
+    ts('0:20', 20),
+    textBlock(' — Что тут происходит?\n'),
+    ts('1:30', 90),
+    blockEnd(),
+    textBlock('Спасибо — на '),
+    ts('42:10', 2530),
+    textBlock(' я рассказываю, что помогло.'),
+    blockEnd(),
+  ];
+  const lastQr = () => mockQrValues[mockQrValues.length - 1];
+  const withPlayer = async (run: () => Promise<void>) => {
+    mockPlayerFlag.on = true;
+    try {
+      await run();
+    } finally {
+      mockPlayerFlag.on = false;
+    }
+  };
+
+  it('matrix «Chapter line», «Consecutive lines», «Empty title», «Inside a paragraph»: one chip per line, no duplicate text, one focus stop each, post order', async () => {
+    withData(CHAPTERS);
+    await withPlayer(async () => {
+      const root = await openFromHome();
+      const id = FEED_ID(0);
+      const chip = (n: number) => BLOCK(id, `link@3/time/${n}`);
+      expect(focusableIds(byTestId(root, 'post/column')[0])).toEqual([
+        AUTHOR(id),
+        PRIMARY(id),
+        PHONE(id),
+        BLOCK(id, 'text@1'),
+        chip(0),
+        chip(1),
+        chip(2),
+        BLOCK(id, 'text@9'),
+        BLOCK(id, 'text@9/link/0'),
+      ]);
+      // One tight list for the three lines.
+      expect(within(byTestId(root, `${chip(0)}/list`)[0], chip(2))).not.toHaveLength(0);
+      expect(text(byTestId(root, `${chip(1)}/time`)[0])).toContain('0:20');
+      expect(text(byTestId(root, `${chip(1)}/title`)[0])).toContain('Что тут происходит?');
+      expect(one(root, chip(1)).props.accessibilityLabel).toBe('Смотреть с 0:20: Что тут происходит?');
+      expect(byTestId(root, `${chip(2)}/title`)).toHaveLength(0);
+      expect(one(root, chip(2)).props.accessibilityLabel).toBe('Смотреть с 1:30');
+      // No chapter text is shown twice (no paragraph holds it), and no «Смотреть» suffix anywhere.
+      const paragraphs = root.container
+        .queryAll((n: any) => n.props.accessibilityRole === 'text' && typeof n.props.testID === 'string')
+        .map((n: any) => text(n));
+      expect(paragraphs.join(' ')).not.toMatch(/Приветики!|Что тут происходит\?/);
+      expect(pageText(root)).not.toContain('· Смотреть');
+      // A timestamp inside a paragraph: the text stays, then «▶ 42:10».
+      expect(text(byTestId(root, BLOCK(id, 'text@9'))[0])).toContain('на 42:10 я рассказываю');
+      expect(text(byTestId(root, `${BLOCK(id, 'text@9/link/0')}/time`)[0])).toContain('42:10');
+      expect(one(root, BLOCK(id, 'text@9/link/0')).props.accessibilityLabel).toBe('Смотреть с 42:10');
+      await unmount(root);
+    });
+  });
+
+  it('matrix «Back from player»: OK on a chip → the Player at that second; Back → focus on that chip', async () => {
+    withData(CHAPTERS);
+    await withPlayer(async () => {
+      const root = await openFromHome();
+      const id = FEED_ID(0);
+      const chip = BLOCK(id, 'link@3/time/1');
+      await focusOn(root, chip);
+      await press(root, chip);
+      expect(currentRoute()).toBe('Player');
+      expect(navigationRef.getCurrentRoute()?.params).toEqual({
+        ref: { blogUrl: FEED_BLOG, postId: id, mediaId: 'v1' },
+        origin: { routeKey: expect.any(String), focusId: chip },
+        start: { atSec: 20 },
+      });
+      focusMock.mockClear();
+      await back();
+      expect(currentRoute()).toBe('Post');
+      expect(lastFocusTarget()).toBe(chip);
+      await unmount(root);
+    });
+  });
+
+  it('matrix «Player off»: the chips render; OK opens the link\'s QR', async () => {
+    withData(CHAPTERS);
+    const root = await openFromHome();
+    const id = FEED_ID(0);
+    const chip = BLOCK(id, 'link@3/time/1');
+    expect(text(byTestId(root, `${chip}/title`)[0])).toContain('Что тут происходит?');
+    expect(one(root, chip).props.accessibilityLabel).toBe('0:20 Что тут происходит? Показать QR-код');
+    await press(root, chip);
+    expect(visible(root, 'dialog/qr')).toBe(true);
+    expect(lastQr()).toBe(`https://boosty.to/${FEED_BLOG}/posts/${id}?t=20&tmid=v1`);
+    expect(currentRoute()).toBe('Post');
+    await unmount(root);
+  });
+
+  it('matrix «Line with another link», «Not this post»: unchanged paragraph and chips', async () => {
+    withData([
+      VIDEO_BLOCK,
+      ts('3:00', 180),
+      textBlock(' Гость — '),
+      link('его канал', 'https://example.invalid/c'),
+      blockEnd(),
+      link('0:20', `https://boosty.to/${FEED_BLOG}/posts/other?t=20&tmid=v1`),
+      textBlock(' Тема'),
+      blockEnd(),
+      ts('0:40', 40, 'zzz'),
+      textBlock(' Чужое'),
+      blockEnd(),
+    ]);
+    await withPlayer(async () => {
+      const root = await openFromHome();
+      const id = FEED_ID(0);
+      expect(text(byTestId(root, BLOCK(id, 'link@1'))[0])).toContain('3:00 Гость — его канал');
+      expect(one(root, BLOCK(id, 'link@1/link/0')).props.accessibilityLabel).toBe('Смотреть с 3:00');
+      expect(one(root, BLOCK(id, 'link@1/link/1')).props.accessibilityLabel).toBe('его канал. Показать QR-код');
+      expect(one(root, BLOCK(id, 'link@5/link/0')).props.accessibilityLabel).toBe('0:20. Открыть пост');
+      expect(one(root, BLOCK(id, 'link@8/link/0')).props.accessibilityLabel).toBe('0:40. Показать QR-код');
+      expect(byTestId(root, BLOCK(id, 'link@1/time/0'))).toHaveLength(0);
+      await unmount(root);
+    });
+  });
+});

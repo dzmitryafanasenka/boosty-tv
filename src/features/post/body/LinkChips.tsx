@@ -14,6 +14,7 @@ import {
   type OpenQr,
   type PlayAt,
 } from './chipParts';
+import { TimeChipContent, timeChipSurface, watchFromLabel } from './TimestampChip';
 
 type LinkChipProps = {
   id: string;
@@ -34,9 +35,10 @@ type LinkAction = 'play' | 'post' | 'qr';
  * the link (nothing opens on the TV); focus returns here when it closes. A
  * link to another Boosty post (owner decision 2026-10-29) reads «<text> ·
  * Открыть» with no QR suffix, and OK opens that post in the app instead. A
- * timestamp link to a video of this post (option b) reads «<text> ·
- * Смотреть» and OK plays that video from that time. Without the handler
- * (no route to push, the player off) a chip falls back to the QR.
+ * timestamp link to a video of this post (option b) reads «▶ time» (Story
+ * 13.2, the timestamp chip in its paragraph form) and OK plays that video
+ * from that time. Without the handler (no route to push, the player off) a
+ * chip falls back to the QR.
  */
 const LinkChip = memo(function LinkChipView({
   id,
@@ -64,14 +66,32 @@ const LinkChip = memo(function LinkChipView({
       onOpenQr?.(text, url, viewRef);
     }
   }, [action, timestamp, post, onPlayAt, onOpenPost, onOpenQr, id, text, url, viewRef]);
+  if (action === 'play' && timestamp !== null) {
+    // Story 13.2: «▶ 42:10» (the paragraph keeps the link text).
+    return (
+      <FocusableSurface
+        ref={ref}
+        testID={id}
+        radius={CHIP.height / 2}
+        scaleFocus={focus['scale-row']}
+        accessibilityRole="button"
+        accessibilityLabel={watchFromLabel(timestamp.seconds, null)}
+        onPress={onPress}
+        onFocus={handleFocus}
+        surfaceStyle={timeChipSurface}
+        style={styles.chipGap}
+      >
+        {({ focused }) => (
+          <TimeChipContent testID={id} seconds={timestamp.seconds} title={null} focused={focused} list={false} />
+        )}
+      </FocusableSurface>
+    );
+  }
   // The action word is its own text, so a long link text is cut before it,
   // never the action (device: «… · От…»).
-  const suffix =
-    action === 'play' ? t('post.chip.watchSuffix') : action === 'post' ? t('post.chip.openSuffix') : null;
+  const suffix = action === 'post' ? t('post.chip.openSuffix') : null;
   const a11yLabel =
-    action === 'play'
-      ? tf('post.chip.a11yWatchAt', { label: text })
-      : action === 'post'
+    action === 'post'
         ? tf('post.chip.a11yOpenPost', { label: text })
         : tf('post.chip.a11y', { label: text });
   return (

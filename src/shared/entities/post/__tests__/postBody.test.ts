@@ -11,6 +11,7 @@ import {
   splitParagraph,
 } from '../postBody';
 import type { PostBodyItem } from '../postBody';
+import { chapterTitle, postChapters } from '../chapters';
 import type { Block, Post } from '../types';
 
 const mapped = (raw: unknown) => mapPost(raw, createLogger()) as Post;
@@ -975,5 +976,207 @@ describe('postBodyItems: polls (Story 6.5)', () => {
     expect(locked.poll).toBeNull();
     expect(locked.pollUnsupported).toBeNull();
     expect(postBodyItems(locked.teaser, { images: true }).some(i => i.kind === 'poll')).toBe(false);
+  });
+});
+
+describe('postBodyItems: timestamp lines as chips (Story 13.2)', () => {
+  const SELF = 'https://boosty.to/self-blog/posts/self-id';
+  const linkBlock = (s: string, url: unknown) => ({ type: 'link', content: JSON.stringify([s, 'unstyled', []]), url });
+  const ts = (label: string, sec: number, tmid = 'v1') => linkBlock(label, `${SELF}?t=${sec}&tmid=${tmid}`);
+  const post = (data: unknown[]) =>
+    mapped(postDetail('self-blog', 'self-id', [{ type: 'ok_video', id: 'v1', title: 'x' }, ...data] as never));
+  /** As the Post body of an accessible post (Story 13.2 needs `qr` and `selfPost`). */
+  const items = (data: unknown[], options: { qr?: boolean; self?: boolean } = {}) =>
+    postBodyItems(post(data).blocks, {
+      videoRows: true,
+      images: 'stops',
+      qr: options.qr ?? true,
+      selfPost: options.self === false ? undefined : { blogUrl: 'self-blog', postId: 'self-id' },
+    });
+  const shape = (list: readonly PostBodyItem[]) =>
+    list.map(i =>
+      i.kind === 'paragraph'
+        ? { p: i.key, text: i.text, links: i.links.map(l => [l.key, l.text, l.timestamp]) }
+        : i.kind === 'timestamp'
+          ? { t: i.key, at: [i.mediaId, i.seconds], title: i.title }
+          : i.kind,
+    );
+
+  it('matrix «Chapter line»: a paragraph «[0:20] Что тут происходит?» is one timestamp item, no text, no link chip', () => {
+    const list = items([ts('0:20', 20), text(' Что тут происходит?'), blockEnd()]);
+    expect(list).toEqual([
+      {
+        kind: 'timestamp',
+        key: 'link@1/time/0',
+        mediaId: 'v1',
+        seconds: 20,
+        title: 'Что тут происходит?',
+        url: `${SELF}?t=20&tmid=v1`,
+      },
+    ]);
+    expect(isFocusStop(list[0])).toBe(true);
+  });
+
+  it('matrix «Consecutive lines»: separate paragraphs and `\\n` lines of one paragraph, in post order', () => {
+    const list = items([
+      ts('0:00', 0),
+      text(' — Приветики!'),
+      blockEnd(),
+      ts('0:20', 20),
+      text(' Что тут происходит?\n'),
+      ts('4:15', 255),
+      text(': Как перестать тревожиться\n'),
+      ts('18:40', 1120),
+      text('. Инвестиции без паники'),
+      blockEnd(),
+    ]);
+    expect(shape(list)).toEqual([
+      { t: 'link@1/time/0', at: ['v1', 0], title: 'Приветики!' },
+      { t: 'link@4/time/0', at: ['v1', 20], title: 'Что тут происходит?' },
+      { t: 'link@4/time/1', at: ['v1', 255], title: 'Как перестать тревожиться' },
+      { t: 'link@4/time/2', at: ['v1', 1120], title: 'Инвестиции без паники' },
+    ]);
+  });
+
+  it('matrix «Mixed paragraph»: the intro stays a paragraph stop (its key), the chapter lines follow, a closing line after them', () => {
+    const list = items([
+      text('Таймкоды:\n'),
+      ts('0:00', 0),
+      text(' Приветики!\n'),
+      ts('0:20', 20),
+      text(' Что тут происходит?\nПриятного!'),
+      blockEnd(),
+    ]);
+    expect(shape(list)).toEqual([
+      { p: 'text@1', text: 'Таймкоды:', links: [] },
+      { t: 'text@1/time/0', at: ['v1', 0], title: 'Приветики!' },
+      { t: 'text@1/time/1', at: ['v1', 20], title: 'Что тут происходит?' },
+      { p: 'text@1#1', text: 'Приятного!', links: [] },
+    ]);
+  });
+
+  it('matrix «Empty title»: a line of only «[1:30]» → the time as the title (the chapter rule)', () => {
+    const list = items([ts('1:30', 90), blockEnd()]);
+    expect(shape(list)).toEqual([{ t: 'link@1/time/0', at: ['v1', 90], title: '1:30' }]);
+  });
+
+  it('a line that is the whole link «[0:20 Что тут]»: the link words after the time are the title, plus the rest of the line', () => {
+    expect(shape(items([ts('0:20 Что тут', 20), blockEnd()]))).toEqual([{ t: 'link@1/time/0', at: ['v1', 20], title: 'Что тут' }]);
+    expect(shape(items([ts('1:02:03 — Тема', 3723), text(' и ещё'), blockEnd()]))).toEqual([
+      { t: 'link@1/time/0', at: ['v1', 3723], title: 'Тема и ещё' },
+    ]);
+  });
+
+  it('a split paragraph keeps its other lines with their link chips and styles', () => {
+    const bold = (s: string, offset: number) => ({
+      type: 'text',
+      content: JSON.stringify([s, 'unstyled', [[0, offset, s.length]]]),
+      modificator: '',
+    });
+    const list = items([
+      text('Ссылки: '),
+      linkBlock('сайт', 'https://example.invalid/site'),
+      text('\n'),
+      ts('0:00', 0),
+      text(' Приветики!\n'),
+      ts('0:20', 20),
+      text(' Тема\nСм. '),
+      linkBlock('другой пост', 'https://boosty.to/other-blog/posts/abc'),
+      text(' и '),
+      bold('важное', 'Ссылки: сайт\n0:00 Приветики!\n0:20 Тема\nСм. другой пост и '.length),
+      blockEnd(),
+    ]);
+    expect(shape(list)).toEqual([
+      { p: 'text@1', text: 'Ссылки: сайт', links: [['text@1/link/0', 'сайт', null]] },
+      { t: 'text@1/time/0', at: ['v1', 0], title: 'Приветики!' },
+      { t: 'text@1/time/1', at: ['v1', 20], title: 'Тема' },
+      { p: 'text@1#1', text: 'См. другой пост и важное', links: [['text@1#1/link/0', 'другой пост', null]] },
+    ]);
+    const intro = list[0] as PostBodyItem & { kind: 'paragraph' };
+    expect(intro.links[0].url).toBe('https://example.invalid/site');
+    const closing = list[3] as PostBodyItem & { kind: 'paragraph' };
+    expect(closing.links[0].post).toEqual({ blogUrl: 'other-blog', postId: 'abc' });
+    expect(closing.segments).toEqual([
+      { kind: 'text', text: 'См. другой пост и ', bold: false, italic: false, underline: false },
+      { kind: 'text', text: 'важное', bold: true, italic: false, underline: false },
+    ]);
+  });
+
+  it('matrix «Inside a paragraph»: text unchanged, the timestamp keeps its link chip', () => {
+    const list = items([text('Спасибо — на '), ts('42:10', 2530), text(' я рассказываю'), blockEnd()]);
+    expect(shape(list)).toEqual([
+      {
+        p: 'text@1',
+        text: 'Спасибо — на 42:10 я рассказываю',
+        links: [['text@1/link/0', '42:10', { mediaId: 'v1', seconds: 2530 }]],
+      },
+    ]);
+  });
+
+  it('matrix «Line with another link»: stays a paragraph with its chips', () => {
+    const list = items([ts('3:00', 180), text(' Гость — '), linkBlock('его канал', 'https://example.invalid/c'), blockEnd()]);
+    expect(shape(list)).toEqual([
+      {
+        p: 'link@1',
+        text: '3:00 Гость — его канал',
+        links: [
+          ['link@1/link/0', '3:00', { mediaId: 'v1', seconds: 180 }],
+          ['link@1/link/1', 'его канал', null],
+        ],
+      },
+    ]);
+  });
+
+  it('a line with two timestamps stays text with two chips', () => {
+    const list = items([ts('0:00', 0), text(' и '), ts('0:20', 20), blockEnd()]);
+    expect(list.map(i => i.kind)).toEqual(['paragraph']);
+  });
+
+  it('matrix «Not this post»: another post, an unknown `tmid` or no `selfPost`/`qr` → unchanged paragraph', () => {
+    const other = items([linkBlock('0:20', 'https://boosty.to/self-blog/posts/other?t=20&tmid=v1'), text(' Тема'), blockEnd()]);
+    expect(shape(other)).toEqual([{ p: 'link@1', text: '0:20 Тема', links: [['link@1/link/0', '0:20', null]] }]);
+    const unknown = items([ts('0:20', 20, 'v9'), text(' Тема'), blockEnd()]);
+    expect(unknown.map(i => i.kind)).toEqual(['paragraph']);
+    expect(items([ts('0:20', 20), text(' Тема'), blockEnd()], { self: false }).map(i => i.kind)).toEqual(['paragraph']);
+    expect(items([ts('0:20', 20), text(' Тема'), blockEnd()], { qr: false }).map(i => i.kind)).toEqual(['paragraph']);
+  });
+
+  it('a list item that starts with a timestamp is a chip too (keys under the list)', () => {
+    const list = items([
+      {
+        type: 'list',
+        items: [
+          { data: [text('Вступление')], items: [] },
+          { data: [ts('0:20', 20), text(' Тема')], items: [] },
+        ],
+      },
+    ]);
+    expect(shape(list)).toEqual([
+      { p: 'list@1', text: 'Вступление', links: [] },
+      { t: 'list@1/time/0', at: ['v1', 20], title: 'Тема' },
+    ]);
+  });
+
+  it('hundreds of chapter lines: one item each, unique stable keys, post order', () => {
+    const data = Array.from({ length: 300 }, (_, i) => [ts(String(i), i), text(` Глава ${i}\n`)]).flat();
+    const list = items([...data, blockEnd()]);
+    expect(list).toHaveLength(300);
+    expect(new Set(list.map(i => i.key)).size).toBe(300);
+    expect(list.map(i => (i.kind === 'timestamp' ? i.seconds : -1))).toEqual(Array.from({ length: 300 }, (_, i) => i));
+    expect(items([...data, blockEnd()]).map(i => i.key)).toEqual(list.map(i => i.key));
+  });
+
+  it('the chip titles are the player chapter names (one rule, `chapterTitle`)', () => {
+    const data = [
+      ts('0:00', 0),
+      text(' — Приветики!\n'),
+      ts('0:20', 20),
+      text(':  Что   тут\n'),
+      ts('1:30', 90),
+      blockEnd(),
+    ];
+    const chips = items(data).flatMap(i => (i.kind === 'timestamp' ? [{ sec: i.seconds, title: i.title }] : []));
+    expect(chips).toEqual(postChapters(post(data), 'v1'));
+    expect(chapterTitle(' — ', 90)).toBe('1:30');
   });
 });

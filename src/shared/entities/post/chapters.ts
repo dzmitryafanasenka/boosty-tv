@@ -36,13 +36,25 @@ const MAX_LIST_DEPTH = 8;
 /** Leading separators and spaces before a chapter name. */
 const LEADING_SEPARATORS = /^[\s—–\-:.]+/;
 
+/**
+ * The chapter-name rule (Story 10.1, owner decision 2026-11-02), shared with
+ * the Post body's timestamp chips (Story 13.2): `rest` is the text after the
+ * timestamp link to the end of its line; leading separators («—», «–», «-»,
+ * «:», «.») and spaces are trimmed and inner whitespace collapsed; when
+ * nothing is left, the time itself (`formatDuration(seconds)`).
+ */
+export function chapterTitle(rest: string, seconds: number): string {
+  const name = rest.replace(LEADING_SEPARATORS, '').replace(/\s+/g, ' ').trim();
+  return name.length > 0 ? name : formatDuration(seconds);
+}
+
 type Self = { blogUrl: string; postId: string; mediaIds: readonly string[] };
 
 type Found = { sec: number; title: string };
 
 /**
- * The name from the inline blocks after a timestamp link, up to the end of
- * its line: a line break, the paragraph end, the next timestamp link of this
+ * The raw text (before `chapterTitle`) from the inline blocks after a
+ * timestamp link, up to the end of its line: a line break, the paragraph end, the next timestamp link of this
  * post or a non-inline block. Any other link is part of the line (its text
  * counts).
  */
@@ -71,7 +83,7 @@ function nameAfter(blocks: readonly Block[], from: number, self: Self): string {
       break;
     }
   }
-  return name.replace(LEADING_SEPARATORS, '').replace(/\s+/g, ' ').trim();
+  return name;
 }
 
 /**
@@ -91,8 +103,7 @@ function collect(blocks: readonly Block[], self: Self, mediaId: string, out: Fou
     if (ref === null || ref.mediaId !== mediaId) {
       return;
     }
-    const name = nameAfter(blocks, index + 1, self);
-    out.push({ sec: ref.seconds, title: name.length > 0 ? name : formatDuration(ref.seconds) });
+    out.push({ sec: ref.seconds, title: chapterTitle(nameAfter(blocks, index + 1, self), ref.seconds) });
   });
 }
 
