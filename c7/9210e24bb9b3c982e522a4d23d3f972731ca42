@@ -1,0 +1,95 @@
+__tests__/demoFlow.test.tsx
+  s_12c741f764bd7c::t_e665bc91260c48 484,498-500
+__tests__/externalPlayerFlow.test.tsx
+  s_12c741f764bd7c::t_0294d5d7c13f89 54,122,197,225,234,275,350,355,405
+__tests__/playerFirstFrameFlow.test.tsx
+  s_12c741f764bd7c::t_f906455504a704 67,103,191,200
+__tests__/playerFlow.test.tsx
+  s_12c741f764bd7c::t_5ce12cc7bb823e 116,122-123,130-147,209,222,232,305,351,400,420-421,430,437,444,452,708,720,1036,1080,1215,1265,1293,1327,1343
+__tests__/playerProgressFlow.test.tsx
+  s_12c741f764bd7c::t_1a6ab83a273aa2 83-97,121,124-125,129,131-133,167,176,187,210-212,299,343-344,367,375
+__tests__/playerQualityFlow.test.tsx
+  s_12c741f764bd7c::t_c3bfad812a36ec 35,258,274,390,397,407
+__tests__/playerRecoveryFlow.test.tsx
+  s_12c741f764bd7c::t_52a144fb22cf2f 46,317,370,468,491,506
+__tests__/playerSpeedFlow.test.tsx
+  s_12c741f764bd7c::t_b85ff58bb5758a 31,225,314
+__tests__/postFlow.test.tsx
+  s_12c741f764bd7c::t_ea6c70b3f4440d 155-156,298,382,419,448-450,466,487,510,528,531,551,556,562-563,636,898,919,965,1312,1317,1324-1330,1332-1335,1338,1340,1344,1355,1359-1364,1385-1386,1392,1394,1398-1399,1402-1404,1426,1438-1440,1450,1469,1520-1522,1540,1546-1547,1549-1551,1595,1611,1613-1614,1675,1796,1803,1823,1834,1872,1890,1910,1928,1938,1944-1946,1950-1953,2001,2041,2122,2443,2486,2529,2646,2690,2705,2735,2746,3534,4088-4297
+_bmad-output/implementation-artifacts/spec-13-1-post-header-large-preview-and-qr.md
+  s_12c741f764bd7c::t_d8164d54d28073 1-113
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_12c741f764bd7c::t_a39a6682d34f13 32,137-138
+_bmad-output/planning-artifacts/ux-designs/ux-boosty-tv-2026-10-25/DESIGN.md
+  s_12c741f764bd7c::t_02b8cc5ad69425 131-132,253,272
+_bmad-output/planning-artifacts/ux-designs/ux-boosty-tv-2026-10-25/EXPERIENCE.md
+  s_12c741f764bd7c::t_0901f02a081479 40,295
+docs/feature-parity.md
+  s_12c741f764bd7c::t_e5249816c8e8ef 179,187
+docs/focus-map.md
+  s_12c741f764bd7c::t_6cc77a4ae47b3f 66,313,315,384-390
+src/features/post/PostBody.tsx
+  s_12c741f764bd7c::t_f2caf8dfa0e66d 20-21,23-24,26
+src/features/post/PostHeader.tsx
+  s_12c741f764bd7c::t_5f14645741d037 1,96-102,113-115,124-125,136-152,200-202
+src/features/post/body/VideoActions.tsx
+  s_12c741f764bd7c::t_c573cee89cfb19 1,6-7,15-27,30,35-40,44,51,54-55,59-61,68-70,77-101,103,106-108,112-127,129-131,133-144,152-163,170-171,173-175,177-179
+src/features/post/body/VideoTiles.tsx
+  s_12c741f764bd7c::t_7ee20a11e45d1c 1-266
+src/shared/entities/__tests__/externalUrls.test.ts
+  s_12c741f764bd7c::t_b11e8b3602fb5f 2,179-202
+src/shared/entities/externalUrls.ts
+  s_12c741f764bd7c::t_81b27b41a24207 133-150
+src/shared/ui/__tests__/icons.test.tsx
+  s_12c741f764bd7c::t_f830048eb4cc1b 16,74-75
+src/shared/ui/icons/index.tsx
+  s_12c741f764bd7c::t_16008d1b39dd49 232-246
+src/shared/ui/index.ts
+  s_12c741f764bd7c::t_1b7f6d3b322989 18-19
+src/shared/ui/tokens.ts
+  s_12c741f764bd7c::t_f7a6c8222a6210 253-281
+src/test/playerFlowHarness.tsx
+  s_12c741f764bd7c::t_51c218eebf98e0 279-283
+_bmad-output/implementation-artifacts/epic-13-context.md
+  s_550b7b7d2923c2::t_efd59ef80dbeac 1-51
+src/features/post/PostHero.tsx
+  s_182b5d2766ad6a::t_6ec588771a7a42 1-224
+src/shared/i18n/ru.ts
+  s_182b5d2766ad6a::t_8d13dae0dbf52b 429-453
+docs/testing.md
+  s_12c741f764bd7c::t_8f9315e7ba9f30 922-943
+src/features/post/PostScreen.tsx
+  s_12c741f764bd7c::t_10a15c8b052a8b 2,39,43,46,61,78-79,116-118,235-243,247-249,292,352-358,361-372,375-376,382,391-395,490,659-660,681,741-750,853-920
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "c79210e24bb9b3c982e522a4d23d3f972731ca42",
+  "prompts": {},
+  "sessions": {
+    "s_12c741f764bd7c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "56fa7fd7-cf2f-4d38-a3e7-0220eb9f612d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_182b5d2766ad6a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ab62f4e0325e171e8",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_550b7b7d2923c2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a25deb78e7b583267",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
