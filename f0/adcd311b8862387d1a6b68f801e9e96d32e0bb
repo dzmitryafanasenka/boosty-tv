@@ -1,0 +1,105 @@
+CHANGELOG.md
+  s_6884b16d8e6d90::t_96a569e6e58382 9-12
+CHANGELOG.ru.md
+  s_6884b16d8e6d90::t_32d9634ea49c9e 9-12
+__tests__/commentsReadOnly.test.js
+  s_6884b16d8e6d90::t_90a08561394b6c 5-6,20-25,40
+__tests__/demoFlow.test.tsx
+  s_6884b16d8e6d90::t_3278d84ad5239c 392-400
+__tests__/postFlow.test.tsx
+  s_6884b16d8e6d90::t_50b2da9397ecfd 12,15,279-284,301-304,1918,1921-1923,1978,3427-4062
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_6884b16d8e6d90::t_c3cde4ffbf83b0 400,404,408
+_bmad-output/planning-artifacts/ux-designs/ux-boosty-tv-2026-10-25/DESIGN.md
+  s_6884b16d8e6d90::t_689a644e3d28fa 132-133,256-257
+_bmad-output/planning-artifacts/ux-designs/ux-boosty-tv-2026-10-25/EXPERIENCE.md
+  s_6884b16d8e6d90::t_2f9348b812420c 127-128
+docs/api-contract.md
+  s_6884b16d8e6d90::t_a5f2a6562dff32 283,541,552-553
+docs/feature-parity.md
+  s_6884b16d8e6d90::t_9ee03bf9006208 82,89,171
+docs/focus-map.md
+  s_6884b16d8e6d90::t_6d3e246bf997b5 386-400
+docs/testing.md
+  s_6884b16d8e6d90::t_e431c327896458 922-949
+src/app/dev/demo.ts
+  s_6884b16d8e6d90::t_73a9419e79ea71 588-589
+src/features/post/ImageViewer.tsx
+  s_6884b16d8e6d90::t_b6fa6152543cbf 1-220
+src/features/post/PostBody.tsx
+  s_6884b16d8e6d90::t_1e647145687a0f 1,14,64-69,95,97-105,217-221
+src/features/post/PostHeader.tsx
+  s_6884b16d8e6d90::t_1aeffeb38abc76 30-39,42-46,104-106
+src/features/post/PostScreen.tsx
+  s_6884b16d8e6d90::t_7f5bbb0369d955 12,51-56,58,76-87,280-297,511-519,532,646-690,704-716,851,853-866
+src/features/post/__tests__/endedReturnFocus.test.ts
+  s_6884b16d8e6d90::t_42b41fffe402f9 29-30
+src/features/post/body/ImageBlocks.tsx
+  s_6884b16d8e6d90::t_5b75cac953d18b 1,5,101-106,128,130,158,161-165
+src/features/post/comments/CommentRow.tsx
+  s_6884b16d8e6d90::t_c2a95cb84aa7ef 1-229
+src/features/post/comments/PostComments.tsx
+  s_6884b16d8e6d90::t_5058c95e01bd99 1-342
+src/shared/api/dto/comments.ts
+  s_6884b16d8e6d90::t_363f24f0a782ff 52-55,57-58,75-76
+src/shared/api/dto/post.ts
+  s_6884b16d8e6d90::t_6a23b829a16019 18-22,26-27,52,54-57,60-61
+src/shared/entities/comment/__tests__/commentRepository.test.ts
+  s_6884b16d8e6d90::t_5f2fdb7d93bd12 129,408-424
+src/shared/entities/comment/__tests__/useComments.test.tsx
+  s_6884b16d8e6d90::t_a305bf5f4f2239 1-306
+src/shared/entities/comment/index.ts
+  s_6884b16d8e6d90::t_e65ff195fb5e4b 9-16
+src/shared/entities/comment/mapComments.ts
+  s_6884b16d8e6d90::t_f95e42037f41f4 46
+src/shared/entities/comment/types.ts
+  s_6884b16d8e6d90::t_be2dfdfd1ebad9 32-37
+src/shared/entities/comment/useComments.ts
+  s_6884b16d8e6d90::t_7f95cd47835912 1-234
+src/shared/entities/post/__tests__/mapPost.test.ts
+  s_6884b16d8e6d90::t_2350295201cfc5 39,359-375
+src/shared/entities/post/__tests__/postRepository.test.ts
+  s_6884b16d8e6d90::t_b5614459779aec 438
+src/shared/entities/post/mapPost.ts
+  s_6884b16d8e6d90::t_7ab4bc534f88c0 367-368
+src/shared/entities/post/types.ts
+  s_6884b16d8e6d90::t_b2c5f56f2f3451 129-135
+src/shared/focus/ModalHost.tsx
+  s_6884b16d8e6d90::t_ac3f1c36e1d782 39-41,43,156-159,166,172,217-224
+src/shared/i18n/ru.ts
+  s_6884b16d8e6d90::t_11b6bc9598c254 358-359,361-362,429-458
+src/shared/ui/tokens.ts
+  s_6884b16d8e6d90::t_943760dace42dc 270-295
+src/test/flow.tsx
+  s_6884b16d8e6d90::t_2d24b834271f85 466-484,486-489
+src/features/post/comments/CommentActionRow.tsx
+  s_84aa82cbd185a7::t_7464122baeadfb 1-80
+_bmad-output/implementation-artifacts/spec-11-2-comments-block-on-post.md
+  s_6884b16d8e6d90::t_f5dac181e01144 1-175
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_6884b16d8e6d90::t_c2ec92202a5ff3 126-127
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "f0adcd311b8862387d1a6b68f801e9e96d32e0bb",
+  "prompts": {},
+  "sessions": {
+    "s_6884b16d8e6d90": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0996ac81-5811-4fbc-abf9-a4c938711610",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_84aa82cbd185a7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a8145f460af4c4b59",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
