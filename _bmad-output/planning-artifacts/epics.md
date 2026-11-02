@@ -56,7 +56,7 @@ The full text and testable consequences are in `prd.md` §4.
 - FR11 [P1]: Focus and scroll are restored by id after returning from a post or the player, with a documented fallback chain. Refetch never moves focus.
 - FR12 [P1]: Initial focus is deterministic. Dialogs and sheets trap focus and return it to the initiator. There is no wrap-around.
 - FR13 [P1]: The subscription feed uses opaque cursor pagination, dedups by post.id and shows an inline load-more retry. Smooth with hundreds of items.
-- FR14 [P1]: Post-type cards show a type badge, a 2-line title, author, date, and duration/progress when known. No comment counts.
+- FR14 [P1]: Post-type cards show a type badge, a 2-line title, author, date, and duration/progress when known. No comment counts on cards (the count appears only in the Пост header, FR58).
 - FR15 [P1]: The «Продолжить просмотр» row: at most 20 entries, one per media id, newest first. An entry is removed when finished, on sign-out or on account switch. Labelled «на этом устройстве».
 - FR16 [P2]: «Обновить» reloads the feed and subscriptions and keeps focus. *As built (Story 5.1, ADR 0010): a forced head refresh. One E5 page 1 is merged into the cached feed, and the subscriptions query is invalidated. The infinite query is never refetched.*
 - FR17 [P2]: The feed can be filtered by access, period and tags.
@@ -74,7 +74,7 @@ The full text and testable consequences are in `prd.md` §4.
 - FR29 [P2]: Period filter: presets, or a custom period set with D-pad steppers. Local day bounds become from_ts/to_ts.
 - FR30 [P2]: Tag filter, multi-select. Feed tags are paginated (E13); Author tags come from E14.
 - FR31 [P2]: Filters apply immediately. «Сбросить» resets them. The filter chip shows the active count.
-- FR32 [P1]: Post screen: author (opens the Author), title, date, read-only likes, «Смотреть/Продолжить», and «С начала» when progress is > 0. Fetched with E8 and comments_limit=0.
+- FR32 [P1]: Post screen: author (opens the Author), title, date, read-only likes, «Смотреть/Продолжить», and «С начала» when progress is > 0. Fetched with E8 and comments_limit=0; its comments come from E19 (FR58).
 - FR33 [P1]: Multiple Media per post, each with its own row, progress and status. The primary action targets the first unfinished Media.
 - FR34 [P2]: Rich text (bold, italic, underline) and inline emoji. Long text collapses; expanded paragraphs are focus stops. *As built (Story 6.1, owner decision 2026-10-29 Q1 a): there is no collapse. Every paragraph is a focus stop, and a long paragraph is split into stops of at most 600 characters.*
 - FR35 [P2]: Links, external video and files appear as chips that open a QR. Signed URLs are never logged. *As built (Story 6.3, owner decisions 2026-10-29; our improvements): a link to another Boosty post opens that post in the app («· Открыть»). A timestamp link to a video of the current post opens the player at that second («· Смотреть»).*
@@ -85,6 +85,7 @@ The full text and testable consequences are in `prd.md` §4.
 - FR40 [P2]: Poll display: title, options with percent, voter count, chosen options and the finished state.
 - FR41 [P2]: Single-choice vote and retract need two OK presses on the same option. The poll is re-fetched afterwards. On error the previous state is kept and nothing auto-retries.
 - FR57 [P2]: Multiple-choice: toggle options, then «Проголосовать». «Отозвать голос» needs two OK presses.
+- FR58 [P2]: Read-only comments: the Пост header shows the comment count next to the likes (read-only, not focusable). A «Комментарии» block after the post's blocks lists the comments with «Показать ещё»; each comment's replies follow it with «Ещё ответы». No posting, liking or deleting. Loading, empty, error and denied states stay inside the block. Comment data is account-scoped and never logged (COMM-01).
 - FR42 [P1]: Play HLS, DASH and MP4 from playerUrls without auth headers to the CDN. Source order: the preferred quality, otherwise HLS > DASH > highest progressive.
 - FR43 [P1]: Resume from the local position if one exists, otherwise from the server timeCode. «С начала» starts from 0.
 - FR44 [P1]: Progress writes (E9, integer seconds): every ≥ 10 s of movement and on pause, background, exit and end. The local copy goes to the Continue history.
@@ -229,6 +230,7 @@ From DESIGN.md and EXPERIENCE.md:
 - FR55: Epic 9
 - FR56: Epic 9
 - FR57: Epic 6
+- FR58: Epic 11
 - NFR1–4, NFR6–9: cross-cutting; they become acceptance criteria in every relevant story. NFR5: Epic 9 (with smoothness checks in Epics 3–4).
 - Phase 0 spike (Epic 1) validates the assumptions behind FR1–4, FR42–44, FR48 and FR51. It closes no FR by itself.
 
@@ -279,6 +281,10 @@ A signed release is installed from GitHub Releases, update notices work, perform
 ### Epic 10: Player improvements (backlog, our improvements)
 Additions the owner asked for beyond BoostBuddy parity, planned after Epic 9.
 **FRs covered:** none (our improvements; owner request 2026-10-29, added to the backlog 2026-11-01)
+
+### Epic 11: Comments (read-only) (P2, parity COMM-01)
+A post's comments as in the reference: the list, «show more», replies with «show more replies», at the bottom of Пост, plus the comment count in the Пост header. No posting, likes or deletion (owner decision 2026-11-02, reversing the former exclusion).
+**FRs covered:** FR58; FR14 and FR32 amended
 
 ## Epic 1: Prove it on the TV (P0)
 
@@ -1803,3 +1809,85 @@ So that I can see the structure of a long video and jump to a part with the remo
 **When** it plays
 **Then** no marks or chapter names are shown, and nothing else changes.
 
+## Epic 11: Comments (read-only) (P2, parity COMM-01)
+
+A post's comments as in the reference (BoostBuddy `develop` at `87c0852`, read-only): the list with «show more», and replies with «show more replies», at the bottom of Пост, plus the comment count in the Пост header. No posting, likes or deletion (owner decision 2026-11-02, reversing the former exclusion). Comment events in События stay hidden (Story 7.5, re-affirmed).
+
+### Story 11.1: Comments endpoint probe and the comment entity
+
+As the owner,
+I want the comments endpoint verified on the live account and a tested comment entity,
+So that the comments UI is built on evidence and not on guesses.
+
+**Acceptance Criteria:**
+
+**Given** the owner's session on the pinned device or the emulator
+**When** a temporary `__DEV__` probe sends `GET /v1/blog/{blogUrl}/post/{postId}/comment/` for accessible posts with and without comments, a reply thread (`parent_id`), a second page (`offset`), and a locked post
+**Then** `docs/api-contract.md` gets a new E19 section with the status codes, the response shape, the paging cursor and «has more» rule, the replies shape and the locked-post behaviour
+**And** the probe logs shapes and counts only, never text, names, ids or URLs, and is removed before the commit (the Story 6.3 method).
+
+**Given** E19
+**When** `entities/comment` maps a page
+**Then** each comment becomes `{id, author{name, avatarUrl?}, replyTo?, blocks, createdAt, replyCount, replies, hasMoreReplies}`:
+- `blocks` go through the shared post-block mapper; unknown blocks are skipped and never crash;
+- a malformed comment is dropped, never the page.
+
+**Given** the repository
+**When** pages are fetched
+**Then**:
+- the query key is account-scoped `['comments', blogUrl, postId]`;
+- paging merges by comment id;
+- retries are bounded and the call is a GET only;
+- 401 goes to the refresh coordinator, and 403/404 are modelled distinctly.
+
+**Given** the tests
+**When** they run
+**Then** sanitized synthetic fixtures cover every mapper and paging row, and the narrowed exclusion guards pass.
+
+**Given** the endpoint is not usable (e.g. it needs a web-only auth)
+**When** the probe finds it
+**Then** the story ends with the finding, and Story 11.2 is re-planned with the owner.
+
+### Story 11.2: The «Комментарии» block on Пост
+
+As a family member,
+I want to read a post's comments with the remote,
+So that I see the discussion as on the website.
+
+**Acceptance Criteria:**
+
+**Given** a post with comments
+**When** Пост is shown
+**Then** the header reads «date · N лайков · M комментариев» (the counter is read-only, not focusable, and left out when `count.comments` is missing)
+**And** the blocks are followed by a «Комментарии» block, and its first page is fetched when the block nears the viewport.
+
+**Given** a comment row
+**When** it is shown
+**Then**:
+- it shows the avatar (or a placeholder), the name, «ответ <name>» when it is a reply to someone, the content (text, emoji, images; links as the existing chips), and the date;
+- it is one focus stop;
+- its replies follow it indented, with «Ещё ответы» when there are more.
+
+**Given** «Показать ещё» at the end of the list
+**When** OK is pressed
+**Then** the next page is appended and focus stays on the first new comment
+**And** while loading, the row shows a spinner and keeps focus.
+
+**Given** loading, empty («Комментариев пока нет»), error («Не удалось загрузить комментарии» + «Повторить») or comments denied by the author
+**When** the block is shown
+**Then** each state is shown inside the block only, and the rest of Пост keeps working.
+
+**Given** hundreds of comments
+**When** the user browses the block
+**Then**:
+- the list is virtualized with stable keys (comment id);
+- Back from anywhere in the block returns to the origin card, as today;
+- after leaving to the player and coming back, focus returns to the same comment id (fallback: the block's first row).
+
+**Given** logout or an account switch
+**When** it completes
+**Then** cached comments are cleared, like other account-scoped server state.
+
+**Given** the release build on the pinned TV
+**When** the owner reads a thread and pages with the remote
+**Then** it works with the D-pad only, and the device check is labelled as the owner's.

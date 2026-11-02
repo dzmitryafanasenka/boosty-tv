@@ -360,6 +360,17 @@ Arrows mean "may import". `shared` never imports `features` or `app`. Features n
   - Sidebar sections and in-screen entry points (filter chip, speed, «Мой блог», live card, search) are rendered only when their flag is on.
   - No screen hard-codes the phase.
 
+### AD-21 — Comments
+
+- **Binds:** FR-58, COMM-01
+- **Prevents:** comment requests scattered across features; comment writing; comment data leaking across accounts or into storage.
+- **Rule:**
+  - One GET-only repository behind `entities/comment` (E19).
+  - The query key is account-scoped `['comments', blogUrl, postId]`; replies use `['commentReplies', blogUrl, postId, commentId]`.
+  - Paging merges by comment id. Comments are never persisted and are cleared on logout.
+  - Comment blocks go through the shared block mapper (AD-8).
+  - No comment request outside `entities/comment`.
+
 ## Consistency Conventions
 
 | Concern | Convention |
@@ -454,6 +465,7 @@ flowchart LR
 | Search and filters (FR-26–31) | `features/search`, `shared/filters` | AD-7, AD-18 |
 | Post, blocks, QR, audio (FR-32–39) | `features/post`, `features/player` (AudioBlock), QrRenderer | AD-8, AD-9, AD-17, AD-19 |
 | Polls (FR-40, FR-41, FR-57) | `features/polls`, `entities/poll` | AD-6, AD-7 |
+| Comments, read-only (FR-58) | `entities/comment` (E19 repository, mapper), `features/post` (CommentsBlock) | AD-7, AD-8, AD-21 |
 | Player (FR-42–51) | `features/player`, PlayerEngine, MediaResolver | AD-10, AD-11, AD-19 |
 | Events (FR-52) | `features/events` | AD-8, AD-20 |
 | Settings, diagnostics, update check (FR-53, 54, 56) | `features/settings`, Logger, UpdateChecker | AD-14, AD-16, AD-20 |

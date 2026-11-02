@@ -250,7 +250,10 @@ Every focusable component is built on **FocusableSurface**. In focus it gets the
 | **ImageBlock** | Full right-column width. Aspect is preserved, max height 300 dp. **Loading:** `{colors.skeleton}`. **Failed:** a neutral placeholder with «Изображение недоступно». **Focused:** ring plus `{focus.scale-row}`. *As built (Story 6.2): the one column's width, capped at `{spacing.text-measure}`, using the loaded image's real aspect. Focused: ring, **no scale**, because a scaled 600 dp image would overlap the text.* |
 | **ParagraphStop** | A paragraph of expanded text (as built: every paragraph, since there is no collapse; Story 6.1, owner decision 2026-10-29). **Focused:** a subtle `{colors.surface}` background behind the paragraph with a 2 dp accent bar on the left. No scale. |
 | **LinkChip** | Pill with the link text and a «QR» suffix. Placed under the paragraph it comes from. As built (Story 6.3): a Boosty post link reads «текст · Открыть» and a timestamp link «текст · Смотреть», both with no «QR» suffix. |
-| **LikeCount** | Meta text «N лайков» in the post header. Never focusable. There is no comment count anywhere. |
+| **LikeCount** | Meta text «N лайков» in the post header. Never focusable. The comment count («M комментариев», FR-58) follows the likes in the Пост header only, also never focusable; cards show no comment count. |
+| **CommentRow** | *Story 11.2 (COMM-01, read-only):* one row per comment in the «Комментарии» block: the author's round avatar (or a placeholder), the name, «ответ <name>» when it replies to someone, the content (text, emoji, images; links as LinkChips) and the date (`meta`). One focus surface for the whole row. **Focused:** ring plus the row surface, as other rows. No reply, like or delete controls. Tokens only; the token values are added in Story 11.2. |
+| **Reply indent** | *Story 11.2:* a comment's replies follow it as CommentRows shifted right by one indent step, with «Ещё ответы» (a ShowMoreRow) when more replies exist. The indent never reflows the parent row. |
+| **ShowMoreRow** | *Story 11.2:* a text row («Показать ещё» at the end of the list, «Ещё ответы» under a thread) and a single focus stop. **Loading:** a spinner in the row, which keeps focus. **Focused:** ring plus the row surface. |
 | **SettingRow** | Kinds: nav, toggle, radio, check, info. Label, optional description and value. Marks and the "on" toggle track use `{colors.accent}`. |
 | **QualityOption** | SettingRow radio. «Авто» (with «· 1080p» only if the player reports it), then 2160p…144p. |
 | **PeriodStepper** | Three value boxes (day, month, year) with ▲/▼ hints. The focused box gets the ring. Then «Готово». |
@@ -274,6 +277,6 @@ Every focusable component is built on **FocusableSurface**. In focus it gets the
 - **Do** use a single accent. **Don't** use gradients (except the player legibility band), glass, neon or the Boosty palette.
 - **Do** ellipsize long Russian titles to fixed line counts. **Don't** let cards change height.
 - **Do** keep all text ≥ 11 sp and inside the safe area.
-- **Don't** show prices, payment, subscribe buttons, comment counts, download, sort controls or a light theme.
+- **Don't** show prices, payment, subscribe buttons, comment counts on cards, comment-writing controls, download, sort controls or a light theme.
 - **Don't** show quality, speed or track options the stream does not provide. Subtitles and audio tracks are never shown.
 - **Don't** implement the on-screen keyboard drawn in `TV Keyboard.dc.html`. It only illustrates the system IME.
