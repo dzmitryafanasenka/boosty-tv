@@ -6,7 +6,7 @@ Build an independent, unofficial Boosty client for television. Working title: Bo
 - React Native + TypeScript strict + react-native-tvos.
 - Android TV / Google TV only. Apple TV (tvOS) is out of scope (owner decision 2026-10-27): do not plan, build, test or keep code portable for it.
 - Use the unofficial Boosty API. Access only content the signed-in user is entitled to access. No paywall or DRM circumvention.
-- Product scope: feature parity with BoostBuddy, EXCEPT comments. No comment screens, comment actions, or comment API requests. Do not silently reduce parity to a video-only MVP.
+- Product scope: feature parity with BoostBuddy, including read-only comments (owner decision 2026-11-02). No comment writing: no posting, replying, liking or deleting comments. Do not silently reduce parity to a video-only MVP.
 - Do not copy BoostBuddy's interface. Its behavior/API implementation is a reference, not the UX target.
 - Communicate with the owner in Russian. Code identifiers and technical documentation in English; initial application copy in Russian, with an i18n-ready structure.
 
@@ -26,7 +26,7 @@ Before implementing production screens:
 3. Create docs/feature-parity.md. For EVERY discovered user-facing capability record: feature, evidence (file/symbol or release reference), expected behavior, API dependency, Android status, tests.
 4. Classify features as confirmed, inferred, or unverified. Distinguish reference parity from our improvements.
 5. Explicitly inventory auth/session refresh/logout; subscriptions; feed; author pages; search scopes; pagination; filters/tags/sorting; text/images/attachments; audio/video; multiple media per post; polls/voting/results; events; settings; update behavior; player settings and progress persistence. Include only confirmed capabilities as parity obligations, and flag unknowns for investigation.
-6. Mark comments as intentionally excluded. Do not omit other confirmed features without explicit owner approval. For platform-restricted behavior, preserve user intent and document the platform equivalent rather than blindly copying Android implementation.
+6. Comment writing is intentionally excluded; reading comments is parity (owner decision 2026-11-02). Do not omit other confirmed features without explicit owner approval. For platform-restricted behavior, preserve user intent and document the platform equivalent rather than blindly copying Android implementation.
 7. Create docs/api-contract.md with verified endpoints, request/response shapes, auth, pagination, entitlement handling, expiry/error behavior and evidence. Never invent endpoints or a Boosty device-code authorization flow.
 8. Report findings and a small implementation plan before large implementation work. An audit is not permission to expand scope to all Boosty website features.
 
@@ -111,7 +111,7 @@ Everything must work with D-pad, Select/OK, Back and available media keys. No ho
 - Overlay auto-hide must not dismiss active settings, scrub interactions, accessibility use or error dialogs. Define Back behavior for settings -> controls -> player exit.
 - Handle sleep/resume, network loss, decoder errors and audio focus using the native player's supported APIs. Release resources when playback ends or the player unmounts.
 - Polls include loading, selection, submitting, success, failure, already-voted and closed states, subject to verified API rules.
-- Comments are excluded everywhere. Do not add comment counters as dead-end navigation.
+- Comments are read-only, in a «Комментарии» block at the bottom of Пост; the count appears only in the Пост header. No comment writing; no comment counters as dead-end navigation.
 
 ## Design implementation
 Use design artifacts from Claude Design as visual/interaction specifications, not as a production web codebase. React DOM, CSS and browser focus are not React Native TV implementations.
@@ -124,7 +124,7 @@ Use design artifacts from Claude Design as visual/interaction specifications, no
 ## Delivery phases
 0. Audit/reference matrix, API contract, dependency compatibility and real-device auth/playback spike.
 1. Android vertical slice: sign in -> subscriptions/feed -> post -> authorized video -> resume -> return with restored focus.
-2. Complete Android parity except comments: implement all confirmed remaining capabilities and settings from the matrix.
+2. Complete Android parity: implement all confirmed remaining capabilities and settings from the matrix.
 3. Android polish: error/lifecycle cases, performance, accessibility, visual fidelity, release build and real-device regression.
 
 Do not call phase 1 a feature-complete release.
@@ -145,7 +145,7 @@ For every completed task report: changes, checks actually run, results, unresolv
 - Read existing files and project instructions before editing. Keep changes small and verifiable.
 - Do not invent API endpoints, package compatibility, CLI commands, feature support, screenshots or successful test results.
 - Do not replace real integration with permanent mocks and call the task done. Keep an explicit development-only demo mode if useful.
-- Do not add comments functionality, billing, donations, account registration, content creation, multi-profile support, cloud sync or tracking unless reference parity requires it or the owner explicitly approves it.
+- Do not add comment writing (posting, replies, likes, deletion), billing, donations, account registration, content creation, multi-profile support, cloud sync or tracking unless reference parity requires it or the owner explicitly approves it.
 - If a confirmed parity feature conflicts with a proposed exclusion or platform limit, document and ask; do not silently drop it.
 - Do not download/install app updates silently. Audit reference update behavior; document a safe Android distribution approach.
 - No publishing, credential export, destructive changes or unrelated refactoring without approval.

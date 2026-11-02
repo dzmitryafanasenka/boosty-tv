@@ -30,7 +30,7 @@ Each FR carries a **phase tag** taken from the CLAUDE.md delivery phases: **[P1]
 
 ## 1. Vision
 
-Boosty TV is an unofficial Boosty client for the television, made for one household that shares one Boosty account on a Chromecast with Google TV 4K. You switch it on, it is already signed in, and in a few remote presses you are watching what is new from the authors you support. It does everything the only existing TV client (BoostBuddy) does, except comments, and adds the two things BoostBuddy lacks: navigation designed for the remote, and a session that does not drop every few days.
+Boosty TV is an unofficial Boosty client for the television, made for one household that shares one Boosty account on a Chromecast with Google TV 4K. You switch it on, it is already signed in, and in a few remote presses you are watching what is new from the authors you support. It does everything the only existing TV client (BoostBuddy) does (comments are read-only, as in the reference), and adds the two things BoostBuddy lacks: navigation designed for the remote, and a session that does not drop every few days.
 
 Video is the main job. Text, images, audio, files, polls, live streams, search, filters and events are all there as well, because the family's subscriptions contain them. Success is personal and simple: the owner stops opening BoostBuddy.
 
@@ -168,7 +168,7 @@ The user can browse the Feed, loading more as focus nears the end (FEED-01, FEED
 
 #### FR-14: Post-type cards [P1]
 Each card shows: preview, type badge (Видео / N видео / Аудио / Текст и фото / Опрос / Файл / Нет доступа), title (2 lines), author, date, and duration and progress when known.
-- No comment count appears anywhere (POST-10 exclusion).
+- Cards show no comment count (the count appears only in the Пост header, FR-58).
 
 #### FR-15: «Продолжить просмотр» row [P1] [IMPROVEMENT]
 Главная shows recently played, unfinished video Media from the Continue history.
@@ -251,7 +251,7 @@ Each filter change refetches immediately. «Сбросить» restores the defa
 
 #### FR-32: Post screen [P1] [IMPROVEMENT]
 The user can open a post and see the author (OK opens the Author), title, date, read-only like count (POST-01, POST-10) and a primary «Смотреть / Продолжить» action, plus «С начала» when Progress > 0.
-- The post is fetched fresh with `comments_limit=0` (E8).
+- The post is fetched fresh with `comments_limit=0` (E8); its comments come from E19 (FR-58).
 
 #### FR-33: Multiple Media per post [P1]
 Each Media in a post has its own row, Progress and status. The user plays a specific one (POST-04).
@@ -273,6 +273,13 @@ A Locked post shows its teaser and the no-access copy (subscription level name o
 
 #### FR-38: Unknown Blocks never break a post [P1]
 An unknown or malformed Block renders a neutral placeholder or is skipped. Unknown Blocks never crash the feed or the post (POST-09).
+
+#### FR-58: Read-only comments [P2]
+- The Пост header shows the comment count next to the likes (read-only, not focusable).
+- A «Комментарии» block after the post's blocks lists the comments with «Показать ещё»; each comment's replies follow it with «Ещё ответы».
+- No posting, liking or deleting comments. Loading, empty, error and denied states stay inside the block.
+- Comment data is account-scoped and never logged.
+- Parity: COMM-01 (reference: read-only list, show more, replies).
 
 ### 4.8 Audio
 
@@ -415,7 +422,7 @@ The app checks the latest release of the public project repository (GitHub Relea
 
 ## 6. Non-Goals (Explicit)
 
-- No comments anywhere: no screens, counters, actions or requests.
+- No comment writing: no posting, replying, liking, reporting or deleting comments (owner decision 2026-11-02; reading is FR-58).
 - No downloading video to the device.
 - No light theme, multiple accounts or profiles.
 - No payments, subscribing, prices, donations, analytics or telemetry.
@@ -428,7 +435,6 @@ The app checks the latest release of the public project repository (GitHub Relea
 
 Excluded reference items, per `feature-parity.md` and the owner decisions in §12:
 - website and virtual-cursor sign-in (AUTH-01, AUTH-02);
-- comments (COMM-01);
 - live chat (LIVE-06);
 - download (PLAY-09);
 - touch gestures (PLAY-15);
@@ -472,6 +478,8 @@ The MVP proves UJ-0, UJ-1, UJ-2 and UJ-3 on the device. Per CLAUDE.md it is **no
   - visual fidelity;
   - device regression.
 
+Post-release (P2+): read-only comments, FR-58 (Epic 11).
+
 Sign-out (FR-8) was moved into P1 by the owner (2026-10-25) so that logout and re-login can be tested in the slice.
 
 ## 8. Success Metrics
@@ -513,6 +521,7 @@ Dependency: **phase 0 (spike) must pass before production implementation of the 
 5. Signed URL TTL and the CDN error on expiry → spike S7.
 6. Refresh-token rotation and lifetime (caps SM-2) → spike S4.
 7. Create `docs/focus-map.md` (English) from the design focus map and EXPERIENCE.md → during architecture or P1.
+8. What do E19's response, paging and locked-post behaviour look like? → Story 11.1 probe.
 
 ## 11. Assumptions Index
 

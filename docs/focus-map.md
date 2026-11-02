@@ -385,6 +385,8 @@ Implementation notes (Story 6.4, inline audio; host-tested, the device rows are 
 
 Block focus stops: ImageBlock (so tall images scroll into view), each paragraph of expanded long text (ParagraphStop), LinkChip, FileChip and the external-video chip (Story 6.3), AudioBlock, MediaRow, the PollWidget (Story 6.5; PollOption from Story 6.6). A heading is not a stop. LikeCount is **not** focusable. A finished poll is one focus stop. Comments are not shown and have no counter or focus stop.
 
+Story 11.2 (planned): comment rows, «Ещё ответы» and «Показать ещё» become stops after the last block.
+
 ### G Плеер
 
 Raw keys (`useTVEventHandler`, key up, §1.1). Seek steps: overlay hidden or timeline focused → 5 s per press; repeated presses during an in-flight seek **build on the pending target**, never on the stale position *(device: Story 1.6)*. Acceleration while a key is held needs key-repeat events; whether this remote sends them is unverified, so the player story measures it before relying on it.

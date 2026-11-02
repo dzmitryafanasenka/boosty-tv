@@ -37,7 +37,7 @@ The sidebar is visible everywhere except in the player and on the sign-in screen
 | Подписки | C1–C3 | Sidebar | Author grid plus «Мой блог» | SUB-01, SUB-02 |
 | Автор | D1–D11 | Author tile, post author, event | Header, live card, posts, search in this author, filters | AUTH-PAGE-01..03, LIVE-01, LIVE-04, LIVE-05 |
 | Поиск | E1–E10 | Sidebar | Search «по подпискам» (feed scope) with filters | FEED-04, SEARCH-SCOPES, FILTER-01..04 |
-| Пост | F1–F8 | Post card, search result, «Продолжить» (via player exit) | Media rows, text, images, audio, files and links (QR), poll, read-only likes | POST-01..11, POLL-01..05 |
+| Пост | F1–F8 | Post card, search result, «Продолжить» (via player exit) | Media rows, text, images, audio, files and links (QR), poll, read-only likes and comment count; then the read-only «Комментарии» block after the blocks (Story 11.2) | POST-01..11, POLL-01..05, COMM-01 |
 | Плеер | G1–G12 | Media row, «Продолжить» card, live card | VOD and live playback | PLAY-01..08, PLAY-10..13 (**not** PLAY-09 download), LIVE-02, LIVE-03 |
 | События | J1–J3 | Sidebar; hidden until E18 (EVT-01) is verified (verified live and shown since Story 7.5, `events` flag on) | Events, e.g. «Начался эфир» → author | EVT-01 (client improvement) |
 | Настройки | K1–K4 | Sidebar | System player, version, diagnostics (hidden), sign out | SET-01, SET-02, SET-05, SET-06, AUTH-07 (**not** SET-03 light theme) |
@@ -124,6 +124,7 @@ Error classes stay distinct (CLAUDE.md): session expired ≠ no access ≠ media
 | Автор | Skeleton header + grid | «Публикаций нет» / «Ничего не найдено» | Error + «Повторить» | — | Live: live / scheduled / needs level / ended (focus → first post). As built (Story 7.1 Q1 a): E15 is polled every 30 s for a live and a scheduled card, while the route is focused and the app is in the foreground. A failed E15 shows no card and no error. |
 | Поиск | Results skeleton | Hint before a query; «Ничего не найдено» + «Сбросить фильтры» | Error + «Повторить» | — | Keyboard open / closed |
 | Пост | Skeleton | — | Error + «Повторить»; 404 → unavailable | Locked: teaser + no-access copy; focus on the author | Unsupported-block placeholder; long text collapsed / expanded (as built: no collapse, every paragraph a stop; Story 6.1 Q1 a) |
+| Пост › «Комментарии» (Story 11.2) | Skeleton rows inside the block | «Комментариев пока нет» | «Не удалось загрузить комментарии» + «Повторить», inside the block only | Comments denied by the author: a note inside the block only | «Показать ещё» / «Ещё ответы» loading: the row shows a spinner and keeps focus. Every state stays inside the block; the rest of Пост keeps working. |
 | Плеер | Spinner after `{motion.buffer-delay}` | — | Recovering (one automatic re-resolve, PLAY-10) → hard error «Повторить» / «Назад» | Media not entitled → exit with a no-access message | Paused, seeking, live, stream ended, **Ended** (below) |
 | События | Skeleton list | «Событий нет» + «Обновить» (focused; refetches; Story 7.5 Q2 a) | Error + «Повторить» | — | Unknown types shown generically. Blog-owner types (donations, subscribers, stats, purchases, referrals, support, level limits, `target_new`) are hidden (Story 7.5 Q3 a); comment types are never shown. First E18 page only, no load-more. |
 | Настройки | — | — | — | — | Diagnostics hidden / visible |
@@ -254,7 +255,7 @@ Error classes stay distinct (CLAUDE.md): session expired ≠ no access ≠ media
 - **Capability reference only: BoostBuddy.** Its anti-patterns to avoid:
   - website sign-in that needs a virtual cursor;
   - touch-style drawer navigation;
-  - comment counters that lead to comments;
+  - a comment count that is focusable or leads nowhere; any comment-writing control;
   - silent poll failures;
   - frequent logouts.
 - **Rejected:**
