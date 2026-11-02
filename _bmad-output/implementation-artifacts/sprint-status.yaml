@@ -231,7 +231,7 @@ action_items:
     epic: 3
     action: "Owner physical-remote pass of Epic 3 flows and a TalkBack pass"
     owner: "owner"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-10-27.md"
   - id: "epic-3-retro-item-17-reconcile-planning-artifacts-to-the-as-b"
     epic: 3
@@ -296,7 +296,7 @@ action_items:
     action: "Owner physical-remote pass of Поиск and Автор search with Cyrillic input
       on a build with the 5.6/5.7 review fixes"
     owner: "owner"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-10-29.md"
   - id: "epic-6-retro-item-26-usepollvote-skip-e10-after-an-account-ge"
     epic: 6
@@ -341,7 +341,7 @@ action_items:
     action: "Owner physical-remote pass of Epic 6 post flows on a build with the 6.7
       review patches"
     owner: "owner"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-6-retro-2026-10-30.md"
   - id: "epic-6-retro-item-32-device-checks-that-play-the-owner-conten"
     epic: 6
