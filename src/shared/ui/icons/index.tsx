@@ -161,6 +161,15 @@ function Glyph({ size = 24, testID, children }: Omit<IconProps, 'color'> & { chi
   );
 }
 
+/** «▶» (Story 13.2, the timestamp chip): a filled play triangle. */
+export function PlayIcon({ color, size, testID }: IconProps) {
+  return (
+    <Glyph size={size} testID={testID}>
+      <Path d="M7 4 L20 12 L7 20 Z" fill={color} />
+    </Glyph>
+  );
+}
+
 /** «Видео»: a play triangle in a rounded frame. */
 export function VideoIcon({ color, size, testID }: IconProps) {
   return (

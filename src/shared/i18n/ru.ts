@@ -381,9 +381,14 @@ export const ru = {
       // A link to another Boosty post (owner decision 2026-10-29): opens it in the app.
       openSuffix: '· Открыть',
       a11yOpenPost: '{label}. Открыть пост',
-      // A timestamp link to a video of this post (option b): plays it from that time.
-      watchSuffix: '· Смотреть',
-      a11yWatchAt: '{label}. Смотреть видео с этого момента',
+      // Story 13.2: a timestamp chip «▶ 0:20  Что тут происходит?» (a line
+      // that starts with a timestamp of this post's video), or «▶ 42:10» (a
+      // timestamp inside a paragraph); OK plays the video from that time.
+      // `{time}` is the time, `{title}` the rest of the line.
+      a11yWatchFrom: 'Смотреть с {time}: {title}',
+      a11yWatchFromTime: 'Смотреть с {time}',
+      // The chip's text for its QR (the player off).
+      timeLabel: '{time} {title}',
       file: 'Файл',
       fileWithSize: '{title} · {size}',
       fileError: 'Не удалось открыть файл',

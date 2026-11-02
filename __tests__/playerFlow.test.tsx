@@ -1393,13 +1393,13 @@ describe('Story 6.3: timestamp link chips (owner decision 2026-10-29, option b)'
     blockEnd(),
   ];
 
-  it('matrix «Timestamp»: «<text> · Смотреть»; another video or format keeps the QR, another post «Открыть»', async () => {
+  it('matrix «Timestamp»: «▶ 3:45» (Story 13.2, the paragraph keeps the text); another video or format keeps the QR, another post «Открыть»', async () => {
     withData(DATA());
     const root = await openPost();
-    expect(label(root, CHIP(0))).toBe('3:45 Тема. Смотреть видео с этого момента');
-    expect(text(byTestId(root, CHIP(0))[0])).toContain('3:45 Тема');
-    // The action word is its own text (a long link text is cut before it).
-    expect(text(byTestId(root, `${CHIP(0)}/action`)[0])).toContain('· Смотреть');
+    expect(label(root, CHIP(0))).toBe('Смотреть с 3:45');
+    expect(text(byTestId(root, `${CHIP(0)}/time`)[0])).toContain('3:45');
+    expect(byTestId(root, `${CHIP(0)}/title`)).toHaveLength(0);
+    expect(text(byTestId(root, `post/${POST}/block/text@2`)[0])).toContain('3:45 Тема');
     expect(text(byTestId(root, CHIP(0))[0])).not.toContain('"QR"');
     expect(label(root, CHIP(1))).toBe('чужое видео. Показать QR-код');
     expect(label(root, CHIP(2))).toBe('другой пост. Открыть пост');

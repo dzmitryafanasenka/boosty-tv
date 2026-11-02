@@ -11,6 +11,7 @@ import { FileChip } from './body/FileChip';
 import { ImageStop, TeaserImage } from './body/ImageBlocks';
 import { LinkChips } from './body/LinkChips';
 import { BlockPlaceholder, EmojiParagraph, Heading, ParagraphStop } from './body/TextBlocks';
+import { TimestampChip, TimestampList } from './body/TimestampChip';
 import type { OpenImages, ViewerImage } from './ImageViewer';
 
 export type { OpenPost, OpenQr, PlayAt, ResolveFileTarget } from './body/chipParts';
@@ -77,7 +78,8 @@ export type PostBodyProps = {
  * decision 2026-10-27). A thin composer: each block kind lives in
  * `./body/` (text, images, link / file / external-video chips, the video
  * rows and the primary action); polls come from `features/polls`, audio
- * from `features/player`.
+ * from `features/player`. Story 13.2: consecutive timestamp lines are one
+ * tight chip list (each chip an ordinary column stop).
  */
 export function PostBody({
   items,
@@ -104,9 +106,47 @@ export function PostBody({
     () => imageStops.map(item => ({ url: item.kind === 'image' ? item.url : '' })),
     [imageStops],
   );
+  // Story 13.2: consecutive timestamp items as one group (a tight list).
+  const groups = useMemo(() => {
+    const out: Array<PostBodyItem | Array<PostBodyItem & { kind: 'timestamp' }>> = [];
+    for (const item of items) {
+      const last = out[out.length - 1];
+      if (item.kind === 'timestamp') {
+        if (Array.isArray(last)) {
+          last.push(item);
+        } else {
+          out.push([item]);
+        }
+      } else {
+        out.push(item);
+      }
+    }
+    return out;
+  }, [items]);
   return (
     <>
-      {items.map(item => {
+      {groups.map(group => {
+        if (Array.isArray(group)) {
+          return (
+            <TimestampList key={`${group[0].key}/list`} testID={`${idPrefix}${group[0].key}/list`}>
+              {group.map(chip => (
+                <TimestampChip
+                  key={chip.key}
+                  id={`${idPrefix}${chip.key}`}
+                  mediaId={chip.mediaId}
+                  seconds={chip.seconds}
+                  title={chip.title}
+                  url={chip.url}
+                  onView={onParagraphView}
+                  onFocus={onParagraphFocus}
+                  onOpenQr={onOpenQr}
+                  onPlayAt={onPlayAt}
+                />
+              ))}
+            </TimestampList>
+          );
+        }
+        const item = group;
         const id = `${idPrefix}${item.key}`;
         switch (item.kind) {
           case 'paragraph': {
@@ -232,6 +272,9 @@ export function PostBody({
                 columnWidth={columnWidth}
               />
             );
+          case 'timestamp':
+            // Always grouped above.
+            return null;
           default:
             return <BlockPlaceholder key={item.key} id={id} kind={item.block} />;
         }

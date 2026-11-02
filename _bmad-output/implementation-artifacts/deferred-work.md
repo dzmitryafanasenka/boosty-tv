@@ -407,3 +407,9 @@
   evidence: Story 11.1 review BH6 / BH7 (maybe-false); settle by a counts-only check or the device pass.
   status: Done 2026-11-02 (Story 11.2), by design rather than by a probe: an author-disabled thread is read from the post's `isCommentsDenied` and sends no E19 request («Автор отключил комментарии»); any other 403 is shown as «Комментарии недоступны» inside the block only, never as a session problem (no refresh, no sign-in screen). Whether a dead token answers E19 with 403 or 401 stays unverified; a 401 still goes through the single-flight refresh.
 
+- source_spec: `_bmad-output/implementation-artifacts/spec-13-2-timestamp-chips.md`
+  summary: Chapter lines that start with a bullet or number marker («• 0:20 …», «🔹 0:20 …», «1) 0:20 …») stay as text plus a duplicate chip; decide with the owner whether to recognise these markers.
+  evidence: `chapterOf` requires the timestamp link to start the trimmed line (Story 13.2 review, blind finding); the frozen intent covers only lines that start with the link.
+- source_spec: `_bmad-output/implementation-artifacts/spec-13-2-timestamp-chips.md`
+  summary: The Пост body is not virtualized, so posts with hundreds of chapter chips render every stop at once.
+  evidence: `PostBody` maps all items inside the Пост ScrollView (pre-existing since Story 3.4); Story 13.2 only tested 300 chapter lines at entity level.
