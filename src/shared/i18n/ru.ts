@@ -434,6 +434,13 @@ export const ru = {
     timelineNoDuration: 'Позиция {elapsed}',
     remaining: '−{remaining}',
     seekTarget: 'Перемотка к {time}',
+    // Story 10.1 (our improvement): the timeline's label with the current
+    // chapter's name; the chapter strip («↑» on the timeline) and its items.
+    timelineChapter: 'Позиция {elapsed} из {duration}. Глава: {chapter}',
+    chapters: {
+      strip: 'Главы',
+      item: '{time}. {title}',
+    },
     play: 'Воспроизвести',
     pause: 'Пауза',
     errorTitle: 'Не удалось воспроизвести видео',

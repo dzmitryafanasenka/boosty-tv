@@ -54,6 +54,13 @@ export type SeekController = {
    * no acceleration); without it the step grows along `SEEK_STEPS_SEC`.
    */
   press(direction: SeekDirection, positionSec: number, durationSec: number | null, stepSec?: number): number;
+  /**
+   * Story 10.1: an absolute target (a chapter's start): the pending target
+   * becomes `targetSec` (whole seconds, clamped as for a press) and is
+   * committed by the same rules (600 ms after it, or `commitNow`; a held
+   * target stays held). The step streak starts over.
+   */
+  seekTo(targetSec: number, durationSec: number | null): number;
   /** The bubble's target: pending, else in flight; null when not seeking. */
   target(): number | null;
   /** A target is pending or a committed seek is in flight. */
@@ -170,6 +177,15 @@ export function createSeekController({
       const base = pending ?? inFlight ?? positionSec;
       const max = durationSec !== null && durationSec > 0 ? durationSec - 1 : Infinity;
       pending = Math.max(0, Math.min(max, Math.round(base + direction * step)));
+      schedule();
+      onChange();
+      return pending;
+    },
+    seekTo(targetSec, durationSec) {
+      streak = 0;
+      lastDirection = null;
+      const max = durationSec !== null && durationSec > 0 ? durationSec - 1 : Infinity;
+      pending = Math.max(0, Math.min(max, Math.round(targetSec)));
       schedule();
       onChange();
       return pending;

@@ -11,6 +11,8 @@ import {
 } from '../../shared/api';
 import {
   PostRepository,
+  postChapters,
+  type Chapter,
   type MediaRef,
   type ServerProgressSink,
   type VideoSource,
@@ -152,6 +154,9 @@ export function chosenByQuality(source: VideoSource, preference: QualityKey | nu
   return typeof preference === 'number' && source.format === 'progressive' && source.height === preference;
 }
 
+/** Story 10.1: a source without chapters (live, or no timestamps). */
+const NO_CHAPTERS: readonly Chapter[] = [];
+
 /** The overlay's top band (DESIGN.md Player overlay). */
 export type PlayerMeta = {
   authorName: string;
@@ -187,6 +192,13 @@ export type MediaSourceState =
        * `startTime`, epoch seconds, null when unknown); null for a video.
        */
       live: { startTime: number | null } | null;
+      /**
+       * Story 10.1 (our improvement): the video's chapters from its post's
+       * timestamp links (`postChapters`, sorted, one per second), not yet
+       * cut to the engine's duration (the player does that). Always empty
+       * for a live stream.
+       */
+      chapters: readonly Chapter[];
       resolution: number;
     }
   /**
@@ -366,6 +378,7 @@ export function useMediaSource(
         durationSec: video?.durationSec !== null && video?.durationSec !== undefined && video.durationSec > 0 ? Math.floor(video.durationSec) : null,
       },
       live: null,
+      chapters: ref?.mediaId === undefined ? NO_CHAPTERS : postChapters(data.post, ref.mediaId),
       resolution,
     };
   }, [data, heldError, dataError, resolution, ref?.mediaId, preference, keep, confirmedLocked, verifiedLocked, status, isFetching]);
@@ -468,6 +481,7 @@ export function useLiveSource(
       },
       progress: null,
       live: { startTime: data.stream.startTime },
+      chapters: NO_CHAPTERS,
       resolution,
     };
   }, [data, heldError, dataError, resolution, client, blogUrl, keep]);

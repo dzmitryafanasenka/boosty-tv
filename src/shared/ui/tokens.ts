@@ -300,6 +300,21 @@ export const components = {
     thumb: colors.text,
     bubble: colors['overlay-badge'],
     bubbleMinWidth: 56,
+    /** Story 10.1: a chapter mark (a tick as tall as the track), over the track and over the fill. */
+    markWidth: 2,
+    mark: colors.text,
+    markPlayed: colors['accent-ink'],
+    /** Story 10.1: the chapter name's widest box next to the elapsed time (one line, truncated). */
+    chapterMaxWidth: 480,
+  },
+  /** Story 10.1: the chapter strip above the timeline (time and name per chapter). */
+  'chapter-strip': {
+    itemWidth: 200,
+    radius: rounded.md,
+    bg: colors['overlay-badge'],
+    bgFocus: colors.text,
+    textFocus: colors.bg,
+    current: colors['accent-text'],
   },
   /** DESIGN.md AudioBlock: the round glyph box, its play/pause glyph and the 2 dp progress line. */
   'audio-block': {

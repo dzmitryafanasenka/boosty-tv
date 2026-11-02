@@ -919,6 +919,30 @@ Review fixes (2026-10-28, host-tested only): short visits write nothing (owner d
 
 Host tests: `src/shared/services/progress/__tests__/progressRepository.test.ts` (29: the finished rule and status, resume precedence, the 10 s cadence, one write in flight with the latest position, forced events, start over, seeks as movement, failure gating ≥ 10 s and the bounded automatic retry, expired hold/flush/drop, sign-out wipe, a late write after a reset, the debounced/forced disk write, cold-start load, corrupt disk, the 200-entry cap, the stale disk write undone, a load after a reset dropped, stable snapshots); `__tests__/playerProgressFlow.test.tsx` «progress and resume (Story 4.2)» (10: server only with no pre-seek t=0 and the E9 request shape, local wins, finished, multi-video + start over, hold-scrub, background and end, the vanished «С начала» fallback, failure retry, cold start from the persisted entry, log hygiene); `__tests__/postFlow.test.tsx` (status and «Продолжить» only while the player is on); `__tests__/accountScopeRegistry.test.js` (`progress` registered); `demoFlow` (the row label now ends with the status). Lint (`--max-warnings 0`), typecheck, `check:fixtures` clean; `npm test` ×3: 1494 passed each; `playerFlow` + `postFlow` + the progress suite 30/30 (187 tests each run).
 
+### Story 10.1 — Chapter marks on the player timeline, 2026-11-02
+
+**Status: implemented, host-tested and checked by the owner on the pinned TV.** `spec-10-1-chapter-marks-on-the-player-timeline.md`, our improvement (feature-parity PLAY-CHAP). Chapters come from the post's timestamp links of the playing video (`shared/entities/post/chapters.ts` over `externalUrls.timestampRef`, no second parser), cut to the engine's duration. The built-in player draws a tick per chapter (none at 0), shows the chapter name after the elapsed time (following the pending target while seeking), opens the chapter strip with ↑ on the focused timeline and maps media Next / Previous to chapter jumps (focus-map §4 G «Story 10.1»). Live, the system player and videos without timestamps are unchanged.
+
+Host tests (35 new): `src/shared/entities/post/__tests__/chapters.test.ts` (the spec's I/O matrix: happy path, two videos, out of range / odd links, duration unknown; sorting and duplicates; the name rules; list items; `chapterAt`; the Next / Previous targets incl. the 3 s rule); `src/features/player/__tests__/seekController.test.ts` «seekTo»; `PlayerOverlayChapters.test.tsx` (marks count and position, colour-only change over the fill, the name and the timeline label, the name following the pending target, none before the first chapter, none without chapters or on live); `__tests__/playerChaptersFlow.test.tsx` (marks and name from a post, no marks before the duration, the scrub name, v2's own chapter, a video without timestamps keeps ↑ and Next as before; the strip: opens on the current chapter, → then OK seeks once and closes with focus on the timeline, the first chapter selected before the first, Back and ↓ close without a seek, no auto-hide while open, the ↑ from the controls does not open it, Menu closes it and opens the sheet, Back order strip → held target; Next / Previous jumps and the exit E9 after a jump). Existing player tests are unchanged and pass (AC 3).
+
+Checks run:
+- `npm run lint -- --max-warnings 0`, `npm run typecheck`, `npm run check:fixtures` (30): clean.
+- `npm test`: 163 suites, 3310 tests passed.
+
+Device (2026-11-02, owner-signed `assembleRelease` armeabi-v7a, `adb install -r`, still named 1.0.0; the session was kept and the app opened on Главная):
+
+| Check | Result | Evidence |
+|---|---|---|
+| Marks on the track at the timestamps; the name after the elapsed time on one line, times and controls not moved | Passed | owner, physical remote |
+| A scrub shows the pending chapter's name | Passed | owner, physical remote |
+| ↑ ↑ opens the strip on the current chapter; ← → select without seeking and stay at the ends | Passed | owner, physical remote |
+| OK jumps to the chapter, closes the strip, the name updates | Passed | owner, physical remote |
+| Back and ↓ close the strip without a jump | Passed | owner, physical remote |
+| ↑ from the controls row reaches the timeline without opening the strip; the next ↑ opens it (`STRIP_ENTRY_GUARD_MS` = 300 ms) | Passed | owner, physical remote |
+| A video without timestamps: no marks, ↑ ↑ opens nothing | Passed | owner, physical remote |
+
+The owner reported «всё прошло, полоса глав работает». The agent made no player visit: under the player-visit rule a visual check would need a capture inside the visit, so the visual checks are the owner's. Not verified: TalkBack reading the chapter in the timeline label. Not checkable on the pinned remote: media Next / Previous (it has no media keys). The TV now runs this unpublished Story 10.1 build, still named 1.0.0 (versionCode 10000); the next published release with a higher versionCode replaces it through the in-app update.
+
 ### Story 9.5 — Full device regression and owner acceptance, 2026-11-01
 
 **Status: done. The owner accepted the Android release on 2026-11-01, which starts SM-1 (4 weeks without BoostBuddy) and SM-2 (30+ days without a forced re-login). `0.9.2` (the release candidate) was published and installed on the pinned TV through the in-app update from `0.9.1`; the agent regression, the joint sign-out session and the owner's remote walk ran on it. `1.0.0` is built from the same code. Every row is labelled agent over adb, emulator, owner or physical remote.** `spec-9-5-full-device-regression-and-owner-acceptance.md`.
@@ -991,7 +1015,7 @@ The press counts and the resume offsets were not reported as numbers; the owner 
 
 **Owner acceptance.** On 2026-11-01 the owner wrote «всё прошло, принимаю релиз, выпускай 1.0.0». The Android release is accepted. SM-1 and SM-2 start on 2026-11-01.
 
-**1.0.0 on the TV.** `1.0.0` was published from `main` `925bc85` (PR #94). On 2026-11-02 the owner updated the TV in the app from `0.9.2` and reported version 1.0.0 with the session kept (owner). The installed `base.apk` hash was not checked over adb, because wireless debugging was not connected.
+**1.0.0 on the TV.** `1.0.0` was published from `main` `925bc85` (PR #94). On 2026-11-02 the owner updated the TV in the app from `0.9.2` and reported version 1.0.0 with the session kept (owner). Later the same day, over adb: `versionName` 1.0.0, `versionCode` 10000, and the installed `base.apk` SHA-256 `0cab5227…2c4c` equals the armeabi-v7a asset digest (agent over adb).
 
 Not verified by decision (owner, 2026-11-01): the account switch (no second account), network loss during playback, the external-player chooser with 2+ players. Live at 1× only if a subscribed author streams during the story.
 
