@@ -2,8 +2,12 @@
 
 Independent, unofficial Boosty client for Android TV / Google TV, built with
 React Native ([react-native-tvos](https://github.com/react-native-tvos/react-native-tvos)).
-"Boosty TV" is a working title, not approved branding. Apple TV is a later
-phase and is **not implemented or validated**.
+"Boosty TV" is a working title, not approved branding. Apple TV (tvOS) is out
+of scope.
+
+This project is not affiliated with or endorsed by Boosty. It uses the
+unofficial Boosty API and shows only content the signed-in account is entitled
+to; it does not bypass paywalls or DRM.
 
 Project rules live in [`CLAUDE.md`](CLAUDE.md). Audit and planning documents
 live in [`docs/`](docs) and [`_bmad-output/`](_bmad-output).
@@ -15,8 +19,7 @@ live in [`docs/`](docs) and [`_bmad-output/`](_bmad-output).
 - TypeScript (strict), Jest with `@react-native/jest-preset` and `test-renderer`,
   ESLint 8 with `@react-native/eslint-config` and `eslint-plugin-boundaries`.
 - npm with exact pins and a committed `package-lock.json`. Node 24.
-- Android only: `android/`. There is no `ios/` target; a tvOS target is added in
-  phase 4.
+- Android only: `android/`. There is no `ios/` or tvOS target.
 
 ## Prerequisites
 
@@ -59,3 +62,14 @@ they reject forbidden imports.
 No keystores, signing configs, tokens or `.env` files are committed. Debug
 builds use the local Android SDK debug keystore; release builds are signed by
 the owner locally.
+
+## Contributing
+
+Bug reports and ideas are welcome as GitHub issues. Code contributions are not
+accepted: pull requests from outside the project are closed automatically. See
+[CONTRIBUTING.md](CONTRIBUTING.md) and, for vulnerabilities,
+[SECURITY.md](SECURITY.md).
+
+## License
+
+[MIT](LICENSE) © 2026 Dzmitry Afanasenka

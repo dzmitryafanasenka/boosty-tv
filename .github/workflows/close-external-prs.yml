@@ -1,0 +1,26 @@
+name: Close external pull requests
+
+# The project does not accept code contributions (CONTRIBUTING.md).
+# pull_request_target runs in the base repository with a write token, so this
+# job must never check out or run code from the pull request.
+on:
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  close:
+    if: ${{ !contains(fromJSON('["OWNER", "COLLABORATOR", "MEMBER"]'), github.event.pull_request.author_association) }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comment and close
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr close "$PR_NUMBER" --comment "Спасибо за интерес к проекту! Изменения в код со стороны не принимаются, поэтому pull request закрыт автоматически. Ошибку или идею можно описать в issue — см. CONTRIBUTING.md.
+
+          Thanks for your interest! This project does not accept code contributions, so this pull request was closed automatically. Please open an issue with a bug report or an idea instead — see CONTRIBUTING.md."
