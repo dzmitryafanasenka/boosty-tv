@@ -389,6 +389,15 @@ test('Story 3.4: Пост answers E8 in demo mode (paragraphs and likes, mixed b
   expect([marks(1), marks(2), marks(3)]).toEqual([0, 1, 0]);
   expect(text()).not.toContain(t('poll.finished'));
   expect(text()).toContain('Файлы и видео');
+  // Story 11.2: the header's comment count and the read-only «Комментарии»
+  // block from the demo E19 (45 comments: the newest 20 first, their inline
+  // replies, «Ещё ответы» under the 5-reply threads, «Показать ещё»).
+  expect(text()).toContain('45 комментариев');
+  const commentStops = ids().filter(id => id.startsWith('post/demo-post-1/comment'));
+  expect(commentStops[0]).toBe('post/demo-post-1/comment/demo-comment-45');
+  expect(commentStops.filter(id => id.startsWith('post/demo-post-1/comment/'))).toHaveLength(35);
+  expect(commentStops.filter(id => id.startsWith('post/demo-post-1/comments/replies/'))).toHaveLength(5);
+  expect(commentStops[commentStops.length - 1]).toBe('post/demo-post-1/comments/more');
   // Story 6.3: the demo file's QR opens from the demo E8, nothing goes to the network.
   await press(root, 'post/demo-post-1/block/file:demo-file-1');
   expect(text()).toContain(t('qr.hint'));

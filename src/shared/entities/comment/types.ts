@@ -29,6 +29,12 @@ export type Comment = {
   replyTo: { name: string } | null;
   /** The content through the shared post block mapper (unknown blocks are `{type: 'unknown'}`). */
   blocks: Block[];
+  /**
+   * Story 11.2: `deleted` (`isDeleted: true`) or `blocked` (`isBlocked:
+   * true`, deleted wins when both): the row shows a note instead of the
+   * content, keeping the author and the date. Null for a shown comment.
+   */
+  hidden: 'deleted' | 'blocked' | null;
   /** Epoch seconds. */
   createdAt: number;
   /** The number of replies the API reports (never below the inline replies). */

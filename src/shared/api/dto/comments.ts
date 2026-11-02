@@ -49,10 +49,13 @@ const commentUserDtoSchema = z.object({
  * - `replyCount`: the number of replies;
  * - `replies{data[], extra{isFirst, isLast}}`: the inline replies (up to
  *   `reply_limit`), each parsed on its own;
- * - `replyToUser.name`: on a reply, the user it answers.
+ * - `replyToUser.name`: on a reply, the user it answers;
+ * - `isDeleted`, `isBlocked` (Story 11.2): booleans seen live, only ever
+ *   `false`; a `true` hides the content in the row. Missing or a wrong
+ *   type: false.
  * Never parsed: `reactions`, `reactionCounters` (no comment likes),
- * `isBlocked`, `isDeleted`, `isUpdated` (their `true` case was never seen
- * live), `post`, `parentId`, `replyId`, ids and `isOfficial` of the users.
+ * `isUpdated`, `post`, `parentId`, `replyId`, ids and `isOfficial` of the
+ * users.
  */
 export const commentDtoSchema = z.object({
   id: z.string().min(1),
@@ -69,6 +72,8 @@ export const commentDtoSchema = z.object({
     .nullish()
     .catch(undefined),
   replyToUser: commentUserDtoSchema.nullish().catch(undefined),
+  isDeleted: z.boolean().nullish().catch(undefined),
+  isBlocked: z.boolean().nullish().catch(undefined),
 });
 
 export type CommentDto = z.infer<typeof commentDtoSchema>;

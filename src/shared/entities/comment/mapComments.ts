@@ -43,6 +43,7 @@ function mapOne(raw: unknown, depth: number, counter: Counter): Comment | null {
     },
     replyTo: dto.replyToUser ? { name: dto.replyToUser.name } : null,
     blocks: mapBlocks(dto.data),
+    hidden: dto.isDeleted === true ? 'deleted' : dto.isBlocked === true ? 'blocked' : null,
     createdAt: dto.createdAt,
     replyCount,
     replies,

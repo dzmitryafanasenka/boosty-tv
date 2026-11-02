@@ -36,10 +36,11 @@ import { focusSoon } from './focusSoon';
  */
 
 /**
- * Where the content sits: `center` (dialogs, the default) or `end`, a
- * full-height panel on the right edge (side sheets, Story 4.3).
+ * Where the content sits: `center` (dialogs, the default), `end`, a
+ * full-height panel on the right edge (side sheets, Story 4.3), or `fill`,
+ * the whole screen (the image viewer, Story 11.2).
  */
-export type ModalPlacement = 'center' | 'end';
+export type ModalPlacement = 'center' | 'end' | 'fill';
 
 export type ModalOptions = { placement?: ModalPlacement };
 
@@ -152,20 +153,23 @@ export function ModalHostProvider({ children }: { children?: ReactNode }) {
         {children}
       </View>
       {modal ? (
-        <View testID="modal/scrim" style={[styles.scrim, modal.placement === 'end' && styles.scrimEnd]}>
+        <View
+          testID="modal/scrim"
+          style={[styles.scrim, modal.placement === 'end' && styles.scrimEnd, modal.placement === 'fill' && styles.scrimFill]}
+        >
           <TVFocusGuideView
             testID="modal/trap"
             trapFocusUp
             trapFocusDown
             trapFocusLeft
             trapFocusRight
-            style={modal.placement === 'end' ? styles.trapEnd : styles.trap}
+            style={modal.placement === 'end' ? styles.trapEnd : modal.placement === 'fill' ? styles.trapFill : styles.trap}
           >
             <View
               testID="modal/content"
               ref={containerRef}
               collapsable={false}
-              style={modal.placement === 'end' ? styles.contentEnd : undefined}
+              style={modal.placement === 'end' || modal.placement === 'fill' ? styles.contentEnd : undefined}
             >
               {modal.content}
             </View>
@@ -208,6 +212,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentEnd: {
+    flex: 1,
+  },
+  // The whole screen (Story 11.2, the image viewer).
+  scrimFill: {
+    alignItems: 'stretch',
+    justifyContent: 'flex-start',
+  },
+  trapFill: {
     flex: 1,
   },
 });

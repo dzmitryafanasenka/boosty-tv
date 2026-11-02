@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { View } from 'react-native';
 import { AudioBlock, type ResolveAudioSource } from '../player';
 import { PollWidget } from '../polls';
@@ -10,6 +11,7 @@ import { FileChip } from './body/FileChip';
 import { ImageStop, TeaserImage } from './body/ImageBlocks';
 import { LinkChips } from './body/LinkChips';
 import { BlockPlaceholder, EmojiParagraph, Heading, ParagraphStop } from './body/TextBlocks';
+import type { OpenImages, ViewerImage } from './ImageViewer';
 
 export type { OpenPost, OpenQr, PlayAt, ResolveFileTarget } from './body/chipParts';
 export { IMAGE_STOP_MAX_HEIGHT, TEASER_IMAGE_GAP } from './body/ImageBlocks';
@@ -59,6 +61,12 @@ export type PostBodyProps = {
     submitId: string;
     retractId: string;
   };
+  /**
+   * Story 11.2 (owner decision 2026-11-02): OK on an image stop opens the
+   * full-screen viewer on it; ← → step through the post's image stops in
+   * post order. Absent: OK on an image does nothing.
+   */
+  onOpenImages?: OpenImages;
 };
 
 /**
@@ -84,7 +92,17 @@ export function PostBody({
   resolveAudio,
   active = true,
   pollVote,
+  onOpenImages,
 }: PostBodyProps) {
+  // The post's image stops in post order: the viewer's list.
+  const imageStops = useMemo(
+    () => items.filter(item => item.kind === 'image' && item.stop),
+    [items],
+  );
+  const viewerImages = useMemo<ViewerImage[]>(
+    () => imageStops.map(item => ({ url: item.kind === 'image' ? item.url : '' })),
+    [imageStops],
+  );
   return (
     <>
       {items.map(item => {
@@ -196,6 +214,11 @@ export function PostBody({
                 columnWidth={columnWidth}
                 onView={onParagraphView}
                 onFocus={onParagraphFocus}
+                onOpen={
+                  onOpenImages
+                    ? initiator => onOpenImages(viewerImages, imageStops.indexOf(item), initiator)
+                    : undefined
+                }
               />
             ) : (
               <TeaserImage

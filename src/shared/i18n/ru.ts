@@ -355,7 +355,11 @@ export const ru = {
     unavailableBody: 'Этого поста нет или он удалён.',
     errorTitle: 'Не удалось загрузить пост',
     likes: ['{n} лайк', '{n} лайка', '{n} лайков'] as RuPluralForms,
+    // Story 11.2: the header's read-only comment count.
+    commentCount: ['{n} комментарий', '{n} комментария', '{n} комментариев'] as RuPluralForms,
     meta: '{date} · {likes}',
+    // Story 11.2: one more part of the meta line («… · 29 комментариев»).
+    metaMore: '{head} · {part}',
     a11yAuthor: 'Автор: {name}. Открыть страницу автора',
     // Locked post (Story 3.6, EXPERIENCE.md «Honest limits»): plain text,
     // never a price, a subscribe button or a payment link. `{level}` is the
@@ -422,6 +426,36 @@ export const ru = {
     continue: 'Продолжить',
     continueVideo: 'Продолжить · {label}',
     restart: 'С начала',
+    // Story 11.2 (our improvement, owner decision 2026-11-02): the full-screen
+    // image viewer for post and comment images. `{n}` / `{m}`: position and count.
+    imageViewer: {
+      counter: '{n} / {m}',
+      a11y: 'Изображение {n} из {m}. Влево и вправо — другие изображения',
+      a11ySingle: 'Изображение',
+      loading: 'Загружаем изображение',
+      // An image stop's label: OK opens the viewer.
+      a11yOpen: 'Изображение. Открыть на весь экран',
+      // A comment row with images: appended to its label.
+      a11yOpenComment: 'Открыть изображения',
+    },
+    // Story 11.2 (COMM-01, read-only): the «Комментарии» block at the
+    // bottom of Пост. No writing control of any kind.
+    comments: {
+      title: 'Комментарии',
+      loading: 'Загружаем комментарии',
+      empty: 'Комментариев пока нет',
+      error: 'Не удалось загрузить комментарии',
+      denied: 'Комментарии недоступны',
+      authorOff: 'Автор отключил комментарии',
+      showMore: 'Показать ещё',
+      moreReplies: 'Ещё ответы',
+      // A failed «Показать ещё» / «Ещё ответы»: the row reads «Повторить» (`common.retry`).
+      a11yMoreFailed: 'Не удалось загрузить. Повторить',
+      a11yLoadingMore: 'Загружаем',
+      replyTo: 'ответ {name}',
+      deleted: 'Комментарий удалён',
+      blocked: 'Комментарий скрыт',
+    },
   },
   // G Плеер (Story 4.1, docs/focus-map.md §4 G). «Настройки» and the
   // quality sheet are Story 4.3. Times are `formatDuration`; `{remaining}`

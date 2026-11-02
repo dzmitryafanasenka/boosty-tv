@@ -919,6 +919,34 @@ Review fixes (2026-10-28, host-tested only): short visits write nothing (owner d
 
 Host tests: `src/shared/services/progress/__tests__/progressRepository.test.ts` (29: the finished rule and status, resume precedence, the 10 s cadence, one write in flight with the latest position, forced events, start over, seeks as movement, failure gating ≥ 10 s and the bounded automatic retry, expired hold/flush/drop, sign-out wipe, a late write after a reset, the debounced/forced disk write, cold-start load, corrupt disk, the 200-entry cap, the stale disk write undone, a load after a reset dropped, stable snapshots); `__tests__/playerProgressFlow.test.tsx` «progress and resume (Story 4.2)» (10: server only with no pre-seek t=0 and the E9 request shape, local wins, finished, multi-video + start over, hold-scrub, background and end, the vanished «С начала» fallback, failure retry, cold start from the persisted entry, log hygiene); `__tests__/postFlow.test.tsx` (status and «Продолжить» only while the player is on); `__tests__/accountScopeRegistry.test.js` (`progress` registered); `demoFlow` (the row label now ends with the status). Lint (`--max-warnings 0`), typecheck, `check:fixtures` clean; `npm test` ×3: 1494 passed each; `playerFlow` + `postFlow` + the progress suite 30/30 (187 tests each run).
 
+### Story 11.2 — The «Комментарии» block on Пост, 2026-11-02
+
+**Status: implemented, host-tested and checked by the owner on the pinned TV with the remote: the comments block («всё окей») and then the image viewer («всё прошло, картинки открываются»).** `spec-11-2-comments-block-on-post.md`.
+
+What changed: the Пост header reads «date · N лайков · M комментариев» (`count.comments`, not focusable, left out when missing); an accessible Пост ends with the read-only «Комментарии» block (`src/features/post/comments`): newest first, «Показать ещё» (older pages, 20 at a time, only on OK), replies under each comment (oldest first, one indent step), «Ещё ответы», the deleted / blocked notes, and the in-block states (loading, empty, error + «Повторить», `denied`, «Автор отключил комментарии» with no request, `notFound` hides the block). Focus ids and moves: `docs/focus-map.md` «F Пост» «Story 11.2».
+
+Host tests:
+- `__tests__/postFlow.test.tsx` «Story 11.2» (20): the header plural (29 / 1 / 3, missing, comments without likes); first page (20 rows newest first after the blocks, then «Показать ещё»; one GET; one stop per comment, nothing focusable inside; initial focus unchanged); «Показать ещё» (appended below, no duplicates, focus on the first new row after two frames, the last page has no row); busy (focus kept, a second OK sends nothing), failure («Повторить», list kept) and retry; replies (2 inline of 5, «Ещё ответы» → 5 oldest first, focus on the first new) and its failure; empty, denied, notFound, author off (no request), error + «Повторить» (page 1 again, focus on the first comment); deleted / blocked; read-only (no writing text, the only buttons in the block are «Ещё ответы» / «Показать ещё», no input); 300 comments by 14 presses with focus on each first new row and no auto-load; Back from a comment pops to the origin card; the player return (same comment; gone → the block's first row); a refetch that drops the focused comment. The locked-post matrix row is in «locked posts» «price fields» (no block, no E19).
+- `src/shared/entities/comment/__tests__/useComments.test.tsx` (10): page 1 newest first, «Показать ещё» merge order and the end of paging, a failed «Показать ещё» kept with its retry, empty, error + retry, denied / notFound, disabled (no request); replies merge (deduped, oldest first, no more after the last page), failure and retry, a press while one runs ignored.
+- `commentRepository.test.ts` (the `hidden` flag), `mapPost.test.ts` (`commentCount`, `commentsDenied`), `demoFlow` (the demo header count and block), `commentsReadOnly.test.js` (still green; import specifiers are now blanked before the scan, since the feature folder is named `comments`), `tokens.test.js` (`comment-row`).
+- `src/test/flow.tsx` `installFixtureTransport`: an E19 request a test does not answer gets an empty comments page, so every other Пост flow keeps its focus order.
+- Image viewer (owner decision 2026-11-02, after the owner's device check of the block, «всё окей»): `postFlow` «Story 11.2: the full-screen image viewer» (5): matrix «Image viewer, post» (OK on the 2nd of 3 → image 2, «2 / 3», spinner until loaded, the background hidden, ← → step and stay at the ends, a key down alone does nothing, one stop, Back → focus on the 2nd image stop, the next Back pops Пост); a load failure («Изображение недоступно», arrows still work); one image (no counter); matrix «Image viewer, comment» (first image, «1 / 2», → stays at the end, Back → the comment row, a comment without images: OK does nothing); a locked post's teaser never opens. Host only: the native key path (`SeekKeys` key down) and the real fit on the screen are for the device.
+
+Checks run:
+- `npm run lint -- --max-warnings 0`, `npm run typecheck`, `npm run check:fixtures` (38): clean.
+- `npm test`: 166 suites, 3408 tests passed.
+
+Device (2026-11-02, owner-signed `assembleRelease` armeabi-v7a, `adb install -r`, session kept; still named 1.1.0):
+
+| Check | Result | Evidence |
+|---|---|---|
+| Header «вчера · 9 лайков · 32 комментария» on a post | Passed | agent over adb (UI dump) |
+| D-pad down through the post's blocks reaches the comment rows (`post/<postId>/comment/<commentId>`) | Passed | agent over adb (focus ids only, no player visit) |
+| Rows newest first, replies indented with «ответ …», «Ещё ответы», «Показать ещё», Back, no count on cards | Passed («всё окей») | owner, physical remote |
+| Image viewer: OK on a post image and on a comment with images, ← →, «N / M», Back returns focus | Passed («всё прошло, картинки открываются») | owner, physical remote |
+
+Not verified: `isCommentsDenied: true`, a deleted or blocked comment, the 403 / dead-token meaning (never seen live); TalkBack reading the rows.
+
 ### Story 11.1 — Comments endpoint probe and the comment entity, 2026-11-02
 
 **Status: E19 verified live (probe, agent over adb, owner's OK for each run); the GET-only comment entity is implemented and host-tested. No UI (Story 11.2).** `spec-11-1-comments-endpoint-probe-and-entity.md`, parity COMM-01 (FR-58, owner decision 2026-11-02: read-only comments).
