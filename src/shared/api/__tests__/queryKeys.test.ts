@@ -266,3 +266,16 @@ describe('Story 5.7: author posts, blog search and blog tags keys', () => {
     expect(queryKeys.feedTags()[0]).not.toBe(queryKeys.blogTags('b')[0]);
   });
 });
+
+describe('queryKeys.comments / commentReplies (Story 11.1)', () => {
+  it('carry ids only (no cursor or URL), each its own root', () => {
+    expect(queryKeys.comments('b', 'p')).toEqual(['comments', 'b', 'p']);
+    expect(queryKeys.commentReplies('b', 'p', 'c')).toEqual(['commentReplies', 'b', 'p', 'c']);
+    const roots = [queryKeys.post('b', 'p'), queryKeys.events(), queryKeys.mediaSource('b', 'p', 'm')].map(k => k[0]);
+    for (const key of [queryKeys.comments('b', 'p'), queryKeys.commentReplies('b', 'p', 'c')]) {
+      expect(roots).not.toContain(key[0]);
+    }
+    const comments = queryKeys.comments('b', 'p');
+    expect(queryKeys.commentReplies('b', 'p', 'c').slice(0, comments.length)).not.toEqual(comments);
+  });
+});

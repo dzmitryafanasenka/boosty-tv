@@ -1,0 +1,14 @@
+{
+  "case": "e19-shape-change",
+  "synthetic": true,
+  "status": 200,
+  "body": {
+    "data": {
+      "comments": []
+    },
+    "extra": {
+      "isFirst": true,
+      "isLast": true
+    }
+  }
+}

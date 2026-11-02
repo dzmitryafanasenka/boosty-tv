@@ -42,7 +42,10 @@ import type { ReadResult, SecureStore } from '../../shared/platform/secureStore'
  * answers 204), E18 (Story 7.5: «События»: a `video_stream_start` of
  * `demo-blog-1` (live, unread), a `post_new` of `demo-blog-2`, a
  * `promo_new`, an unknown type, a row without a blog, and a comment and an
- * owner-side event that the app hides), every other request a
+ * owner-side event that the app hides), E19 (Story 11.1: read-only
+ * comments: none, 45 or 3 per post, every fourth with 5 replies of which 2
+ * arrive inline, the live paging rule; a locked post answers 403), every
+ * other request a
  * 404. The
  * keychain is never touched, so the owner's stored session survives a demo
  * run.
@@ -509,6 +512,11 @@ const DEMO_LIKE_PATH = /^\/v1\/blog\/(demo-blog-\d+)\/video_stream\/like$/;
 const DEMO_STREAM_LIKES = 42;
 /** E18 (Story 7.5). */
 const DEMO_EVENTS_PATH = '/v1/notification/standalone/event/';
+/**
+ * E19 (Story 11.1): a demo post's read-only comments and replies. Its last
+ * segment is `comment`, so `DEMO_POST_PATH` never matches it.
+ */
+const DEMO_COMMENTS_PATH = /^\/v1\/blog\/(demo-blog-\d+)\/post\/([^/]+)\/comment\/$/;
 /** The demo blog with a live stream (Story 7.1); the other demo blogs have none (204). */
 const DEMO_LIVE_BLOG = 'demo-blog-1';
 /** E9: `PUT /v1/viewstat/video/{mediaId}/timecode/` (Story 4.2). */
@@ -651,6 +659,103 @@ function demoEvents() {
   };
 }
 
+/** Demo comments per post (Story 11.1): none, 45 (three pages) or 3, by the post's index. */
+function demoCommentCount(n: number): number {
+  return n % 3 === 0 ? 0 : n % 3 === 1 ? 45 : 3;
+}
+
+/** Demo replies of comment `k`: 5 (more than the 2 inline ones), 1 or none. */
+function demoReplyCount(k: number): number {
+  return k % 4 === 0 ? 5 : k % 4 === 1 ? 1 : 0;
+}
+
+const DEMO_COMMENT_BASE = 500_000;
+/** E19 `reply_limit` of the app (live: up to 2 replies arrive inline). */
+const DEMO_INLINE_REPLIES = 2;
+
+const demoCommenter = (k: number) => ({
+  id: 2000 + (k % 5),
+  name: `Демо-зритель ${(k % 5) + 1}`,
+  avatarUrl: '',
+  hasAvatar: false,
+  isOfficial: false,
+});
+
+/** One synthetic E19 item (the live shape, api-contract «E19 (LIVE)»); `r` > 0 is reply `r` of comment `k`. */
+function demoCommentItem(k: number, r = 0): Record<string, unknown> {
+  const intId = DEMO_COMMENT_BASE + k * 10 + r;
+  const item: Record<string, unknown> = {
+    id: `demo-comment-${k}${r > 0 ? `-${r}` : ''}`,
+    intId,
+    author: demoCommenter(k + r),
+    createdAt: DEMO_FEED_START + k * 600 + r * 60,
+    data: [
+      ...textBlock(r > 0 ? `Демо-ответ ${r} на комментарий ${k}.` : `Демо-комментарий ${k}.`),
+      // Every seventh comment carries a block type the app does not know.
+      ...(r === 0 && k % 7 === 0 ? [{ type: 'demo_unknown_block' }] : []),
+    ],
+    isBlocked: false,
+    isDeleted: false,
+    isUpdated: false,
+    replyCount: r > 0 ? 0 : demoReplyCount(k),
+    reactions: {},
+    reactionCounters: [],
+  };
+  if (r > 0) {
+    const parent = DEMO_COMMENT_BASE + k * 10;
+    return { ...item, parentId: parent, replyId: parent, replyToUser: demoCommenter(k) };
+  }
+  const replies = Array.from({ length: demoReplyCount(k) }, (_, i) => demoCommentItem(k, i + 1));
+  return {
+    ...item,
+    replies: {
+      data: replies.slice(0, DEMO_INLINE_REPLIES),
+      extra: { isFirst: true, isLast: replies.length <= DEMO_INLINE_REPLIES },
+    },
+  };
+}
+
+/**
+ * The live paging rule (api-contract «E19 (LIVE)»): the newest `limit`
+ * items below `offset` (an `intId`), `intId` ascending; `isLast` when no
+ * older item remains.
+ */
+function demoCommentsPage(url: string, all: ReadonlyArray<Record<string, unknown>>) {
+  const offset = numberParam(url, 'offset') ?? Infinity;
+  const limit = numberParam(url, 'limit') ?? 20;
+  const below = all.filter(item => (item.intId as number) < offset);
+  const start = Math.max(0, below.length - limit);
+  return { data: below.slice(start), extra: { isFirst: offset === Infinity, isLast: start === 0 } };
+}
+
+/**
+ * E19 for a demo post: 404 when the post does not exist, 403 when it is
+ * locked (live), else its comments, or with `parent_id` one comment's
+ * replies.
+ */
+function demoCommentsReply(url: string, blogUrl: string, postId: string) {
+  const post = postId === DEMO_MISSING_POST ? null : demoPostDetail(blogUrl, postId);
+  if (post === null) {
+    return { status: 404, body: { error: 'not_found' } };
+  }
+  if (!post.hasAccess) {
+    // Live: 403; its body was not recorded, so none is sent here.
+    return { status: 403 };
+  }
+  const count = demoCommentCount(post.int_id - 100000);
+  const parent = numberParam(url, 'parent_id');
+  if (parent !== null) {
+    const k = (parent - DEMO_COMMENT_BASE) / 10;
+    const replies =
+      Number.isInteger(k) && k >= 1 && k <= count
+        ? Array.from({ length: demoReplyCount(k) }, (_, i) => demoCommentItem(k, i + 1))
+        : [];
+    return { status: 200, body: demoCommentsPage(url, replies) };
+  }
+  const comments = Array.from({ length: count }, (_, i) => demoCommentItem(i + 1));
+  return { status: 200, body: demoCommentsPage(url, comments) };
+}
+
 const DEMO_SESSION = JSON.stringify({
   v: 1,
   accessToken: 'demo-access-token',
@@ -733,6 +838,12 @@ export function createDemoSessionManager(): SessionManager {
     const blogTags = DEMO_BLOG_TAGS_PATH.exec(request.path);
     if (blogTags) {
       return { status: 200, body: demoBlogTags(blogTags[1]), delayMs: 300 };
+    }
+    // E19 (Story 11.1): read-only demo comments; GET only.
+    const comments = DEMO_COMMENTS_PATH.exec(request.path);
+    if (comments && request.method === 'GET') {
+      const [, blogUrl, postId] = comments;
+      return { ...demoCommentsReply(request.url, blogUrl, decodeURIComponent(postId)), delayMs: 300 };
     }
     const single = DEMO_POST_PATH.exec(request.path);
     if (single) {

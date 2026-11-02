@@ -1,6 +1,7 @@
 export {
   firstText,
   kindOf,
+  mapBlocks,
   mapPost,
   previewOf,
   styledTextOf,

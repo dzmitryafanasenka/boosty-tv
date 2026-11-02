@@ -6,6 +6,9 @@ The Russian version of this file is [CHANGELOG.ru.md](CHANGELOG.ru.md); both lis
 
 ## [Unreleased]
 
+### Internal
+- Comments groundwork (Story 11.1): the comments endpoint was verified live on the TV, and a read-only comments data layer was added. Nothing changes in the app yet.
+
 ## [1.1.0] - 2026-11-02
 
 Chapters in the player (Epic 10, Story 10.1).

@@ -1,0 +1,12 @@
+{
+  "case": "e19-empty",
+  "synthetic": true,
+  "status": 200,
+  "body": {
+    "data": [],
+    "extra": {
+      "isFirst": true,
+      "isLast": true
+    }
+  }
+}
