@@ -4,6 +4,11 @@ All notable changes to Boosty TV, an unofficial Boosty client for Android TV / G
 Versions follow `MAJOR.MINOR.PATCH`; each release is tagged `v{version}` on GitHub Releases.
 The Russian version of this file is [CHANGELOG.ru.md](CHANGELOG.ru.md); both list the same versions.
 
+## [Unreleased]
+
+### Added
+- Player: chapters from a post's timestamps («Таймкоды»). The timeline shows a mark for each timestamp of the playing video, and the current chapter's name appears next to the elapsed time (it follows the target while you seek). Press ↑ on the timeline to open the chapter list: ← → pick a chapter, OK jumps to it, Back or ↓ closes the list. On remotes with media keys, Next and Previous jump between chapters. Videos without timestamps, live streams and the system video player are unchanged.
+
 ## [1.0.0] - 2026-11-01
 
 First stable release: the owner accepted the Android release after the full device regression (Story 9.5). Same code as 0.9.2.

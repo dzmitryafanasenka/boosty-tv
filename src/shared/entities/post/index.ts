@@ -36,6 +36,15 @@ export {
   type Segment,
 } from './postBody';
 export { mediaRefsOf, videoRowsOf } from './mediaRows';
+export {
+  CHAPTER_RESTART_SEC,
+  chapterAt,
+  chapterIndexAt,
+  chapterJumpTarget,
+  chaptersWithin,
+  postChapters,
+  type Chapter,
+} from './chapters';
 export { isGenericVideoTitle, videoDisplayTitle } from './videoTitle';
 export {
   videoSourceOf,

@@ -17,6 +17,7 @@ const readyWith = (source: VideoSource, sources: readonly VideoSource[]): Ready 
   meta: { authorName: 'a', authorAvatarUrl: null, postTitle: 'p', videoTitle: '' },
   progress: null,
   live: null,
+  chapters: [],
   resolution: 1,
 });
 

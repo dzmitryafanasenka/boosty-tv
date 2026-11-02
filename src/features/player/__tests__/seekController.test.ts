@@ -214,3 +214,44 @@ describe('a fixed step (the ±10 s controls, Story 4.3)', () => {
     jest.useRealTimers();
   });
 });
+
+describe('seekTo (Story 10.1, a chapter jump)', () => {
+  it('sets an absolute pending target (clamped), committed once 600 ms later; commitNow commits at once', () => {
+    const { seek, onCommit } = setup();
+    expect(seek.seekTo(730, 1200)).toBe(730);
+    expect(seek.target()).toBe(730);
+    jest.advanceTimersByTime(SEEK_COMMIT_MS - 1);
+    expect(onCommit).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(1);
+    expect(onCommit).toHaveBeenCalledWith(730);
+    seek.reset();
+    expect(seek.seekTo(5000, 1200)).toBe(1199);
+    expect(seek.seekTo(-3, 1200)).toBe(0);
+    expect(seek.commitNow()).toBe(true);
+    expect(onCommit).toHaveBeenLastCalledWith(0);
+    seek.reset();
+  });
+
+  it('a press after it starts over at 5 s from that target', () => {
+    const { seek } = setup();
+    seek.press(1, 100, 1000);
+    seek.press(1, 100, 1000);
+    seek.seekTo(300, 1000);
+    expect(seek.press(1, 100, 1000)).toBe(305);
+    seek.reset();
+  });
+
+  it('a held target stays held: not committed by the timer, cancelled after 5 s idle', () => {
+    const onHeldEnd = jest.fn();
+    const onCommit = jest.fn();
+    const seek = createSeekController({ onCommit, onChange: () => {}, onHeldEnd });
+    seek.press(1, 100, 1000);
+    seek.markHeld();
+    seek.seekTo(400, 1000);
+    expect(seek.isHeld()).toBe(true);
+    jest.advanceTimersByTime(HELD_TARGET_IDLE_MS);
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(onHeldEnd).toHaveBeenCalledWith(false);
+    expect(seek.target()).toBeNull();
+  });
+});

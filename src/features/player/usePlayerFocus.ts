@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { focusSoon } from '../../shared/focus';
 import { motion, type HostView } from '../../shared/ui';
-import { PLAYER_PLAYPAUSE_ID, PLAYER_SETTINGS_ID, PLAYER_TIMELINE_ID } from './PlayerOverlay';
+import { CHAPTER_ITEM_PREFIX } from './ChapterStrip';
+import { PLAYER_CONTROL_IDS, PLAYER_PLAYPAUSE_ID, PLAYER_SETTINGS_ID, PLAYER_TIMELINE_ID } from './PlayerOverlay';
 import type { PlaybackMode } from './playbackMode';
 import type { ErrorTarget, Phase } from './playerPhase';
 import type { EntryGuard } from './usePlayerKeys';
@@ -29,6 +30,7 @@ export function useOverlayTimers({
   paused,
   seeking,
   sheetOpen,
+  stripOpen = false,
   interaction,
   hideOverlay,
 }: {
@@ -38,6 +40,8 @@ export function useOverlayTimers({
   paused: boolean;
   seeking: boolean;
   sheetOpen: boolean;
+  /** Story 10.1: the chapter strip is open (the overlay does not auto-hide). */
+  stripOpen?: boolean;
   /** Bumped on every input that shows the overlay: restarts the auto-hide. */
   interaction: number;
   hideOverlay: () => void;
@@ -55,7 +59,7 @@ export function useOverlayTimers({
   }, [buffered]);
 
   // Auto-hide: only while playing, never paused, seeking or on error.
-  const mayHide = overlay && playing && !paused && !seeking && !sheetOpen;
+  const mayHide = overlay && playing && !paused && !seeking && !sheetOpen && !stripOpen;
   useEffect(() => {
     if (!mayHide) {
       return;
@@ -79,8 +83,16 @@ export type PlayerFocus = {
   playPauseView: RefObject<HostView | null>;
   retryView: RefObject<HostView | null>;
   backView: RefObject<HostView | null>;
+  /** Story 10.1: the chapter strip's initial item. */
+  stripView: RefObject<HostView | null>;
   /** The focused player element (raw ← → seek only off the controls). */
   focused: RefObject<string | null>;
+  /**
+   * Story 10.1: when focus last came onto the timeline from a control (↑
+   * from the controls row); 0 otherwise. The key up of that ↑ must not open
+   * the chapter strip.
+   */
+  timelineFromControlsAt: RefObject<number>;
   /** The surface takes focus (loading, recovering, playing with the overlay hidden). */
   surfaceFocusable: boolean;
   onSurfaceFocus: () => void;
@@ -90,6 +102,8 @@ export type PlayerFocus = {
   onBackFocus: () => void;
   onSettingsFocus: () => void;
   onControlFocus: (id: string) => void;
+  /** Story 10.1: focus arrived on a chapter strip item (its id). */
+  onStripItemFocus: (id: string) => void;
 };
 
 /**
@@ -113,6 +127,7 @@ export function usePlayerFocus({
   isActive,
   sheetOpenRef,
   entryGuard,
+  stripOpen = false,
 }: {
   phase: Phase;
   overlay: boolean;
@@ -121,6 +136,8 @@ export function usePlayerFocus({
   isActive: () => boolean;
   sheetOpenRef: RefObject<boolean>;
   entryGuard: EntryGuard;
+  /** Story 10.1: the chapter strip is open: focus on its initial item; closing it → the timeline. */
+  stripOpen?: boolean;
 }): PlayerFocus {
   const playing = phase === 'playing';
   const surfaceView = useRef<HostView | null>(null);
@@ -128,13 +145,17 @@ export function usePlayerFocus({
   const playPauseView = useRef<HostView | null>(null);
   const retryView = useRef<HostView | null>(null);
   const backView = useRef<HostView | null>(null);
+  const stripView = useRef<HostView | null>(null);
   const focused = useRef<string | null>(null);
+  const timelineFromControlsAt = useRef(0);
 
   const onSurfaceFocus = useCallback(() => {
     focused.current = PLAYER_SURFACE_ID;
     entryGuard.landed();
   }, [entryGuard]);
   const onTimelineFocus = useCallback(() => {
+    timelineFromControlsAt.current =
+      focused.current !== null && PLAYER_CONTROL_IDS.has(focused.current) ? Date.now() : 0;
     focused.current = PLAYER_TIMELINE_ID;
   }, []);
   const onPlayPauseFocus = useCallback(() => {
@@ -152,6 +173,9 @@ export function usePlayerFocus({
   const onControlFocus = useCallback((id: string) => {
     focused.current = id;
   }, []);
+  const onStripItemFocus = useCallback((id: string) => {
+    focused.current = id;
+  }, []);
 
   // «Восстанавливаем воспроизведение…» has no action: focus on the surface (Story 4.4).
   const surfaceFocusable = phase === 'loading' || phase === 'recovering' || (playing && !overlay);
@@ -161,7 +185,9 @@ export function usePlayerFocus({
         ? [retryView, PLAYER_RETRY_ID]
         : errorTarget === 'back'
           ? [backView, PLAYER_BACK_ID]
-          : playing && overlay
+          : playing && overlay && stripOpen
+            ? [stripView, CHAPTER_ITEM_PREFIX]
+            : playing && overlay
             ? overlayFocus === 'playPause'
               ? [playPauseView, PLAYER_PLAYPAUSE_ID]
               : [timelineView, PLAYER_TIMELINE_ID]
@@ -171,10 +197,13 @@ export function usePlayerFocus({
     if (view === null || !isActive() || sheetOpenRef.current) {
       return;
     }
+    // In the strip, any of its items counts as arrived (the user may have moved already).
+    const arrived = () =>
+      id === CHAPTER_ITEM_PREFIX ? (focused.current ?? '').startsWith(CHAPTER_ITEM_PREFIX) : focused.current === id;
     return focusSoon(() => view.current, {
-      guard: () => focused.current !== id && isActive() && !sheetOpenRef.current,
+      guard: () => !arrived() && isActive() && !sheetOpenRef.current,
     });
-  }, [errorTarget, playing, overlay, surfaceFocusable, isActive, overlayFocus, sheetOpenRef]);
+  }, [errorTarget, playing, overlay, surfaceFocusable, isActive, overlayFocus, sheetOpenRef, stripOpen]);
 
   return {
     surfaceView,
@@ -182,7 +211,9 @@ export function usePlayerFocus({
     playPauseView,
     retryView,
     backView,
+    stripView,
     focused,
+    timelineFromControlsAt,
     surfaceFocusable,
     onSurfaceFocus,
     onTimelineFocus,
@@ -191,5 +222,6 @@ export function usePlayerFocus({
     onBackFocus,
     onSettingsFocus,
     onControlFocus,
+    onStripItemFocus,
   };
 }

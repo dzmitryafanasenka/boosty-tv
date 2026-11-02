@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import type { MediaRef } from '../../shared/entities/post';
+import { chapterJumpTarget, chaptersWithin, type Chapter, type MediaRef } from '../../shared/entities/post';
 import { useLatestRef } from '../../shared/focus';
 import { playbackArbiter } from '../../shared/platform/playbackArbiter';
 import type { PlayerEngineHandle } from '../../shared/platform/playerEngine';
@@ -14,6 +14,8 @@ import { countPlayback, createRecoveryBudget, takeRecovery, type StartGate } fro
 import { createSeekController, type SeekController, type SeekDirection } from './seekController';
 import { speedPreference, type PlaybackSpeed } from './speedPreference';
 import type { PlayerSource } from './usePlayerSource';
+
+const NO_CHAPTERS: readonly Chapter[] = [];
 
 /** The ±10 s controls' step (Story 4.3 owner decision). */
 export const SKIP_STEP_SEC = 10;
@@ -82,6 +84,8 @@ export type SessionView = {
   seekTarget: number | null;
   /** Story 8.1: the engine's rate (the overlay's «N×» label while it is not 1). */
   rate: PlaybackSpeed;
+  /** Story 10.1: the chapters inside the known duration (empty: no marks, no name, no strip). */
+  chapters: readonly Chapter[];
 };
 
 /** The session's commands (every one stable unless noted). */
@@ -101,6 +105,10 @@ export type SessionCommands = {
   onOk: () => void;
   seekBy: (direction: SeekDirection) => void;
   onSkip: (direction: SeekDirection) => void;
+  /** Story 10.1: media `next` / `previous` (a chapter jump, else `seekBy`). */
+  jumpChapter: (direction: SeekDirection) => void;
+  /** Story 10.1: OK in the chapter strip (seek to that second now). */
+  seekToChapter: (sec: number) => void;
   onRetry: () => void;
   /**
    * Story 4.6, background (device sleep included): a forced write (best
@@ -321,7 +329,16 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
   }, []);
 
   const rate = mode.rate(source.speed);
-  const latest = useLatestRef({ phase, overlay, paused, positionSec, durationSec, vodRef, ready });
+  /**
+   * Story 10.1: the chapters inside the engine's duration (none until it is
+   * known, none for a mode that cannot seek: live).
+   */
+  const readyChapters = ready?.chapters ?? NO_CHAPTERS;
+  const chapters = useMemo(
+    () => (mode.canSeek ? chaptersWithin(readyChapters, durationSec) : NO_CHAPTERS),
+    [mode, readyChapters, durationSec],
+  );
+  const latest = useLatestRef({ phase, overlay, paused, positionSec, durationSec, vodRef, ready, chapters });
 
   const report = useCallback(
     (event: ProgressEvent, positionOverride?: number) => {
@@ -533,6 +550,43 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
       const { positionSec: position, durationSec: duration } = latest.current;
       if (duration > 0 && mode.canSeek) {
         seek.press(direction, position, duration, SKIP_STEP_SEC);
+      }
+      showOverlay();
+    },
+    [latest, seek, showOverlay, mode],
+  );
+
+  /**
+   * Story 10.1, media `next` / `previous`: with chapters, the next chapter's
+   * start, or (`previous`, YouTube rule) the current chapter's start when
+   * more than 3 s into it, else the previous one's; built on the pending
+   * target, so quick presses walk the chapters. A normal seek (the pending
+   * target, one commit 600 ms later). No jump there (past the last chapter,
+   * before the first): only the overlay. Without chapters: `seekBy`.
+   */
+  const jumpChapter = useCallback(
+    (direction: SeekDirection) => {
+      const { positionSec: position, durationSec: duration, chapters: list } = latest.current;
+      if (list.length === 0) {
+        seekBy(direction);
+        return;
+      }
+      const target = chapterJumpTarget(list, seek.target() ?? position, direction);
+      if (target !== null && duration > 0 && mode.canSeek) {
+        seek.seekTo(target, duration);
+      }
+      showOverlay();
+    },
+    [latest, seek, seekBy, showOverlay, mode],
+  );
+
+  /** Story 10.1, OK in the chapter strip: seek to that chapter's start now (a normal engine seek). */
+  const seekToChapter = useCallback(
+    (sec: number) => {
+      const { durationSec: duration } = latest.current;
+      if (duration > 0 && mode.canSeek) {
+        seek.seekTo(sec, duration);
+        seek.commitNow();
       }
       showOverlay();
     },
@@ -781,7 +835,7 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
     readyResolution,
     playing,
     seek,
-    view: { paused, positionSec, durationSec, buffering, autoHeight, overlay, interaction, seeking, seekTarget, rate },
+    view: { paused, positionSec, durationSec, buffering, autoHeight, overlay, interaction, seeking, seekTarget, rate, chapters },
     engineProps: {
       ref: engine,
       paused,
@@ -806,6 +860,8 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
       onOk,
       seekBy,
       onSkip,
+      jumpChapter,
+      seekToChapter,
       onRetry,
       background,
       foreground,

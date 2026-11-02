@@ -8,6 +8,7 @@ import { t } from '../../shared/i18n';
 import { PlayerEngineView } from '../../shared/platform/PlayerEngineView';
 import { useProgressRepository } from '../../shared/services/progress';
 import { Button, Spinner, Text, colors, spacing } from '../../shared/ui';
+import { ChapterStrip, useChapterStrip } from './ChapterStrip';
 import { PlayerOverlay } from './PlayerOverlay';
 import { createLiveMode, createVodMode } from './playbackMode';
 import { errorCopy, errorTarget } from './playerPhase';
@@ -165,6 +166,19 @@ export function PlayerScreen({
   // stop on the end or the unmount). VOD: disabled (no blog).
   useLiveHeartbeat(http, liveRef?.blogUrl ?? null, mode.heartbeat && playing && !paused, phase === 'ended');
 
+  // Story 10.1: the chapter strip (↑ on the focused timeline, with chapters).
+  const chapterStrip = useChapterStrip({
+    chapters: view.chapters,
+    overlay,
+    playing,
+    atSec: view.seekTarget ?? view.positionSec,
+  });
+  const { openRef: stripOpenRef, openStrip, closeStrip } = chapterStrip;
+  const stripKeys = useMemo(
+    () => ({ openRef: stripOpenRef, openStrip, closeStrip }),
+    [stripOpenRef, openStrip, closeStrip],
+  );
+
   const sheet = useSheetOpen();
   const spinner = useOverlayTimers({
     playing,
@@ -173,6 +187,7 @@ export function PlayerScreen({
     paused,
     seeking: view.seeking,
     sheetOpen: sheet.sheetOpen,
+    stripOpen: chapterStrip.open,
     interaction: view.interaction,
     hideOverlay: commands.hideOverlay,
   });
@@ -204,6 +219,7 @@ export function PlayerScreen({
     isActive,
     sheetOpenRef: sheet.sheetOpenRef,
     entryGuard,
+    stripOpen: chapterStrip.open,
   });
 
   usePlayerProgress({
@@ -272,7 +288,20 @@ export function PlayerScreen({
     setPlaying: commands.setPlaying,
     exitPlayer,
     openSettings: settings.openSettings,
+    jumpChapter: commands.jumpChapter,
+    strip: stripKeys,
+    timelineFromControlsAt: focus.timelineFromControlsAt,
   });
+
+  /** Story 10.1: OK in the strip: seek to that chapter now, close the strip (focus → the timeline). */
+  const seekToChapter = commands.seekToChapter;
+  const onChapterSelect = useCallback(
+    (sec: number) => {
+      seekToChapter(sec);
+      closeStrip();
+    },
+    [seekToChapter, closeStrip],
+  );
 
   usePlayerAccessEnd({
     state,
@@ -344,6 +373,19 @@ export function PlayerScreen({
           live={ready.live}
           showSettings={settingsShown}
           notice={shownNotice}
+          chapters={view.chapters}
+          chapterStrip={
+            chapterStrip.open ? (
+              <ChapterStrip
+                chapters={view.chapters}
+                initialIndex={chapterStrip.initialIndex}
+                currentIndex={chapterStrip.currentIndex}
+                initialRef={focus.stripView}
+                onSelect={onChapterSelect}
+                onItemFocus={focus.onStripItemFocus}
+              />
+            ) : null
+          }
         />
       ) : null}
       {phase === 'recovering' ? (

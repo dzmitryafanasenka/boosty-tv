@@ -1,6 +1,6 @@
-import { useEffect, useState, type Ref } from 'react';
+import { useEffect, useState, type ReactNode, type Ref } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { isGenericVideoTitle } from '../../shared/entities/post';
+import { chapterAt, isGenericVideoTitle, type Chapter } from '../../shared/entities/post';
 import { tf, t } from '../../shared/i18n';
 import { formatDuration } from '../../shared/i18n/format';
 import { speedLabel, type PlaybackSpeed } from './speedPreference';
@@ -39,6 +39,8 @@ const THUMB = 12;
 const THUMB_FOCUSED = 16;
 /** The legibility bands' darkening (DESIGN.md: the app's only gradient). */
 const BAND_DARK = colors.scrim;
+
+const NO_CHAPTERS: readonly Chapter[] = [];
 
 /** Whole seconds → `m:ss` / `h:mm:ss`. */
 const time = (sec: number) => formatDuration(sec);
@@ -99,8 +101,14 @@ export function isDistinctVideoTitle(videoTitle: string, postTitle: string): boo
   return !isGenericVideoTitle(title) && title !== postTitle.trim();
 }
 
-/** «Позиция 1:23 из 12:34» (or without the duration when it is unknown). */
-export function timelineA11yLabel(positionSec: number, durationSec: number): string {
+/**
+ * «Позиция 1:23 из 12:34» (or without the duration when it is unknown);
+ * Story 10.1: «… Глава: Разбор» when a chapter is playing.
+ */
+export function timelineA11yLabel(positionSec: number, durationSec: number, chapter: string | null = null): string {
+  if (durationSec > 0 && chapter !== null) {
+    return tf('player.timelineChapter', { elapsed: time(positionSec), duration: time(durationSec), chapter });
+  }
   return durationSec > 0
     ? tf('player.timeline', { elapsed: time(positionSec), duration: time(durationSec) })
     : tf('player.timelineNoDuration', { elapsed: time(positionSec) });
@@ -139,6 +147,10 @@ type TimelineProps = {
   durationSec: number;
   /** The bubble's target (pending or in-flight seek); null when not seeking. */
   seekTargetSec: number | null;
+  /** Story 10.1: the chapters inside the duration (a mark each, none at 0). */
+  chapters: readonly Chapter[];
+  /** Story 10.1: the chapter at the position (the timeline's accessibility label). */
+  chapterName: string | null;
   onPress: () => void;
   onFocus: () => void;
   ref?: Ref<HostView>;
@@ -150,7 +162,7 @@ type TimelineProps = {
  * focus state). While seeking, a bubble above the track shows the target
  * time. OK toggles play/pause.
  */
-function Timeline({ positionSec, durationSec, seekTargetSec, onPress, onFocus, ref }: TimelineProps) {
+function Timeline({ positionSec, durationSec, seekTargetSec, chapters, chapterName, onPress, onFocus, ref }: TimelineProps) {
   const played = fraction(positionSec, durationSec);
   const target = seekTargetSec === null ? null : fraction(seekTargetSec, durationSec);
   // While a target is pending or in flight the thumb and the accent fill
@@ -166,7 +178,7 @@ function Timeline({ positionSec, durationSec, seekTargetSec, onPress, onFocus, r
       scalePressed={1}
       ring={false}
       accessibilityRole="adjustable"
-      accessibilityLabel={timelineA11yLabel(positionSec, durationSec)}
+      accessibilityLabel={timelineA11yLabel(positionSec, durationSec, chapterName)}
       onPress={onPress}
       onFocus={onFocus}
       surfaceStyle={() => styles.timelineHit}
@@ -195,6 +207,21 @@ function Timeline({ positionSec, durationSec, seekTargetSec, onPress, onFocus, r
                 testID="player/progress"
                 style={[styles.fill, { width: `${thumbAt * 100}%`, borderRadius: track / 2 }]}
               />
+              {chapters.map(chapter => {
+                // Story 10.1: a tick per chapter over the track, none at 0;
+                // over the fill only its colour changes (no layout change).
+                const at = fraction(chapter.sec, durationSec);
+                return chapter.sec > 0 && durationSec > 0 ? (
+                  <View
+                    key={chapter.sec}
+                    testID={`player/mark/${chapter.sec}`}
+                    style={[
+                      styles.mark,
+                      { left: `${at * 100}%`, backgroundColor: at <= thumbAt ? TIMELINE.markPlayed : TIMELINE.mark },
+                    ]}
+                  />
+                ) : null;
+              })}
             </View>
             <View
               testID="player/thumb"
@@ -335,6 +362,13 @@ export type PlayerOverlayProps = {
    */
   showSettings?: boolean;
   /**
+   * Story 10.1 (our improvement): the chapters inside the known duration;
+   * empty (default): no marks, no name.
+   */
+  chapters?: readonly Chapter[];
+  /** Story 10.1: the chapter strip, drawn above the timeline while open (else null). */
+  chapterStrip?: ReactNode;
+  /**
    * Story 8.2: a one-line hint in the top band («Внешний плеер не найден»
    * after a system-player fallback); none by default. Not focusable.
    */
@@ -375,9 +409,15 @@ export function PlayerOverlay({
   live = null,
   showSettings = true,
   notice,
+  chapters = NO_CHAPTERS,
+  chapterStrip = null,
 }: PlayerOverlayProps) {
   const showVideoTitle = isDistinctVideoTitle(meta.videoTitle, meta.postTitle);
   const isLive = live !== null;
+  // Story 10.1: the name follows the pending target during a scrub.
+  const chapterName = isLive ? null : (chapterAt(chapters, seekTargetSec ?? positionSec)?.title ?? null);
+  // The timeline's label pairs the position with the chapter at the position.
+  const positionChapter = isLive ? null : (chapterAt(chapters, positionSec)?.title ?? null);
   return (
     <View testID="player/overlay" style={styles.overlay} pointerEvents="box-none">
       <View testID="player/top" style={[styles.band, styles.top]}>
@@ -423,11 +463,14 @@ export function PlayerOverlay({
           <LiveStatus startTime={live.startTime} />
         ) : (
           <>
+            {chapterStrip}
             <Timeline
               ref={timelineRef}
               positionSec={positionSec}
               durationSec={durationSec}
               seekTargetSec={seekTargetSec}
+              chapters={chapters}
+              chapterName={positionChapter}
               onPress={onTogglePause}
               onFocus={onTimelineFocus}
             />
@@ -439,6 +482,17 @@ export function PlayerOverlay({
                 {rate !== 1 ? (
                   <Text testID="player/speed" variant="meta" color="text-secondary" style={[styles.tabular, styles.speed]}>
                     {speedLabel(rate)}
+                  </Text>
+                ) : null}
+                {chapterName !== null ? (
+                  <Text
+                    testID="player/chapter"
+                    variant="meta"
+                    color="text-secondary"
+                    numberOfLines={1}
+                    style={styles.chapter}
+                  >
+                    {chapterName}
                   </Text>
                 ) : null}
               </View>
@@ -592,6 +646,20 @@ const styles = StyleSheet.create({
   },
   elapsedRow: {
     flexDirection: 'row',
+    flexShrink: 1,
+  },
+  // Story 10.1: the chapter name after the elapsed time (and «N×»): one line, truncated.
+  chapter: {
+    marginLeft: spacing['4'],
+    flexShrink: 1,
+    maxWidth: TIMELINE.chapterMaxWidth,
+  },
+  mark: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: TIMELINE.markWidth,
+    marginLeft: -TIMELINE.markWidth / 2,
   },
   // Story 8.1: the «N×» label after the elapsed time.
   speed: {

@@ -3,7 +3,7 @@ import { useCallback, useRef, useState, type RefObject } from 'react';
 import { BackHandler, useTVEventHandler } from 'react-native';
 import { useLatestRef } from '../../shared/focus';
 import { subscribeSeekKeys, type SeekKeyEvent } from '../../shared/platform/seekKeys';
-import { PLAYER_CONTROL_IDS } from './PlayerOverlay';
+import { PLAYER_CONTROL_IDS, PLAYER_TIMELINE_ID } from './PlayerOverlay';
 import type { Phase } from './playerPhase';
 import type { SeekController, SeekDirection } from './seekController';
 
@@ -15,6 +15,13 @@ import type { SeekController, SeekDirection } from './seekController';
 export const ENTRY_GUARD_MS = 500;
 /** A held ← → seeks at most this often (Android repeats a held key every ≈ 50 ms). */
 export const HOLD_REPEAT_MS = 200;
+/**
+ * Story 10.1: the key up of an ↑ that moved focus from the controls onto
+ * the timeline can reach JS after the timeline's `onFocus` (both orders
+ * were seen, focus-map §1.1); within this window after such a move it does
+ * not open the chapter strip.
+ */
+export const STRIP_ENTRY_GUARD_MS = 300;
 
 type HWEvent = Parameters<Parameters<typeof useTVEventHandler>[0]>[0];
 
@@ -92,8 +99,13 @@ export function useEntryGuard(): EntryGuard {
  *   without input cancels it. The React Native key up of a press handled
  *   natively is swallowed, so the key up that ends a hold never counts as
  *   one more press. A live stream never builds a held target.
- * - Back: the sheet's levels first, then a held target (cancel), then the
- *   overlay (hide it), then exit.
+ * - Back: the sheet's levels first, then the chapter strip (close it,
+ *   Story 10.1), then a held target (cancel), then the overlay (hide it),
+ *   then exit.
+ * - Story 10.1: ↑ on the focused timeline (overlay shown) opens the chapter
+ *   strip when the video has chapters; in the strip ← → ↑ do nothing here
+ *   (native focus), ↓ closes it; Next / Previous jump between chapters
+ *   (a seek step without chapters).
  *
  * Returns the surface's OK handler (overlay hidden: pause, or commit a
  * pending seek).
@@ -114,6 +126,9 @@ export function usePlayerKeys({
   setPlaying,
   exitPlayer,
   openSettings,
+  jumpChapter,
+  strip,
+  timelineFromControlsAt,
 }: {
   phase: Phase;
   overlay: boolean;
@@ -131,6 +146,12 @@ export function usePlayerKeys({
   setPlaying: (play: boolean) => void;
   exitPlayer: () => void;
   openSettings: () => void;
+  /** Story 10.1: media `next` / `previous` (a chapter jump with chapters, else a seek step). */
+  jumpChapter: (direction: SeekDirection) => void;
+  /** Story 10.1: the chapter strip (open state, open, close). */
+  strip: { openRef: RefObject<boolean>; openStrip: () => boolean; closeStrip: () => void };
+  /** Story 10.1: when focus last came onto the timeline from a control (0: not from a control). */
+  timelineFromControlsAt: RefObject<number>;
 }): { onSurfacePress: () => void } {
   const latest = useLatestRef({ phase, overlay, isActive });
   const entryGuarded = entryGuard.guarded;
@@ -163,6 +184,11 @@ export function usePlayerKeys({
         return;
       }
       if (!active() || current !== 'playing' || sheetOpenRef.current) {
+        return;
+      }
+      // Story 10.1: in the chapter strip ← → move the selection natively; no seek, no held target.
+      if (strip.openRef.current) {
+        hold.current = { key: null, repeats: 0, lastAt: 0, ignored: false };
         return;
       }
       const direction: SeekDirection = event.key === 'right' ? 1 : -1;
@@ -200,7 +226,7 @@ export function usePlayerKeys({
       // a tap keeps the 600 ms window.
       hold.current = { key: null, repeats: 0, lastAt: 0, ignored: false };
     },
-    [latest, seek, seekBy, showOverlay, entryGuarded, canSeek, focused, sheetOpenRef],
+    [latest, seek, seekBy, showOverlay, entryGuarded, canSeek, focused, sheetOpenRef, strip],
   );
   useFocusEffect(useCallback(() => subscribeSeekKeys(onSeekKey), [onSeekKey]));
 
@@ -232,6 +258,25 @@ export function usePlayerKeys({
       if (entryGuarded()) {
         return;
       }
+      // Story 10.1: the chapter strip owns the arrows while open: ← → move
+      // its selection natively, ↑ does nothing, ↓ closes it (no seek).
+      if (strip.openRef.current) {
+        switch (type) {
+          case 'left':
+          case 'right':
+          case 'up':
+            return;
+          case 'down':
+            strip.closeStrip();
+            return;
+          case 'menu':
+          case 'info':
+            strip.closeStrip();
+            break;
+          default:
+            break;
+        }
+      }
       switch (type) {
         case 'left':
         case 'right':
@@ -243,6 +288,20 @@ export function usePlayerKeys({
           }
           return;
         case 'up':
+          // Story 10.1 (owner decision 2026-11-02, as on YouTube): ↑ again on
+          // the focused timeline opens the chapter strip (with chapters only),
+          // unless this ↑ is the one that just moved focus up from the controls.
+          if (
+            latest.current.overlay &&
+            focused.current === PLAYER_TIMELINE_ID &&
+            Date.now() - timelineFromControlsAt.current > STRIP_ENTRY_GUARD_MS &&
+            strip.openStrip()
+          ) {
+            showOverlay();
+            return;
+          }
+          showOverlay();
+          return;
         case 'down':
           showOverlay();
           return;
@@ -264,12 +323,18 @@ export function usePlayerKeys({
           }
           return;
         case 'fastForward':
-        case 'next':
           seekBy(1);
           return;
         case 'rewind':
-        case 'previous':
           seekBy(-1);
+          return;
+        // Story 10.1 (owner decision 2026-11-02): the next / previous
+        // chapter when the video has chapters; a seek step as before when not.
+        case 'next':
+          jumpChapter(1);
+          return;
+        case 'previous':
+          jumpChapter(-1);
           return;
         case 'stop':
           exitPlayer();
@@ -281,7 +346,22 @@ export function usePlayerKeys({
           return;
       }
     },
-    [latest, seek, seekBy, showOverlay, togglePause, setPlaying, entryGuarded, exitPlayer, openSettings, focused, sheetOpenRef],
+    [
+      latest,
+      seek,
+      seekBy,
+      showOverlay,
+      togglePause,
+      setPlaying,
+      entryGuarded,
+      exitPlayer,
+      openSettings,
+      focused,
+      sheetOpenRef,
+      jumpChapter,
+      strip,
+      timelineFromControlsAt,
+    ],
   );
   useTVEventHandler(onTvEvent);
 
@@ -292,6 +372,11 @@ export function usePlayerKeys({
         // The settings sheet's levels come first (the modal host and the sheet).
         if (sheetOpenRef.current) {
           return false;
+        }
+        // Story 10.1: the chapter strip next: close it (no seek), the overlay stays on the timeline.
+        if (strip.openRef.current) {
+          strip.closeStrip();
+          return true;
         }
         // A held seek target is the first Back layer: cancel it, the overlay stays.
         if (seek.isHeld()) {
@@ -306,7 +391,7 @@ export function usePlayerKeys({
         return true;
       });
       return () => sub.remove();
-    }, [latest, seek, exitPlayer, sheetOpenRef, hideOverlay]),
+    }, [latest, seek, exitPlayer, sheetOpenRef, hideOverlay, strip]),
   );
 
   return { onSurfacePress };

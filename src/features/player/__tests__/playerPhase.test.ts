@@ -13,6 +13,7 @@ const ready = (resolution: number): MediaSourceState => ({
   meta: { authorName: 'a', authorAvatarUrl: null, postTitle: 'p', videoTitle: '' },
   progress: null,
   live: null,
+  chapters: [],
   resolution,
 });
 const LOCKED: MediaSourceState = { kind: 'locked', confirmed: true, verified: true };
