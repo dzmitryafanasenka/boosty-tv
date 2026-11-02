@@ -919,6 +919,10 @@ Review fixes (2026-10-28, host-tested only): short visits write nothing (owner d
 
 Host tests: `src/shared/services/progress/__tests__/progressRepository.test.ts` (29: the finished rule and status, resume precedence, the 10 s cadence, one write in flight with the latest position, forced events, start over, seeks as movement, failure gating ≥ 10 s and the bounded automatic retry, expired hold/flush/drop, sign-out wipe, a late write after a reset, the debounced/forced disk write, cold-start load, corrupt disk, the 200-entry cap, the stale disk write undone, a load after a reset dropped, stable snapshots); `__tests__/playerProgressFlow.test.tsx` «progress and resume (Story 4.2)» (10: server only with no pre-seek t=0 and the E9 request shape, local wins, finished, multi-video + start over, hold-scrub, background and end, the vanished «С начала» fallback, failure retry, cold start from the persisted entry, log hygiene); `__tests__/postFlow.test.tsx` (status and «Продолжить» only while the player is on); `__tests__/accountScopeRegistry.test.js` (`progress` registered); `demoFlow` (the row label now ends with the status). Lint (`--max-warnings 0`), typecheck, `check:fixtures` clean; `npm test` ×3: 1494 passed each; `playerFlow` + `postFlow` + the progress suite 30/30 (187 tests each run).
 
+### Release 1.2.0 on the TV, 2026-11-02
+
+`1.2.0` (versionCode 10200) was published from `main` `8071f46` (PR #103) with Epic 11: read-only comments and the full-screen image viewer. The owner updated the pinned TV in the app over the unpublished Story 11.2 build and reported version 1.2.0 (owner). Over adb: `versionName` 1.2.0, `versionCode` 10200, and the installed `base.apk` SHA-256 `92bc6bec…2342` equals the armeabi-v7a asset digest; the app opened on Главная with the session kept (agent over adb). The TV runs a published release again.
+
 ### Story 11.2 — The «Комментарии» block on Пост, 2026-11-02
 
 **Status: implemented, host-tested and checked by the owner on the pinned TV with the remote: the comments block («всё окей») and then the image viewer («всё прошло, картинки открываются»).** `spec-11-2-comments-block-on-post.md`.
