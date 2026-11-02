@@ -8,7 +8,7 @@ scope: 'Boosty TV Android TV app (React Native TV), phases 0–3; Apple TV (tvOS
 status: final
 created: '2026-10-25'
 updated: '2026-10-31'
-binds: [FR-1..FR-57, NFR-1..NFR-9]
+binds: [FR-1..FR-66, NFR-1..NFR-9]
 sources:
   - ../../prds/prd-boosty-tv-2026-10-25/prd.md
   - ../../prds/prd-boosty-tv-2026-10-25/addendum.md
@@ -191,7 +191,8 @@ Arrows mean "may import". `shared` never imports `features` or `app`. Features n
     - **E15 polling:** it is refetched every 30 s while the Author route is focused, the app is in the foreground and a live or scheduled card is shown (`LIVE_POLL_INTERVAL_MS`, `src/features/author/useAuthorLive.tsx`; owner decision 2026-10-30 Q1 a).
     - Leaving the live player by any path invalidates it (`src/app/stackRoutes.tsx`).
     - Signed live URLs live under their own key root, with no structural sharing and a short `gcTime`. They are never refetched by a resume.
-  - **Events:** `['events']` (Story 7.5), one E18 request with `staleTime: 0`.
+  - **Events:** `['events']` (Story 7.5), one E18 request with `staleTime: 0`. *Retired with the События section (owner decision 2026-11-02, Story 12.3).*
+  - **Live plaque (FR-61, Story 12.3):** one bounded source chosen at spec time (E18, or E15 for at most N subscribed authors, sequential, TTL ≥ 5 min), refetched only on Главная focus or resume after the TTL. It replaces the `events()` invalidation on resume. A failed check renders nothing.
   - **Defaults:** `staleTime` 60 s, `gcTime` 10 min, and no focus-based refetch. `AppLifecycle` resume invalidates the visible list silently (focus is kept).
     - *As built (ADR 0010, `src/app/App.tsx`):* resume never invalidates a paged list, because a refetch of an infinite query reloads every loaded page. Instead, after the resume E1 succeeds:
       - Главная's feed and every observed `authorPosts` query get a **head refresh**: one page-1 request when the list is at least 60 s old, merged into the head (`refreshPostsHead`).
@@ -225,7 +226,7 @@ Arrows mean "may import". `shared` never imports `features` or `app`. Features n
 
 ### AD-10 — Progress ownership
 
-- **Binds:** FR-14, FR-15, FR-33, FR-43, FR-44, FR-49, FR-51
+- **Binds:** FR-14, FR-15, FR-33, FR-43, FR-44, FR-49, FR-51, FR-59, FR-60, FR-64
 - **Prevents:** the player, post and Главная disagreeing; write storms.
 - **Rule:**
   - **ProgressRepository** (`shared/services`) is the only writer of E9 and of the Continue history, and the only reader of `timeCode`.
@@ -237,6 +238,8 @@ Arrows mean "may import". `shared` never imports `features` or `app`. Features n
   - **Finished** is computed only here: ≥ 95 % or < 30 s left, using `durationSec`.
   - **UI reads progress only through `useProgress(ref)`.**
   - **On `SessionExpired`:** a pending write is held, then flushed after re-login only if the generation is unchanged (AD-4).
+  - **User removal (FR-59, Story 12.1):** `forget(ref)` for one entry and a clear-all for the account's Continue history. Both are local, written at once, and send no E9 (the server `timeCode` stays).
+  - **Feed cards (FR-60, Story 12.2)** read progress through `useProgress(ref)` like every other UI; no per-card request.
 
 ### AD-11 — Media resolution
 
@@ -467,7 +470,11 @@ flowchart LR
 | Polls (FR-40, FR-41, FR-57) | `features/polls`, `entities/poll` | AD-6, AD-7 |
 | Comments, read-only (FR-58) | `entities/comment` (E19 repository, mapper), `features/post` (CommentsBlock) | AD-7, AD-8, AD-21 |
 | Player (FR-42–51) | `features/player`, PlayerEngine, MediaResolver | AD-10, AD-11, AD-19 |
-| Events (FR-52) | `features/events` | AD-8, AD-20 |
+| Events (FR-52, retired 2026-11-02) | removed in Story 12.3 | — |
+| Continue removal, card progress, live plaque (FR-59–61) | `features/home`, ProgressRepository, `entities/stream` | AD-7, AD-10 |
+| Пост header, post QR, timestamp chips (FR-62, 63) | `features/post`, QrRenderer | AD-8, AD-9, AD-12 |
+| Sleep timer, end time (FR-64, 65) | `features/player` | AD-10 |
+| About, report a problem, account name (FR-66) | `features/settings`, `entities/user` (E1) | AD-4, AD-14 |
 | Settings, diagnostics, update check (FR-53, 54, 56) | `features/settings`, Logger, UpdateChecker | AD-14, AD-16, AD-20 |
 | Release (FR-55) | local build + GitHub Release | AD-16 |
 | NFR-1 Security | SecureStore, Logger, manifest | AD-3, AD-14 |
@@ -491,3 +498,4 @@ flowchart LR
 - **Virtualization tuning and FlashList:** measured in P3. *FlashList itself was adopted early in Story 3.1 (ADR 0011). The P3 tuning stays deferred.*
 - **Events paging:** after E18 is verified. *E18 was verified in Story 7.5. Its body has no cursor-like field, so only the first page is shown, and paging stays deferred.*
 - **Crash reporting:** none in v1 (no telemetry). It needs owner approval.
+- **Watch Next channel (system launchers):** a `WatchNext` port in `src/shared/platform` (`androidx.tvprovider`), synced with the Continue history and wiped by AccountScope. Only if the Story 12.4 spike is a go.

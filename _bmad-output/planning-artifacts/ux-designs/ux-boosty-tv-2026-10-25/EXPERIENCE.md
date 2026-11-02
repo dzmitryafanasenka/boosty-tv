@@ -3,7 +3,7 @@ name: Boosty TV
 title: "Boosty TV — Experience"
 status: final
 created: 2026-10-25
-updated: 2026-10-31
+updated: 2026-11-02
 sources:
   - ../../briefs/brief-boosty-tv-2026-10-25/brief.md
   - ../../../../docs/feature-parity.md
@@ -33,18 +33,18 @@ The sidebar is visible everywhere except in the player and on the sign-in screen
 |---|---|---|---|---|
 | Sign-in | A1–A10 | Cold start without a session; after sign-out | Phone → code → session | AUTH-03, AUTH-04, AUTH-08 |
 | Session expired | A11 | Any 401 after a failed refresh | Re-login with a prefilled phone | AUTH-05, AUTH-06 |
-| Главная | B1–B6 | Default after sign-in; sidebar | «Продолжить просмотр» (client improvement), the subscription feed, «Фильтры», «Обновить» | FEED-01, FEED-02, FEED-03, FILTER-01..04, PLAY-03 |
+| Главная | B1–B6 | Default after sign-in; sidebar | «Продолжить просмотр» (client improvement), the subscription feed, «Фильтры», «Обновить». *Planned (owner decisions 2026-11-02, `sprint-change-proposal-2026-11-02-post-1-2-0.md`):* a «в эфире» plaque above the row (Story 12.3), long-OK removal and a «Очистить всё» tile (Story 12.1), progress on cards (Story 12.2) | FEED-01, FEED-02, FEED-03, FILTER-01..04, PLAY-03 |
 | Подписки | C1–C3 | Sidebar | Author grid plus «Мой блог» | SUB-01, SUB-02 |
 | Автор | D1–D11 | Author tile, post author, event | Header, live card, posts, search in this author, filters | AUTH-PAGE-01..03, LIVE-01, LIVE-04, LIVE-05 |
 | Поиск | E1–E10 | Sidebar | Search «по подпискам» (feed scope) with filters | FEED-04, SEARCH-SCOPES, FILTER-01..04 |
-| Пост | F1–F8 | Post card, search result, «Продолжить» (via player exit) | Media rows, text, images, audio, files and links (QR), poll, read-only likes and comment count; then the read-only «Комментарии» block after the blocks (Story 11.2) | POST-01..11, POLL-01..05, COMM-01 |
+| Пост | F1–F8 | Post card, search result, «Продолжить» (via player exit) | Media rows, text, images, audio, files and links (QR), poll, read-only likes and comment count; then the read-only «Комментарии» block after the blocks (Story 11.2). *Planned (owner decisions 2026-11-02, `sprint-change-proposal-2026-11-02-post-1-2-0.md`):* a header with a large preview beside the actions and «На телефоне» (Story 13.1); timestamp chips «▶ time title» (Story 13.2) | POST-01..11, POLL-01..05, COMM-01 |
 | Плеер | G1–G12 | Media row, «Продолжить» card, live card | VOD and live playback | PLAY-01..08, PLAY-10..13 (**not** PLAY-09 download), LIVE-02, LIVE-03 |
-| События | J1–J3 | Sidebar; hidden until E18 (EVT-01) is verified (verified live and shown since Story 7.5, `events` flag on) | Events, e.g. «Начался эфир» → author | EVT-01 (client improvement) |
+| События | J1–J3 | Sidebar; hidden until E18 (EVT-01) is verified (verified live and shown since Story 7.5, `events` flag on). **Retired by the owner 2026-11-02; removed in Story 12.3, replaced by the live plaque on Главная.** | Events, e.g. «Начался эфир» → author | EVT-01 (client improvement) |
 | Настройки | K1–K4 | Sidebar | System player, version, diagnostics (hidden), sign out | SET-01, SET-02, SET-05, SET-06, AUTH-07 (**not** SET-03 light theme) |
 
 Overlays: the filter SideSheet (from Главная, Автор, Поиск), the player-settings SideSheet, QrDialog, the sign-out Dialog and the system keyboard.
 
-**Live streams on Главная.** Home does not fetch live streams: a stream comes only from the per-author endpoint (E15), and polling every subscription would cause a request storm. Home learns about a live stream through События (`video_stream_start`). A LIVE card appears in the feed only if the spike proves the feed returns stream posts.
+**Live streams on Главная.** Home does not fetch live streams: a stream comes only from the per-author endpoint (E15), and polling every subscription would cause a request storm. Home learns about a live stream through События (`video_stream_start`). **Superseded 2026-11-02 (owner decision):** События is removed, and Главная shows a «в эфире» plaque from one bounded source (E18, or E15 for a capped set of authors, sequential, TTL ≥ 5 min; Story 12.3). Unbounded per-author polling stays forbidden. A LIVE card appears in the feed only if the spike proves the feed returns stream posts.
 
 ## Voice and Tone
 
@@ -127,7 +127,7 @@ Error classes stay distinct (CLAUDE.md): session expired ≠ no access ≠ media
 | Пост › image viewer (Story 11.2, as built) | A spinner over the dark backdrop | — | «Изображение недоступно» in place; ← → still step | — | Opened by OK on a post image or a comment with images; ← → step (staying at the ends), «N / M» with several images; Back closes it and returns focus to the image or comment that opened it. |
 | Пост › «Комментарии» (Story 11.2) | A spinner line «Загружаем комментарии» inside the block (as built; not skeleton rows) | «Комментариев пока нет» | «Не удалось загрузить комментарии» + «Повторить» (page 1 again), inside the block only | The author turned comments off (`isCommentsDenied`): «Автор отключил комментарии», no request. Any other refusal (403): «Комментарии недоступны», no retry. 404: no block | «Показать ещё» / «Ещё ответы» loading: the row shows a spinner and keeps focus; a failure keeps the list and the row reads «Повторить». Every state stays inside the block; the rest of Пост keeps working. As built: newest first, «Показать ещё» appends older comments below and focus lands on the first new one; replies oldest first, one indent step; a deleted / blocked comment shows «Комментарий удалён» / «Комментарий скрыт» with its author and date. |
 | Плеер | Spinner after `{motion.buffer-delay}` | — | Recovering (one automatic re-resolve, PLAY-10) → hard error «Повторить» / «Назад» | Media not entitled → exit with a no-access message | Paused, seeking, live, stream ended, **Ended** (below) |
-| События | Skeleton list | «Событий нет» + «Обновить» (focused; refetches; Story 7.5 Q2 a) | Error + «Повторить» | — | Unknown types shown generically. Blog-owner types (donations, subscribers, stats, purchases, referrals, support, level limits, `target_new`) are hidden (Story 7.5 Q3 a); comment types are never shown. First E18 page only, no load-more. |
+| События (retired 2026-11-02) | Skeleton list | «Событий нет» + «Обновить» (focused; refetches; Story 7.5 Q2 a) | Error + «Повторить» | — | Unknown types shown generically. Blog-owner types (donations, subscribers, stats, purchases, referrals, support, level limits, `target_new`) are hidden (Story 7.5 Q3 a); comment types are never shown. First E18 page only, no load-more. |
 | Настройки | — | — | — | — | Diagnostics hidden / visible |
 
 ### Ended (recordings)
@@ -170,6 +170,7 @@ Error classes stay distinct (CLAUDE.md): session expired ≠ no access ≠ media
   - Shown on OK, ↑↓, ←→ (with the bubble) or pause, and on media keys. Fades with `{motion.overlay-fade}`.
   - Hides after `{motion.overlay-hide}` only while playing. It **never** hides while paused, while seeking, with a sheet open or on an error.
   - Initial focus is the Timeline; ↓ moves to the PlayerControls.
+  - *Planned (2026-11-02):* the end time of the video next to the remaining time (Story 14.1); a «Таймер сна» row in the settings sheet, and the remaining timer in the overlay while active (Story 14.2).
 - **Back in the player.** Settings submenu → settings sheet → overlay → exit (E9 write, restore the originating card or row).
 - **Progress writes.** Throttled to every ≥ 10 s of movement, plus on pause, on background, on Stop or exit and at the end. The identity is `video.id`, never the URL.
 - **Live player.**
@@ -228,7 +229,7 @@ Error classes stay distinct (CLAUDE.md): session expired ≠ no access ≠ media
 - *Failure:* «Ничего не найдено» + «Сбросить фильтры» (focus on that action). A load-more error appears as an inline «Повторить» row.
 
 ### Flow 5 — Live stream (the owner)
-1. События shows «Начался эфир» (when EVT-01 is enabled), or the owner opens the author directly. Focus lands on the LiveCard.
+1. События shows «Начался эфир» (when EVT-01 is enabled), or the owner opens the author directly. *Planned (2026-11-02): the «в эфире» plaque on Главная replaces События (Story 12.3).* Focus lands on the LiveCard.
 2. OK opens the live player: LIVE badge, elapsed time, no timeline.
 3. OK pauses; OK again resumes at the live edge.
 4. The stream ends → «Стрим завершён» with focus on «Назад».
@@ -291,7 +292,7 @@ Error classes stay distinct (CLAUDE.md): session expired ≠ no access ≠ media
 - For more than 30 subscriptions, show «Показаны первые 30» instead of «28 из 55».
 - **Superseded mock layouts (as built, 2026-10-31 reconcile):**
   - The post grids (Главная, Автор, Поиск) have **3 columns**, not the mocks' 4 (owner decision 2026-10-26; `Home Feed.dc.html`, `Author Page.dc.html`, `Search Screen.dc.html`, `Boosty TV - D-L.dc.html` D3, the 1280×720 notes in `Boosty TV - A B C.dc.html`).
-  - Пост is **one column with the header on top**, not two columns (owner decision 2026-10-27; `Post Screen.dc.html`, F screens in `Boosty TV - D-L.dc.html`).
+  - Пост is **one column with the header on top**, not two columns (owner decision 2026-10-27; `Post Screen.dc.html`, F screens in `Boosty TV - D-L.dc.html`). *Planned (owner decision 2026-11-02, Story 13.1):* the header becomes two parts — a 16:9 preview on the left (about 45 %), title, meta and actions on the right; the body below stays one column. Mockup: Claude Design canvas «Пост — новый макет».
   - Автор and Пост show the Shell sidebar (ADR 0012).
   - The order of the post's elements is unchanged. See `DESIGN.md › Layout & Spacing`.
 

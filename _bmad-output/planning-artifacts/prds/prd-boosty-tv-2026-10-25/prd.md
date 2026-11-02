@@ -2,7 +2,7 @@
 title: "PRD: Boosty TV"
 status: final
 created: 2026-10-25
-updated: 2026-10-25
+updated: 2026-11-02
 sources:
   - ../../briefs/brief-boosty-tv-2026-10-25/brief.md
   - ../../ux-designs/ux-boosty-tv-2026-10-25/DESIGN.md
@@ -138,7 +138,7 @@ The user can sign out after a confirmation dialog whose default focus is «От�
 The user can switch sections from the sidebar.
 - A section opens only on OK, never on focus alone.
 - Current section and focused item are visually distinct.
-- «События» stays hidden until E18 is verified (FR-52).
+- There is no «События» section (owner decision 2026-11-02; live streams surface on Главная, FR-61).
 - Only sections whose FRs are implemented in the current phase are shown. In P1 the sidebar shows Главная, Подписки and Настройки (minimal). Поиск appears in P2. No dead-end sections.
 
 #### FR-10: Back hierarchy [P1]
@@ -169,6 +169,7 @@ The user can browse the Feed, loading more as focus nears the end (FEED-01, FEED
 #### FR-14: Post-type cards [P1]
 Each card shows: preview, type badge (Видео / N видео / Аудио / Текст и фото / Опрос / Файл / Нет доступа), title (2 lines), author, date, and duration and progress when known.
 - Cards show no comment count (the count appears only in the Пост header, FR-58).
+- Video progress comes from the local store: a progress line, and «Просмотрено» when finished; for several videos, «Просмотрено» only when all are finished (FR-60).
 
 #### FR-15: «Продолжить просмотр» row [P1] [IMPROVEMENT]
 Главная shows recently played, unfinished video Media from the Continue history.
@@ -176,6 +177,25 @@ Each card shows: preview, type badge (Видео / N видео / Аудио / �
 - The row is hidden when empty. It is labeled «на этом устройстве».
 - The Continue history keeps at most 20 entries, one per media `id`. It is ordered by last played, newest first, and the oldest entry drops when the limit is exceeded.
 - An entry is removed when its Media is finished (FR-49), on sign-out and on Account switch.
+- The user can remove one entry (long OK) or clear the row («Очистить всё», confirmed). Removal is local; the server Progress is unchanged (FR-59).
+
+#### FR-59: Remove from «Продолжить просмотр» [P2] [IMPROVEMENT]
+- A long OK on a Continue card opens «Убрать из списка» / «Отмена» (focus on «Отмена»); a short OK still opens the player.
+- The last item of the row is «Очистить всё»; OK asks for confirmation (focus on «Отмена») and clears the account's Continue history.
+- Removal is local and written at once; no request is sent and the server `timeCode` is unchanged. Focus moves to the neighbour card, else the first feed card.
+- Gated on a device check that a long OK is reliably detectable on the pinned remote (Story 12.1).
+
+#### FR-60: Progress on feed cards [P2] [IMPROVEMENT]
+Completes FR-14 «progress when known».
+- A video post card with a local progress entry shows a progress line; a finished video (FR-49) shows «Просмотрено».
+- Several videos: «Просмотрено» only when all are finished; otherwise the progress of the first unfinished video.
+- Local data only: no request per card. Returning from the player updates the card without a feed refetch; focus is unchanged.
+
+#### FR-61: Live plaque on Главная [P2] [IMPROVEMENT]
+- When a subscribed author is live, Главная shows a plaque above «Продолжить просмотр» (author, «в эфире», title); OK opens the live player (FR-22).
+- One bounded live source (E18, or E15 with an author cap, sequential requests and a TTL of at least 5 minutes), chosen in Story 12.3 (NFR-3).
+- No live author or a failed check: no plaque and no error. The check never delays Главная's initial focus or the Feed.
+- Replaces the retired FR-52 События section.
 
 #### FR-16: Refresh [P2]
 The user can refresh the Feed and Subscriptions with «Обновить» (FEED-03) while keeping focus on the same card.
@@ -252,10 +272,12 @@ Each filter change refetches immediately. «Сбросить» restores the defa
 #### FR-32: Post screen [P1] [IMPROVEMENT]
 The user can open a post and see the author (OK opens the Author), title, date, read-only like count (POST-01, POST-10) and a primary «Смотреть / Продолжить» action, plus «С начала» when Progress > 0.
 - The post is fetched fresh with `comments_limit=0` (E8); its comments come from E19 (FR-58).
+- The header shows a large preview beside the title, meta and actions, and a «На телефоне» QR of the post's URL (FR-62).
 
 #### FR-33: Multiple Media per post [P1]
 Each Media in a post has its own row, Progress and status. The user plays a specific one (POST-04).
 - The primary action targets the first unfinished Media.
+- A single-video post shows no Media row; several videos show a compact row under the header (FR-62).
 
 #### FR-34: Rich text and emoji [P2]
 Text Blocks render bold, italic, underline and inline emoji (POST-02).
@@ -264,6 +286,7 @@ Text Blocks render bold, italic, underline and inline emoji (POST-02).
 #### FR-35: Links, external video and files via QR [P2]
 Inline links, external video (e.g. YouTube) and files are offered as chips that open a QR handoff (POST-02, POST-05, POST-07).
 - Signed URLs are never logged.
+- A text line that starts with a timestamp is rendered as one chip «▶ time title»; a timestamp inside a paragraph gets a chip after it (FR-63).
 
 #### FR-36: Images [P2]
 Image Blocks render inline and are focus stops. A failed image shows a placeholder (POST-03).
@@ -280,6 +303,18 @@ An unknown or malformed Block renders a neutral placeholder or is skipped. Unkno
 - No posting, liking or deleting comments. Loading, empty, error and denied states stay inside the block.
 - Comment data is account-scoped and never logged.
 - Parity: COMM-01 (reference: read-only list, show more, replies).
+
+#### FR-62: Пост header with a large preview and the post's QR [P2] [IMPROVEMENT]
+Owner decision 2026-11-02; approved mockup (Claude Design canvas «Пост — новый макет»).
+- A video post's header has a 16:9 preview on the left (about 45 % of the content width; duration and progress; not focusable) and, on the right, the title, meta, a media line and the buttons «Продолжить / Смотреть», «С начала» (Progress > 0) and «На телефоне».
+- One video: no Media row. Several videos: the preview and the primary target the first unfinished one, and a compact row «Видео в посте · N» follows the header.
+- «На телефоне» opens a QrDialog with the post's boosty.to URL; Back returns to the button.
+- The body below the header stays one column; initial focus stays on the primary button.
+
+#### FR-63: Timestamp chips [P2] [IMPROVEMENT]
+- A text line that starts with a timestamp of a video in this post renders as one chip «▶ time title», and the plain line is not rendered. Consecutive chips form a tight list.
+- A timestamp inside a paragraph keeps the text; a chip «▶ time» follows the paragraph.
+- OK opens the player at that second (Story 6.3 rules unchanged).
 
 ### 4.8 Audio
 
@@ -332,7 +367,7 @@ The overlay shows the post title, the video title, the author [IMPROVEMENT], the
 - Play/Pause, FF/Next, Prev/Step-back, Rew [IMPROVEMENT] and Stop are supported.
 - Menu/Info/Settings opens the settings.
 
-The overlay auto-hides after 5 s only while playing. It never hides while paused, seeking, with a sheet open or on an error.
+The overlay also shows the end time of the video (FR-65). The overlay auto-hides after 5 s only while playing. It never hides while paused, seeking, with a sheet open or on an error.
 
 #### FR-46: Quality selection [P1]
 The user can choose among the available variants only. Adaptive streams appear as «Авто». The «· 1080p» suffix is shown only if the player reports it (PLAY-02).
@@ -350,6 +385,14 @@ On a player error, the app re-fetches the post (or stream), matches the Media by
 - **End of playback** is the player reaching the actual end of the stream. The player writes the final Progress and exits to its origin, with focus on the next unfinished Media (or the card).
 - No autoplay of the next item (PLAY-14 out of scope).
 
+#### FR-64: Sleep timer [P2] [IMPROVEMENT]
+- The player settings sheet has «Таймер сна»: «Выкл», fixed durations and «До конца видео». Default off, not persisted across player sessions.
+- The overlay shows the remaining time while a timer is active.
+- When it fires, playback pauses and Progress is written at that position (live: pause, no Progress). Leaving the player or changing the video cancels it.
+
+#### FR-65: End time in the player overlay [P2] [IMPROVEMENT]
+- For a seekable video with a known duration, the overlay shows the clock time the video ends at the current speed (24-hour, device clock), updated at least once a minute and after a seek or speed change. Hidden for live and unknown durations.
+
 #### FR-50: External system player [P2]
 With «Системный видеоплеер» on, the user picks a quality and the video opens in an external Android player via the chooser (PLAY-13). *As built (Story 8.2): one real player opens directly; 2+ get the chooser.*
 - Progress is not tracked in this mode, and the setting says so.
@@ -358,9 +401,11 @@ With «Системный видеоплеер» on, the user picks a quality an
 #### FR-51: Lifecycle behavior [P1]
 On sleep or background, playback pauses and Progress is written. On return, the player shows the paused overlay, and resuming re-resolves the URL if it has expired. Player resources are released on exit.
 
-### 4.11 Events [IMPROVEMENT]
+### 4.11 Events [RETIRED]
 
-#### FR-52: Events list [P2, gated]
+FR-52 was shipped in Story 7.5 and retired by the owner on 2026-11-02: the section was never used, and one live event was observed. Live streams surface on Главная instead (FR-61).
+
+#### FR-52: Events list [P2, gated] [RETIRED 2026-11-02]
 After E18 is verified live, the user can see a list of Events. A «Начался эфир» event opens the Author with the live card focused.
 - Unknown event types are shown generically.
 - Until E18 is verified, the section stays hidden (EVT-01).
@@ -368,11 +413,17 @@ After E18 is verified live, the user can see a list of Events. A «Началс�
 ### 4.12 Settings and Diagnostics
 
 #### FR-53: Settings screen [P1 minimal, P2 full]
-Настройки contains the app version and «Выйти из аккаунта» in P1 (SET-06, AUTH-07). «Системный видеоплеер» (SET-02) is added in P2 together with FR-50 (SET-01).
+Настройки contains the app version and «Выйти из аккаунта» in P1 (SET-06, AUTH-07). «Системный видеоплеер» (SET-02) is added in P2 together with FR-50 (SET-01). Настройки also has «О приложении», «Сообщить о проблеме» and the account name with «Выйти из аккаунта» (FR-66).
 
 #### FR-54: Diagnostics for testing [P2]
 Seven OK presses on «Версия» reveal Diagnostics. It can capture logs for testing and debugging and explains how to retrieve them (adb) (SET-05).
 - Logs are redacted: no tokens, cookies, phone, code, signed URLs or personal data.
+
+#### FR-66: About, report a problem and the account name [P2] [IMPROVEMENT]
+- «О приложении»: the app name, version, «Неофициальный клиент Boosty, не связан с Boosty», «Лицензия MIT» and a QR to the GitHub repository.
+- «Сообщить о проблеме»: a QR to a new GitHub issue with the bug template, with the version and device model prefilled if GitHub supports it for issue forms. The URL never carries account data.
+- «Выйти из аккаунта» shows the account's display name when E1 provides one (field verified in Story 15.2). The phone number is never shown; the name is never logged.
+- Separate rows, not one screen (owner decision 2026-11-02).
 
 ### 4.13 Distribution
 
@@ -427,7 +478,7 @@ The app checks the latest release of the public project repository (GitHub Relea
 - No light theme, multiple accounts or profiles.
 - No payments, subscribing, prices, donations, analytics or telemetry.
 - No sign-in via the website, QR or a companion phone.
-- No global Boosty search, recommendations, sorting, subtitles, audio tracks, chapters or seek thumbnails.
+- No global Boosty search, recommendations, sorting or seek thumbnails. No subtitles or audio tracks: Boosty does not provide them (PLAY-14, checked 2026-10-27). Chapters are shipped (Epic 10).
 - No live chat and no live DVR/seek.
 - No silent or background update install; in-app install only after the user's explicit OK and the system installer's confirmation (FR-56, owner decision 2026-11-01). No Google Play publication in v1.
 - No own backend, proxy or cloud sync. Continue history is device-local.
@@ -469,7 +520,7 @@ The MVP proves UJ-0, UJ-1, UJ-2 and UJ-3 on the device. Per CLAUDE.md it is **no
   - polls (FR-40, FR-41, FR-57);
   - speed (FR-47);
   - the external player (FR-50);
-  - Events, gated (FR-52);
+  - Events, gated (FR-52; retired 2026-11-02);
   - full Settings and Diagnostics (FR-53 P2 part, FR-54).
 - **[P3], polish and release:**
   - the release APK and GitHub Release (FR-55);
@@ -478,7 +529,7 @@ The MVP proves UJ-0, UJ-1, UJ-2 and UJ-3 on the device. Per CLAUDE.md it is **no
   - visual fidelity;
   - device regression.
 
-Post-release (P2+): read-only comments, FR-58 (Epic 11).
+Post-release (P2+): read-only comments, FR-58 (Epic 11). Everyday improvements FR-59–FR-66 (Epics 12–15, owner decisions 2026-11-02).
 
 Sign-out (FR-8) was moved into P1 by the owner (2026-10-25) so that logout and re-login can be tested in the slice.
 
@@ -522,6 +573,10 @@ Dependency: **phase 0 (spike) must pass before production implementation of the 
 6. Refresh-token rotation and lifetime (caps SM-2) → spike S4.
 7. Create `docs/focus-map.md` (English) from the design focus map and EXPERIENCE.md → during architecture or P1.
 8. What do E19's response, paging and locked-post behaviour look like? → Story 11.1 probe.
+9. Is a long OK press detectable on the pinned remote? → Story 12.1.
+10. Which live source is cheap enough for Главная (E18 or capped E15)? → Story 12.3.
+11. Does Aero TV read the system Watch Next channel? → Story 12.4.
+12. Which E1 field carries the display name? → Story 15.2.
 
 ## 11. Assumptions Index
 
