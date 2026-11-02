@@ -27,10 +27,23 @@ export function likesLabel(n: number): string {
   return tp('post.likes', n).replace('{n}', String(n));
 }
 
-/** «12 окт · 5 лайков», or the date alone when the post has no like count. */
+/** «29 комментариев» (Story 11.2); the `ru` forms carry `{n}`. */
+export function commentCountLabel(n: number): string {
+  return tp('post.commentCount', n).replace('{n}', String(n));
+}
+
+/**
+ * «12 окт · 5 лайков · 29 комментариев» (Story 11.2): the date, then the like
+ * count and the comment count, each left out when the API gives none (the
+ * comment count also when the author turned comments off).
+ */
 export function postMetaLine(post: Post, nowMs?: number): string {
   const date = formatCardDate(post.publishedAt, nowMs);
-  return post.likeCount === null ? date : tf('post.meta', { date, likes: likesLabel(post.likeCount) });
+  const head = post.likeCount === null ? date : tf('post.meta', { date, likes: likesLabel(post.likeCount) });
+  // The author turned comments off: no count (the block says so instead).
+  return post.commentCount === null || post.commentsDenied
+    ? head
+    : tf('post.metaMore', { head, part: commentCountLabel(post.commentCount) });
 }
 
 type AuthorRowProps = {
@@ -88,8 +101,9 @@ export type PostHeaderProps = {
  * container spans the content width; inside it: the author row (OK → Автор,
  * as wide as its content), the title
  * (≤ 6 lines; fallback: the first text, then «Без названия», as PostCard)
- * and the meta line «date · N лайков» (the like count is read-only, never
- * focusable; no comment count).
+ * and the meta line «date · N лайков · M комментариев» (Story 11.2; both
+ * counts are read-only and never focusable; each is left out when the API
+ * gives none).
  */
 export function PostHeader({
   post,

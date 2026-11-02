@@ -9,6 +9,7 @@ import {
   type ScrollViewInstance,
 } from 'react-native';
 import type { HttpClient } from '../../shared/api';
+import { useComments } from '../../shared/entities/comment';
 import {
   isFocusStop,
   postBodyItems,
@@ -47,7 +48,14 @@ import {
   type PlayAt,
   type OpenQr,
 } from './PostBody';
+import {
+  PostComments,
+  postCommentId,
+  postCommentPrefix,
+  postCommentsRetryId,
+} from './comments/PostComments';
 import { LOCKED_NOTICE_GAP, LockedNotice } from './LockedNotice';
+import { ImageViewer, type OpenImages } from './ImageViewer';
 import { PostHeader, PostHeaderSkeleton } from './PostHeader';
 import { useAudioSource, useFileTarget, usePost } from './usePost';
 
@@ -65,6 +73,18 @@ export const postVideoId = (postId: string, mediaId: string) =>
 export const postPrimaryId = (postId: string) => `post/${postId}/primary`;
 /** «С начала», to the right of the primary (Story 4.2, owner decision 2026-10-28). */
 export const postRestartId = (postId: string) => `post/${postId}/restart`;
+/**
+ * Story 11.2: the «Комментарии» block's ids: rows are `post/<postId>/` +
+ * `comment/<commentId>`; the actions `post/<postId>/` + `comments/more`,
+ * `comments/retry` and `comments/replies/<commentId>`.
+ */
+export {
+  postCommentId,
+  postCommentPrefix,
+  postCommentsMoreId,
+  postCommentsRetryId,
+  postRepliesMoreId,
+} from './comments/PostComments';
 
 /**
  * The primary's target (Story 4.2): the first unfinished video; `resume`
@@ -257,6 +277,24 @@ export function PostScreen({
   const restartId = postRestartId(postId);
   // Stories 6.6–6.7: the poll's stops, `post/<postId>/poll/…` (`features/polls`).
   const pollIds = useMemo(() => pollFocusIds(contentPrefix), [contentPrefix]);
+  // Story 11.2: the «Комментарии» block (read-only), only for an accessible
+  // post whose author has not turned comments off; page 1 once it is shown.
+  // Every id of the block shares this prefix (`post/<postId>/` + `comment`):
+  // the rows (`postCommentId`) and the action rows («Показать ещё»,
+  // «Повторить», «Ещё ответы»).
+  const commentPrefix = postCommentPrefix(postId).slice(0, -1);
+  const showComments = post !== null && post.hasAccess;
+  const comments = useComments(http, blogUrl, postId, showComments && !post.commentsDenied);
+  const commentsView = comments.view;
+  /** The block's first stop: the first comment, else the error's «Повторить»; null: none. */
+  const firstCommentStopId =
+    commentsView.kind === 'ready' && commentsView.comments.length > 0
+      ? postCommentId(postId, commentsView.comments[0].id)
+      : commentsView.kind === 'error'
+        ? postCommentsRetryId(postId)
+        : null;
+  const firstCommentStopRef = useLatestRef(firstCommentStopId);
+  const commentPrefixRef = useLatestRef(commentPrefix);
 
   // The MediaRows (an accessible post's videos with an id, deduped) and the
   // body: the other blocks of an accessible post, the teaser of a locked one
@@ -470,6 +508,15 @@ export function PostScreen({
         return;
       }
       const current = info.current();
+      // Story 11.2: the remembered comment row or action row is gone: the block's first row.
+      if (current !== null && current.startsWith(commentPrefixRef.current) && !views.current.has(current)) {
+        const first = firstCommentStopRef.current;
+        const firstView = first === null ? undefined : views.current.get(first);
+        if (firstView) {
+          requestHostFocus(firstView);
+          return;
+        }
+      }
       // «С начала» opened the player and is gone now (that video is
       // finished): the primary instead (Story 4.2).
       if (current === restartRef.current && !views.current.has(current)) {
@@ -482,7 +529,7 @@ export function PostScreen({
       if (!(current !== null && current !== info.sectionItemId && info.focusZoneTarget())) {
         info.focusSidebar();
       }
-    }, [phaseRef, restartRef, primaryRef]),
+    }, [phaseRef, restartRef, primaryRef, commentPrefixRef, firstCommentStopRef]),
   );
 
   usePhaseChange(phase, () => {
@@ -596,6 +643,51 @@ export function PostScreen({
     }
   }, [rows, items, showPrimary, showRestart, blockPrefix, videoPrefix, pollIds, primaryId, restartId, focusInitial, focusAfterUnmount, focusLaidOut, phaseRef, postId]);
 
+  // Story 11.2: «Показать ещё», «Ещё ответы» and «Повторить» move focus
+  // themselves once their load ends (`focusLaidOut`); the action row that
+  // started such a move is left to it by the fallback below.
+  const commentMoveFrom = useRef<string | null>(null);
+  const moveCommentFocus = useCallback(
+    (fromId: string, candidates: readonly string[]) => {
+      commentMoveFrom.current = fromId;
+      focusLaidOut(fromId, candidates);
+    },
+    [focusLaidOut],
+  );
+
+  // Story 11.2: the comments changed and the focused stop of the block (a
+  // row or an action row) is gone: the block's first stop, else the initial
+  // element.
+  useEffect(() => {
+    const info = focusRef.current;
+    const current = info.current();
+    if (current !== null && current === commentMoveFrom.current) {
+      // Its own move (above) handles it.
+      commentMoveFrom.current = null;
+      return;
+    }
+    if (
+      phaseRef.current === 'ready' &&
+      info.isActive() &&
+      current !== null &&
+      current.startsWith(commentPrefix) &&
+      !views.current.has(current)
+    ) {
+      if (lastFocused.current === current) {
+        lastFocused.current = null;
+      }
+      focusAfterUnmount(current, () => {
+        const first = firstCommentStopRef.current;
+        const firstView = first === null ? undefined : views.current.get(first);
+        if (firstView) {
+          requestHostFocus(firstView);
+        } else {
+          focusInitial();
+        }
+      });
+    }
+  }, [commentsView, commentPrefix, focusAfterUnmount, focusInitial, phaseRef, firstCommentStopRef]);
+
   // Story 6.3: OK on a link, file or external-video chip → the QrDialog in
   // the modal host (focus trapped; «Закрыть» or Back returns it to the chip).
   // Only while Пост is the focused route (a file's E8 can land after a pop).
@@ -606,6 +698,19 @@ export function PostScreen({
         return;
       }
       modal.open(<QrDialog title={title} value={value} onClose={() => modal.close()} />, initiator);
+    },
+    [modal],
+  );
+  // Story 11.2 (owner decision 2026-11-02): OK on an image stop or a comment
+  // with images → the full-screen viewer in the modal host (`fill`: focus
+  // trapped, Back closes it first and returns focus to the initiator). Only
+  // while Пост is the focused route.
+  const onOpenImages = useCallback<OpenImages>(
+    (images, index, initiator) => {
+      if (!focusRef.current.isActive() || modal.isOpen() || images.length === 0) {
+        return;
+      }
+      modal.open(<ImageViewer images={images} initialIndex={index} />, initiator, { placement: 'fill' });
     },
     [modal],
   );
@@ -743,7 +848,22 @@ export function PostScreen({
               resolveAudio={playerEnabled ? resolveAudio : undefined}
               active={routeFocused}
               pollVote={pollVote}
+              onOpenImages={onOpenImages}
             />
+            {showComments ? (
+              <PostComments
+                postId={postId}
+                http={http}
+                blogUrl={blogUrl}
+                authorOff={post.commentsDenied}
+                state={comments}
+                columnWidth={columnWidth}
+                onView={onStopView}
+                onFocus={onStopFocus}
+                moveFocus={moveCommentFocus}
+                onOpenImages={onOpenImages}
+              />
+            ) : null}
           </ScrollView>
         ) : (
           <View

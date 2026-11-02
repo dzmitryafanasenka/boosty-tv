@@ -585,7 +585,8 @@ function demoPostDetail(blogUrl: string, postId: string) {
     ...base,
     data: base.hasAccess ? [...videos, ...DEMO_PARAGRAPHS.flatMap(textBlock), ...mixed] : [],
     teaser: base.hasAccess ? [] : [{ type: 'image', id: `demo-teaser-${n}`, width: 1280, height: 720 }],
-    count: { likes: (n * 7) % 40, comments: 0 },
+    // Story 11.2: the header's comment count matches the demo E19 comments.
+    count: { likes: (n * 7) % 40, comments: demoCommentCount(n) },
     // Stories 6.3–6.4: a fake signed query (the file QR's target, the demo
     // audio's source), never a real one.
     signedQuery: base.hasAccess ? '?demo=1' : '',

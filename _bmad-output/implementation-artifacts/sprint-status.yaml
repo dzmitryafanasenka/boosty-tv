@@ -123,8 +123,8 @@ development_status:
   epic-10-retrospective: optional
 
   epic-11: in-progress
-  11-1-comments-endpoint-probe-and-entity: review
-  11-2-comments-block-on-post: backlog
+  11-1-comments-endpoint-probe-and-entity: done
+  11-2-comments-block-on-post: review
   epic-11-retrospective: optional
 action_items:
   - id: "epic-2-retro-item-1-route-the-a2-a5-auth-api-calls-send-rese"

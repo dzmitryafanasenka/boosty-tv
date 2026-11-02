@@ -126,6 +126,7 @@ describe('E19 page', () => {
       intId: 1201,
       author: { name: 'redacted', avatarUrl: 'https://example.invalid/avatar' },
       replyTo: null,
+      hidden: null,
       blocks: [
         { type: 'text', text: 'Sample text', spans: [], paragraphEnd: false },
         { type: 'text', text: '', spans: [], paragraphEnd: true },
@@ -402,6 +403,23 @@ describe('mapComments', () => {
     expect(comment.replies).toHaveLength(2);
     expect(comment.replyCount).toBe(5);
     expect(comment.hasMoreReplies).toBe(false);
+  });
+
+  it('Story 11.2: isDeleted / isBlocked → hidden (deleted wins); missing or not a boolean → null; author and date kept', () => {
+    const [deleted, blocked, both, shown, odd] = map([
+      { ...base, id: 'c-1', isDeleted: true },
+      { ...base, id: 'c-2', isBlocked: true },
+      { ...base, id: 'c-3', isDeleted: true, isBlocked: true },
+      { ...base, id: 'c-4', isDeleted: false, isBlocked: false },
+      { ...base, id: 'c-5', isDeleted: 'yes', isBlocked: 1 },
+    ]);
+    expect(deleted.hidden).toBe('deleted');
+    expect(deleted.author.name).toBe((base.author as { name: string }).name);
+    expect(deleted.createdAt).toBe(base.createdAt);
+    expect(blocked.hidden).toBe('blocked');
+    expect(both.hidden).toBe('deleted');
+    expect(shown.hidden).toBeNull();
+    expect(odd.hidden).toBeNull();
   });
 
   it('the domain carries no raw DTO field (reactions, flags, parent ids)', () => {

@@ -1,8 +1,8 @@
-import { memo, useState } from 'react';
+import { memo, useState, type RefObject } from 'react';
 import { Image, StyleSheet, View, type ImageLoadEvent } from 'react-native';
 import { useColumnStop, type StopFocusHandler, type StopViewHandler } from '../../../shared/focus';
 import { t } from '../../../shared/i18n';
-import { FocusableSurface, Text, colors, rounded, spacing } from '../../../shared/ui';
+import { FocusableSurface, Text, colors, rounded, spacing, type HostView } from '../../../shared/ui';
 import { DEFAULT_ASPECT, aspectOf, blockStyles } from './blockStyles';
 import { BlockPlaceholder } from './TextBlocks';
 
@@ -98,6 +98,12 @@ type ImageStopProps = {
   columnWidth: number | null;
   onView: StopViewHandler;
   onFocus: StopFocusHandler;
+  /**
+   * Story 11.2 (owner decision 2026-11-02): OK opens the full-screen image
+   * viewer on this image; `initiator` is the stop (focus returns there).
+   * Absent: OK does nothing (Story 6.2).
+   */
+  onOpen?: (initiator: RefObject<HostView | null>) => void;
 };
 
 /**
@@ -119,8 +125,9 @@ export const ImageStop = memo(function ImageStopView({
   columnWidth,
   onView,
   onFocus,
+  onOpen,
 }: ImageStopProps) {
-  const { ref, handleFocus } = useColumnStop(id, onView, onFocus);
+  const { ref, viewRef, handleFocus } = useColumnStop(id, onView, onFocus);
   // Per URL, as the teaser image: a refetch with a new URL starts over.
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const [loaded, setLoaded] = useState<{ url: string; aspect: number } | null>(null);
@@ -148,11 +155,14 @@ export const ImageStop = memo(function ImageStopView({
       radius={rounded.md}
       // No scale (not `focus.scale-row`): a 600 dp image scaled past the
       // column would overlap the text around it; the ring marks focus.
-      // OK has no action, so no press feedback either.
+      // No press feedback: OK opens the viewer (Story 11.2), never a «click».
       scaleFocus={1}
       scalePressed={1}
-      accessibilityRole="image"
-      accessibilityLabel={failed ? t('post.imageUnavailable') : t('post.block.image')}
+      accessibilityRole={onOpen ? 'imagebutton' : 'image'}
+      accessibilityLabel={
+        failed ? t('post.imageUnavailable') : onOpen ? t('post.imageViewer.a11yOpen') : t('post.block.image')
+      }
+      onPress={onOpen ? () => onOpen(viewRef) : undefined}
       onFocus={handleFocus}
       style={styles.imageStop}
     >

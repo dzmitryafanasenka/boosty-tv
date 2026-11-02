@@ -397,10 +397,13 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-11-1-comments-endpoint-probe-and-entity.md`
   summary: Story 11.2 must define how «Ещё ответы» merges the inline replies with the `parent_id` list (the live `parent_id` page returned all replies, the inline ones included).
   evidence: Story 11.1 review BH5; the entity returns both lists separately.
+  status: Done 2026-11-02 (Story 11.2): `useCommentReplies` merges the inline replies with every loaded `parent_id` page, deduped by id, oldest first by `intId`; focus moves to the first reply not shown before (host-tested).
 - source_spec: `_bmad-output/implementation-artifacts/spec-11-1-comments-endpoint-probe-and-entity.md`
   summary: Story 11.2 decides how a deleted or blocked comment is shown (`isDeleted` / `isBlocked` are in the live shape but were never seen true, and the entity does not read them).
   evidence: Story 11.1 review BH8 (medium, unverified).
+  status: Done 2026-11-02 (Story 11.2): the DTO reads both flags as optional booleans; the entity's `hidden` is `deleted` / `blocked` (deleted wins) and the row shows «Комментарий удалён» / «Комментарий скрыт» instead of the content, keeping the author and date (host-tested; the `true` case is still never seen live).
 - source_spec: `_bmad-output/implementation-artifacts/spec-11-1-comments-endpoint-probe-and-entity.md`
   summary: Story 11.2 checks whether every E19 403 means «denied» (only a locked post was probed; an author-disabled thread, `isCommentsDenied`, was not), and whether a dead token answers 403 rather than 401.
   evidence: Story 11.1 review BH6 / BH7 (maybe-false); settle by a counts-only check or the device pass.
+  status: Done 2026-11-02 (Story 11.2), by design rather than by a probe: an author-disabled thread is read from the post's `isCommentsDenied` and sends no E19 request («Автор отключил комментарии»); any other 403 is shown as «Комментарии недоступны» inside the block only, never as a session problem (no refresh, no sign-in screen). Whether a dead token answers E19 with 403 or 401 stays unverified; a 401 still goes through the single-flight refresh.
 

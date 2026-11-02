@@ -126,6 +126,13 @@ export type Post = {
   levelName: string | null;
   /** `count.likes` (read-only, Story 3.4); null when the API gives none. */
   likeCount: number | null;
+  /**
+   * `count.comments` (read-only, Story 11.2): only the Пост header shows
+   * it; null when the API gives none. Cards never show it.
+   */
+  commentCount: number | null;
+  /** `isCommentsDenied` (Story 11.2): the author turned comments off; no E19 request. */
+  commentsDenied: boolean;
   /** `isPinned`: the author pinned it (E4 puts it first); the Author page marks it. */
   pinned: boolean;
   /**

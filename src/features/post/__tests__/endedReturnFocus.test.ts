@@ -26,6 +26,8 @@ const post = (blocks: Post['blocks']): Post => ({
   durationSec: null,
   levelName: null,
   likeCount: null,
+  commentCount: null,
+  commentsDenied: false,
   pinned: false,
   poll: null,
   pollUnsupported: null,

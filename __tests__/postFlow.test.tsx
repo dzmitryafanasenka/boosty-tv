@@ -9,9 +9,10 @@
  * and which guide destinations it sets, not native focus movement (device
  * checks, docs/testing.md).
  */
+import { StackActions } from '@react-navigation/native';
 import { notifyManager } from '@tanstack/react-query';
 import { act } from 'react';
-import { StyleSheet } from 'react-native';
+import { DeviceEventEmitter, StyleSheet } from 'react-native';
 import App, { navigationRef } from '../src/app/App';
 import { queryClient, resetQueryCache } from '../src/app/queryClient';
 import { QUERY_STALE_TIME_MS, queryKeys } from '../src/shared/api';
@@ -275,8 +276,12 @@ describe('open from Главная (matrix «Text post», «Likes»)', () => {
     expect(call.headers.Authorization).toBe(`Bearer ${'a'.repeat(64)}`);
     expect(call.headers['X-App']).toBeUndefined();
     expect(call.headers['X-From-Id']).toBeUndefined();
-    expect(transport.calls.every(c => !/comment/.test(c.path))).toBe(true);
-    // Left: author row, title, date · likes (not focusable).
+    // Story 11.2: one E19 (page 1 of the read-only comments), GET, after E8.
+    const commentCalls = transport.calls.filter(c => /comment/.test(c.path));
+    expect(commentCalls.map(c => [c.method, c.url])).toEqual([
+      ['GET', `https://api.boosty.to/v1/blog/${FEED_BLOG}/post/${id}/comment/?limit=20&reply_limit=2&order=top`],
+    ]);
+    // Left: author row, title, date · likes · comments (not focusable).
     expect(text(byTestId(root, AUTHOR(id))[0])).toContain('redacted');
     expect(one(root, AUTHOR(id)).props.accessibilityLabel).toBe(
       'Автор: redacted. Открыть страницу автора',
@@ -293,9 +298,10 @@ describe('open from Главная (matrix «Text post», «Likes»)', () => {
       BLOCK(id, 'text@4'),
     ]);
     expect(one(root, BLOCK(id, 'text@2')).props.accessibilityLabel).toBe('Second');
-    // No comment count (7 in the body), price, reaction or «Смотреть» anywhere.
-    expect(byTestId(root, 'post/meta')[0].props.children).toMatch(/^[^·]+ · 5 лайков$/);
-    for (const forbidden of ['коммент', '₽', 'RUB', 'Смотреть', 'Оформить', 'реакц']) {
+    // Story 11.2: the comment count (7 in the body) in the meta line only; no
+    // price, reaction or «Смотреть» anywhere.
+    expect(byTestId(root, 'post/meta')[0].props.children).toMatch(/^[^·]+ · 5 лайков · 7 комментариев$/);
+    for (const forbidden of ['₽', 'RUB', 'Смотреть', 'Оформить', 'реакц']) {
       expect(pageText(root)).not.toContain(forbidden);
     }
     // Initial focus: the first paragraph (after the skeleton's sidebar item).
@@ -1909,9 +1915,12 @@ describe('locked posts (Story 3.6, focus-map §4 F)', () => {
     const id = FEED_ID(0);
     const e1Calls = transport.callsTo(E1).length;
     const page = pageText(root);
-    for (const forbidden of ['990', '₽', 'RUB', 'USD', 'EUR', 'руб', 'Подписаться', 'QR', 'коммент']) {
+    for (const forbidden of ['990', '₽', 'RUB', 'USD', 'EUR', 'руб', 'Подписаться', 'QR']) {
       expect(page).not.toContain(forbidden);
     }
+    // Story 11.2: no «Комментарии» block and no E19 request on a locked post.
+    expect(visible(root, 'post/comments')).toBe(false);
+    expect(transport.calls.filter(c => /comment/.test(c.path))).toHaveLength(0);
     // The only button on the page is the author row; the copy is text.
     const buttons = byTestId(root, 'post/page')[0]
       .queryAll((n: any) => typeof n.type === 'string' && n.props.accessibilityRole === 'button')
@@ -1966,7 +1975,7 @@ describe('Story 6.2: images in a post', () => {
     const image = BLOCK(id, 'image:i1');
     expect(contentIds(root)).toEqual([AUTHOR(id), BLOCK(id, 'text@0'), image, BLOCK(id, 'text@3')]);
     expect(lastFocusTarget()).toBe(BLOCK(id, 'text@0'));
-    expect(one(root, image).props.accessibilityLabel).toBe('Изображение');
+    expect(one(root, image).props.accessibilityLabel).toBe('Изображение. Открыть на весь экран');
     const img = byTestId(root, `${image}/image`)[0];
     expect(img.props.source).toEqual({ uri: IMG });
     // 4:3 at most 300 dp tall → 400 × 300 (under the 600 dp text measure).
@@ -3412,6 +3421,642 @@ describe('Story 6.7: multiple-choice poll', () => {
     expect(pollIds(root, id)).toEqual([POLL_ROOT(id)]);
     await press(root, POLL_ROOT(id));
     expect(pollCalls()).toEqual([]);
+    await unmount(root);
+  });
+});
+
+describe('Story 11.2: the «Комментарии» block (read-only)', () => {
+  const POST0 = FEED_ID(0);
+  const ROW = (commentId: string) => `post/${POST0}/comment/${commentId}`;
+  const MORE = `post/${POST0}/comments/more`;
+  const RETRY = `post/${POST0}/comments/retry`;
+  const REPLIES_MORE = (commentId: string) => `post/${POST0}/comments/replies/${commentId}`;
+  const BASE = 7000;
+  const TEXT = (k: number) => `Comment ${k}`;
+
+  /** Synthetic E19 item `k` (intId BASE + k), the live shape. */
+  const item = (k: number, extra: Record<string, unknown> = {}): Record<string, unknown> => ({
+    id: `c-${k}`,
+    intId: BASE + k,
+    author: { id: 1, name: `User ${k}`, avatarUrl: '', hasAvatar: false, isOfficial: false },
+    createdAt: 1_700_000_000 + k * 60,
+    data: paragraph(TEXT(k)),
+    isBlocked: false,
+    isDeleted: false,
+    replyCount: 0,
+    replies: { data: [], extra: { isFirst: true, isLast: true } },
+    reactions: {},
+    reactionCounters: [],
+    ...extra,
+  });
+  const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
+
+  /** The live paging rule: the newest 20 below `offset`, ascending; `isLast` when none older remains. */
+  const pageOf = (all: ReadonlyArray<Record<string, unknown>>, url: string): FixtureReply => {
+    const offset = Number(new URL(url).searchParams.get('offset') ?? Infinity);
+    const below = all.filter(i => (i.intId as number) < offset);
+    const start = Math.max(0, below.length - 20);
+    return { status: 200, body: { data: below.slice(start), extra: { isFirst: offset === Infinity, isLast: start === 0 } } };
+  };
+
+  const E19 = /^\/v1\/blog\/[^/]+\/post\/[^/]+\/comment\/$/;
+  let e19: (req: FixtureRequest) => Reply;
+  const e19Calls = () => transport.calls.filter(c => E19.test(c.path));
+  const rowIds = (root: Root) =>
+    focusableIds(root, byTestId(root, 'post/comments')[0]).filter(id => id.startsWith(`post/${POST0}/comment`));
+
+  beforeEach(() => {
+    installFrameQueue();
+    e19 = req => pageOf(range(1, 45).map(k => item(k)), req.url);
+    transport = installFixtureTransport(req => (E19.test(req.path) ? e19(req) : fullHandler(req)));
+  });
+
+  it.each([
+    [29, '5 лайков · 29 комментариев'],
+    [1, '5 лайков · 1 комментарий'],
+    [3, '5 лайков · 3 комментария'],
+  ])('header: count.comments %i → «… · %s» (not focusable)', async (comments, tail) => {
+    e8 = (_req, blogUrl, postId) => ({
+      status: 200,
+      body: postDetail(blogUrl, postId, THREE, { count: { likes: 5, comments } }),
+    });
+    const root = await openFromHome();
+    const meta = byTestId(root, 'post/meta')[0];
+    expect(meta.props.children).toMatch(new RegExp(`^[^·]+ · ${tail}$`));
+    expect(meta.props.focusable).toBeUndefined();
+    await unmount(root);
+  });
+
+  it('header: no count.comments → no comment part; likes missing too → the date alone', async () => {
+    e8 = (_req, blogUrl, postId) => ({ status: 200, body: postDetail(blogUrl, postId, THREE, { count: { likes: 5 } }) });
+    const root = await openFromHome();
+    expect(byTestId(root, 'post/meta')[0].props.children).toMatch(/^[^·]+ · 5 лайков$/);
+    await unmount(root);
+    await resetQueryCache();
+    e8 = (_req, blogUrl, postId) => ({ status: 200, body: postDetail(blogUrl, postId, THREE, { count: { comments: 4 } }) });
+    const other = await openFromHome();
+    expect(byTestId(other, 'post/meta')[0].props.children).toMatch(/^[^·]+ · 4 комментария$/);
+    await unmount(other);
+  });
+
+  it('first page: 20 rows newest first after the blocks, then «Показать ещё»; one GET; rows are stops with name, content and date; initial focus unchanged', async () => {
+    const root = await openFromHome();
+    expect(e19Calls().map(c => c.method)).toEqual(['GET']);
+    expect(byTestId(root, 'post/comments-title')[0].props.children).toBe('Комментарии');
+    const expected = range(26, 45).reverse().map(k => ROW(`c-${k}`));
+    expect(rowIds(root)).toEqual([...expected, MORE]);
+    // After every block, in the one column.
+    expect(contentIds(root)).toEqual([AUTHOR(POST0), BLOCK(POST0, 'text@0'), BLOCK(POST0, 'text@2'), BLOCK(POST0, 'text@4'), ...expected, MORE]);
+    const row = one(root, ROW('c-45'));
+    expect(row.props.accessibilityLabel).toMatch(/^User 45\. Comment 45\. .+$/);
+    expect(text(row)).toContain('User 45');
+    expect(text(row)).toContain(TEXT(45));
+    // The content is not focusable: one stop per comment (nothing focusable inside the row).
+    expect(row.props.focusable).toBe(true);
+    expect(focusableIds(root, row)).toEqual([]);
+    expect(text(one(root, MORE))).toContain('Показать ещё');
+    expect(focusTargets()).toEqual(['post/nav/home', BLOCK(POST0, 'text@0')]);
+    await unmount(root);
+  });
+
+  it('«Показать ещё»: 20 older rows appended below, no duplicates; focus on the first new one; the last page has no «Показать ещё»', async () => {
+    const root = await openFromHome();
+    focusMock.mockClear();
+    await press(root, MORE);
+    expect(new URL(e19Calls()[1].url).searchParams.get('offset')).toBe(String(BASE + 26));
+    expect(rowIds(root)).toEqual([...range(6, 45).reverse().map(k => ROW(`c-${k}`)), MORE]);
+    await frames(2);
+    expect(lastFocusTarget()).toBe(ROW('c-25'));
+    await focusOn(root, ROW('c-25'));
+    await focusOn(root, MORE);
+    focusMock.mockClear();
+    await press(root, MORE);
+    expect(rowIds(root)).toEqual(range(1, 45).reverse().map(k => ROW(`c-${k}`)));
+    await frames(2);
+    expect(lastFocusTarget()).toBe(ROW('c-5'));
+    expect(e19Calls()).toHaveLength(3);
+    await unmount(root);
+  });
+
+  it('«Показать ещё» busy: the spinner, focus kept, a second OK sends nothing; a failure keeps the list and reads «Повторить»; OK retries', async () => {
+    const all = range(1, 45).map(k => item(k));
+    const held = deferred();
+    e19 = req => (new URL(req.url).searchParams.has('offset') ? held.promise : pageOf(all, req.url));
+    const root = await openFromHome();
+    await press(root, MORE);
+    expect(visible(root, `${MORE}/busy`) || one(root, MORE).props.accessibilityState?.busy === true).toBe(true);
+    expect(one(root, MORE).props.onClick).toBeDefined();
+    await press(root, MORE);
+    expect(e19Calls()).toHaveLength(2);
+    held.resolve({ status: 400, body: { error: 'bad_request' } });
+    await settle();
+    expect(rowIds(root)).toHaveLength(21);
+    expect(text(one(root, MORE))).toContain('Повторить');
+    expect(one(root, MORE).props.accessibilityLabel).toBe('Не удалось загрузить. Повторить');
+    e19 = req => pageOf(all, req.url);
+    focusMock.mockClear();
+    await press(root, MORE);
+    expect(rowIds(root)).toHaveLength(41);
+    await frames(2);
+    expect(lastFocusTarget()).toBe(ROW('c-25'));
+    await unmount(root);
+  });
+
+  it('replies: 2 inline of 5 under their comment (oldest first, indented); «Ещё ответы» → 5 replies, no duplicates, focus on the first new; then no «Ещё ответы»', async () => {
+    const replies = range(1, 5).map(r => item(100 + r, { replyToUser: { name: 'User 3' }, replies: undefined }));
+    const parent = item(3, { replyCount: 5, replies: { data: replies.slice(3), extra: { isFirst: false, isLast: false } } });
+    e19 = req => {
+      const parentId = new URL(req.url).searchParams.get('parent_id');
+      return parentId === null
+        ? pageOf([item(1), item(2), parent], req.url)
+        : pageOf(parentId === String(BASE + 3) ? replies : [], req.url);
+    };
+    const root = await openFromHome();
+    expect(rowIds(root)).toEqual([ROW('c-3'), ROW('c-104'), ROW('c-105'), REPLIES_MORE('c-3'), ROW('c-2'), ROW('c-1')]);
+    expect(text(one(root, ROW('c-104')))).toContain('ответ User 3');
+    expect(one(root, ROW('c-104')).props.accessibilityLabel).toMatch(/^User 104\. ответ User 3\. Comment 104\./);
+    expect(text(one(root, REPLIES_MORE('c-3')))).toContain('Ещё ответы');
+    focusMock.mockClear();
+    await press(root, REPLIES_MORE('c-3'));
+    expect(new URL(e19Calls()[1].url).searchParams.get('parent_id')).toBe(String(BASE + 3));
+    expect(rowIds(root)).toEqual([
+      ROW('c-3'),
+      ...range(101, 105).map(k => ROW(`c-${k}`)),
+      ROW('c-2'),
+      ROW('c-1'),
+    ]);
+    await frames(2);
+    expect(lastFocusTarget()).toBe(ROW('c-101'));
+    await unmount(root);
+  });
+
+  it('«Ещё ответы» failure: «Повторить» in place, the inline replies kept, focus stays', async () => {
+    const replies = range(1, 5).map(r => item(100 + r, { replyToUser: { name: 'User 3' }, replies: undefined }));
+    const parent = item(3, { replyCount: 5, replies: { data: replies.slice(3), extra: { isFirst: false, isLast: false } } });
+    e19 = req =>
+      new URL(req.url).searchParams.has('parent_id')
+        ? { status: 400, body: { error: 'bad_request' } }
+        : pageOf([parent], req.url);
+    const root = await openFromHome();
+    focusMock.mockClear();
+    await press(root, REPLIES_MORE('c-3'));
+    expect(text(one(root, REPLIES_MORE('c-3')))).toContain('Повторить');
+    expect(rowIds(root)).toEqual([ROW('c-3'), ROW('c-104'), ROW('c-105'), REPLIES_MORE('c-3')]);
+    await frames(2);
+    expect(focusTargets()).toEqual([]);
+    await unmount(root);
+  });
+
+  it.each([
+    ['empty', () => ({ status: 200, body: { data: [], extra: { isFirst: true, isLast: true } } }), 'post/comments-empty', 'Комментариев пока нет'],
+    ['denied (403)', () => ({ status: 403 }), 'post/comments-denied', 'Комментарии недоступны'],
+  ])('%s: the note in the block, nothing focusable there', async (_name, reply, testID, copy) => {
+    e19 = reply as () => FixtureReply;
+    const root = await openFromHome();
+    expect(text(byTestId(root, testID)[0])).toContain(copy);
+    expect(focusableIds(root, byTestId(root, 'post/comments')[0])).toEqual([]);
+    expect(e19Calls()).toHaveLength(1);
+    await unmount(root);
+  });
+
+  it('notFound (404): no block', async () => {
+    e19 = () => ({ status: 404, body: { error: 'not_found' } });
+    const root = await openFromHome();
+    expect(e19Calls()).toHaveLength(1);
+    expect(visible(root, 'post/comments')).toBe(false);
+    await unmount(root);
+  });
+
+  it('author off (isCommentsDenied): «Автор отключил комментарии», no request', async () => {
+    e8 = (_req, blogUrl, postId) => ({ status: 200, body: postDetail(blogUrl, postId, THREE, { isCommentsDenied: true }) });
+    const root = await openFromHome();
+    expect(text(byTestId(root, 'post/comments-off')[0])).toContain('Автор отключил комментарии');
+    expect(e19Calls()).toHaveLength(0);
+    await unmount(root);
+  });
+
+  it('error: «Не удалось загрузить комментарии» + «Повторить» (page 1 again); success → focus on the first comment; the rest of Пост works', async () => {
+    let reply: FixtureReply = { status: 400, body: { error: 'bad_request' } };
+    e19 = req => ('status' in reply && reply.status === 200 ? pageOf([item(1), item(2)], req.url) : reply);
+    const root = await openFromHome();
+    expect(text(byTestId(root, 'post/comments-error')[0])).toContain('Не удалось загрузить комментарии');
+    expect(rowIds(root)).toEqual([RETRY]);
+    expect(contentIds(root)).toContain(BLOCK(POST0, 'text@4'));
+    reply = { status: 200 };
+    focusMock.mockClear();
+    await press(root, RETRY);
+    expect(e19Calls()).toHaveLength(2);
+    expect(new URL(e19Calls()[1].url).searchParams.has('offset')).toBe(false);
+    expect(rowIds(root)).toEqual([ROW('c-2'), ROW('c-1')]);
+    await frames(2);
+    expect(lastFocusTarget()).toBe(ROW('c-2'));
+    await unmount(root);
+  });
+
+  it('deleted / blocked: the note instead of the content; author and date kept', async () => {
+    e19 = req => pageOf([item(1, { isBlocked: true }), item(2, { isDeleted: true })], req.url);
+    const root = await openFromHome();
+    const deleted = one(root, ROW('c-2'));
+    expect(text(deleted)).toContain('Комментарий удалён');
+    expect(text(deleted)).toContain('User 2');
+    expect(text(deleted)).not.toContain(TEXT(2));
+    expect(visible(root, `${ROW('c-2')}/date`)).toBe(true);
+    expect(text(one(root, ROW('c-1')))).toContain('Комментарий скрыт');
+    expect(text(one(root, ROW('c-1')))).not.toContain(TEXT(1));
+    await unmount(root);
+  });
+
+  it('read-only: no comment-writing text or control anywhere; the only buttons in the block are «Ещё ответы» and «Показать ещё»', async () => {
+    const replies = range(1, 5).map(r => item(100 + r, { replyToUser: { name: 'User 3' }, replies: undefined }));
+    e19 = req => pageOf([...range(1, 25).map(k => (k === 23 ? item(23, { replyCount: 5, replies: { data: replies.slice(3), extra: { isLast: false } } }) : item(k)))], req.url);
+    const root = await openFromHome();
+    const page = pageText(root);
+    for (const forbidden of ['Ответить', 'Написать', 'Отправить', 'Нравится', 'Удалить', 'Пожаловаться', 'Редактировать', 'Комментировать']) {
+      expect(page).not.toContain(forbidden);
+    }
+    const block = byTestId(root, 'post/comments')[0];
+    const buttons = block
+      .queryAll((n: any) => typeof n.type === 'string' && n.props.accessibilityRole === 'button')
+      .map((n: any) => n.props.testID);
+    expect(buttons).toEqual([REPLIES_MORE('c-23'), MORE]);
+    // No TextField or input of any kind.
+    expect(block.queryAll((n: any) => n.type === 'TextInput')).toHaveLength(0);
+    await unmount(root);
+  });
+
+  it('300 comments: grows only by OK on «Показать ещё» (20 at a time), stable rows, focus on each first new one; no auto-load', async () => {
+    const all = range(1, 300).map(k => item(k));
+    e19 = req => pageOf(all, req.url);
+    const root = await openFromHome();
+    await settle(WITH_TIMERS);
+    expect(e19Calls()).toHaveLength(1);
+    for (let page = 1; page < 15; page += 1) {
+      focusMock.mockClear();
+      await press(root, MORE);
+      await frames(2);
+      expect(lastFocusTarget()).toBe(ROW(`c-${300 - page * 20}`));
+      await focusOn(root, ROW(`c-${300 - page * 20}`));
+    }
+    const ids = rowIds(root);
+    expect(ids).toEqual(range(1, 300).reverse().map(k => ROW(`c-${k}`)));
+    expect(new Set(ids).size).toBe(300);
+    expect(e19Calls()).toHaveLength(15);
+    await unmount(root);
+  });
+
+  it('Back from a comment pops Пост to the origin card', async () => {
+    const root = await openFromHome();
+    await focusOn(root, ROW('c-40'));
+    focusMock.mockClear();
+    await back();
+    expect(currentRoute()).toBe('Shell');
+    expect(lastFocusTarget()).toBe(FEED_CARD(0));
+    await unmount(root);
+  });
+
+  it('player return: focus on the same comment; gone → the block`s first row', async () => {
+    mockPlayerFlag.on = true;
+    try {
+      e8 = (_req, blogUrl, postId) => ({
+        status: 200,
+        body: postDetail(blogUrl, postId, [{ type: 'ok_video', id: 'v1', title: 'Видео', playerUrls: [{ type: 'hd', url: '' }] }, ...THREE]),
+      });
+      const root = await openFromHome();
+      const routeKey = navigationRef.getCurrentRoute()?.key ?? '';
+      const openPlayerFrom = async (focusId: string) => {
+        await focusOn(root, focusId);
+        await act(async () => {
+          navigationRef.dispatch(
+            StackActions.push('Player', {
+              ref: { blogUrl: FEED_BLOG, postId: POST0, mediaId: 'v1' },
+              origin: { routeKey, focusId },
+            }),
+          );
+        });
+        await settle();
+        expect(currentRoute()).toBe('Player');
+      };
+      await openPlayerFrom(ROW('c-40'));
+      focusMock.mockClear();
+      await back();
+      expect(currentRoute()).toBe('Post');
+      expect(lastFocusTarget()).toBe(ROW('c-40'));
+      // Gone while the Player is on top: the block's first row.
+      await openPlayerFrom(ROW('c-30'));
+      await act(async () => {
+        queryClient.setQueryData(queryKeys.comments(FEED_BLOG, POST0), (data: any) => ({
+          ...data,
+          pages: data.pages.map((p: any) => ({ ...p, comments: p.comments.filter((c: any) => c.id !== 'c-30') })),
+        }));
+      });
+      focusMock.mockClear();
+      await back();
+      expect(currentRoute()).toBe('Post');
+      expect(lastFocusTarget()).toBe(ROW('c-45'));
+      await unmount(root);
+    } finally {
+      mockPlayerFlag.on = false;
+    }
+  });
+
+  it('a refetch that drops the focused comment: focus on the block`s first row', async () => {
+    const root = await openFromHome();
+    await focusOn(root, ROW('c-40'));
+    focusMock.mockClear();
+    await act(async () => {
+      queryClient.setQueryData(queryKeys.comments(FEED_BLOG, POST0), (data: any) => ({
+        ...data,
+        pages: data.pages.map((p: any) => ({ ...p, comments: p.comments.filter((c: any) => c.id !== 'c-40') })),
+      }));
+    });
+    await settle();
+    expect(lastFocusTarget()).toBe(ROW('c-45'));
+    await unmount(root);
+  });
+
+  it('a focused action row that vanishes (no move of its own): focus on the block`s first row', async () => {
+    const root = await openFromHome();
+    await focusOn(root, MORE);
+    focusMock.mockClear();
+    await act(async () => {
+      queryClient.setQueryData(queryKeys.comments(FEED_BLOG, POST0), (data: any) => ({
+        ...data,
+        pages: data.pages.map((p: any) => ({ ...p, nextCursor: null })),
+      }));
+    });
+    await settle();
+    expect(visible(root, MORE)).toBe(false);
+    expect(lastFocusTarget()).toBe(ROW('c-45'));
+    await unmount(root);
+  });
+
+  it('a stale «Показать ещё» never moves focus later: the list reset while it loads', async () => {
+    const all = range(1, 45).map(k => item(k));
+    const held = deferred();
+    e19 = req => (new URL(req.url).searchParams.has('offset') ? held.promise : pageOf(all, req.url));
+    const root = await openFromHome();
+    await press(root, MORE);
+    await act(async () => {
+      await queryClient.resetQueries({ queryKey: queryKeys.comments(FEED_BLOG, POST0) });
+    });
+    await settle();
+    held.resolve(pageOf(all, `https://x.invalid/?offset=${BASE + 26}`));
+    await settle();
+    expect(rowIds(root)).toEqual([...range(26, 45).reverse().map(k => ROW(`c-${k}`)), MORE]);
+    await focusOn(root, BLOCK(POST0, 'text@0'));
+    focusMock.mockClear();
+    await frames(3);
+    expect(focusTargets().filter(id => String(id).startsWith(`post/${POST0}/comment`))).toEqual([]);
+    await unmount(root);
+  });
+
+  it('header: the author turned comments off → no comment count', async () => {
+    e8 = (_req, blogUrl, postId) => ({
+      status: 200,
+      body: postDetail(blogUrl, postId, THREE, { count: { likes: 5, comments: 12 }, isCommentsDenied: true }),
+    });
+    const root = await openFromHome();
+    expect(byTestId(root, 'post/meta')[0].props.children).toMatch(/^[^·]+ · 5 лайков$/);
+    await unmount(root);
+  });
+
+  it('the spoken label skips empty parts: an emoji-only comment reads «{name}. {date}»', async () => {
+    e19 = req =>
+      pageOf(
+        [item(1, { data: [{ type: 'smile', name: 'smile', mediumUrl: 'https://example.invalid/emoji' }, blockEnd()] })],
+        req.url,
+      );
+    const root = await openFromHome();
+    const label = one(root, ROW('c-1')).props.accessibilityLabel as string;
+    expect(label).toMatch(/^User 1\. [^.]+\d{4}$/);
+    expect(label).not.toMatch(/\.\s*\./);
+    await unmount(root);
+  });
+
+  it('comment images: the content width is min(column, text measure) − the row padding, avatar and gap; a reply one indent less', async () => {
+    const wide = { type: 'image', id: 'w', url: 'https://example.invalid/wide', width: 4000, height: 400 };
+    const reply = item(101, { replyToUser: { name: 'User 2' }, replies: undefined, data: [wide] });
+    e19 = req =>
+      pageOf([item(2, { data: [wide], replyCount: 1, replies: { data: [reply], extra: { isLast: true } } })], req.url);
+    const root = await openFromHome();
+    await act(async () => {
+      byTestId(root, 'post/body')[0].props.onLayout({ nativeEvent: { layout: { width: 724, height: 470 } } });
+    });
+    const boxWidth = (rowId: string) =>
+      StyleSheet.flatten(byTestId(root, `${rowId}/content/image:w`)[0].props.style).width;
+    // Column 724 − 2 × 12 = 700 → the 600 measure − 2 × 8 − 28 − 8 = 548; a reply − 36 = 512.
+    expect(boxWidth(ROW('c-2'))).toBe(548);
+    expect(boxWidth(ROW('c-101'))).toBe(512);
+    await unmount(root);
+  });
+
+  it('Back, then the same card again: the loaded pages stay (no new E19), 40 rows and «Показать ещё»', async () => {
+    const root = await openFromHome();
+    await press(root, MORE);
+    expect(rowIds(root)).toHaveLength(41);
+    await back();
+    expect(currentRoute()).toBe('Shell');
+    const before = e19Calls().length;
+    await press(root, FEED_CARD(0));
+    expect(currentRoute()).toBe('Post');
+    expect(e19Calls()).toHaveLength(before);
+    expect(rowIds(root)).toEqual([...range(6, 45).reverse().map(k => ROW(`c-${k}`)), MORE]);
+    await unmount(root);
+  });
+});
+
+describe('Story 11.2: the full-screen image viewer (owner decision 2026-11-02, our improvement)', () => {
+  const POST0 = FEED_ID(0);
+  const IMG = (n: number) => `https://example.invalid/image-${n}`;
+  const IMAGE = (n: number) => ({ type: 'image', id: `i${n}`, url: IMG(n), width: 800, height: 600 });
+  const VIEWER = 'dialog/image-viewer';
+  const E19 = /^\/v1\/blog\/[^/]+\/post\/[^/]+\/comment\/$/;
+  const shown = (root: Root) => byTestId(root, `${VIEWER}/image`)[0]?.props.source?.uri;
+  const counter = (root: Root) => byTestId(root, `${VIEWER}/counter`)[0]?.queryAll((n: any) => typeof n.props.children === 'string')[0]?.props.children;
+
+  beforeEach(() => {
+    installFrameQueue();
+    e8 = (_req, blogUrl, postId) => ({
+      status: 200,
+      body: postDetail(blogUrl, postId, [
+        IMAGE(1),
+        ...paragraph('One'),
+        IMAGE(2),
+        ...paragraph('Two'),
+        IMAGE(3),
+      ]),
+    });
+  });
+
+  it('matrix «Image viewer, post»: OK on the 2nd of 3 → the viewer on image 2, «2 / 3»; ← → step and stay at the ends; Back: focus on the 2nd image stop', async () => {
+    const root = await openFromHome();
+    const second = BLOCK(POST0, 'image:i2');
+    expect(one(root, second).props.accessibilityRole).toBe('imagebutton');
+    focusMock.mockClear();
+    await press(root, second);
+    expect(visible(root, 'post/image-viewer')).toBe(true);
+    // The viewer asks for its one stop; the modal host also moves focus into its content.
+    expect(focusTargets()).toContain(VIEWER);
+    expect(shown(root)).toBe(IMG(2));
+    expect(counter(root)).toBe('2 / 3');
+    expect(visible(root, `${VIEWER}/spinner`)).toBe(true);
+    await act(async () => {
+      byTestId(root, `${VIEWER}/image`)[0].props.onLoad({ nativeEvent: { source: { width: 800, height: 600 } } });
+    });
+    expect(visible(root, `${VIEWER}/spinner`)).toBe(false);
+    // Inside the modal host's trap; the background hidden from accessibility.
+    expect(byTestId(root, 'modal/background')[0].props.importantForAccessibility).toBe('no-hide-descendants');
+    await focusOn(root, VIEWER);
+    await remoteKey('left');
+    expect(shown(root)).toBe(IMG(1));
+    expect(counter(root)).toBe('1 / 3');
+    await remoteKey('left');
+    expect(shown(root)).toBe(IMG(1));
+    await remoteKey('right');
+    await remoteKey('right');
+    await remoteKey('right');
+    expect(shown(root)).toBe(IMG(3));
+    expect(counter(root)).toBe('3 / 3');
+    // A key down (no key up) does nothing.
+    await remoteKey('left', 0);
+    expect(shown(root)).toBe(IMG(3));
+    // No other control in the viewer: one focus stop.
+    expect(focusableIds(root, byTestId(root, 'post/image-viewer')[0])).toEqual([VIEWER]);
+    focusMock.mockClear();
+    await back();
+    expect(visible(root, 'post/image-viewer')).toBe(false);
+    expect(currentRoute()).toBe('Post');
+    expect(lastFocusTarget()).toBe(second);
+    // The next Back pops Пост.
+    await back();
+    expect(currentRoute()).toBe('Shell');
+    await unmount(root);
+  });
+
+  it('native SeekKeys: a key down steps once (counter updates); a repeat does not; the key up after it is swallowed; nothing while the stage is not focused', async () => {
+    const setEnabled = jest.fn();
+    installNativeModules({ SeekKeys: { setEnabled } });
+    const nativeKey = async (key: string, action: 'down' | 'up', repeat = 0) => {
+      await act(async () => {
+        DeviceEventEmitter.emit('seekKey', { key, action, repeat });
+      });
+    };
+    const root = await openFromHome();
+    await press(root, BLOCK(POST0, 'image:i1'));
+    // Not focused yet: nothing listens.
+    await nativeKey('right', 'down');
+    expect(shown(root)).toBe(IMG(1));
+    await focusOn(root, VIEWER);
+    expect(setEnabled).toHaveBeenLastCalledWith(true);
+    await nativeKey('right', 'down');
+    expect(shown(root)).toBe(IMG(2));
+    expect(counter(root)).toBe('2 / 3');
+    await nativeKey('right', 'down', 1);
+    expect(shown(root)).toBe(IMG(2));
+    await nativeKey('right', 'up');
+    await remoteKey('right');
+    expect(shown(root)).toBe(IMG(2));
+    // A React Native key up without a native key down does nothing with the module present.
+    await remoteKey('left');
+    expect(shown(root)).toBe(IMG(2));
+    await act(async () => {
+      one(root, VIEWER).props.onBlur({ nativeEvent: {} });
+    });
+    expect(setEnabled).toHaveBeenLastCalledWith(false);
+    await nativeKey('right', 'down');
+    expect(shown(root)).toBe(IMG(2));
+    await unmount(root);
+  });
+
+  it('a load failure: «Изображение недоступно»; the arrows still work', async () => {
+    const root = await openFromHome();
+    await press(root, BLOCK(POST0, 'image:i1'));
+    await act(async () => {
+      byTestId(root, `${VIEWER}/image`)[0].props.onError({ nativeEvent: {} });
+    });
+    expect(text(byTestId(root, `${VIEWER}/failed`)[0])).toContain('Изображение недоступно');
+    expect(one(root, VIEWER).props.accessibilityLabel).toBe('Изображение недоступно');
+    await focusOn(root, VIEWER);
+    await remoteKey('right');
+    expect(shown(root)).toBe(IMG(2));
+    await remoteKey('left');
+    expect(visible(root, `${VIEWER}/failed`)).toBe(true);
+    await unmount(root);
+  });
+
+  it('one image: no counter', async () => {
+    e8 = (_req, blogUrl, postId) => ({ status: 200, body: postDetail(blogUrl, postId, [...paragraph('One'), IMAGE(1)]) });
+    const root = await openFromHome();
+    await press(root, BLOCK(POST0, 'image:i1'));
+    expect(shown(root)).toBe(IMG(1));
+    expect(visible(root, `${VIEWER}/counter`)).toBe(false);
+    expect(one(root, VIEWER).props.accessibilityLabel).toBe('Изображение');
+    await unmount(root);
+  });
+
+  it('matrix «Image viewer, comment»: OK on a comment with 2 images → its first image, «1 / 2»; Back: focus on that comment row; a comment without images: OK does nothing', async () => {
+    const commentItem = (k: number, data: unknown[]) => ({
+      id: `c-${k}`,
+      intId: 7000 + k,
+      author: { id: 1, name: `User ${k}`, avatarUrl: '', hasAvatar: false, isOfficial: false },
+      createdAt: 1_700_000_000 + k,
+      data,
+      replyCount: 0,
+      replies: { data: [], extra: { isFirst: true, isLast: true } },
+    });
+    transport = installFixtureTransport(req =>
+      E19.test(req.path)
+        ? {
+            status: 200,
+            body: {
+              data: [
+                commentItem(1, paragraph('Plain')),
+                commentItem(2, [...paragraph('Look'), IMAGE(7), IMAGE(8)]),
+              ],
+              extra: { isFirst: true, isLast: true },
+            },
+          }
+        : fullHandler(req),
+    );
+    e8 = (_req, blogUrl, postId) => ({ status: 200, body: postDetail(blogUrl, postId, THREE) });
+    const root = await openFromHome();
+    const withImages = `post/${POST0}/comment/c-2`;
+    const plain = `post/${POST0}/comment/c-1`;
+    expect(one(root, withImages).props.accessibilityRole).toBe('button');
+    expect(one(root, withImages).props.accessibilityLabel).toMatch(/Открыть изображения$/);
+    expect(one(root, plain).props.accessibilityRole).toBe('text');
+    // Images inside the row are not focusable.
+    expect(focusableIds(root, one(root, withImages))).toEqual([]);
+    focusMock.mockClear();
+    await press(root, withImages);
+    expect(shown(root)).toBe(IMG(7));
+    expect(counter(root)).toBe('1 / 2');
+    await focusOn(root, VIEWER);
+    await remoteKey('right');
+    expect(shown(root)).toBe(IMG(8));
+    await remoteKey('right');
+    expect(shown(root)).toBe(IMG(8));
+    focusMock.mockClear();
+    await back();
+    expect(visible(root, 'post/image-viewer')).toBe(false);
+    expect(lastFocusTarget()).toBe(withImages);
+    // A comment without images: OK does nothing.
+    await press(root, plain);
+    expect(visible(root, 'post/image-viewer')).toBe(false);
+    expect(currentRoute()).toBe('Post');
+    await unmount(root);
+  });
+
+  it('a locked post: teaser images stay non-focusable and never open', async () => {
+    e8 = (_req, blogUrl, postId) => ({
+      status: 200,
+      body: postDetail(blogUrl, postId, [], { hasAccess: false, teaser: [IMAGE(1)] }),
+    });
+    const root = await openFromHome();
+    const teaser = byTestId(root, BLOCK(POST0, 'image:i1'))[0];
+    expect(teaser.props.focusable).toBe(false);
+    expect(teaser.props.onClick).toBeUndefined();
+    expect(visible(root, 'post/image-viewer')).toBe(false);
     await unmount(root);
   });
 });

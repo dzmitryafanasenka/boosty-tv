@@ -435,7 +435,7 @@ describe('PostRepository.post (E8, Story 3.4)', () => {
     expect(transport.calls).toHaveLength(1);
     // No signed or progress value in the domain.
     const json = JSON.stringify(one);
-    for (const field of ['timeCode', 'playerUrls', 'signedQuery', 'sig=', 'comments', 'reactions']) {
+    for (const field of ['timeCode', 'playerUrls', 'signedQuery', 'sig=', '"comments"', 'reactions']) {
       expect(json).not.toContain(field);
     }
   });

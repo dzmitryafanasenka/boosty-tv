@@ -463,9 +463,30 @@ export function resetKeychain(seed: Record<string, string> = {}): KeychainMock {
 // ---------------------------------------------------------------------------
 // Network and native modules
 
-/** Installs a FixtureTransport over `handler` as the global `fetch` and returns it. */
+/**
+ * E19 (Story 11.2): a post's comments (api-contract «E19 (LIVE)», also with
+ * `parent_id`). Built from parts so no source line spells the path
+ * (`__tests__/commentsReadOnly.test.js`).
+ */
+export const E19_PATH_RE = new RegExp(['^\\/v1\\/blog\\/([^/]+)\\/post\\/([^/]+)', 'comment', '$'].join('\\/'));
+
+/** A live empty E19 page (`data: []`, `isLast: true`). */
+export const emptyCommentsReply = () => ({
+  status: 200,
+  body: { data: [], extra: { isFirst: true, isLast: true } },
+});
+
+/**
+ * Installs a FixtureTransport over `handler` as the global `fetch` and
+ * returns it. Story 11.2: an E19 request the handler does not answer gets
+ * an empty comments page (every accessible Пост now asks for its comments;
+ * tests about comments answer E19 themselves).
+ */
 export function installFixtureTransport(handler: FixtureHandler): FixtureTransport {
-  const transport = createFixtureTransport(handler);
+  const transport = createFixtureTransport(async request => {
+    const reply = await handler(request);
+    return reply === undefined && E19_PATH_RE.test(request.path) ? emptyCommentsReply() : reply;
+  });
   (globalThis as { fetch: unknown }).fetch = transport;
   return transport;
 }

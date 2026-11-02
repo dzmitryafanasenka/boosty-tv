@@ -267,6 +267,32 @@ export const components = {
     scaleFocus: focus['scale-row'],
     skeletonLine: 12,
   },
+  /**
+   * Story 11.2 CommentRow (read-only): `indent` shifts a reply right by one
+   * level (the avatar plus its gap, so the reply's avatar sits under the
+   * parent's text); `gap` is the avatar–text gap; `rowGap` the room between
+   * rows; `imageMaxHeight` caps an image in a comment.
+   */
+  'comment-row': {
+    avatar: 28,
+    gap: 8,
+    indent: 36,
+    rowGap: 6,
+    imageMaxHeight: 200,
+    radius: rounded.md,
+    bgFocus: colors['surface-focus-row'],
+  },
+  /**
+   * Story 11.2 image viewer (our improvement): a full-screen modal on `bg`;
+   * `padding` keeps the fitted image off the screen edges; the «N / M»
+   * counter sits on an `overlay-badge` pill.
+   */
+  'image-viewer': {
+    bg: colors.bg,
+    padding: 24,
+    counterBg: colors['overlay-badge'],
+    counterRadius: rounded.full,
+  },
   'link-chip': {
     height: 32,
     radius: rounded.full,

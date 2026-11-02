@@ -36,7 +36,7 @@ describe('mapPost: the live E5 posts', () => {
     });
     expect(post.intId).toBe(1010);
     const json = JSON.stringify(post);
-    for (const field of ['timeCode', 'playerUrls', 'signedQuery', 'sig=', 'comments', 'currencyPrices']) {
+    for (const field of ['timeCode', 'playerUrls', 'signedQuery', 'sig=', '"comments"', 'currencyPrices']) {
       expect(json).not.toContain(field);
     }
     const video = post.blocks.find(b => b.type === 'ok_video');
@@ -354,6 +354,23 @@ describe('mapPost: like count (Story 3.4)', () => {
     expect(mapped({ ...feedPost(1), count: { likes: 1.5 } }).likeCount).toBeNull();
     expect(mapped({ ...feedPost(1), count: 'x' }).likeCount).toBeNull();
     expect(lockedPost()).toBeDefined();
+  });
+
+  it('Story 11.2: count.comments → commentCount; missing or invalid → null', () => {
+    expect(mapped({ ...feedPost(1), count: { likes: 5, comments: 29 } }).commentCount).toBe(29);
+    expect(mapped({ ...feedPost(1), count: { comments: 0 } }).commentCount).toBe(0);
+    expect(mapped({ ...feedPost(1), count: { likes: 5 } }).commentCount).toBeNull();
+    expect(mapped({ ...feedPost(1), count: undefined }).commentCount).toBeNull();
+    expect(mapped({ ...feedPost(1), count: { comments: -1 } }).commentCount).toBeNull();
+    expect(mapped({ ...feedPost(1), count: { comments: 2.5 } }).commentCount).toBeNull();
+    expect(mapped({ ...feedPost(1), count: { comments: '7', likes: 3 } })).toMatchObject({ commentCount: null, likeCount: 3 });
+  });
+
+  it('Story 11.2: isCommentsDenied → commentsDenied; missing or not a boolean → false', () => {
+    expect(mapped({ ...feedPost(1), isCommentsDenied: true }).commentsDenied).toBe(true);
+    expect(mapped({ ...feedPost(1), isCommentsDenied: false }).commentsDenied).toBe(false);
+    expect(mapped({ ...feedPost(1) }).commentsDenied).toBe(false);
+    expect(mapped({ ...feedPost(1), isCommentsDenied: 'yes' }).commentsDenied).toBe(false);
   });
 
   it('a post whose user.blogUrl is not route-safe is dropped', () => {

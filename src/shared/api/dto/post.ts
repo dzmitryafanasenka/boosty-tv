@@ -15,13 +15,16 @@ import { blogUrlSchema } from './subscriptions';
  *   instead of dropping the post.
  * - Blocks stay `unknown` here: each block is parsed by its own schema in
  *   the mapper, and an unknown `type` becomes `Block.Unknown`.
- * - Of `count`, only `likes` is read (Story 3.4, the read-only like count);
- *   a missing or invalid value is no like line.
+ * - Of `count`, `likes` (Story 3.4, the read-only like count) and
+ *   `comments` (Story 11.2, the header's comment count) are read; a missing
+ *   or invalid value is no like or comment part in the meta line.
+ * - `isCommentsDenied` (Story 11.2): the author turned comments off; the
+ *   Пост block then sends no E19 request. Missing or a wrong type: false.
  * - Never parsed into the post: `signedQuery` (Story 6.3 reads it beside
  *   the mapper for a file's QR, Story 6.4 for an audio source,
  *   `signedQueryDtoSchema`), `playerUrls`, `timeCode`,
- *   `comments`, `count.comments`, reactions, prices. They are not part of
- *   the domain (AD-9; comments are excluded). `playerUrls` (Story 4.1) and
+ *   the post's `comments` field (comments come from E19 only, Story 11.1),
+ *   reactions, prices. They are not part of the domain (AD-9). `playerUrls` (Story 4.1) and
  *   `timeCode` (Story 4.2) have their own schemas below, read beside the
  *   mapper for the player and the ProgressRepository only.
  */
@@ -46,11 +49,16 @@ export const postDtoSchema = z.object({
   user: postUserDtoSchema,
   data: z.array(z.unknown()).nullish().catch(undefined),
   teaser: z.array(z.unknown()).nullish().catch(undefined),
-  /** Only `likes` (a non-negative integer); anything else is ignored. */
+  /** `likes` and `comments` (non-negative integers); anything else is ignored. */
   count: z
-    .object({ likes: z.number().int().nonnegative().nullish().catch(undefined) })
+    .object({
+      likes: z.number().int().nonnegative().nullish().catch(undefined),
+      comments: z.number().int().nonnegative().nullish().catch(undefined),
+    })
     .nullish()
     .catch(undefined),
+  /** Story 11.2: the author turned comments off (no E19 request); a wrong type → false. */
+  isCommentsDenied: z.boolean().nullish().catch(undefined),
   /** E4: the author's pinned post comes first (Boosty's order); a wrong type → not pinned. */
   isPinned: z.boolean().nullish().catch(undefined),
   /**
