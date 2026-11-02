@@ -1,0 +1,71 @@
+CHANGELOG.md
+  s_6884b16d8e6d90::t_0a0c8a5c161047 7-11
+CHANGELOG.ru.md
+  s_6884b16d8e6d90::t_d92a0379bfafd7 7-11
+__tests__/playerChaptersFlow.test.tsx
+  s_6884b16d8e6d90::t_94243384eb7548 1-420
+_bmad-output/implementation-artifacts/epic-10-context.md
+  s_6884b16d8e6d90::t_192046b1bd4062 1-52
+_bmad-output/implementation-artifacts/spec-10-1-chapter-marks-on-the-player-timeline.md
+  s_6884b16d8e6d90::t_36bd280b94fbca 1-131
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_6884b16d8e6d90::t_b441a84b27c0bd 121-122
+_bmad-output/planning-artifacts/ux-designs/ux-boosty-tv-2026-10-25/DESIGN.md
+  s_6884b16d8e6d90::t_40eff0aff12dc8 134-135,260-261
+docs/feature-parity.md
+  s_6884b16d8e6d90::t_7dd19dc0ca9279 121
+docs/focus-map.md
+  s_6884b16d8e6d90::t_0de39acef81fba 43,67,395-396,447-452,465
+docs/testing.md
+  s_6884b16d8e6d90::t_ba5e6591d52941 922-945,1018
+src/features/player/ChapterStrip.tsx
+  s_6884b16d8e6d90::t_bc36aec5cb1f21 1-204
+src/features/player/PlayerOverlay.tsx
+  s_6884b16d8e6d90::t_ec76b6318a71a2 1,3,43-44,104-111,150-153,165,181,210-224,364-370,412-413,417-420,466,472-473,487-497,649-662
+src/features/player/PlayerScreen.tsx
+  s_6884b16d8e6d90::t_b26d46a9f1eac7 11,169-181,190,222,291-293,296-305,376-388
+src/features/player/__tests__/PlayerOverlayChapters.test.tsx
+  s_6884b16d8e6d90::t_c229c6f99c327a 1-154
+src/features/player/__tests__/playbackMode.test.ts
+  s_6884b16d8e6d90::t_79ae21f4c67673 20
+src/features/player/__tests__/playerPhase.test.ts
+  s_6884b16d8e6d90::t_86337882c56acc 16
+src/features/player/__tests__/seekController.test.ts
+  s_6884b16d8e6d90::t_85e5c4be863fd0 217-257
+src/features/player/mediaResolver.ts
+  s_6884b16d8e6d90::t_b7de5c865b00d7 14-15,157-159,195-201,381,484
+src/features/player/seekController.ts
+  s_6884b16d8e6d90::t_b64b21bcad6081 57-63,181-189
+src/features/player/usePlaybackSession.ts
+  s_6884b16d8e6d90::t_39202116938db2 2,18-19,87-88,108-111,332-341,559-595,838,863-864
+src/features/player/usePlayerFocus.ts
+  s_6884b16d8e6d90::t_e12c06b5fe7b6d 4-5,33,43-44,62,86-87,90-95,105-106,130,139-140,148,150,157-158,176-178,188-190,200-202,204,206,214,216,225
+src/features/player/usePlayerKeys.ts
+  s_6884b16d8e6d90::t_4c03ee969c1439 6,18-24,102-108,129-131,149-154,189-193,229,261-279,291-304,331-338,349-364,376-380,394
+src/shared/entities/post/__tests__/chapters.test.ts
+  s_6884b16d8e6d90::t_4fcbbe405663b6 1-272
+src/shared/entities/post/chapters.ts
+  s_6884b16d8e6d90::t_707da9e7f4fd35 1-194
+src/shared/entities/post/index.ts
+  s_6884b16d8e6d90::t_3a615b267b7624 39-47
+src/shared/i18n/ru.ts
+  s_6884b16d8e6d90::t_72a4f81d26f734 437-443
+src/shared/ui/tokens.ts
+  s_6884b16d8e6d90::t_568a5697675f6b 303-317
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "91ca19b35c67b574badde864371acd3c0774cbfa",
+  "prompts": {},
+  "sessions": {
+    "s_6884b16d8e6d90": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0996ac81-5811-4fbc-abf9-a4c938711610",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
