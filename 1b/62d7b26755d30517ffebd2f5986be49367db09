@@ -1,0 +1,37 @@
+README.md
+  s_12c741f764bd7c::t_386b483bd3565e 5-10,22,65-75
+package-lock.json
+  s_12c741f764bd7c::t_33185041e233cf 10
+package.json
+  s_12c741f764bd7c::t_9af834b37bc761 5
+.github/ISSUE_TEMPLATE/bug_report.yml
+  s_12c741f764bd7c::t_6ccbbb74a64879 1-50
+.github/ISSUE_TEMPLATE/config.yml
+  s_12c741f764bd7c::t_012acaa144d7ea 1-5
+.github/ISSUE_TEMPLATE/feature_idea.yml
+  s_12c741f764bd7c::t_4319e35d0bc590 1-27
+.github/workflows/close-external-prs.yml
+  s_12c741f764bd7c::t_7ac1a4222f0189 1-26
+CONTRIBUTING.md
+  s_12c741f764bd7c::t_7bfb1b31ca1e36 1-40
+LICENSE
+  s_12c741f764bd7c::t_148bd9db98a883 1-21
+SECURITY.md
+  s_12c741f764bd7c::t_8e9802402d4887 1-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "1b62d7b26755d30517ffebd2f5986be49367db09",
+  "prompts": {},
+  "sessions": {
+    "s_12c741f764bd7c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "56fa7fd7-cf2f-4d38-a3e7-0220eb9f612d",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
