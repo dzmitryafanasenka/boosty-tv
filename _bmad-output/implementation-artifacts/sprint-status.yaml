@@ -122,9 +122,9 @@ development_status:
   10-1-chapter-marks-on-the-player-timeline: done
   epic-10-retrospective: optional
 
-  epic-11: in-progress
+  epic-11: done
   11-1-comments-endpoint-probe-and-entity: done
-  11-2-comments-block-on-post: review
+  11-2-comments-block-on-post: done
   epic-11-retrospective: optional
 action_items:
   - id: "epic-2-retro-item-1-route-the-a2-a5-auth-api-calls-send-rese"

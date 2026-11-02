@@ -6,12 +6,16 @@ The Russian version of this file is [CHANGELOG.ru.md](CHANGELOG.ru.md); both lis
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-02
+
+Read-only comments and a full-screen image viewer (Epic 11).
+
 ### Added
 - Comments (read-only, Story 11.2): a post now shows its comment count in the header («· 29 комментариев») and a «Комментарии» block at the bottom, newest first. «Показать ещё» loads older comments, replies appear under each comment, and «Ещё ответы» loads the rest of a thread. Deleted or hidden comments show a note. Nothing can be written, liked or deleted.
 - Image viewer: OK on an image in a post opens it full screen; ← → move between the post's images, Back returns to the post. OK on a comment with images opens that comment's images the same way.
 
-### Internal
-- Comments groundwork (Story 11.1): the comments endpoint was verified live on the TV, and a read-only comments data layer was added. Nothing changes in the app yet.
+### Notes
+- Install from the app on 1.1.0: Settings → «Версия» → «Скачать и установить». The session is kept.
 
 ## [1.1.0] - 2026-11-02
 
