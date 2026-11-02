@@ -991,6 +991,8 @@ The press counts and the resume offsets were not reported as numbers; the owner 
 
 **Owner acceptance.** On 2026-11-01 the owner wrote «всё прошло, принимаю релиз, выпускай 1.0.0». The Android release is accepted. SM-1 and SM-2 start on 2026-11-01.
 
+**1.0.0 on the TV.** `1.0.0` was published from `main` `925bc85` (PR #94). On 2026-11-02 the owner updated the TV in the app from `0.9.2` and reported version 1.0.0 with the session kept (owner). The installed `base.apk` hash was not checked over adb, because wireless debugging was not connected.
+
 Not verified by decision (owner, 2026-11-01): the account switch (no second account), network loss during playback, the external-player chooser with 2+ players. Live at 1× only if a subscribed author streams during the story.
 
 ### Story 9.4 — Visual fidelity and accessibility pass, 2026-11-01
