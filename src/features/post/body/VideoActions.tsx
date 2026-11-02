@@ -4,7 +4,17 @@ import type { MediaRef, VideoRow } from '../../../shared/entities/post';
 import { useColumnStop, type StopFocusHandler, type StopViewHandler } from '../../../shared/focus';
 import { t, tf } from '../../../shared/i18n';
 import { formatDuration } from '../../../shared/i18n/format';
-import { Button, QrIcon, buttonInk, components, mediaRowLabel, type HostView } from '../../../shared/ui';
+import {
+  Button,
+  FocusableSurface,
+  QrIcon,
+  Text,
+  buttonInk,
+  components,
+  mediaRowLabel,
+  type HostView,
+  type SurfaceState,
+} from '../../../shared/ui';
 
 /**
  * How the Player is opened (Story 4.2): `beginning` for «С начала»; Story
@@ -152,24 +162,77 @@ export function PostActions({
         />
       ) : null}
       {onOpenPhone !== null ? (
-        <ColumnButton
-          id={phoneId}
-          kind="secondary"
-          label={t('post.phone')}
-          accessibilityLabel={t('post.phoneA11y')}
-          icon={<QrIcon testID={`${phoneId}/icon`} color={buttonInk({ kind: 'secondary' })} size={HERO.buttonIcon} />}
-          onPress={onPhone}
-          onView={onView}
-          onFocus={onFocus}
-        />
+        <PhoneButton id={phoneId} onPress={onPhone} onView={onView} onFocus={onFocus} />
       ) : null}
     </View>
   );
 }
 
 const HERO = components['post-hero'];
+const SECONDARY = components['button-secondary'];
+
+type PhoneButtonProps = {
+  id: string;
+  onPress: (viewRef: RefObject<HostView | null>) => void;
+  onView: StopViewHandler;
+  onFocus: StopFocusHandler;
+};
+
+/**
+ * «На телефоне» (Story 13.1, owner follow-up 2026-11-02): a square,
+ * icon-only secondary button in the same row as the play buttons, so it
+ * never wraps onto a row of its own. The label «На телефоне» shows under
+ * it only while it is focused, positioned absolutely (no reflow);
+ * TalkBack always reads the full label.
+ */
+function PhoneButton({ id, onPress, onView, onFocus }: PhoneButtonProps) {
+  const { ref, viewRef, handleFocus } = useColumnStop(id, onView, onFocus);
+  const handlePress = useCallback(() => onPress(viewRef), [onPress, viewRef]);
+  const surfaceStyle = ({ focused }: SurfaceState) => [
+    styles.phoneSurface,
+    { backgroundColor: focused ? SECONDARY.bgFocus : SECONDARY.bg },
+  ];
+  return (
+    <FocusableSurface
+      ref={ref}
+      testID={id}
+      radius={SECONDARY.radius}
+      scaleFocus={components['button-primary'].scaleFocus}
+      accessibilityRole="button"
+      accessibilityLabel={t('post.phoneA11y')}
+      onPress={handlePress}
+      onFocus={handleFocus}
+      surfaceStyle={surfaceStyle}
+    >
+      {({ focused }: SurfaceState) => (
+        <>
+          <QrIcon testID={`${id}/icon`} color={buttonInk({ kind: 'secondary' })} size={HERO.buttonIcon} />
+          {focused ? (
+            <Text testID={`${id}/hint`} variant="meta" color="text-secondary" numberOfLines={1} style={styles.phoneHint}>
+              {t('post.phone')}
+            </Text>
+          ) : null}
+        </>
+      )}
+    </FocusableSurface>
+  );
+}
 
 const styles = StyleSheet.create({
+  phoneSurface: {
+    width: SECONDARY.height,
+    height: SECONDARY.height,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Under the button, centred on it, outside the row's layout.
+  phoneHint: {
+    position: 'absolute',
+    top: SECONDARY.height + HERO.buttonGap / 2,
+    width: HERO.hintWidth,
+    left: (SECONDARY.height - HERO.hintWidth) / 2,
+    textAlign: 'center',
+  },
   // The buttons left-aligned, wrapping onto a second row when narrow; the
   // gap stays between wrapped rows too (the 1.04 focus scale never overlaps).
   row: {

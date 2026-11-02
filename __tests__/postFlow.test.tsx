@@ -4242,7 +4242,11 @@ describe('Story 13.1: the Пост header with a large preview and «На тел
   it('«На телефоне»: OK → the QrDialog «Пост на Boosty» with the post\'s boosty.to page (never logged); Back → focus on «На телефоне»', async () => {
     const root = await openFromHome();
     const id = FEED_ID(0);
+    // Icon-only (owner follow-up 2026-11-02): the label shows only while focused.
+    expect(byTestId(root, `${PHONE(id)}/hint`)).toHaveLength(0);
+    expect(one(root, PHONE(id)).props.accessibilityLabel).toBe('На телефоне. Показать QR-код поста');
     await focusOn(root, PHONE(id));
+    expect(byTestId(root, `${PHONE(id)}/hint`)[0].props.children).toBe('На телефоне');
     focusMock.mockClear();
     await press(root, PHONE(id));
     expect(visible(root, 'dialog/qr')).toBe(true);

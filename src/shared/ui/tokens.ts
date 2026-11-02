@@ -263,8 +263,10 @@ export const components = {
     radius: rounded.xl,
     gap: 28,
     buttonGap: 12,
-    /** The QR glyph on «На телефоне». */
-    buttonIcon: 14,
+    /** The QR glyph on the icon-only «На телефоне». */
+    buttonIcon: 20,
+    /** The focused-only label under the icon-only «На телефоне». */
+    hintWidth: 120,
     glyph: 48,
     titleLines: 4,
     plate: colors['surface-raised'],

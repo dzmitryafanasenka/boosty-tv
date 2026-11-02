@@ -934,7 +934,7 @@ Device checks (pinned Chromecast with Google TV 4K, release-like build, the owne
 | Check | Result | Method |
 |---|---|---|
 | One video, not started | Author row; 16:9 preview left; title, «вчера · 10 лайков · 40 комментариев», «Видео» (no duration from the API); «Смотреть» focused, «На телефоне» with the QR glyph; no MediaRow; the body below | agent, adb + screencap |
-| One video, in progress | «Видео · 56:14 · осталось 56 мин», duration badge on the preview, «Продолжить · 0:29» focused, «С начала», «На телефоне» wraps to a second row (the right column is ≈ 378 dp) | agent, adb + screencap |
+| One video, in progress | «Видео · 56:14 · осталось 56 мин», duration badge on the preview, «Продолжить · 0:29» focused, «С начала», «На телефоне» wrapped to a second row (the right column is ≈ 378 dp) — fixed in the owner follow-up below | agent, adb + screencap |
 | Focus | → primary → «На телефоне»; ↑ → the author; ↓ → the primary; ↓ → the first paragraph | agent, adb |
 | «На телефоне» | OK → «Пост на Boosty» with a QR, «Откроется на телефоне», «Закрыть» focused; Back → focus on «На телефоне» | agent, adb + screencap |
 | Text post | Plain header (title, meta), «На телефоне» under the meta; focus on the first paragraph | agent, adb + screencap |
@@ -2170,3 +2170,6 @@ Smoke (agent, adb injected keys + uiautomator + screencap, release-like build, o
 Review fixes (host-tested only, 2026-10-27): a failed or skipped E1 no longer keeps the window; `refetch` goes only to a still-mounted caller; a clock moved back ends the window; the hook catches; a failed post-`ok` E8 refetch keeps «Нет доступа к этому видео»; the player's immediate focus request also requires `isActive()`. New flow tests: page 2 all locked (no E1), page 1 all locked during the cold-start E1 (one shared E1; refetch / A11), focus kept across the silent-refresh feed refetch, a cached locked post within `staleTime` (no E1), the failed player refetch, exact E1 counts in the offline cases.
 
 Host: lint (`--max-warnings 0`), typecheck, check:fixtures clean; `npm test` ×3: 1454 passed each (after the review fixes); `playerFlow`, `postFlow`, `homeFeedFlow`, `authorFlow` + `sessionCheck.test.ts` 30/30. Not checked with the physical remote.
+
+**Story 13.1 follow-up (owner, 2026-11-02): icon-only «На телефоне».** The owner found the wrapped text button too prominent. It is now a 40 × 40 dp secondary button with the QR glyph in the same row; «На телефоне» shows under it only while focused. Release-like build (armeabi-v7a, owner-signed, still 1.2.0 / 10200) installed over the previous story build with `adb install -r`, session kept. On «Философский выпуск по вашим заявкам №2»: «Продолжить · 0:29», «С начала» and the QR button in one row; → → focuses the QR button and the label appears under it (agent, adb + screencap). Test: the hint is absent until focus, then «На телефоне» (`postFlow` «Story 13.1» QR test).
+
