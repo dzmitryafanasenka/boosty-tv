@@ -1,0 +1,21 @@
+README.en.md
+  s_12c741f764bd7c::t_6e9520a8b988b8 25-28
+README.md
+  s_12c741f764bd7c::t_dee5c20dc0b2b8 25-28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "e1b16e039a4c9bdd1315f598a3574f2845831511",
+  "prompts": {},
+  "sessions": {
+    "s_12c741f764bd7c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "56fa7fd7-cf2f-4d38-a3e7-0220eb9f612d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
