@@ -102,6 +102,8 @@ export function useEntryGuard(): EntryGuard {
  * - Back: the sheet's levels first, then the chapter strip (close it,
  *   Story 10.1), then a held target (cancel), then the overlay (hide it),
  *   then exit.
+ * - Story 14.2: during the sleep timer's warning, ↑ on the focused timeline
+ *   moves focus to «Ещё 15 мин» instead.
  * - Story 10.1: ↑ on the focused timeline (overlay shown) opens the chapter
  *   strip when the video has chapters; in the strip ← → ↑ do nothing here
  *   (native focus), ↓ closes it; Next / Previous jump between chapters
@@ -129,6 +131,7 @@ export function usePlayerKeys({
   jumpChapter,
   strip,
   timelineFromControlsAt,
+  sleepWarning,
 }: {
   phase: Phase;
   overlay: boolean;
@@ -152,6 +155,8 @@ export function usePlayerKeys({
   strip: { openRef: RefObject<boolean>; openStrip: () => boolean; closeStrip: () => void };
   /** Story 10.1: when focus last came onto the timeline from a control (0: not from a control). */
   timelineFromControlsAt: RefObject<number>;
+  /** Story 14.2: the sleep timer's warning is showing; ↑ on the timeline focuses «Ещё 15 мин» (before the strip). */
+  sleepWarning?: { activeRef: RefObject<boolean>; focusExtend: () => void };
 }): { onSurfacePress: () => void } {
   const latest = useLatestRef({ phase, overlay, isActive });
   const entryGuarded = entryGuard.guarded;
@@ -288,6 +293,18 @@ export function usePlayerKeys({
           }
           return;
         case 'up':
+          // Story 14.2: during the sleep timer's warning ↑ on the timeline
+          // goes to «Ещё 15 мин» in the top band (before the chapter strip).
+          if (
+            sleepWarning?.activeRef.current &&
+            latest.current.overlay &&
+            focused.current === PLAYER_TIMELINE_ID &&
+            Date.now() - timelineFromControlsAt.current > STRIP_ENTRY_GUARD_MS
+          ) {
+            sleepWarning.focusExtend();
+            showOverlay();
+            return;
+          }
           // Story 10.1 (owner decision 2026-11-02, as on YouTube): ↑ again on
           // the focused timeline opens the chapter strip (with chapters only),
           // unless this ↑ is the one that just moved focus up from the controls.
@@ -361,6 +378,7 @@ export function usePlayerKeys({
       jumpChapter,
       strip,
       timelineFromControlsAt,
+      sleepWarning,
     ],
   );
   useTVEventHandler(onTvEvent);

@@ -421,3 +421,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-12-5-continue-history-launcher-channel.md`
   summary: LauncherChannelModule behaviour (card order by weight, one-shot pending open, recents/tile launch handling) is covered only by Kotlin source-text tests.
   evidence: maybe-false (review 12.5 #10); no JVM/Robolectric path in the repo; settle with the device rows in docs/testing.md Story 12.5 or add a JVM test harness later.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-14-2-sleep-timer.md`
+  summary: Check on the pinned TV that a paused player (sleep-timer fire or «До конца видео» hold) lets the screensaver/sleep engage; add a test for the quality row vanishing while its submenu is open.
+  evidence: maybe-false (review 14.2 #8, #9); react-native-video keep-screen-on while paused is unverified; live quality lists shrinking mid-session not shown reachable.

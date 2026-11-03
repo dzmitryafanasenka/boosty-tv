@@ -46,6 +46,12 @@ export type PlaybackSessionInput = {
   start: PlayerStart;
   /** Story 4.5: leave after the real end (VOD); undefined: stay paused at the end. */
   onEnded: (() => void) | undefined;
+  /**
+   * Story 14.2: the sleep timer's «До конца видео» check, asked at the real
+   * end of a VOD (after the `end` write): true → stay paused at the end with
+   * the overlay instead of `onEnded`. Null: no check.
+   */
+  holdAtEnd: RefObject<(() => boolean) | null>;
 };
 
 type Report = (event: ProgressEvent, positionOverride?: number) => void;
@@ -122,6 +128,18 @@ export type SessionCommands = {
   background: (closeSheet: (restoreFocus: boolean) => void) => void;
   /** Story 4.6, foreground: paused, the overlay shown (focus → the timeline). */
   foreground: () => void;
+  /**
+   * Story 14.2, a fixed sleep timer fired: a playing video (a held scrub of
+   * a playing video included) pauses: `closeSheet(true)` closes the settings
+   * sheet, a held scrub is cancelled without resuming, then the normal pause
+   * (one `pause` write for a VOD; live: a plain pause) and the overlay.
+   * Loading, recovering or on an error: the next start (a new source, a
+   * recovery, «Повторить») is held paused, no write, but only when it would
+   * have played (not paused by the viewer, not held by the lifecycle).
+   * Paused or in the background: nothing. True: it paused, or held a start
+   * that would have played (the «Пауза по таймеру сна» notice).
+   */
+  sleepPause: (closeSheet: (restoreFocus: boolean) => void) => boolean;
 };
 
 /** The progress wiring (`usePlayerProgress`, `usePlayerAccessEnd`, the exit). */
@@ -162,7 +180,7 @@ export type PlaybackSession = {
  * resolution, the recovery end and the PlaybackArbiter claim. `PlayerScreen`
  * calls it right after `usePlayerSource` (effect order).
  */
-export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: PlaybackSessionInput): PlaybackSession {
+export function usePlaybackSession({ mode, source, vodRef, start, onEnded, holdAtEnd }: PlaybackSessionInput): PlaybackSession {
   const { media, markEnded, bumpEpoch, setPreference, setKeepQuality, liveEnded, setSpeed } = source;
   const progress = mode.progress;
   const { state } = media;
@@ -355,6 +373,7 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
 
   const pauseForLifecycle = useCallback(() => {
     heldByLifecycle.current = true;
+    // A held scrub never resumes, and a source still to come starts paused.
     scrubWasPlaying.current = false;
     if (nextStart.current !== null) {
       nextStart.current = { ...nextStart.current, paused: true };
@@ -710,13 +729,15 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
     reportRef.current('end', Math.max(d, p));
     ended.current = true;
     setPaused(true);
+    // Story 14.2: «До конца видео» keeps the player paused on the last frame.
+    const hold = holdAtEnd.current?.() ?? false;
     const leave = onEndedRef.current;
-    if (leave) {
+    if (leave && !hold) {
       leave();
       return;
     }
     showOverlay();
-  }, [showOverlay, latest, reportRef, onEndedRef, mode, markEnded]);
+  }, [showOverlay, latest, reportRef, onEndedRef, mode, markEnded, holdAtEnd]);
   /**
    * An engine error (Story 4.4: an expired signed URL, a CDN or decoder
    * failure, also before the first `onLoad`). With the budget left: the
@@ -825,6 +846,55 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
       showOverlay();
     }
   }, [latest, showOverlay]);
+  const sleepPause = useCallback(
+    (closeSheet: (restoreFocus: boolean) => void): boolean => {
+      const { phase: now, paused: isPaused } = latest.current;
+      if (now === 'ended') {
+        return false;
+      }
+      if (now !== 'playing') {
+        // Loading, recovering or on an error: whatever starts next (a new
+        // source, a recovery, «Повторить») starts paused; nothing to write.
+        // Only when it would have played: not paused by the viewer, not held
+        // by the lifecycle.
+        const pending = nextStart.current;
+        const failure = lastFailure.current;
+        const wouldPlay =
+          !heldByLifecycle.current &&
+          (now === 'error'
+            ? failure === null || !failure.paused
+            : pending !== null
+              ? !pending.paused
+              : !isPaused);
+        if (!wouldPlay) {
+          return false;
+        }
+        pauseForLifecycle();
+        if (failure !== null) {
+          lastFailure.current = { ...failure, paused: true };
+        }
+        return true;
+      }
+      const scrubbing = seek.isHeld() && scrubWasPlaying.current;
+      if (isPaused && !scrubbing) {
+        return false;
+      }
+      closeSheet(true);
+      if (scrubbing) {
+        // The held scrub paused a playing video: cancelled and never resumed
+        // (the lifecycle hold); this pause is the user-pause write the scrub
+        // pause did not make.
+        pauseForLifecycle();
+        seek.cancel();
+        report('pause');
+        showOverlay();
+        return true;
+      }
+      setPlaying(false);
+      return true;
+    },
+    [latest, seek, report, showOverlay, setPlaying, pauseForLifecycle],
+  );
 
   return {
     phase,
@@ -865,6 +935,7 @@ export function usePlaybackSession({ mode, source, vodRef, start, onEnded }: Pla
       onRetry,
       background,
       foreground,
+      sleepPause,
     },
     progress: { report, reportRef, readyProgressRef },
   };

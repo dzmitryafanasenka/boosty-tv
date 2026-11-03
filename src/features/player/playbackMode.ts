@@ -1,7 +1,7 @@
 import type { ProgressRepository } from '../../shared/services/progress';
 import { pickSource, type MediaSourceState, type QualityKey } from './mediaResolver';
 import { recoveryTarget, type StartGate } from './recovery';
-import { liveQualitySwitch, liveSettingsShown } from './livePolicy';
+import { liveQualityShown, liveQualitySwitch } from './livePolicy';
 import type { PlaybackSpeed } from './speedPreference';
 
 /**
@@ -90,8 +90,12 @@ export type PlaybackMode = {
   pickMedia<T>(vod: T, live: T): T;
   /** The error state offers «Повторить» (live: only after a failed E15 request). */
   retryable(state: MediaSourceState): boolean;
-  /** The overlay shows «Настройки» (live: only with a real quality choice). */
-  settingsShown(sources: ReadySource['sources']): boolean;
+  /**
+   * The settings sheet has a «Качество» row (live: only with a real quality
+   * choice). Story 14.2: the gear itself always shows (the sheet always has
+   * «Таймер сна»).
+   */
+  qualityShown(sources: ReadySource['sources']): boolean;
   /** `sourceAgeMs`: since the ready source was resolved; null without one. */
   playIntent(input: { play: boolean; paused: boolean; sourceAgeMs: number | null }): PlayIntent;
   qualityIntent(current: ReadySource | null, key: QualityKey): QualityIntent;
@@ -118,7 +122,7 @@ export function createVodMode(progress: ProgressRepository | null, { speed = fal
     progress,
     pickMedia: vod => vod,
     retryable: () => true,
-    settingsShown: () => true,
+    qualityShown: () => true,
     playIntent: ({ play, sourceAgeMs }) =>
       play && sourceAgeMs !== null && sourceAgeMs >= SOURCE_REFRESH_AGE_MS ? 'refreshSource' : 'plain',
     qualityIntent: (current, key) => {
@@ -144,7 +148,7 @@ export function createLiveMode(): PlaybackMode {
     progress: null,
     pickMedia: (_vod, live) => live,
     retryable: state => state.kind === 'error',
-    settingsShown: sources => liveSettingsShown(sources),
+    qualityShown: sources => liveQualityShown(sources),
     playIntent: ({ play, paused }) => (play && paused ? 'liveEdge' : 'plain'),
     qualityIntent: (current, key) => (liveQualitySwitch(current, key) ? 'liveSwitch' : 'none'),
     endIntent: () => 'markEnded',

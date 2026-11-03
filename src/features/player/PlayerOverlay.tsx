@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState, type ReactNode, type Ref } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, type StyleProp, type TextStyle } from 'react-native';
 import { chapterAt, isGenericVideoTitle, type Chapter } from '../../shared/entities/post';
 import { tf, t } from '../../shared/i18n';
 import { formatClockTime, formatDuration } from '../../shared/i18n/format';
 import { endTimeMs, stableEndTime } from './endTime';
 import { speedLabel, type PlaybackSpeed } from './speedPreference';
+import { sleepClockNow, sleepLeftSec, type SleepIndicator } from './useSleepTimer';
 import {
   AuthorAvatar,
+  Button,
   FocusableSurface,
   GearIcon,
   SkipIcon,
@@ -26,12 +28,15 @@ export const PLAYER_PLAYPAUSE_ID = 'player/playpause';
 export const PLAYER_SETTINGS_ID = 'player/settings';
 export const PLAYER_BACK10_ID = 'player/back10';
 export const PLAYER_FORWARD10_ID = 'player/forward10';
+/** Story 14.2: «Ещё 15 мин» in the sleep timer's warning. */
+export const PLAYER_SLEEP_EXTEND_ID = 'player/sleep/extend';
 /** The overlay's controls: raw ← → never seek on them (they move focus natively). */
 export const PLAYER_CONTROL_IDS: ReadonlySet<string> = new Set([
   PLAYER_PLAYPAUSE_ID,
   PLAYER_BACK10_ID,
   PLAYER_FORWARD10_ID,
   PLAYER_SETTINGS_ID,
+  PLAYER_SLEEP_EXTEND_ID,
 ]);
 
 const CONTROL = components['player-control'];
@@ -78,6 +83,64 @@ function EndsAt({ positionSec, durationSec, rate }: { positionSec: number; durat
   return (
     <Text testID="player/endsAt" variant="meta" color="text-secondary" numberOfLines={1} style={styles.tabular}>
       {tf('player.endsAt', { time: formatClockTime(end) })}
+    </Text>
+  );
+}
+
+/** Story 14.2: the sleep timer's time left ticks this often. */
+export const SLEEP_TICK_MS = 1_000;
+
+/**
+ * Story 14.2 (our improvement IMP-08): «Таймер сна · 12:34» (the time left
+ * of a fixed timer, on the timer's own monotonic clock) or «Таймер сна · до
+ * конца». The time left is computed on every render from the current clock
+ * (a new deadline never shows a stale value); a timer re-renders it every
+ * second. Plain tabular meta text: not focusable, no live region.
+ */
+function SleepStatus({ indicator }: { indicator: SleepIndicator }) {
+  return (
+    <SleepCountdown
+      testID="player/sleep"
+      deadlineAt={indicator.kind === 'deadline' ? indicator.deadlineAt : null}
+      format={left => tf('player.sleep.left', { left })}
+      untilEnd={t('player.sleep.untilEnd')}
+      style={styles.sleep}
+    />
+  );
+}
+
+/** The ticking «… 12:34» text of the sleep timer (its monotonic clock, recomputed on every render). */
+function SleepCountdown({
+  testID,
+  deadlineAt,
+  format,
+  untilEnd,
+  style,
+}: {
+  testID: string;
+  deadlineAt: number | null;
+  format: (left: string) => string;
+  untilEnd: string;
+  style?: StyleProp<TextStyle>;
+}) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (deadlineAt === null) {
+      return;
+    }
+    // A timeout chain, not an interval: the countdown often unmounts in the
+    // same tick as the sleep timer's own check (a fire, the warning).
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = () => {
+      setTick(n => n + 1);
+      timer = setTimeout(tick, SLEEP_TICK_MS);
+    };
+    timer = setTimeout(tick, SLEEP_TICK_MS);
+    return () => clearTimeout(timer);
+  }, [deadlineAt]);
+  return (
+    <Text testID={testID} variant="meta" color="text-secondary" numberOfLines={1} style={[styles.tabular, style]}>
+      {deadlineAt === null ? untilEnd : format(time(sleepLeftSec(deadlineAt, sleepClockNow())))}
     </Text>
   );
 }
@@ -402,11 +465,27 @@ export type PlayerOverlayProps = {
    * after a system-player fallback); none by default. Not focusable.
    */
   notice?: string;
+  /** Story 14.2: the active sleep timer (the top band's «Таймер сна · …»); none by default. */
+  sleep?: SleepIndicator | null;
+  /**
+   * Story 14.2 (owner decision 2026-11-03, after review): the last minute of
+   * a fixed timer: «Ещё 15 мин» (focusable) and «Пауза через 0:59» instead
+   * of the «Таймер сна · …» line. Null: none.
+   */
+  sleepWarning?: {
+    deadlineAt: number;
+    onExtend: () => void;
+    onExtendFocus: () => void;
+    extendRef?: Ref<HostView>;
+  } | null;
+  /** Story 14.2: «Пауза по таймеру сна» (the timer paused playback and it is still paused). */
+  sleepNotice?: boolean;
 };
 
 /**
  * DESIGN.md Player overlay. Top band: avatar · author, the post title
- * (`player-title`, ≤ 2 lines), the video title when it differs. Bottom band:
+ * (`player-title`, ≤ 2 lines), the video title when it differs, the notice
+ * and (Story 14.2) the sleep timer's «Таймер сна · …». Bottom band:
  * the timeline, elapsed (Story 8.1: then «N×» while the rate is not 1) /
  * remaining (tabular), then the controls row:
  * «−10 с» · play/pause · «+10 с» centered, the ⚙ «Настройки» at its right
@@ -438,6 +517,9 @@ export function PlayerOverlay({
   live = null,
   showSettings = true,
   notice,
+  sleep = null,
+  sleepWarning = null,
+  sleepNotice = false,
   chapters = NO_CHAPTERS,
   chapterStrip = null,
 }: PlayerOverlayProps) {
@@ -484,6 +566,33 @@ export function PlayerOverlay({
             style={styles.notice}
           >
             {notice}
+          </Text>
+        ) : null}
+        {sleepWarning !== null ? (
+          <View testID="player/sleep/warning" style={styles.sleepWarning}>
+            <Button
+              ref={sleepWarning.extendRef}
+              testID={PLAYER_SLEEP_EXTEND_ID}
+              kind="secondary"
+              size="small"
+              label={t('player.sleep.extend')}
+              accessibilityLabel={t('player.sleep.extendA11y')}
+              onPress={sleepWarning.onExtend}
+              onFocus={sleepWarning.onExtendFocus}
+            />
+            <SleepCountdown
+              testID="player/sleep/countdown"
+              deadlineAt={sleepWarning.deadlineAt}
+              format={left => tf('player.sleep.warning', { left })}
+              untilEnd=""
+            />
+          </View>
+        ) : sleep !== null ? (
+          <SleepStatus indicator={sleep} />
+        ) : null}
+        {sleepNotice ? (
+          <Text testID="player/sleep/notice" variant="body-s" color="accent" numberOfLines={1} style={styles.sleep}>
+            {t('player.sleep.paused')}
           </Text>
         ) : null}
       </View>
@@ -583,6 +692,16 @@ export function PlayerOverlay({
 
 const styles = StyleSheet.create({
   notice: {
+    marginTop: spacing['3'],
+  },
+  sleep: {
+    marginTop: spacing['3'],
+  },
+  // Story 14.2: «Ещё 15 мин» then «Пауза через 0:59».
+  sleepWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing['4'],
     marginTop: spacing['3'],
   },
   overlay: {
