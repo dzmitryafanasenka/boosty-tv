@@ -108,6 +108,7 @@ The full text and testable consequences are in `prd.md` §4.
 - FR63 [P2, improvement]: Timestamp lines become one chip «▶ time title» (no duplicated text); a timestamp inside a paragraph gets a chip after it.
 - FR64 [P2, improvement]: Sleep timer in the player settings sheet; on fire, pause and write progress. Not persisted.
 - FR65 [P2, improvement]: The overlay shows the clock time the video ends (current speed), hidden for live and unknown durations.
+- FR67 [P2, improvement]: «Продолжить просмотр» as an app preview channel for third-party launchers (Aero TV), from the Story 12.4 spike: go for a channel, no-go for Watch Next. Synced from the local Continue history, emptied on sign-out.
 - FR66 [P2, improvement]: Настройки rows «О приложении» (unofficial, MIT, GitHub QR), «Сообщить о проблеме» (QR to a GitHub bug issue, version prefilled if supported), and the account name with «Выйти из аккаунта» (never the phone).
 
 ### NonFunctional Requirements
@@ -247,6 +248,7 @@ From DESIGN.md and EXPERIENCE.md:
 - FR64: Epic 14
 - FR65: Epic 14
 - FR66: Epic 15
+- FR67: Epic 12 (Story 12.5)
 - NFR1–4, NFR6–9: cross-cutting; they become acceptance criteria in every relevant story. NFR5: Epic 9 (with smoothness checks in Epics 3–4).
 - Phase 0 spike (Epic 1) validates the assumptions behind FR1–4, FR42–44, FR48 and FR51. It closes no FR by itself.
 
@@ -303,8 +305,8 @@ A post's comments as in the reference: the list, «show more», replies with «s
 **FRs covered:** FR58; FR14 and FR32 amended
 
 ### Epic 12: Home and feed polish (our improvements)
-Remove videos from «Продолжить просмотр», show progress on feed cards, replace the «События» section with a live plaque on Главная, and test the system Watch Next channel for third-party launchers (owner decisions 2026-11-02).
-**FRs covered:** FR59, FR60, FR61; FR14 completed; FR9, FR15 amended; FR52 retired
+Remove videos from «Продолжить просмотр», show progress on feed cards, replace the «События» section with a live plaque on Главная, and test the system Watch Next channel for third-party launchers (owner decisions 2026-11-02); the spike's go for an app channel adds Story 12.5 (2026-11-03).
+**FRs covered:** FR59, FR60, FR61, FR67; FR14 completed; FR9, FR15 amended; FR52 retired
 
 ### Epic 13: Post screen redesign (our improvements)
 A large preview with the actions beside it, the post's own QR, and timestamp chips without duplicated text (owner decisions 2026-11-02; approved mockup).
@@ -2022,6 +2024,34 @@ So that we build it only if it works.
 **Given** the result
 **Then** a research note in `docs/research/` gives a go or no-go
 **And** a go adds a follow-up story (sync with the Continue history including removal and «Очистить всё», the deep link with the cold-start session check and Back behaviour decided with the owner, the AccountScope wipe); Google TV certification for its own row is not a goal.
+
+### Story 12.5: «Продолжить просмотр» as an app channel in the launcher
+
+*Added 2026-11-03 after the Story 12.4 spike (go for an app preview channel, no-go for Watch Next in Aero TV 1.32; `docs/research/watch-next-and-launcher-channel-spike.md`). FR67, our improvement. Planning level: refine with the owner before the spec.*
+
+As the viewer,
+I want my «Продолжить просмотр» videos to appear in Aero TV when I focus the Boosty TV tile,
+So that I can resume from the home screen.
+
+**Acceptance Criteria:**
+
+**Given** the spike's open point
+**When** the story starts
+**Then** a device probe first checks that updating the channel's programs, and emptying the channel, also update Aero TV's cached cards; if Aero keeps stale cards, the story stops and the owner decides (account isolation must hold).
+
+**Given** the local Continue history
+**When** it changes on discrete events (pause, exit, removal, «Очистить всё», a finished video; never on every periodic progress write)
+**Then** one app preview channel «Продолжить просмотр» holds the same entries in the same order, at most `MAX_CONTINUE_ENTRIES`, each with the video title and a token-free poster (never a signed URL; the app banner as fallback) and no other account data, written through a port in `src/shared/platform` that runs only on API 26+ (minSdk stays 24) with the normal `WRITE_EPG_DATA` permission.
+
+**Given** a card in the launcher
+**When** OK is pressed
+**Then** Boosty TV opens it through a validated deep link (unknown or malformed ids open Главная) with the cold-start session check; Back behaviour is chosen with the owner from: back to the launcher, or to Главная; a removed or locked post shows the existing unavailable state.
+
+**Given** sign-out or an account switch
+**Then** the channel is emptied in the AccountScope wipe, and the device check confirms Aero TV shows no card of the previous account.
+
+**Given** the change
+**Then** unit tests cover the mapping, the sync triggers and the wipe, and `docs/focus-map.md`, `docs/testing.md` and the feature-parity row are updated.
 
 ## Epic 13: Post screen redesign (our improvements)
 

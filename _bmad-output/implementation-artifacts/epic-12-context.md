@@ -72,7 +72,7 @@ Make Главная and the post grids better for everyday use, based on the own
   - Native modules stay behind ports in `src/shared/platform`, and features never touch `NativeModules` directly.
   - JS D-pad handlers are allowed only in the player, the period stepper and the audio block. A long-OK detector on Continue cards is a new case and needs a justified, documented exception.
   - React Native does not give JS key repeats for held keys on the pinned remote. The player's hold-to-seek uses a native `dispatchKeyEvent` forwarder that reports `repeatCount`.
-  - The `WatchNext` port (`androidx.tvprovider`) is deferred and added only if 12.4 is a go.
+  - The `WatchNext` port (`androidx.tvprovider`) is deferred and added only if 12.4 is a go. *Result 2026-11-03: Watch Next is no-go in Aero TV; an app preview channel through the platform `TvContract` is a go, so Story 12.5 adds a launcher-channel port instead (`docs/research/watch-next-and-launcher-channel-spike.md`).*
 - **Focus:**
   - Focus IDs follow `<screen>/<zone>/<id>`. Continue cards use `home/continue/<mediaId>`.
   - FocusRestoration is the single return-focus store.
@@ -99,7 +99,7 @@ Make Главная and the post grids better for everyday use, based on the own
 
 ## Cross-Story Dependencies
 
-- 12.1 → 12.4: a Watch Next follow-up (if go) must mirror 12.1's removal and «Очистить всё».
+- 12.1 → 12.4 → 12.5: the launcher-channel follow-up (Story 12.5, after the 12.4 go for an app channel) must mirror 12.1's removal and «Очистить всё».
 - 12.2 reuses ContinueCard's progress line and the finished rule from the player (Epic 4). The multi-video target matches Пост's «Продолжить · Видео N» (Epic 13).
 - 12.3 depends on the Epic 7 live player and the Author page's live entry. It retires Story 7.5 (События) and its resume invalidation (ADR 0010 path).
 - All stories update the wiki after completion (standing owner rule), and per-release changelog pairs.
