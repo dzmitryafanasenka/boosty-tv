@@ -2,6 +2,7 @@ import { accountScope as appAccountScope, type AccountScope } from '../../accoun
 import type { HttpClient, SessionStatus } from '../../api';
 import type { MediaRef } from '../../entities/post/types';
 import { logger as appLogger, type Logger } from '../logger';
+import { isContinueEntry } from './continueEntries';
 import { isFinished } from './finished';
 import type { ProgressMeta, ProgressStore } from './progressStore';
 
@@ -75,6 +76,23 @@ export type ProgressRepository = {
    * request is sent.
    */
   forget(mediaId: string): void;
+  /**
+   * Story 12.1 (our improvement, owner decision 2026-11-02): the user removed
+   * the video from «Продолжить просмотр». Drops its local entry (written at
+   * once); the server position (E8 `timeCode`, else the last accepted E9)
+   * stays, so `resumePoint` still offers it. The writer is kept: an owed E9
+   * retry still goes out («Позиция на Boosty сохранится»); it never writes
+   * the local entry back (only `report`, i.e. a new playback, does). No new
+   * request is sent.
+   */
+  dismiss(mediaId: string): void;
+  /**
+   * Story 12.1 («Очистить всё»): drops the local entries of the videos in
+   * «Продолжить просмотр» (started, not finished; written at once). Finished
+   * entries, the server values and the writers (owed E9 retries) stay. Not
+   * an AccountScope reset. No new request is sent.
+   */
+  clearContinue(): void;
   /** Stops listening to the session and drops timers (tests). */
   dispose(): void;
 };
@@ -162,6 +180,15 @@ export function createProgressRepository({
     }
   }
 
+  /** This video's player session writes nothing more (its retries and held write go too). */
+  function dropWriter(mediaId: string) {
+    const writer = writers.get(mediaId);
+    if (writer !== undefined) {
+      clearRetry(writer);
+      writers.delete(mediaId);
+    }
+  }
+
   function requestWrite(writer: Writer) {
     if (writer.latest === null) {
       return;
@@ -226,6 +253,9 @@ export function createProgressRepository({
           }
           writer.inFlight = false;
           writer.lastSuccess = positionSec;
+          // Boosty now holds this position: the resume point once the local
+          // entry is gone (Story 12.1 removal).
+          store.setServerPosition(writer.ref.mediaId, positionSec);
           writer.failedAt = null;
           writer.autoRetries = 0;
           if (writer.pending) {
@@ -367,12 +397,14 @@ export function createProgressRepository({
       store.setServerPosition(mediaId, wholeSec(positionSec));
     },
     forget(mediaId) {
-      const writer = writers.get(mediaId);
-      if (writer !== undefined) {
-        clearRetry(writer);
-        writers.delete(mediaId);
-      }
+      dropWriter(mediaId);
       store.remove(mediaId);
+    },
+    dismiss(mediaId) {
+      store.removeLocal(mediaId);
+    },
+    clearContinue() {
+      store.clearLocal(isContinueEntry);
     },
     dispose() {
       unsubscribeSession();

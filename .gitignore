@@ -27,6 +27,9 @@ _bmad/config.user.toml
 # BMAD generated render cache
 _bmad/render/
 
+# BMAD party-mode session memory (personal, not shared)
+_bmad-output/party-mode/
+
 # Node / React Native
 node_modules/
 npm-debug.log

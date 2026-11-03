@@ -12,6 +12,15 @@ export function entryDurationSec(entry: ProgressEntry): number | null {
 }
 
 /**
+ * An entry that belongs to «Продолжить просмотр» (Story 4.7): started and
+ * not finished (the ADR 0004 rule). «Очистить всё» (Story 12.1) removes
+ * exactly these; finished entries stay.
+ */
+export function isContinueEntry(entry: ProgressEntry): boolean {
+  return entry.positionSec > 0 && !isFinished(entry.positionSec, entryDurationSec(entry));
+}
+
+/**
  * The Continue view (Story 4.7, FR15) from the local entries (newest
  * first, one per media id): unfinished (the ADR 0004 rule) with a position
  * > 0, at most `MAX_CONTINUE_ENTRIES`. A started video without a known
@@ -25,7 +34,7 @@ export function continueEntries(entries: readonly ProgressEntry[]): ProgressEntr
       break;
     }
     const id = entry.ref.mediaId;
-    if (seen.has(id) || entry.positionSec <= 0 || isFinished(entry.positionSec, entryDurationSec(entry))) {
+    if (seen.has(id) || !isContinueEntry(entry)) {
       continue;
     }
     seen.add(id);

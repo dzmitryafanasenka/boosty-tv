@@ -77,3 +77,61 @@ it('an empty author is left out of the label and the meta line', async () => {
   const [left] = find(r, `${ID}/left`);
   expect(left.children.join('')).toBe('Осталось 48 мин');
 });
+
+describe('Story 12.1: a long OK', () => {
+  const host = (r: Root) => r.container.queryAll(n => n.props.testID === ID && n.props.focusable !== undefined)[0];
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('OK held ≥ 500 ms (the TV pressIn / pressOut path) calls onLongPress, not onPress', async () => {
+    const onPress = jest.fn();
+    const onLongPress = jest.fn();
+    const r = await mount({ onPress, onLongPress });
+    await act(async () => host(r).props.onPressIn({ nativeEvent: {} }));
+    await act(async () => {
+      jest.advanceTimersByTime(520);
+    });
+    expect(onLongPress).toHaveBeenCalledTimes(1);
+    await act(async () => host(r).props.onPressOut({ nativeEvent: {} }));
+    expect(onPress).not.toHaveBeenCalled();
+  });
+
+  it('a short OK (< 500 ms) calls onPress only', async () => {
+    const onPress = jest.fn();
+    const onLongPress = jest.fn();
+    const r = await mount({ onPress, onLongPress });
+    await act(async () => host(r).props.onPressIn({ nativeEvent: {} }));
+    await act(async () => {
+      jest.advanceTimersByTime(180);
+    });
+    await act(async () => host(r).props.onPressOut({ nativeEvent: {} }));
+    expect(onPress).toHaveBeenCalledTimes(1);
+    expect(onLongPress).not.toHaveBeenCalled();
+  });
+});
+
+describe('Story 12.1: TalkBack', () => {
+  const host = (r: Root) => r.container.queryAll(n => n.props.testID === ID && n.props.focusable !== undefined)[0];
+
+  it('with onLongPress: a «longpress» accessibility action labelled «Убрать из списка» calls it', async () => {
+    const onLongPress = jest.fn();
+    const onPress = jest.fn();
+    const r = await mount({ onLongPress, onPress });
+    expect(host(r).props.accessibilityActions).toEqual([{ name: 'longpress', label: 'Убрать из списка' }]);
+    await act(async () => host(r).props.onAccessibilityAction({ nativeEvent: { actionName: 'activate' } }));
+    expect(onLongPress).not.toHaveBeenCalled();
+    await act(async () => host(r).props.onAccessibilityAction({ nativeEvent: { actionName: 'longpress' } }));
+    expect(onLongPress).toHaveBeenCalledTimes(1);
+    expect(onPress).not.toHaveBeenCalled();
+  });
+
+  it('without onLongPress: no accessibility action', async () => {
+    const r = await mount();
+    expect(host(r).props.accessibilityActions).toBeUndefined();
+  });
+});

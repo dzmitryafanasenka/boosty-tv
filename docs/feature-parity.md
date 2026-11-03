@@ -180,7 +180,7 @@ Not in the reference; our improvements from `_bmad-output/planning-artifacts/spr
 
 | ID | Capability | PRD | Story |
 |---|---|---|---|
-| IMP-01 | Remove from «Продолжить просмотр» (long OK) and «Очистить всё» | FR-59 | 12.1 |
+| IMP-01 | Remove from «Продолжить просмотр» (long OK) and «Очистить всё». **As built (Story 12.1, host-tested; the physical-remote long press is the owner's check):** a long OK (≥ 500 ms, Pressability's `onLongPress` driven by react-native-tvos from the native key down; no JS key handler) on a Continue card opens a Dialog «Убрать из «Продолжить просмотр»?» with «Отмена» focused; «Убрать из списка» drops the local entry at once (`ProgressRepository.dismiss`), focus → the next card, else the previous, else the first feed card. A short OK still opens the Player. The row ends with a «Очистить всё» tile; its Dialog clears the account's unfinished local entries, the ones the row is built from (`clearContinue`; finished entries stay, owner decision 2026-11-03) and focus goes to the first feed card. Local only: no request, the in-memory server position stays (the E8 `timeCode`, updated by every accepted E9; Пост still offers «Продолжить» from it) and an owed E9 retry still goes out; a video watched again returns to the row; sign-out / account switch keep the AccountScope wipe | FR-59 | 12.1 |
 | IMP-02 | Progress and «Просмотрено» on feed cards (completes FR-14) | FR-60 | 12.2 |
 | IMP-03 | «в эфире» plaque on Главная, replacing События (EVT-01) | FR-61 | 12.3 |
 | IMP-04 | Watch Next channel for third-party launchers (spike, Aero TV `tv.aero.home`) | — | 12.4 |

@@ -6,6 +6,9 @@ The Russian version of this file is [CHANGELOG.ru.md](CHANGELOG.ru.md); both lis
 
 ## [Unreleased]
 
+### Added
+- «Продолжить просмотр» on Главная (Story 12.1): hold OK on a card to remove that video from the list; the dialog asks first, with «Отмена» focused. The last tile of the row, «Очистить всё», clears the whole list after a confirmation. Only this device's list changes: the position saved on Boosty is kept, and a video you watch again comes back to the list.
+
 ## [1.2.0] - 2026-11-02
 
 Read-only comments and a full-screen image viewer (Epic 11).
