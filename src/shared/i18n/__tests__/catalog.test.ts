@@ -32,7 +32,7 @@ describe('ru catalog', () => {
     expect(t('shell.wordmark')).toBe('Boosty TV');
     expect(t('shell.nav.home')).toBe('Главная');
     expect(t('shell.nav.settings')).toBe('Настройки');
-    expect(Object.keys(ru.shell.nav)).toEqual(['home', 'search', 'subs', 'events', 'settings']);
+    expect(Object.keys(ru.shell.nav)).toEqual(['home', 'search', 'subs', 'settings']);
     expect(t('home.feed.title')).toBe('Новое в подписках');
     expect(ru.home).not.toHaveProperty('placeholder');
     expect(t('settings.version')).toBe('Версия');

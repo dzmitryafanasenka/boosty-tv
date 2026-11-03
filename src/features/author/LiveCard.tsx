@@ -1,7 +1,7 @@
 import { memo, useEffect, useState, type Ref } from 'react';
 import { Image, StyleSheet, TVFocusGuideView, View } from 'react-native';
 import type { AppErrorKind } from '../../shared/api';
-import type { Stream } from '../../shared/entities/stream';
+import { isPlayableLive, type Stream } from '../../shared/entities/stream';
 import { t, tf, tp } from '../../shared/i18n';
 import { formatCount, formatStreamStart } from '../../shared/i18n/format';
 import {
@@ -71,7 +71,7 @@ export function liveCardState(stream: Stream): LiveCardState {
  * card (scheduled, needs a level, no URL) shows the stream page's QR.
  */
 export function liveCardPlayable(stream: Stream): boolean {
-  return stream.status === 'live' && stream.hasAccess && stream.hasLiveSources;
+  return isPlayableLive(stream);
 }
 
 export function liveCardTitle(stream: Stream): string {

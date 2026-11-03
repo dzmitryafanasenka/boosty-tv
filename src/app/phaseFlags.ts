@@ -23,10 +23,11 @@
  * Author page's LiveCard (E15). While it is off, Автор sends no E15 and
  * shows no card. Owner decision 2026-10-30 (Q3 a): it ships on.
  *
- * `events` (Story 7.5) is the События sidebar section (E18). Owner decision
- * 2026-10-30 (Q1 a): on after the live probe found E18 in the documented
- * shape (first page only, no load-more). While it is off, there is no
- * sidebar item and no E18.
+ * Story 12.3 removed the События section and its `events` flag (owner
+ * decision 2026-11-02). `livePlaque` (Story 12.3, IMP-03) is Главная's «в
+ * эфире» plaque that replaces it: a bounded E2 + E15 pass (at most 10 E15,
+ * sequential, 5 min TTL). It also needs `live` and `player`; while any of
+ * them is off, there is no plaque and no pass. It ships on.
  *
  * `speed` (Story 8.1) is the player settings sheet's «Скорость» row for
  * recordings. While it is off, there is no row and every video plays at 1×
@@ -54,12 +55,12 @@ export const phaseFlags = {
   home: true,
   search: true,
   subs: true,
-  events: true,
   settings: true,
   player: true,
   myBlog: true,
   filters: true,
   live: true,
+  livePlaque: true,
   speed: true,
   externalPlayer: true,
   diagnostics: true,
@@ -69,7 +70,7 @@ export const phaseFlags = {
 export type Capability = keyof typeof phaseFlags;
 
 /** Sidebar sections in DESIGN.md order (Sidebar / NavItem). */
-export const SECTION_ORDER = ['home', 'search', 'subs', 'events', 'settings'] as const;
+export const SECTION_ORDER = ['home', 'search', 'subs', 'settings'] as const;
 
 export type SectionId = (typeof SECTION_ORDER)[number];
 

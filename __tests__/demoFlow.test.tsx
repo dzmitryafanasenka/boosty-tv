@@ -109,13 +109,14 @@ test('fixture-backed Shell with the «ДЕМО» badge; SecureStore and the netw
   const focusable = root.container
     .queryAll(n => n.props.focusable === true)
     .map(n => n.props.testID as string);
-  // Then «Фильтры» (Story 5.3) and «Обновить» (Story 5.1) in the feed's title row.
+  // Then the demo's «в эфире» plaque (Story 12.3: demo-blog-1 is live), and
+  // «Фильтры» (Story 5.3) and «Обновить» (Story 5.1) in the feed's title row.
   expect(focusable.slice(0, 7)).toEqual([
     'nav/home',
     'nav/search',
     'nav/subs',
-    'nav/events',
     'nav/settings',
+    'home/live/demo-blog-1',
     'home/filters',
     'home/refresh',
   ]);
@@ -324,23 +325,19 @@ test('Story 7.4: the demo like toggles in memory and survives a poll; share open
   });
 });
 
-test('Story 7.5: the demo E18: События lists the shown demo events (stream first); OK on the stream row → Автор on the live card; no network', async () => {
+test('Story 12.3: the demo «в эфире» pass: Главная shows one plaque (demo-blog-1, the demo E15 live stream); OK → the live Player; no network', async () => {
   fetchMock.mockClear();
-  const focusMock = requestHostFocus as jest.Mock;
   const root = await renderApp();
-  focusMock.mockClear();
-  await press(root, 'nav/events');
-  const rows = root.container
-    .queryAll(n => n.props.focusable === true && String(n.props.testID).startsWith('events/row/'))
+  await settle();
+  const plaques = root.container
+    .queryAll(n => n.props.focusable === true && String(n.props.testID).startsWith('home/live/'))
     .map(n => n.props.testID as string);
-  // The comment (9002) and the owner-side donation (9003) are hidden.
-  expect(rows).toEqual(['events/row/9001', 'events/row/9004', 'events/row/9005', 'events/row/9006', 'events/row/9007']);
-  const testIdOf = (call: unknown[]) => (call[0] as { props?: { testID?: string } } | null)?.props?.testID;
-  expect(focusMock.mock.calls.map(testIdOf).pop()).toBe('events/row/9001');
-  expect(one(root, 'events/row/9001').props.accessibilityLabel).toMatch(/^Новое\. Демо-автор 1: Начался эфир\. Эфир\./);
-  focusMock.mockClear();
-  await press(root, 'events/row/9001');
-  expect(focusMock.mock.calls.map(testIdOf).filter(Boolean).pop()).toBe('author/demo-blog-1/live');
+  expect(plaques).toEqual(['home/live/demo-blog-1']);
+  expect(one(root, 'home/live/demo-blog-1').props.accessibilityLabel).toBe(
+    'Демо-автор 1 в эфире: Демо-эфир: разбор вопросов зрителей',
+  );
+  await press(root, 'home/live/demo-blog-1');
+  expect(topScreen(root, ['shell', 'player'])).toBe('player');
   expect(fetchMock).not.toHaveBeenCalled();
   await act(async () => {
     root.unmount();

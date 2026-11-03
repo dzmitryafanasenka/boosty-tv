@@ -271,11 +271,22 @@ describe('queryKeys.comments / commentReplies (Story 11.1)', () => {
   it('carry ids only (no cursor or URL), each its own root', () => {
     expect(queryKeys.comments('b', 'p')).toEqual(['comments', 'b', 'p']);
     expect(queryKeys.commentReplies('b', 'p', 'c')).toEqual(['commentReplies', 'b', 'p', 'c']);
-    const roots = [queryKeys.post('b', 'p'), queryKeys.events(), queryKeys.mediaSource('b', 'p', 'm')].map(k => k[0]);
+    const roots = [queryKeys.post('b', 'p'), queryKeys.livePlaque(), queryKeys.mediaSource('b', 'p', 'm')].map(k => k[0]);
     for (const key of [queryKeys.comments('b', 'p'), queryKeys.commentReplies('b', 'p', 'c')]) {
       expect(roots).not.toContain(key[0]);
     }
     const comments = queryKeys.comments('b', 'p');
     expect(queryKeys.commentReplies('b', 'p', 'c').slice(0, comments.length)).not.toEqual(comments);
+  });
+});
+
+describe('queryKeys.livePlaque (Story 12.3)', () => {
+  it('is its own root: never under `stream` (the resume and Player-exit invalidations miss it)', () => {
+    expect(queryKeys.livePlaque()).toEqual(['livePlaque']);
+    const stream = queryKeys.allStreams();
+    expect(queryKeys.livePlaque().slice(0, stream.length)).not.toEqual(stream);
+    expect(queryKeys.livePlaque()[0]).not.toBe(queryKeys.subscriptions()[0]);
+    expect(queryKeys.livePlaque()[0]).not.toBe(queryKeys.liveSource('b')[0]);
+    expect(Object.keys(queryKeys)).not.toContain('events');
   });
 });

@@ -122,11 +122,13 @@ export const queryKeys = {
    */
   liveSource: (blogUrl: string) => ['liveSource', blogUrl] as const,
   /**
-   * E18 the account's events (Story 7.5, `entities/event`), one request, no
-   * paging. Its own root: never a prefix of another key. Account-scoped like
-   * every key (the cache is cleared on sign-out and account switch).
+   * Главная's «в эфире» plaque (Story 12.3, IMP-03): one bounded pass, E2
+   * then E15 for at most `LIVE_PLAQUE_MAX_AUTHORS` subscribed blogs in
+   * sequence (`features/home/livePlaque.ts`), with a 5 min TTL. Its own
+   * root, never under `stream`: the resume `allStreams()` and the live
+   * Player's exit invalidation never touch it. Account-scoped like every key.
    */
-  events: () => ['events'] as const,
+  livePlaque: () => ['livePlaque'] as const,
   /**
    * E19 a post's comments (Story 11.1, `entities/comment`), an infinite
    * query by the post identity only: the cursor stays a page param, never in

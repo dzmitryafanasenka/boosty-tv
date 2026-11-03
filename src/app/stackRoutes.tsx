@@ -59,7 +59,7 @@ export function takePendingLiveQr(routeKey: string): boolean {
 
 /**
  * Автор's default sidebar current item (decision A): Подписки. Other callers
- * pass their own `section` (Главная/Пост, События in Story 7.5).
+ * pass their own `section` (Главная/Пост).
  */
 const AUTHOR_ORIGIN: SectionId = 'subs';
 
@@ -513,13 +513,21 @@ export function PlayerRoute({ navigation, route }: StackScreenProps<RootStackPar
   }, [navigation, queryClient, vodBlogUrl, vodPostId, vodMediaId, origin.focusId]);
   // Story 7.2: the live stream is not playable here (resolve time): Автор
   // below shows the stream page's QR on its return, focus back to the card.
+  // Story 12.3: from a Главная plaque (`origin.sectionId`) the player only
+  // leaves (Главная has no QR) and the plaque's pass runs again at once, so
+  // the stale plaque goes instead of staying up to the 5 min TTL; focus
+  // returns to the plaque, or its fallback when the new pass drops it.
   const onLiveUnplayable = useCallback(() => {
     if (!navigation.isFocused()) {
       return;
     }
-    pendingLiveQr = { routeKey: origin.routeKey };
+    if (origin.sectionId === undefined) {
+      pendingLiveQr = { routeKey: origin.routeKey };
+    } else {
+      queryClient.invalidateQueries({ queryKey: queryKeys.livePlaque(), exact: true }).catch(() => {});
+    }
     navigation.goBack();
-  }, [navigation, origin.routeKey]);
+  }, [navigation, origin.routeKey, origin.sectionId, queryClient]);
   return (
     <Screen testID="player">
       {liveBlogUrl !== null ? (

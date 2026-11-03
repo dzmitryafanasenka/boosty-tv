@@ -33,6 +33,10 @@ import {
 
 // The root `__mocks__/react-native-keychain.js` (in-memory, per service).
 jest.mock('react-native-keychain');
+/** Story 12.3: the «в эфире» plaque's E2 + E15 pass is off here (livePlaqueFlow covers it). */
+jest.mock('../src/app/phaseFlags', () =>
+  require('../src/test/phaseFlagsMock').phaseFlagsWith({ livePlaque: false }),
+);
 
 jest.mock('../src/shared/ui/requestHostFocus', () => ({
   requestHostFocus: jest.fn(),
@@ -388,7 +392,6 @@ describe('confirm and session creation', () => {
       'nav/home',
       'nav/search',
       'nav/subs',
-      'nav/events',
       'nav/settings',
       'home/filters',
       'home/refresh',
