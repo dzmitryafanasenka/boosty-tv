@@ -5,6 +5,7 @@ import { qualityOf, qualityOptions, type MediaSourceState, type QualityKey } fro
 import type { Phase } from './playerPhase';
 import { PlayerSettingsSheet, createSettingsSheetModel, type SettingsSheetData } from './PlayerSettingsSheet';
 import type { PlaybackSpeed } from './speedPreference';
+import type { SleepChoice } from './useSleepTimer';
 
 type ReadySource = Extract<MediaSourceState, { kind: 'ready' }>;
 
@@ -39,7 +40,8 @@ export type PlayerSettings = {
 /**
  * The player's settings sheet (Story 4.3, `PlayerSettingsSheet`, the one
  * modal host, a right side sheet). A quality pick goes to `pickQuality`
- * and a speed pick (Story 8.1) to `pickSpeed` (the session), then the sheet
+ * and a speed pick (Story 8.1) to `pickSpeed` (the session), a sleep timer
+ * pick (Story 14.2) to `pickSleep` (`useSleepTimer`), then the sheet
  * closes with focus on «Настройки» and the overlay shows. The sheet exists only while playing: leaving that phase
  * closes it without restoring focus, before the focus effect picks its
  * target (`PlayerScreen` calls this hook before `usePlayerFocus`).
@@ -54,18 +56,29 @@ export function usePlayerSettings({
   pickQuality,
   speed,
   pickSpeed,
+  qualityShown,
+  sleep,
+  sleepEnd,
+  pickSleep,
 }: {
   sheet: SheetOpen;
   ready: ReadySource | null;
   autoHeight: number | null;
   phase: Phase;
-  /** The overlay shows «Настройки» (`PlaybackMode.settingsShown`). */
+  /** The overlay shows «Настройки» (Story 14.2: always once a source is ready; «Качество» is `qualityShown`). */
   settingsShown: boolean;
   showOverlay: () => void;
   pickQuality: (key: QualityKey) => void;
   /** Story 8.1: the current speed for the «Скорость» row; null: no row (`PlaybackMode.speedShown` off). */
   speed: PlaybackSpeed | null;
   pickSpeed: (speed: PlaybackSpeed) => void;
+  /** Story 14.2: the «Качество» row (`PlaybackMode.qualityShown`). */
+  qualityShown: boolean;
+  /** Story 14.2: the sleep timer's choice. */
+  sleep: SleepChoice;
+  /** Story 14.2: «До конца видео» is offered. */
+  sleepEnd: boolean;
+  pickSleep: (choice: SleepChoice) => void;
 }): PlayerSettings {
   const { sheetOpenRef, setSheetOpen } = sheet;
   const playing = phase === 'playing';
@@ -73,14 +86,30 @@ export function usePlayerSettings({
   const settingsView = useRef<HostView | null>(null);
   /** The sheet's data (the modal host renders the sheet element once; this updates under it). */
   const [sheetModel] = useState(() =>
-    createSettingsSheetModel({ options: [], selected: 'auto', autoHeight: null, speed: null }),
+    createSettingsSheetModel({
+      quality: false,
+      options: [],
+      selected: 'auto',
+      autoHeight: null,
+      speed: null,
+      sleep: 'off',
+      sleepEnd: false,
+    }),
   );
   const sheetData = useMemo<SettingsSheetData | null>(
     () =>
       ready === null
         ? null
-        : { options: qualityOptions(ready.sources), selected: qualityOf(ready.source), autoHeight, speed },
-    [ready, autoHeight, speed],
+        : {
+            quality: qualityShown,
+            options: qualityOptions(ready.sources),
+            selected: qualityOf(ready.source),
+            autoHeight,
+            speed,
+            sleep,
+            sleepEnd,
+          },
+    [ready, autoHeight, speed, qualityShown, sleep, sleepEnd],
   );
   useEffect(() => {
     if (sheetData !== null) {
@@ -120,6 +149,11 @@ export function usePlayerSettings({
     closeSheet(true);
     showOverlay();
   });
+  const onPickSleepRef = useLatestRef((choice: SleepChoice) => {
+    pickSleep(choice);
+    closeSheet(true);
+    showOverlay();
+  });
 
   const openSettings = useCallback(() => {
     if (latest.current.phase !== 'playing' || sheetOpenRef.current || !latest.current.settingsShown) {
@@ -133,6 +167,7 @@ export function usePlayerSettings({
         model={sheetModel}
         onPick={key => onPickRef.current(key)}
         onPickSpeed={next => onPickSpeedRef.current(next)}
+        onPickSleep={choice => onPickSleepRef.current(choice)}
         onClosed={() => {
           sheetOpenRef.current = false;
           setSheetOpen(false);
@@ -141,7 +176,17 @@ export function usePlayerSettings({
       settingsView,
       { placement: 'end' },
     );
-  }, [latest, sheetOpenRef, setSheetOpen, showOverlay, modal, sheetModel, onPickRef, onPickSpeedRef]);
+  }, [
+    latest,
+    sheetOpenRef,
+    setSheetOpen,
+    showOverlay,
+    modal,
+    sheetModel,
+    onPickRef,
+    onPickSpeedRef,
+    onPickSleepRef,
+  ]);
 
   return { openSettings, closeSheet, settingsView };
 }

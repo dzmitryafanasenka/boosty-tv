@@ -518,6 +518,24 @@ export const ru = {
       title: 'Скорость',
       value: '{speed}×',
     },
+    // Story 14.2 (FR-64, IMP-08): the sleep timer row, its options and the
+    // overlay's indicator. `{left}` is `formatDuration` of the time left.
+    sleep: {
+      title: 'Таймер сна',
+      off: 'Выкл',
+      minutes: '{minutes} мин',
+      end: 'До конца видео',
+      left: 'Таймер сна · {left}',
+      untilEnd: 'Таймер сна · до конца',
+      // The last minute of a fixed timer (owner decision 2026-11-03, after review).
+      warning: 'Пауза через {left}',
+      extend: 'Ещё 15 мин',
+      extendA11y: 'Ещё 15 минут до паузы',
+      // Announced once when the warning starts (TalkBack).
+      announce: 'Пауза через минуту. Ещё 15 минут — OK',
+      // The top band after a timer pause, while paused.
+      paused: 'Пауза по таймеру сна',
+    },
     // Story 8.2 (PLAY-13): the hand-off to an installed player. `notFound`
     // is the fallback hint in the built-in player's overlay; `chooser` heads
     // the Android chooser.

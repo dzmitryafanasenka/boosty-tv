@@ -116,6 +116,7 @@ describe('Story 8.1: playback speed (PLAY-07, SET-04)', () => {
     expect(byTestId(root, 'modal/content')[0].queryAll(n => n.props.focusable === true).map(n => n.props.testID)).toEqual([
       QUALITY,
       SPEED,
+      'player/sheet/sleep',
     ]);
     expect(label(root, SPEED)).toBe('Скорость 1×');
     expect(lastFocusTarget()).toBe(QUALITY);
@@ -334,6 +335,7 @@ describe('Story 8.1: playback speed (PLAY-07, SET-04)', () => {
       await openSheet(root);
       expect(byTestId(root, 'modal/content')[0].queryAll(n => n.props.focusable === true).map(n => n.props.testID)).toEqual([
         QUALITY,
+        'player/sheet/sleep',
       ]);
       await unmount(root);
     } finally {
@@ -410,6 +412,7 @@ describe('Story 8.1: playback speed (PLAY-07, SET-04)', () => {
       await openSheet(root);
       expect(byTestId(root, 'modal/content')[0].queryAll(n => n.props.focusable === true).map(n => n.props.testID)).toEqual([
         QUALITY,
+        'player/sheet/sleep',
       ]);
       expect(visible(root, SPEED)).toBe(false);
       await back();

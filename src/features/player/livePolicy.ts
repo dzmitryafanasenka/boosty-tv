@@ -6,8 +6,12 @@ import { qualityOf, qualityOptions, type MediaSourceState, type QualityKey } fro
  * pure mode imports no hook module.
  */
 
-/** Story 7.2 (owner decision 2026-10-30): live shows the gear only with a real quality choice. */
-export function liveSettingsShown(sources: Parameters<typeof qualityOptions>[0]): boolean {
+/**
+ * Story 7.2 (owner decision 2026-10-30): live offers «Качество» only with a
+ * real quality choice. Story 14.2 (owner decision 2026-11-03): the gear
+ * itself always shows on live (the sheet has «Таймер сна»).
+ */
+export function liveQualityShown(sources: Parameters<typeof qualityOptions>[0]): boolean {
   return qualityOptions(sources).length > 1;
 }
 

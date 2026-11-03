@@ -81,16 +81,16 @@ describe('retryable', () => {
   });
 });
 
-describe('settingsShown', () => {
+describe('qualityShown', () => {
   test('VOD: always', () => {
-    expect(vod.settingsShown([hls])).toBe(true);
-    expect(vod.settingsShown([])).toBe(true);
+    expect(vod.qualityShown([hls])).toBe(true);
+    expect(vod.qualityShown([])).toBe(true);
   });
 
   test('live: only with a real quality choice', () => {
-    expect(live.settingsShown([hls])).toBe(false);
-    expect(live.settingsShown([hls, mp4(720)])).toBe(true);
-    expect(live.settingsShown([])).toBe(false);
+    expect(live.qualityShown([hls])).toBe(false);
+    expect(live.qualityShown([hls, mp4(720)])).toBe(true);
+    expect(live.qualityShown([])).toBe(false);
   });
 });
 

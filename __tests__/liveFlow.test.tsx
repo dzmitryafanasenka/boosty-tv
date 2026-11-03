@@ -193,7 +193,7 @@ describe('Story 7.2: watch a live stream (LiveRef)', () => {
     await unmount(noUrl);
   });
 
-  it('Overlay: the LIVE badge and the ticking elapsed time; no timeline, ±10 or gear; focus on play/pause', async () => {
+  it('Overlay: the LIVE badge and the ticking elapsed time; no timeline or ±10; the gear (Story 14.2); focus on play/pause', async () => {
     jest.setSystemTime((START + 3599) * 1000);
     const root = await openLive();
     focusMock.mockClear();
@@ -204,9 +204,11 @@ describe('Story 7.2: watch a live stream (LiveRef)', () => {
     expect(playerText(root)).toContain('59:59');
     await advance(1_000);
     expect(playerText(root)).toContain('1:00:00');
-    for (const id of [TIMELINE, BACK10, FORWARD10, SETTINGS, 'player/remaining']) {
+    for (const id of [TIMELINE, BACK10, FORWARD10, 'player/remaining']) {
       expect(visible(root, id)).toBe(false);
     }
+    // Story 14.2 (owner decision 2026-11-03): the live gear always shows (the sheet has «Таймер сна»).
+    expect(visible(root, SETTINGS)).toBe(true);
     await unmount(root);
   });
 
@@ -283,12 +285,17 @@ describe('Story 7.2: watch a live stream (LiveRef)', () => {
     await unmount(root);
   });
 
-  it('Quality: the live candidates give one entry («Авто») → no gear; Menu does not open the sheet', async () => {
+  it('Quality: the live candidates give one entry («Авто») → no «Качество» row; Story 14.2: the gear and Menu open the sheet with «Таймер сна» only', async () => {
     const root = await openLive();
     await key('up');
-    expect(visible(root, SETTINGS)).toBe(false);
+    expect(visible(root, SETTINGS)).toBe(true);
     await key('menu');
-    expect(visible(root, 'player/sheet')).toBe(false);
+    await advance(50);
+    expect(visible(root, 'player/sheet')).toBe(true);
+    expect(byTestId(root, 'modal/content')[0].queryAll(n => n.props.focusable === true).map(n => n.props.testID)).toEqual([
+      'player/sheet/sleep',
+    ]);
+    expect(visible(root, 'player/sheet/quality')).toBe(false);
     await unmount(root);
   });
 

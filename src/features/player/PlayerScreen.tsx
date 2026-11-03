@@ -20,6 +20,8 @@ import { useEntryGuard, usePlayerKeys } from './usePlayerKeys';
 import { usePlayerAccessEnd, usePlayerProgress } from './usePlayerProgress';
 import { useSheetOpen, usePlayerSettings } from './usePlayerSettings';
 import { usePlayerSource } from './usePlayerSource';
+import { useSleepTimer } from './useSleepTimer';
+import { announceForAccessibility } from '../../shared/platform/accessibilityAnnounce';
 
 export { BUFFER_SPINNER_MS, OVERLAY_HIDE_MS, PLAYER_BACK_ID, PLAYER_RETRY_ID, PLAYER_SURFACE_ID } from './usePlayerFocus';
 export { ENTRY_GUARD_MS, HOLD_REPEAT_MS } from './usePlayerKeys';
@@ -155,10 +157,13 @@ export function PlayerScreen({
     () => (isLive ? createLiveMode() : createVodMode(progressRepository, { speed: speedEnabled })),
     [isLive, progressRepository, speedEnabled],
   );
-  // Hook order is effect order: source, session, heartbeat, overlay timers,
-  // settings, focus, progress and lifecycle, remote, access endings, live exit.
+  // Hook order is effect order: source, session, heartbeat, sleep timer,
+  // overlay timers, settings, focus, progress and lifecycle, remote, access
+  // endings, live exit.
   const source = usePlayerSource(http, mode, liveRef, vodRef);
-  const session = usePlaybackSession({ mode, source, vodRef, start, onEnded });
+  /** Story 14.2: the sleep timer's «До конца видео» check (set by `useSleepTimer`). */
+  const holdAtEnd = useRef<(() => boolean) | null>(null);
+  const session = usePlaybackSession({ mode, source, vodRef, start, onEnded, holdAtEnd });
   const { phase, state, ready, failed, playing, seek, view, commands } = session;
   const { paused, overlay } = view;
 
@@ -180,6 +185,42 @@ export function PlayerScreen({
   );
 
   const sheet = useSheetOpen();
+  // Story 14.2: the sleep timer (a fixed one pauses a playing video; see
+  // `useSleepTimer`); «До конца видео» only for a recording with a known
+  // duration. One minute before a fixed timer fires, the warning shows the
+  // overlay with focus on «Ещё 15 мин» (`warnFocus`, until the overlay hides).
+  const sleepPause = commands.sleepPause;
+  const closeSheetRef = useRef<(restoreFocus: boolean) => void>(() => {});
+  const [warnFocus, setWarnFocus] = useState(false);
+  const warnState = useLatestRef({ phase, paused });
+  const sleep = useSleepTimer({
+    resetKey: liveRef !== null ? `live:${liveRef.blogUrl}` : `${vodRef?.blogUrl}/${vodRef?.postId}/${vodRef?.mediaId}`,
+    paused,
+    onFire: () => sleepPause(closeSheetRef.current),
+    // Like the open sheet, an open chapter strip holds the warning back (no focus steal).
+    canWarn: () =>
+      warnState.current.phase === 'playing' &&
+      !warnState.current.paused &&
+      !sheet.sheetOpenRef.current &&
+      !stripOpenRef.current,
+    onWarn: () => {
+      setWarnFocus(true);
+      commands.showOverlay();
+      announceForAccessibility(t('player.sleep.announce'));
+    },
+    holdAtEnd,
+  });
+  const sleepWarning = sleep.warning && sleep.indicator?.kind === 'deadline' ? sleep.indicator.deadlineAt : null;
+  // The focus claim ends when the overlay hides (Back), the warning ends or
+  // the chapter strip opens (closing the strip returns to the timeline).
+  useEffect(() => {
+    if (!overlay || sleepWarning === null || chapterStrip.open) {
+      setWarnFocus(false);
+    }
+  }, [overlay, sleepWarning, chapterStrip.open]);
+  const sleepWarningActive = useLatestRef(sleepWarning !== null);
+  const sleepEnd = mode.canSeek && view.durationSec > 0;
+
   const spinner = useOverlayTimers({
     playing,
     buffering: view.buffering,
@@ -188,12 +229,17 @@ export function PlayerScreen({
     seeking: view.seeking,
     sheetOpen: sheet.sheetOpen,
     stripOpen: chapterStrip.open,
+    sleepWarning: sleepWarning !== null,
     interaction: view.interaction,
     hideOverlay: commands.hideOverlay,
   });
 
-  /** Story 7.2 (owner decision 2026-10-30): live shows the gear only with a real quality choice. */
-  const settingsShown = ready !== null && mode.settingsShown(ready.sources);
+  /**
+   * Story 14.2 (owner decision 2026-11-03): the gear always shows once a
+   * source is ready (live too: the sheet has «Таймер сна»); live offers
+   * «Качество» only with a real choice (Story 7.2).
+   */
+  const settingsShown = ready !== null;
   const settings = usePlayerSettings({
     sheet,
     ready,
@@ -204,7 +250,12 @@ export function PlayerScreen({
     pickQuality: commands.pickQuality,
     speed: mode.speedShown ? source.speed : null,
     pickSpeed: commands.pickSpeed,
+    qualityShown: ready !== null && mode.qualityShown(ready.sources),
+    sleep: sleep.choice,
+    sleepEnd,
+    pickSleep: sleep.pick,
   });
+  closeSheetRef.current = settings.closeSheet;
 
   // Live (Story 7.2): only a failed E15 request offers «Повторить»; a broken
   // live source after its one recovery shows «Назад» only.
@@ -220,6 +271,7 @@ export function PlayerScreen({
     sheetOpenRef: sheet.sheetOpenRef,
     entryGuard,
     stripOpen: chapterStrip.open,
+    warnFocus: warnFocus && sleepWarning !== null,
   });
 
   usePlayerProgress({
@@ -272,6 +324,8 @@ export function PlayerScreen({
     onExitRef.current();
   }, [report, onExitRef]);
 
+  const focusExtend = focus.focusExtend;
+  const sleepKeys = useMemo(() => ({ activeRef: sleepWarningActive, focusExtend }), [sleepWarningActive, focusExtend]);
   const { onSurfacePress } = usePlayerKeys({
     phase,
     overlay,
@@ -291,6 +345,7 @@ export function PlayerScreen({
     jumpChapter: commands.jumpChapter,
     strip: stripKeys,
     timelineFromControlsAt: focus.timelineFromControlsAt,
+    sleepWarning: sleepKeys,
   });
 
   /** Story 10.1: OK in the strip: seek to that chapter now, close the strip (focus → the timeline). */
@@ -373,6 +428,18 @@ export function PlayerScreen({
           live={ready.live}
           showSettings={settingsShown}
           notice={shownNotice}
+          sleep={sleep.indicator}
+          sleepWarning={
+            sleepWarning !== null
+              ? {
+                  deadlineAt: sleepWarning,
+                  onExtend: sleep.extend,
+                  onExtendFocus: focus.onExtendFocus,
+                  extendRef: focus.extendView,
+                }
+              : null
+          }
+          sleepNotice={sleep.pausedByTimer && paused}
           chapters={view.chapters}
           chapterStrip={
             chapterStrip.open ? (

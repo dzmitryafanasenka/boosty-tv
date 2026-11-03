@@ -114,10 +114,11 @@ describe('quality (Story 4.3)', () => {
     expect(label(root, QUALITY)).toBe('Качество Авто');
     expect(lastFocusTarget()).toBe(QUALITY);
     // The sheet is the only focusable content in the modal (the trap holds it);
-    // Story 8.1 added «Скорость» under «Качество» for recordings.
+    // Story 8.1 added «Скорость» under «Качество» for recordings; Story 14.2 «Таймер сна» last.
     expect(byTestId(root, 'modal/content')[0].queryAll(n => n.props.focusable === true).map(n => n.props.testID)).toEqual([
       QUALITY,
       'player/sheet/speed',
+      'player/sheet/sleep',
     ]);
     await advance(20_000);
     expect(visible(root, 'player/overlay')).toBe(true);
