@@ -1,0 +1,85 @@
+CHANGELOG.md
+  s_835eb95b89135d::t_de41a2b43e43fd 13
+CHANGELOG.ru.md
+  s_835eb95b89135d::t_353d075f327dc2 13
+__tests__/accountScopeRegistry.test.js
+  s_835eb95b89135d::t_3c89be19cdc8dd 53,69-73
+__tests__/demoFlow.test.tsx
+  s_835eb95b89135d::t_aea08f92218594 864-898
+__tests__/launcherChannelModule.test.js
+  s_835eb95b89135d::t_2794a566e275b1 1-100
+__tests__/launcherOpenFlow.test.tsx
+  s_835eb95b89135d::t_2c27aafe584253 1-392
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_835eb95b89135d::t_19b5d3e29430f1 420-423
+_bmad-output/implementation-artifacts/spec-12-5-continue-history-launcher-channel.md
+  s_835eb95b89135d::t_64e763e58c02b9 1-104
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_835eb95b89135d::t_cca20356e634bb 32,134-135
+android/app/src/main/AndroidManifest.xml
+  s_835eb95b89135d::t_b896e56f7122e8 8-11
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/BoostyNativePackage.kt
+  s_835eb95b89135d::t_af03ac7d841eab 19
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/LauncherChannelModule.kt
+  s_835eb95b89135d::t_15d63fc5b5889a 1-331
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/MainActivity.kt
+  s_835eb95b89135d::t_847d1c975d80e8 3-4,26-45
+docs/adr/0016-launcher-preview-channel.md
+  s_835eb95b89135d::t_9dd60230f2590e 1-29
+docs/feature-parity.md
+  s_835eb95b89135d::t_ead460bb4c63d6 186
+docs/focus-map.md
+  s_835eb95b89135d::t_35245b48112a4b 224-230,584
+docs/testing.md
+  s_835eb95b89135d::t_b6387cf881ae86 922-943
+src/app/App.tsx
+  s_835eb95b89135d::t_3bdff81e3da95d 32,50,52,56-62,105,200,217,225-287,432,509-523,609-611
+src/app/Shell.tsx
+  s_835eb95b89135d::t_7138b4082d6350 81-87,139,175-176,208-211
+src/app/__tests__/launcherChannel.test.ts
+  s_835eb95b89135d::t_e310fb7e25babf 1-405
+src/app/__tests__/launcherOpen.test.ts
+  s_835eb95b89135d::t_25435f4141a81a 1-105
+src/app/bootstrap.ts
+  s_835eb95b89135d::t_a1a9ded8aa70fe 9,46-47
+src/app/launcherChannel.ts
+  s_835eb95b89135d::t_62e873b29a8911 1-215
+src/features/home/index.ts
+  s_835eb95b89135d::t_c2bdd96170ae80 18
+src/shared/i18n/ru.ts
+  s_835eb95b89135d::t_ded5387f480623 693-698
+src/shared/platform/__tests__/launcherChannel.test.ts
+  s_835eb95b89135d::t_e3861fd0132811 1-88
+src/shared/services/progress/index.ts
+  s_835eb95b89135d::t_d967f3407afd03 34
+src/shared/services/progress/progressStore.ts
+  s_835eb95b89135d::t_c0d26be1368e5f 119-128,130
+src/app/launcherOpen.ts
+  s_00adf67be9c364::t_e6225bb5646cad 1-75
+src/shared/platform/launcherChannel.ts
+  s_00adf67be9c364::t_6c9099a599af1a 1-115
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "3847cdef1859edfb0456eab128e22e65ba5fe3d7",
+  "prompts": {},
+  "sessions": {
+    "s_00adf67be9c364": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a58555988929499eb",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_835eb95b89135d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5024ade5-03c5-45d9-9934-e24d9370e8ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
