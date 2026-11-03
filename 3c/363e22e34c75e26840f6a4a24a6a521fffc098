@@ -1,0 +1,53 @@
+CHANGELOG.md
+  s_835eb95b89135d::t_62ea76688a6267 10
+CHANGELOG.ru.md
+  s_835eb95b89135d::t_250cff2f57649e 10
+_bmad-output/implementation-artifacts/spec-14-1-end-time-in-player-overlay.md
+  s_835eb95b89135d::t_030cb4aea12da6 1-44
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_835eb95b89135d::t_0a5f3eb9198087 32,130,135,143-144
+_bmad-output/planning-artifacts/ux-designs/ux-boosty-tv-2026-10-25/DESIGN.md
+  s_835eb95b89135d::t_9604142993ad30 268
+_bmad-output/planning-artifacts/ux-designs/ux-boosty-tv-2026-10-25/EXPERIENCE.md
+  s_835eb95b89135d::t_a6897742291b6d 173
+docs/feature-parity.md
+  s_835eb95b89135d::t_100d6785e67d83 189
+docs/testing.md
+  s_835eb95b89135d::t_f425a501cdd36d 922-929
+src/features/player/PlayerOverlay.tsx
+  s_835eb95b89135d::t_72b10de15fc532 1,5-6,57-84,529-534,683-687
+src/features/player/__tests__/PlayerOverlayEndTime.test.tsx
+  s_835eb95b89135d::t_315c9797beceb4 1-178
+src/features/player/endTime.ts
+  s_835eb95b89135d::t_ebe676554287f5 1-34
+src/shared/i18n/format.ts
+  s_835eb95b89135d::t_4c805728e7a478 35-44
+src/shared/i18n/ru.ts
+  s_835eb95b89135d::t_42c0ffc5dc6631 480-482
+_bmad-output/implementation-artifacts/epic-14-context.md
+  s_acb1189ad29bda::t_3bfa77585132d0 1-52
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "3c363e22e34c75e26840f6a4a24a6a521fffc098",
+  "prompts": {},
+  "sessions": {
+    "s_835eb95b89135d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5024ade5-03c5-45d9-9934-e24d9370e8ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_acb1189ad29bda": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a0789d227e98269bf",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
