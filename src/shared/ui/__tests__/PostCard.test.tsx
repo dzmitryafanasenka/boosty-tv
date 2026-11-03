@@ -5,6 +5,12 @@ import { mapPost, type Post } from '../../entities/post';
 import { t } from '../../i18n';
 import { formatCardDate } from '../../i18n/format';
 import { createLogger } from '../../services/logger';
+import {
+  ProgressContext,
+  createProgressStore,
+  type ProgressRepository,
+  type ProgressStore,
+} from '../../services/progress';
 // eslint-disable-next-line boundaries/dependencies -- test-only fixtures
 import { e5Posts, feedPost, lockedPost } from '../../../test/feedFixtures';
 import {
@@ -555,6 +561,168 @@ describe('pinned (Author page, owner decision 2026-10-27)', () => {
     expect(byId(root, `${ID}/pin`)).toHaveLength(0);
     expect(json(root)).not.toContain('Закреплено');
     expect(host(root).props.accessibilityLabel).not.toMatch(/Закреплено/);
+    await act(async () => root.unmount());
+  });
+});
+
+describe('Story 12.2: local progress on a video card', () => {
+  let store: ProgressStore;
+  const memoryKv = () => {
+    const data = new Map<string, string>();
+    return {
+      get: async (key: string) => data.get(key) ?? null,
+      set: async (key: string, value: string) => {
+        data.set(key, value);
+      },
+      remove: async (key: string) => {
+        data.delete(key);
+      },
+      clear: async () => {
+        data.clear();
+      },
+    };
+  };
+  const put = (post: Post, mediaId: string, positionSec: number, durationSec: number | null = 3600) =>
+    store.put({
+      ref: { blogUrl: post.author.blogUrl, postId: post.id, mediaId },
+      positionSec,
+      durationSec,
+      updatedAt: Date.now(),
+      meta: { title: '', postTitle: post.title, authorName: post.author.name, previewUrl: null, durationSec },
+    });
+
+  async function renderWith(post: Post, width = 162): Promise<Root> {
+    const root = createRoot();
+    await act(async () => {
+      root.render(
+        <ProgressContext.Provider value={{ store } as unknown as ProgressRepository}>
+          <PostCard post={post} width={width} nowMs={NOW} testID={ID} />
+        </ProgressContext.Provider>,
+      );
+    });
+    return root;
+  }
+  const fillWidth = (root: Root) => {
+    const [fill] = byId(root, `${ID}/progress`)[0].queryAll(
+      n => n.props.style !== undefined && n.props.testID === undefined,
+    );
+    return (StyleSheet.flatten(fill.props.style) as { width: number }).width;
+  };
+
+  beforeEach(() => {
+    store = createProgressStore({ kv: memoryKv, scope: { generation: () => 0 }, logger: createLogger(), debounceMs: 10 });
+  });
+
+  it('no entry: no line, no badge, the label unchanged', async () => {
+    const post = withData([video('a', 3600)]);
+    const root = await renderWith(post);
+    expect(byId(root, `${ID}/progress`)).toHaveLength(0);
+    expect(byId(root, `${ID}/watched`)).toHaveLength(0);
+    expect(host(root).props.accessibilityLabel).not.toMatch(/Прогресс/);
+    await act(async () => root.unmount());
+  });
+
+  it('in progress (12:00 of 60:00): the line at 20 % on the preview\'s bottom edge; the label ends «осталось 48 мин»', async () => {
+    const post = withData([video('a', 3600)]);
+    put(post, 'a', 720);
+    const root = await renderWith(post);
+    const track = StyleSheet.flatten(byId(root, `${ID}/progress`)[0].props.style) as { top: number; width: number };
+    expect(track).toMatchObject({
+      top: postCardThumbHeight(162) - components.timeline.trackHeight,
+      width: 162,
+      backgroundColor: colors['overlay-badge'],
+    });
+    expect(fillWidth(root)).toBe(Math.round(162 * 0.2));
+    expect(byId(root, `${ID}/watched`)).toHaveLength(0);
+    expect(host(root).props.accessibilityLabel).toMatch(/осталось 48 мин\.$/);
+    // The card keeps its height.
+    const scale = StyleSheet.flatten(byId(root, `${ID}/scale`)[0].props.style) as { height?: number };
+    expect(scale.height ?? postCardHeight(162)).toBe(postCardHeight(162));
+    await act(async () => root.unmount());
+  });
+
+  it('finished: a full line and «Просмотрено» at the bottom left; the duration chip stays; the label ends «просмотрено»', async () => {
+    const post = withData([video('a', 3600)]);
+    put(post, 'a', 3590);
+    const root = await renderWith(post);
+    expect(fillWidth(root)).toBe(162);
+    const badge = byId(root, `${ID}/watched`)[0];
+    expect(JSON.stringify(badge.toJSON())).toContain(t('post.video.status.watched'));
+    expect(StyleSheet.flatten(badge.props.style)).toMatchObject({
+      left: spacing['3'],
+      top: postCardThumbHeight(162) - spacing['3'] - components.badge.height,
+    });
+    expect(byId(root, `${ID}/duration`)).toHaveLength(1);
+    expect(byId(root, `${ID}/badge`)).toHaveLength(1);
+    expect(host(root).props.accessibilityLabel).toMatch(/просмотрено\.$/);
+    await act(async () => root.unmount());
+  });
+
+  it('an unknown duration: no line, no badge', async () => {
+    const post = withData([video('a')]);
+    put(post, 'a', 720, null);
+    const root = await renderWith(post);
+    expect(byId(root, `${ID}/progress`)).toHaveLength(0);
+    expect(byId(root, `${ID}/watched`)).toHaveLength(0);
+    await act(async () => root.unmount());
+  });
+
+  it('a server-only position: the card is unchanged', async () => {
+    const post = withData([video('a', 3600)]);
+    store.setServerPosition('a', 720);
+    const root = await renderWith(post);
+    expect(byId(root, `${ID}/progress`)).toHaveLength(0);
+    expect(host(root).props.accessibilityLabel).not.toMatch(/Прогресс/);
+    await act(async () => root.unmount());
+  });
+
+  it('several videos: 1 watched + 2 in progress → the line of video 2; all watched → «Просмотрено»', async () => {
+    const post = withData([video('a', 3600), video('b', 3600), video('c', 3600)]);
+    put(post, 'a', 3500);
+    put(post, 'b', 1800);
+    put(post, 'c', 600);
+    const root = await renderWith(post);
+    expect(fillWidth(root)).toBe(Math.round(162 * 0.5));
+    expect(byId(root, `${ID}/watched`)).toHaveLength(0);
+    await act(async () => {
+      put(post, 'b', 3500);
+      put(post, 'c', 3500);
+    });
+    expect(fillWidth(root)).toBe(162);
+    expect(byId(root, `${ID}/watched`)).toHaveLength(1);
+    await act(async () => root.unmount());
+  });
+
+  it('several videos: 1 watched, 2 not started → no line, no badge', async () => {
+    const post = withData([video('a', 3600), video('b', 3600)]);
+    put(post, 'a', 3500);
+    const root = await renderWith(post);
+    expect(byId(root, `${ID}/progress`)).toHaveLength(0);
+    expect(byId(root, `${ID}/watched`)).toHaveLength(0);
+    await act(async () => root.unmount());
+  });
+
+  it('not a video post, or locked: unchanged even with an entry for its id', async () => {
+    const audio = withData([{ type: 'audio_file', id: 'x', title: 'a', duration: 60 }]);
+    put(audio, 'x', 30, 60);
+    const locked = asPost(lockedPost());
+    const r1 = await renderWith(audio);
+    expect(byId(r1, `${ID}/progress`)).toHaveLength(0);
+    await act(async () => r1.unmount());
+    const r2 = await renderWith(locked);
+    expect(byId(r2, `${ID}/progress`)).toHaveLength(0);
+    expect(byId(r2, `${ID}/watched`)).toHaveLength(0);
+    await act(async () => r2.unmount());
+  });
+
+  it('follows the store: an entry appears, then is removed (Story 12.1) → the line goes', async () => {
+    const post = withData([video('a', 3600)]);
+    const root = await renderWith(post);
+    expect(byId(root, `${ID}/progress`)).toHaveLength(0);
+    await act(async () => put(post, 'a', 720));
+    expect(byId(root, `${ID}/progress`)).toHaveLength(1);
+    await act(async () => store.removeLocal('a'));
+    expect(byId(root, `${ID}/progress`)).toHaveLength(0);
     await act(async () => root.unmount());
   });
 });

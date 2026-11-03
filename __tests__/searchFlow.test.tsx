@@ -966,3 +966,49 @@ describe('300 results', () => {
     await unmount(root);
   });
 });
+
+describe('Story 12.2: progress and «Просмотрено» on search results', () => {
+  const DURATION = 3600;
+  const videoPost = (n: number) =>
+    feedPost(n, { data: [{ type: 'ok_video', id: `search-v${n}`, title: 'v', duration: DURATION }] });
+  function put(post: ReturnType<typeof feedPost>, n: number, positionSec: number) {
+    progressStore.put({
+      ref: {
+        blogUrl: (post.user as { blogUrl: string }).blogUrl,
+        postId: `feed-post-${n}`,
+        mediaId: `search-v${n}`,
+      },
+      positionSec,
+      durationSec: DURATION,
+      updatedAt: Date.now(),
+      meta: { title: '', postTitle: `Post ${n}`, authorName: 'Author', previewUrl: null, durationSec: DURATION },
+    });
+  }
+
+  it('in progress → the line; finished → «Просмотрено»; no entry → unchanged; no request per card', async () => {
+    const posts = [0, 1, 2].map(videoPost);
+    search = () => ({
+      status: 200,
+      body: {
+        data: { blogs: [], searchPosts: posts.map(post => ({ post, rank: 5, headline: 'redacted' })) },
+        extra: { offset: 'end', isLast: true },
+      },
+    });
+    put(posts[0], 0, 720);
+    put(posts[1], 1, 3590);
+    const root = await openSearch();
+    await runSearch(root, 'капуста');
+    expect(resultIds(root)).toEqual([RESULT(0), RESULT(1), RESULT(2)]);
+    // No E8 (per-post) request was sent while the results rendered.
+    expect(transport.calls.filter(c => /^\/v1\/blog\/[^/]+\/post\/[^/]+$/.test(c.path))).toEqual([]);
+    const before = transport.calls.length;
+    expect(visible(root, `${RESULT(0)}/progress`)).toBe(true);
+    expect(one(root, RESULT(0)).props.accessibilityLabel).toMatch(/осталось 48 мин\.$/);
+    expect(visible(root, `${RESULT(1)}/watched`)).toBe(true);
+    expect(one(root, RESULT(1)).props.accessibilityLabel).toMatch(/просмотрено\.$/);
+    expect(visible(root, `${RESULT(2)}/progress`)).toBe(false);
+    expect(visible(root, `${RESULT(2)}/watched`)).toBe(false);
+    expect(transport.calls.length).toBe(before);
+    await unmount(root);
+  });
+});

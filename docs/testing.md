@@ -938,6 +938,24 @@ Device checks (2026-11-03, release-like build `./gradlew assembleRelease -Preact
 - *(owner, physical remote)* A long OK on a Continue card opens the remove Dialog and «Отмена» is not pressed by the key up of the hold; «Убрать из списка» removes the card; «Очистить всё» works; a short OK still opens the Player: «все работает».
 - `npm test` ran 5 times in full: 3 green (3482/3482); 2 runs had `playerRecoveryFlow` / `playerQualityFlow` failures that pass alone (2 × 46/46), the known load flakiness of the player flow suites.
 
+### Story 12.2 — Progress and «Просмотрено» on feed cards, 2026-11-03
+
+**Status: implemented and host-tested; checked on the pinned TV by the agent (adb screencap, uiautomator label) and by the owner with the physical remote (the line after watching and after seeking to the middle). «Просмотрено» and long-list smoothness were not checked on the device.** `spec-12-2-progress-on-feed-cards.md`, our improvement IMP-02 (FR-60). Focus is unchanged (`docs/focus-map.md` «Story 12.2»).
+
+Host tests:
+- `src/shared/services/progress/__tests__/cardProgress.test.ts` (10): `postCardProgress` (no entry; 12:00 of 60:00 → 20 %, 48 min left; finished by ≥ 95 % and by < 30 s left; the block duration fallback; no duration → none; server-only → none; multi: 1 watched + 2 in progress → video 2's line; 1 watched + 2 not started → none; all finished → watched, a server-only one does not count) and `primaryTarget` (moved from `PostScreen`).
+- `src/shared/ui/__tests__/PostCard.test.tsx` «Story 12.2» (9): with a `ProgressContext` over a memory store: the line's geometry and colours (ContinueCard's), the fill width, the bottom-left badge next to the kept duration chip and type badge, the label endings, unknown duration, server-only, multi-video target, other kinds and locked, and the card following the store (put → line, `removeLocal` → gone).
+- `__tests__/homeFeedFlow.test.tsx` «Story 12.2» (6): the matrix rows on Главная with no E8 per card and one E5; Back from the Player via Пост (feed card → Пост → primary → Player, progress through the engine mock, Back → Пост, Back → Главная: focus on the same feed card, its line and label at the new position, no E5 refetch); Back from the Player (from a Continue card) → the feed card shows the new position, no E5 refetch, focus back on the card; a store write while a feed card is focused re-renders only that card, no focus request, no request; «Очистить всё» drops the line and keeps «Просмотрено» of a finished entry; account isolation: the AccountScope wipe (`progressStore.reset`) → no line, no badge, no status in the label. The Story 3.1 render-count tests stay green.
+- `__tests__/authorFlow.test.tsx` and `__tests__/searchFlow.test.tsx` «Story 12.2» (1 each): line, «Просмотрено», unchanged card, no per-card request on Автор and Поиск.
+
+Lint, typecheck clean; full `npm test` after the Пост-path test: 3508/3508 (orchestrator run).
+
+Device checks (2026-11-03, release-like build `./gradlew assembleRelease -PreactNativeArchitectures=armeabi-v7a`, owner-signed, still 1.2.0 / 10200, `adb install -r`, session kept; foreground checked before every capture):
+- *(owner, physical remote)* watched part of «ОТЕ №15» from the feed and returned: the feed card shows the line (a few pixels at < 1 min of 62), the Continue row came back, focus on the same card, no feed reload; after seeking to the middle the line reaches about half of the preview («линия видна»).
+- *(agent, uiautomator)* the feed card's label ends «… Длительность 1:02:04. Прогресс: осталось 62 мин.».
+- Not checked on the device: the «Просмотрено» badge (host-tested only) and scrolling a long feed right after playback (deferred-work entry).
+- `npm run lint`, `npm run typecheck` clean; full `npm test` 3509/3509 after the review patches.
+
 ### Story 13.2 — Timestamp chips instead of a text line and a chip, 2026-11-02
 
 **Status: implemented and host-tested; checked on the pinned TV by the agent over adb (screenshots); the remote check against the mockup is the owner's.** `spec-13-2-timestamp-chips.md`, our improvement IMP-06 (FR-63). Focus ids and moves: `docs/focus-map.md` «F Пост» «Story 13.2».

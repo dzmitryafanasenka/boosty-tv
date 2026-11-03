@@ -1,6 +1,6 @@
-import { memo, type JSX, type ReactNode, type Ref } from 'react';
+import { memo, useMemo, type JSX, type ReactNode, type Ref } from 'react';
 import { Image, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import { firstText, type Post, type PostKind } from '../entities/post';
+import { firstText, videoRowsOf, type Post, type PostKind, type VideoRow } from '../entities/post';
 import { t, tf } from '../i18n';
 import { formatCardDate, formatDuration } from '../i18n/format';
 import { FocusableSurface, type FocusableSurfaceProps, type HostView } from './FocusableSurface';
@@ -13,6 +13,8 @@ import {
   VideosIcon,
   type IconProps,
 } from './icons';
+import { postCardProgress, type PostCardProgress } from '../services/progress/cardProgress';
+import { useProgress } from '../services/progress/useProgress';
 import { Text } from './Text';
 import { useItemState } from './useItemState';
 import { colors, components, rounded, spacing } from './tokens';
@@ -32,6 +34,11 @@ import { colors, components, rounded, spacing } from './tokens';
  * instead (`text-secondary`). Locked without a preview: the plate, the
  * avatar dimmed, the lock glyph on top and no type icon (without an avatar:
  * the plate and the lock only).
+ *
+ * Story 12.2 (IMP-02): a video post with local progress shows the accent
+ * line along the preview's bottom edge (as ContinueCard), and «Просмотрено»
+ * at the bottom left when every video is finished; the label adds the
+ * status. Read from the progress store (`useProgress`), no request.
  *
  * The width is the grid's: the token width (168) leaves no horizontal focus
  * headroom in the 720 dp content (4 × 168 + 3 × 16 = 720), so the feed
@@ -55,6 +62,9 @@ const LOCK = { body: 14, shackle: 10 } as const;
  */
 const PLATE_AVATAR_RATIO = 0.5;
 const PLATE_ICON_RATIO = 0.3;
+/** The progress line (Story 12.2): ContinueCard's. */
+const PROGRESS_HEIGHT = components.timeline.trackHeight;
+const NO_ROWS: readonly VideoRow[] = [];
 
 /**
  * The text block under the thumb (title, then the meta row). Shared with
@@ -101,18 +111,37 @@ export function postCardTitle(post: Post): string {
   return text.length > 0 ? text : t('postCard.untitled');
 }
 
-/** `showPinned` (the Author page): a pinned post's label starts with «Закреплено.». */
-export function postCardA11yLabel(post: Post, nowMs?: number, showPinned = false): string {
+/**
+ * `showPinned` (the Author page): a pinned post's label starts with
+ * «Закреплено.». `progress` (Story 12.2): the label ends with «осталось N
+ * мин» or «просмотрено».
+ */
+export function postCardA11yLabel(
+  post: Post,
+  nowMs?: number,
+  showPinned = false,
+  progress: PostCardProgress = { kind: 'none' },
+): string {
   const values = {
     badge: postBadgeLabel(post.kind),
     title: postCardTitle(post),
     author: post.author.name,
     date: formatCardDate(post.publishedAt, nowMs),
   };
-  const label =
+  const base =
     post.durationSec !== null
       ? tf('postCard.a11yDuration', { ...values, duration: formatDuration(post.durationSec) })
       : tf('postCard.a11y', values);
+  const label =
+    progress.kind === 'none'
+      ? base
+      : tf('postCard.a11yProgress', {
+          label: base,
+          status:
+            progress.kind === 'watched'
+              ? t('postCard.progress.watched')
+              : tf('postCard.progress.left', { n: String(progress.minutesLeft) }),
+        });
   return showPinned && post.pinned ? tf('postCard.a11yPinned', { label }) : label;
 }
 
@@ -224,6 +253,18 @@ function Avatar({
   return <View style={[styles.avatar, styles.avatarPlaceholder, sized]} />;
 }
 
+/**
+ * Story 12.2: a video post's card progress from the local store (no
+ * request); other kinds (and locked posts) read nothing.
+ */
+function usePostCardProgress(post: Post): PostCardProgress {
+  const isVideo = post.kind.kind === 'video' || post.kind.kind === 'videos';
+  const rows = useMemo(() => (isVideo ? videoRowsOf(post) : NO_ROWS), [isVideo, post]);
+  const refs = useMemo(() => rows.map(row => row.ref), [rows]);
+  const snapshots = useProgress(refs);
+  return useMemo(() => postCardProgress(rows, snapshots), [rows, snapshots]);
+}
+
 export function PostCardView({
   post,
   width,
@@ -240,6 +281,9 @@ export function PostCardView({
   const locked = !post.hasAccess;
   const thumbHeight = postCardThumbHeight(width);
   const preview = post.previewUrl && !previewFailed ? post.previewUrl : null;
+  const progress = usePostCardProgress(post);
+  const fraction = progress.kind === 'watched' ? 1 : progress.kind === 'inProgress' ? progress.fraction : null;
+  const bottomBadgeTop = thumbHeight - spacing['3'] - BADGE.height;
   return (
     <FocusableSurface
       ref={ref}
@@ -247,7 +291,7 @@ export function PostCardView({
       radius={TOKENS.radius}
       scaleFocus={TOKENS.scaleFocus}
       accessibilityRole="button"
-      accessibilityLabel={postCardA11yLabel(post, nowMs, showPinned)}
+      accessibilityLabel={postCardA11yLabel(post, nowMs, showPinned, progress)}
       onFocus={onFocus}
       onPress={onPress}
       style={style}
@@ -326,14 +370,29 @@ export function PostCardView({
           testID={testID ? `${testID}/duration` : undefined}
           variant="badge"
           numberOfLines={1}
-          style={[
-            styles.badge,
-            styles.badgeRight,
-            { top: thumbHeight - spacing['3'] - BADGE.height },
-          ]}
+          style={[styles.badge, styles.badgeRight, { top: bottomBadgeTop }]}
         >
           {formatDuration(post.durationSec)}
         </Text>
+      ) : null}
+      {progress.kind === 'watched' ? (
+        <Text
+          testID={testID ? `${testID}/watched` : undefined}
+          variant="badge"
+          numberOfLines={1}
+          style={[styles.badge, styles.badgeLeft, { top: bottomBadgeTop }]}
+        >
+          {t('post.video.status.watched')}
+        </Text>
+      ) : null}
+      {fraction !== null ? (
+        <View
+          testID={testID ? `${testID}/progress` : undefined}
+          pointerEvents="none"
+          style={[styles.track, { top: thumbHeight - PROGRESS_HEIGHT, width }]}
+        >
+          <View style={[styles.fill, { width: Math.round(width * fraction) }]} />
+        </View>
       ) : null}
       <Text
         variant="card-title"
@@ -437,6 +496,21 @@ const styles = StyleSheet.create({
   },
   badgeRight: {
     right: spacing['3'],
+  },
+  badgeLeft: {
+    left: spacing['3'],
+  },
+  // Story 12.2: ContinueCard's accent line over the preview's bottom edge
+  // (absolute: the card keeps its height).
+  track: {
+    position: 'absolute',
+    left: 0,
+    height: PROGRESS_HEIGHT,
+    backgroundColor: colors['overlay-badge'],
+  },
+  fill: {
+    height: PROGRESS_HEIGHT,
+    backgroundColor: components['media-row'].progress,
   },
   title: {
     marginTop: TITLE_GAP,

@@ -40,3 +40,4 @@ export {
   type ProgressStoreDeps,
 } from './progressStore';
 export { ProgressContext, useProgress, useProgressRepository } from './useProgress';
+export { postCardProgress, primaryTarget, type PostCardProgress } from './cardProgress';

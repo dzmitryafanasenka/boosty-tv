@@ -2976,6 +2976,168 @@ describe('Story 4.7: «Продолжить просмотр» on Главная
       await unmount(root);
     });
   });
+
+  describe('Story 12.2: progress and «Просмотрено» on feed cards', () => {
+    const CLEAR = `${PREFIX}clear-all`;
+    const feedCard = (n: number) => `home/feed/cw-post-${n}`;
+    /** A feed page of `count` single-video posts `cw-post-<n>` (video `cw-v<n>`, 60:00). */
+    function videoFeed(count: number) {
+      const body = e5Page() as { data: { posts: unknown[] } };
+      body.data.posts = Array.from({ length: count }, (_, i) =>
+        feedPost(i + 1, {
+          id: `cw-post-${i + 1}`,
+          title: `Post ${i + 1}`,
+          data: [{ type: 'ok_video', id: `cw-v${i + 1}`, title: `Video ${i + 1}`, duration: DURATION }],
+        }),
+      );
+      feed = () => ({ status: 200, body });
+    }
+    const fillWidth = (root: Root, id: string) => {
+      const track = byTestId(root, `${id}/progress`)[0];
+      const trackWidth = (StyleSheet.flatten(track.props.style) as { width: number }).width;
+      const [fill] = track.queryAll(n => n.props.style !== undefined && n.props.testID === undefined);
+      return (StyleSheet.flatten(fill.props.style) as { width: number }).width / trackWidth;
+    };
+    const e8Calls = () => transport.calls.filter(c => E8_RE.test(c.path));
+
+    it('matrix «In progress», «Finished», «No entry», «Server only»: from the local store, no request per card', async () => {
+      videoFeed(4);
+      seed(1, 720, 1000);
+      seed(2, 3590, 2000);
+      progressStore.setServerPosition('cw-v4', 720);
+      const root = await renderApp();
+      // In progress: the line at 20 %, the label ends «осталось 48 мин».
+      expect(fillWidth(root, feedCard(1))).toBeCloseTo(0.2, 1);
+      expect(visible(root, `${feedCard(1)}/watched`)).toBe(false);
+      expect(one(root, feedCard(1)).props.accessibilityLabel).toMatch(/осталось 48 мин\.$/);
+      // Finished: a full line and «Просмотрено».
+      expect(fillWidth(root, feedCard(2))).toBe(1);
+      expect(text(byTestId(root, `${feedCard(2)}/watched`)[0])).toContain(t('post.video.status.watched'));
+      expect(one(root, feedCard(2)).props.accessibilityLabel).toMatch(/просмотрено\.$/);
+      // No entry, and a server-only position: unchanged.
+      for (const n of [3, 4]) {
+        expect(visible(root, `${feedCard(n)}/progress`)).toBe(false);
+        expect(visible(root, `${feedCard(n)}/watched`)).toBe(false);
+        expect(one(root, feedCard(n)).props.accessibilityLabel).not.toMatch(/Прогресс/);
+      }
+      expect(e8Calls()).toEqual([]);
+      expect(feedCalls()).toHaveLength(1);
+      await unmount(root);
+    });
+
+    it('matrix «Back from player»: the card shows the new position without a feed refetch; focus back on the card it left from', async () => {
+      videoFeed(3);
+      seed(1, 720, 1000);
+      const root = await renderApp();
+      expect(fillWidth(root, feedCard(1))).toBeCloseTo(0.2, 1);
+      const feedBefore = feedCalls().length;
+      await openFromCard(root, card(1), 720);
+      for (let sec = 1790; sec <= 1802; sec += 1) {
+        await fire('onProgress', sec);
+      }
+      focusMock.mockClear();
+      await back();
+      expect(currentRoute()).toBe('Shell');
+      expect(lastFocusTarget()).toBe(card(1));
+      expect(fillWidth(root, feedCard(1))).toBeCloseTo(0.5, 1);
+      expect(one(root, feedCard(1)).props.accessibilityLabel).toMatch(/осталось 30 мин\.$/);
+      expect(feedCalls()).toHaveLength(feedBefore);
+      await unmount(root);
+    });
+
+    it('matrix «Back from player» via Пост: feed card → Пост → Player → Back → Back → the same feed card, its new line and label, no E5 refetch', async () => {
+      videoFeed(3);
+      seed(1, 720, 1000);
+      const root = await renderApp();
+      expect(visible(root, `${feedCard(2)}/progress`)).toBe(false);
+      const feedBefore = feedCalls().length;
+      await focusOn(root, feedCard(2));
+      await press(root, feedCard(2));
+      expect(currentRoute()).toBe('Post');
+      const primary = 'post/cw-post-2/primary';
+      await focusOn(root, primary);
+      await press(root, primary);
+      expect(currentRoute()).toBe('Player');
+      await focusOn(root, SURFACE);
+      await advance(600);
+      await fire('onLoad', { durationSec: DURATION });
+      await fire('onBuffering', false);
+      for (let sec = 1790; sec <= 1802; sec += 1) {
+        await fire('onProgress', sec);
+      }
+      await back();
+      expect(currentRoute()).toBe('Post');
+      focusMock.mockClear();
+      await back();
+      expect(currentRoute()).toBe('Shell');
+      expect(lastFocusTarget()).toBe(feedCard(2));
+      expect(progressStore.get('cw-v2')?.positionSec).toBeGreaterThanOrEqual(1790);
+      expect(fillWidth(root, feedCard(2))).toBeCloseTo(0.5, 1);
+      expect(one(root, feedCard(2)).props.accessibilityLabel).toMatch(/осталось 30 мин\.$/);
+      expect(feedCalls()).toHaveLength(feedBefore);
+      await unmount(root);
+    });
+
+    it('a store change while a feed card is focused: only that card updates, focus does not move, no refetch', async () => {
+      videoFeed(3);
+      const root = await renderApp();
+      await focusOn(root, feedCard(2));
+      focusMock.mockClear();
+      const before = transport.calls.length;
+      const renders = new Map(mockCardRenders);
+      await act(async () => {
+        progressStore.put({
+          ref: cwRef(2),
+          positionSec: 3500,
+          durationSec: DURATION,
+          updatedAt: Date.now(),
+          meta: { title: '', postTitle: 'Post 2', authorName: 'Author', previewUrl: null, durationSec: DURATION },
+        });
+      });
+      await settle();
+      expect(visible(root, `${feedCard(2)}/watched`)).toBe(true);
+      expect(focusMock).not.toHaveBeenCalled();
+      // Only that card re-renders (its own `useProgress` snapshot changed).
+      const rerendered = [1, 2, 3].filter(n => mockCardRenders.get(feedCard(n)) !== renders.get(feedCard(n)));
+      expect(rerendered).toEqual([2]);
+      expect(transport.calls.slice(before)).toEqual([]);
+      await unmount(root);
+    });
+
+    it('account isolation: the AccountScope wipe (sign-out / account switch) → no line, no «Просмотрено», no status in the label', async () => {
+      videoFeed(3);
+      seed(1, 720, 1000);
+      seed(2, 3590, 2000);
+      const root = await renderApp();
+      expect(visible(root, `${feedCard(1)}/progress`)).toBe(true);
+      expect(visible(root, `${feedCard(2)}/watched`)).toBe(true);
+      await act(async () => {
+        await progressStore.reset();
+      });
+      await settle();
+      for (const n of [1, 2]) {
+        expect(visible(root, `${feedCard(n)}/progress`)).toBe(false);
+        expect(visible(root, `${feedCard(n)}/watched`)).toBe(false);
+        expect(one(root, feedCard(n)).props.accessibilityLabel).not.toMatch(/Прогресс/);
+      }
+      await unmount(root);
+    });
+
+    it('matrix «Removed from Continue»: «Очистить всё» drops the line; a finished entry it keeps keeps «Просмотрено»', async () => {
+      videoFeed(3);
+      seed(1, 720, 1000);
+      seed(2, 3590, 2000);
+      const root = await renderApp();
+      expect(visible(root, `${feedCard(1)}/progress`)).toBe(true);
+      await focusOn(root, CLEAR);
+      await press(root, CLEAR);
+      await press(root, `dialog/continue-clear/confirm`);
+      expect(visible(root, 'home/continue')).toBe(false);
+      expect(visible(root, `${feedCard(1)}/progress`)).toBe(false);
+      expect(visible(root, `${feedCard(2)}/watched`)).toBe(true);
+      await unmount(root);
+    });
+  });
 });
 
 describe('Story 5.3: filter the feed by access', () => {

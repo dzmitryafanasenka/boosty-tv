@@ -7,7 +7,6 @@ export {
   postIdPrefix,
   postPrimaryId,
   postRestartId,
-  primaryTarget,
   postVideoId,
   type PostFocusInfo,
   type PostScreenProps,

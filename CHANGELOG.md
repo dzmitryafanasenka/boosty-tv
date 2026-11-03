@@ -8,6 +8,7 @@ The Russian version of this file is [CHANGELOG.ru.md](CHANGELOG.ru.md); both lis
 
 ### Added
 - «Продолжить просмотр» on Главная (Story 12.1): hold OK on a card to remove that video from the list; the dialog asks first, with «Отмена» focused. The last tile of the row, «Очистить всё», clears the whole list after a confirmation. Only this device's list changes: the position saved on Boosty is kept, and a video you watch again comes back to the list.
+- Post cards on Главная, the author page and search (Story 12.2): a video you started on this device shows a progress line along the bottom of its preview, and a finished one is marked «Просмотрено» (for a post with several videos, once all of them are finished). Progress saved only on Boosty is not shown on the cards.
 
 ## [1.2.0] - 2026-11-02
 
