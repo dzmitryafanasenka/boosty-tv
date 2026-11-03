@@ -1,0 +1,29 @@
+_bmad-output/implementation-artifacts/epic-12-context.md
+  s_835eb95b89135d::t_472671f6a1a0be 75,102
+_bmad-output/implementation-artifacts/spec-12-4-spike-watch-next-channel.md
+  s_835eb95b89135d::t_777cbbdc9a1d2d 1-48
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_835eb95b89135d::t_38572edd28a18c 32,134-135
+_bmad-output/planning-artifacts/epics.md
+  s_835eb95b89135d::t_333ad1e4ee1aec 111,251,308-309,2028-2055
+docs/feature-parity.md
+  s_835eb95b89135d::t_e79ca93575ff79 186
+docs/research/watch-next-and-launcher-channel-spike.md
+  s_835eb95b89135d::t_8a79915ae7629d 1-57
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "bb3917a3cb8c64a8de330531f4a4d9321f347829",
+  "prompts": {},
+  "sessions": {
+    "s_835eb95b89135d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5024ade5-03c5-45d9-9934-e24d9370e8ed",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
