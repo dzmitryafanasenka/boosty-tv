@@ -170,7 +170,7 @@ Error classes stay distinct (CLAUDE.md): session expired ≠ no access ≠ media
   - Shown on OK, ↑↓, ←→ (with the bubble) or pause, and on media keys. Fades with `{motion.overlay-fade}`.
   - Hides after `{motion.overlay-hide}` only while playing. It **never** hides while paused, while seeking, with a sheet open or on an error.
   - Initial focus is the Timeline; ↓ moves to the PlayerControls.
-  - *Planned (2026-11-02):* the end time of the video next to the remaining time (Story 14.1); a «Таймер сна» row in the settings sheet, and the remaining timer in the overlay while active (Story 14.2).
+  - *As built (Story 14.1):* «Закончится в H:MM» next to the remaining time (VOD with a known duration, current speed, recomputed at least every 30 s). *Planned (2026-11-02):* a «Таймер сна» row in the settings sheet, and the remaining timer in the overlay while active (Story 14.2).
 - **Back in the player.** Settings submenu → settings sheet → overlay → exit (E9 write, restore the originating card or row).
 - **Progress writes.** Throttled to every ≥ 10 s of movement, plus on pause, on background, on Stop or exit and at the end. The identity is `video.id`, never the URL.
 - **Live player.**

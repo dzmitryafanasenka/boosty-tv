@@ -33,6 +33,16 @@ function sameDay(a: Date, b: Date): boolean {
 }
 
 /**
+ * Story 14.1: a wall-clock time in epoch milliseconds as `H:MM` on the
+ * device's time zone (24-hour, the app's clock style, as `formatCardDate`).
+ * No `Intl`: Hermes on Android has no full `Intl`.
+ */
+export function formatClockTime(ms: number): string {
+  const date = new Date(ms);
+  return `${date.getHours()}:${pad2(date.getMinutes())}`;
+}
+
+/**
  * Owner decision 2026-10-26: «сегодня, 14:30» / «вчера» / «12 окт» (current
  * year) / «12 окт 2025». `epochSec` is a publish time in epoch seconds;
  * `nowMs` is the current time in epoch milliseconds.

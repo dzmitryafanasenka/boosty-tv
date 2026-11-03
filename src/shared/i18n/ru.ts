@@ -477,6 +477,9 @@ export const ru = {
     timeline: 'Позиция {elapsed} из {duration}',
     timelineNoDuration: 'Позиция {elapsed}',
     remaining: '−{remaining}',
+    // Story 14.1 (our improvement): the clock time a VOD ends at the current
+    // speed, next to the remaining time; `{time}` is `H:MM`.
+    endsAt: 'Закончится в {time}',
     seekTarget: 'Перемотка к {time}',
     // Story 10.1 (our improvement): the timeline's label with the current
     // chapter's name; the chapter strip («↑» on the timeline) and its items.

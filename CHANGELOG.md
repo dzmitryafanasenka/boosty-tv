@@ -7,6 +7,7 @@ The Russian version of this file is [CHANGELOG.ru.md](CHANGELOG.ru.md); both lis
 ## [Unreleased]
 
 ### Added
+- Player (Story 14.1): next to the remaining time the overlay shows when the video ends, «Закончится в 21:47», taking the playback speed into account. Not shown for live streams or videos without a known duration.
 - «Продолжить просмотр» on Главная (Story 12.1): hold OK on a card to remove that video from the list; the dialog asks first, with «Отмена» focused. The last tile of the row, «Очистить всё», clears the whole list after a confirmation. Only this device's list changes: the position saved on Boosty is kept, and a video you watch again comes back to the list.
 - Post cards on Главная, the author page and search (Story 12.2): a video you started on this device shows a progress line along the bottom of its preview, and a finished one is marked «Просмотрено» (for a post with several videos, once all of them are finished). Progress saved only on Boosty is not shown on the cards.
 - Главная (Story 12.3): a «в эфире» plaque above «Продолжить просмотр» for each subscribed author who is live now, with the author and the stream title. OK opens the live stream; Back returns to the plaque. The app checks at most the first 10 subscriptions, one at a time, at most once every 5 minutes (when Главная opens or the app returns); nothing is shown if nobody is live or the check fails.
