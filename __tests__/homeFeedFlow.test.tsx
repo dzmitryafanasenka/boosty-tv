@@ -2115,7 +2115,9 @@ describe('Story 4.7: «Продолжить просмотр» on Главная
       },
     });
   }
-  const rowIds = (root: Root) => focusableIds(root).filter(id => id.startsWith(PREFIX));
+  /** The row's cards (Story 12.1: without the trailing «Очистить всё» tile). */
+  const rowIds = (root: Root) =>
+    focusableIds(root).filter(id => id.startsWith(PREFIX) && id !== `${PREFIX}clear-all`);
   const currentRoute = () => navigationRef.getCurrentRoute()?.name;
   const e9Sent = () =>
     transport.calls
@@ -2738,6 +2740,241 @@ describe('Story 4.7: «Продолжить просмотр» on Главная
     await focusOn(root, `home/feed/${e5Posts()[1].id}`);
     expect(destinationIds('home/title-row')).toEqual(['home/refresh']);
     await unmount(root);
+  });
+
+  describe('Story 12.1: remove from «Продолжить просмотр»', () => {
+    const CLEAR = `${PREFIX}clear-all`;
+    const REMOVE_DIALOG = 'dialog/continue-remove';
+    const REMOVE_CANCEL = 'dialog/continue-remove/cancel';
+    const REMOVE_CONFIRM = 'dialog/continue-remove/confirm';
+    const CLEAR_DIALOG = 'dialog/continue-clear';
+    const CLEAR_CANCEL = 'dialog/continue-clear/cancel';
+    const CLEAR_CONFIRM = 'dialog/continue-clear/confirm';
+    const firstFeedCard = () => `home/feed/${e5Posts()[0].id}`;
+
+    /**
+     * OK held on a focused card, as react-native-tvos delivers it: `pressIn`
+     * on the native key down, Pressability's 500 ms long-press timer, then
+     * the key up goes to whatever has focus by then (the dialog's «Отмена»
+     * when it opened: a `pressOut` without its `pressIn`).
+     */
+    async function longPress(root: Root, id: string, holdMs = 520) {
+      await focusOn(root, id);
+      await act(async () => {
+        one(root, id).props.onPressIn({ nativeEvent: {} });
+      });
+      await advance(holdMs);
+      const upOn = visible(root, REMOVE_CANCEL) ? REMOVE_CANCEL : id;
+      await act(async () => {
+        one(root, upOn).props.onPressOut({ nativeEvent: {} });
+      });
+      await settle();
+    }
+
+    it('matrix «Short OK»: OK < 500 ms → the Player, no dialog', async () => {
+      seed(1, 720, 1000);
+      const root = await renderApp();
+      await longPress(root, card(1), 180);
+      expect(visible(root, REMOVE_DIALOG)).toBe(false);
+      expect(currentRoute()).toBe('Player');
+      await unmount(root);
+    });
+
+    it('matrix «Long OK»: OK held ≥ 500 ms → the dialog, «Отмена» preferred; JS Pressability model: the trailing key up on «Отмена» (a pressOut without its pressIn) does not press it (the physical remote is the proof); no Player', async () => {
+      seed(1, 600, 1000);
+      seed(2, 720, 2000);
+      const root = await renderApp();
+      await longPress(root, card(2));
+      expect(currentRoute()).toBe('Shell');
+      expect(visible(root, REMOVE_DIALOG)).toBe(true);
+      expect(text(byTestId(root, REMOVE_DIALOG)[0])).toContain(t('dialog.continueRemove.title'));
+      expect(text(byTestId(root, REMOVE_DIALOG)[0])).toContain(t('dialog.continueRemove.body'));
+      expect(one(root, REMOVE_CANCEL).props.hasTVPreferredFocus).toBe(true);
+      expect(text(one(root, REMOVE_CANCEL))).toContain('Отмена');
+      expect(text(one(root, REMOVE_CONFIRM))).toContain('Убрать из списка');
+      // The entry is still there.
+      expect(rowIds(root)).toEqual([card(1), card(2)]);
+      await unmount(root);
+    });
+
+    it('matrix «Cancel»: «Отмена» or Back → the dialog closes, focus on the same card, the entry kept', async () => {
+      seed(1, 600, 1000);
+      seed(2, 720, 2000);
+      const root = await renderApp();
+      await longPress(root, card(2));
+      focusMock.mockClear();
+      await press(root, REMOVE_CANCEL);
+      expect(visible(root, REMOVE_DIALOG)).toBe(false);
+      expect(lastFocusTarget()).toBe(card(2));
+      expect(rowIds(root)).toEqual([card(1), card(2)]);
+      await longPress(root, card(2));
+      expect(visible(root, REMOVE_DIALOG)).toBe(true);
+      focusMock.mockClear();
+      await back();
+      expect(visible(root, REMOVE_DIALOG)).toBe(false);
+      expect(lastFocusTarget()).toBe(card(2));
+      expect(rowIds(root)).toEqual([card(1), card(2)]);
+      expect(progressStore.get('cw-v2')?.positionSec).toBe(720);
+      await unmount(root);
+    });
+
+    it('matrix «Confirm remove»: the entry leaves the row and the store at once; focus → the next card, else the previous; no request', async () => {
+      seed(1, 600, 1000);
+      seed(2, 720, 2000);
+      seed(3, 900, 3000);
+      const root = await renderApp();
+      const before = transport.calls.length;
+      await longPress(root, card(2));
+      focusMock.mockClear();
+      await press(root, REMOVE_CONFIRM);
+      expect(visible(root, REMOVE_DIALOG)).toBe(false);
+      expect(rowIds(root)).toEqual([card(1), card(3)]);
+      expect(progressStore.get('cw-v2')).toBeUndefined();
+      expect(lastFocusTarget()).toBe(card(3));
+      // The last card → the previous one.
+      await longPress(root, card(3));
+      focusMock.mockClear();
+      await press(root, REMOVE_CONFIRM);
+      expect(rowIds(root)).toEqual([card(1)]);
+      expect(lastFocusTarget()).toBe(card(1));
+      // The row guide names the remaining card, never the tile.
+      expect(destinationIds('home/continue/guide')).toEqual([card(1)]);
+      expect(transport.calls.slice(before)).toEqual([]);
+      expect(e9Sent()).toEqual([]);
+      await unmount(root);
+    });
+
+    it('matrix «Remove last card»: the only entry → the row is hidden, focus on the first feed card', async () => {
+      seed(1, 600, 1000);
+      const root = await renderApp();
+      await longPress(root, card(1));
+      focusMock.mockClear();
+      await press(root, REMOVE_CONFIRM);
+      expect(visible(root, 'home/continue')).toBe(false);
+      expect(visible(root, CLEAR)).toBe(false);
+      expect(visible(root, 'home/feed/list')).toBe(true);
+      expect(lastFocusTarget()).toBe(firstFeedCard());
+      await unmount(root);
+    });
+
+    it('matrix «Server position»: the E8 `timeCode` seen for the video stays its resume point after the removal', async () => {
+      seed(1, 600, 1000);
+      progressStore.setServerPosition('cw-v1', 900);
+      const root = await renderApp();
+      await longPress(root, card(1));
+      await press(root, REMOVE_CONFIRM);
+      expect(progressStore.get('cw-v1')).toBeUndefined();
+      expect(progressStore.snapshot('cw-v1')).toEqual({ positionSec: 900, durationSec: null, source: 'server' });
+      await unmount(root);
+    });
+
+    it('matrix «Watched again»: a removed video played again returns to the row', async () => {
+      seed(1, 600, 1000);
+      seed(2, 720, 2000);
+      const root = await renderApp();
+      await longPress(root, card(2));
+      await press(root, REMOVE_CONFIRM);
+      expect(rowIds(root)).toEqual([card(1)]);
+      await act(async () => {
+        navigationRef.navigate('Player', {
+          ref: cwRef(2),
+          origin: { routeKey: 'shell', sectionId: 'home', focusId: card(1) },
+        });
+      });
+      await settle();
+      expect(currentRoute()).toBe('Player');
+      await focusOn(root, SURFACE);
+      await advance(600);
+      await fire('onLoad', { durationSec: DURATION });
+      await fire('onBuffering', false);
+      for (let sec = 0; sec <= 12; sec += 1) {
+        await fire('onProgress', sec);
+      }
+      await back();
+      expect(currentRoute()).toBe('Shell');
+      expect(rowIds(root)).toEqual([card(2), card(1)]);
+      await unmount(root);
+    });
+
+    it('a remembered «Очистить всё», Настройки → OK «Главная»: focus is restored on the tile (the row opens with it in view)', async () => {
+      for (let n = 1; n <= 5; n += 1) {
+        seed(n, 600, n * 1000);
+      }
+      const root = await renderApp();
+      await focusOn(root, CLEAR);
+      await back(); // → nav/home
+      await focusOn(root, 'nav/settings');
+      await press(root, 'nav/settings');
+      expect(visible(root, 'shell/content/settings')).toBe(true);
+      await focusOn(root, 'nav/home');
+      focusMock.mockClear();
+      await press(root, 'nav/home');
+      expect(visible(root, 'home/continue')).toBe(true);
+      // The tile follows card 5 (index 5): flush on column 3.
+      const [row] = byTestId(root, 'home/continue/row').filter(n => n.props.contentOffset);
+      expect(row.props.contentOffset).toEqual({ x: 3 * (221 + 16), y: 0 });
+      expect(lastFocusTarget()).toBe(CLEAR);
+      await unmount(root);
+    });
+
+    it('matrix «Clear all»: «Очистить всё» is the row\'s last stop; Отмена / Back → focus back on it; confirm → every Continue entry gone (a finished one stays, owner decision 2026-11-03), the row hidden, focus on the first feed card; no request, no reset', async () => {
+      seed(1, 600, 1000);
+      seed(2, 720, 2000);
+      seed(3, 3590, 3000); // finished: not in the row, but local
+      progressStore.setServerPosition('cw-v1', 900);
+      const resets = jest.fn();
+      const unsubscribe = progressStore.onReset(resets);
+      const root = await renderApp();
+      const ids = focusableIds(root).filter(id => id.startsWith(PREFIX));
+      expect(ids[ids.length - 1]).toBe(CLEAR);
+      expect(one(root, CLEAR).props.accessibilityLabel).toBe(t('home.continue.clearAllA11y'));
+      expect(text(one(root, CLEAR))).toContain(t('home.continue.clearAll'));
+      const before = transport.calls.length;
+      await focusOn(root, CLEAR);
+      // ↑ from the feed returns to the tile (the row guide remembers it).
+      expect(destinationIds('home/continue/guide')).toEqual([CLEAR]);
+      // A plain OK opens the dialog, «Отмена» preferred.
+      await press(root, CLEAR);
+      expect(visible(root, CLEAR_DIALOG)).toBe(true);
+      expect(text(byTestId(root, CLEAR_DIALOG)[0])).toContain(t('dialog.continueClear.title'));
+      expect(one(root, CLEAR_CANCEL).props.hasTVPreferredFocus).toBe(true);
+      focusMock.mockClear();
+      await press(root, CLEAR_CANCEL);
+      expect(visible(root, CLEAR_DIALOG)).toBe(false);
+      expect(lastFocusTarget()).toBe(CLEAR);
+      await press(root, CLEAR);
+      focusMock.mockClear();
+      await back();
+      expect(visible(root, CLEAR_DIALOG)).toBe(false);
+      expect(lastFocusTarget()).toBe(CLEAR);
+      expect(rowIds(root)).toEqual([card(1), card(2)]);
+      await press(root, CLEAR);
+      focusMock.mockClear();
+      await press(root, CLEAR_CONFIRM);
+      expect(visible(root, 'home/continue')).toBe(false);
+      expect(progressStore.entries().map(entry => entry.ref.mediaId)).toEqual(['cw-v3']);
+      expect(progressStore.snapshot('cw-v1')).toEqual({ positionSec: 900, durationSec: null, source: 'server' });
+      expect(lastFocusTarget()).toBe(firstFeedCard());
+      expect(transport.calls.slice(before)).toEqual([]);
+      expect(resets).not.toHaveBeenCalled();
+      unsubscribe();
+      await unmount(root);
+    });
+
+    it('matrix «Account switch / sign-out»: after a removal the AccountScope wipe is unchanged (the other entries go too)', async () => {
+      seed(1, 600, 1000);
+      seed(2, 720, 2000);
+      const root = await renderApp();
+      await longPress(root, card(2));
+      await press(root, REMOVE_CONFIRM);
+      expect(rowIds(root)).toEqual([card(1)]);
+      await press(root, 'nav/settings');
+      await press(root, 'settings/row/signout');
+      await press(root, 'dialog/signout/confirm');
+      expect(visible(root, 'auth/welcome')).toBe(true);
+      expect(progressStore.entries()).toEqual([]);
+      await unmount(root);
+    });
   });
 });
 

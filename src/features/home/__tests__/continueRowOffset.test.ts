@@ -25,6 +25,11 @@ describe('continueRowOffset', () => {
     expect(continueRowOffset(items(8), 'home/continue/gone')).toBe(0);
   });
 
+  it('Story 12.1: «Очистить всё» follows the last card (8 cards: 6 steps; 2 cards: 0)', () => {
+    expect(continueRowOffset(items(8), 'home/continue/clear-all')).toBe(6 * STEP);
+    expect(continueRowOffset(items(2), 'home/continue/clear-all')).toBe(0);
+  });
+
   it('undefined: 0', () => {
     expect(continueRowOffset(items(8), undefined)).toBe(0);
   });

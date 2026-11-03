@@ -667,6 +667,154 @@ describe('local store', () => {
     expect(store.get('v1')?.positionSec).toBe(12);
   });
 
+  it('Story 12.1: dismiss drops the local entry only (memory and disk at once); the server position stays; other entries untouched; no request', async () => {
+    const { repo, store, kv, net } = setup();
+    await repo.ready();
+    repo.onServerProgress('v1', 300);
+    repo.begin(REF, META);
+    repo.report(REF, 100, 'tick', 600);
+    repo.report(REF, 110, 'pause', 600);
+    repo.begin(REF2, META);
+    repo.report(REF2, 40, 'pause', 600);
+    await flush();
+    await store.flush();
+    const sent = net.calls.length;
+    const listener = jest.fn();
+    store.subscribe(listener);
+    repo.dismiss('v1');
+    expect(store.get('v1')).toBeUndefined();
+    expect(listener).toHaveBeenCalled();
+    // The server value is the resume point again (Пост offers «Продолжить» from it):
+    // the accepted E9 (110) replaced the E8 value (300).
+    expect(store.snapshot('v1')).toEqual({ positionSec: 110, durationSec: null, source: 'server' });
+    expect(repo.resumePoint(REF, 600)).toBe(110);
+    // Written at once (no debounce).
+    await flush();
+    const disk = JSON.parse(kv.data.get(PROGRESS_STORAGE_KEY) ?? '{"entries":[]}');
+    expect(disk.entries.map((e: { ref: MediaRef }) => e.ref.mediaId)).toEqual(['v2']);
+    expect(store.get('v2')?.positionSec).toBe(40);
+    // Nothing is sent and nothing writes the entry back.
+    await advance(DISK_DEBOUNCE_MS + WRITE_RETRY_MS);
+    expect(store.get('v1')).toBeUndefined();
+    expect(net.calls).toHaveLength(sent);
+    // Watched again: a new player session brings it back (the Story 4.7 rule).
+    repo.begin(REF, META);
+    repo.report(REF, 300, 'tick', 600);
+    repo.report(REF, 315, 'tick', 600);
+    expect(store.get('v1')?.positionSec).toBe(315);
+  });
+
+  it('Story 12.1: dismiss keeps a pending E9 retry (the Boosty position is kept); the entry is not written back', async () => {
+    const { repo, store, net } = setup();
+    net.setAuto('network');
+    await repo.ready();
+    repo.begin(REF, META);
+    repo.report(REF, 30, 'pause', 600);
+    await flush();
+    expect(net.sent()).toEqual([30]);
+    repo.dismiss('v1');
+    net.setAuto('ok');
+    await advance(WRITE_RETRY_MS * (MAX_AUTO_RETRIES + 1));
+    expect(net.sent()).toEqual([30, 30]);
+    expect(store.get('v1')).toBeUndefined();
+    expect(repo.resumePoint(REF, 600)).toBe(30);
+  });
+
+  it('Story 12.1: an accepted E9 becomes the server position: E8 300, E9 410, dismiss → resume at 410', async () => {
+    const { repo } = setup();
+    await repo.ready();
+    repo.onServerProgress('v1', 300);
+    repo.begin(REF, META);
+    repo.report(REF, 400, 'tick', 600);
+    repo.report(REF, 410, 'pause', 600);
+    await flush();
+    repo.dismiss('v1');
+    expect(repo.resumePoint(REF, 600)).toBe(410);
+  });
+
+  it('Story 12.1: a dismiss disk write that lands after an account reset undoes itself (generation guard)', async () => {
+    const h = setup();
+    const { repo, store, kv } = h;
+    await repo.ready();
+    store.put({ ref: REF, positionSec: 10, durationSec: 600, updatedAt: 1, meta: META }, { flush: true });
+    store.put({ ref: REF2, positionSec: 20, durationSec: 600, updatedAt: 2, meta: META }, { flush: true });
+    await store.flush();
+    let release!: () => void;
+    kv.setGate = new Promise(resolve => {
+      release = resolve;
+    });
+    repo.dismiss('v1');
+    await flush();
+    await h.accountReset();
+    kv.setGate = null;
+    release();
+    await flush();
+    expect(kv.data.has(PROGRESS_STORAGE_KEY)).toBe(false);
+  });
+
+  it('Story 12.1: clearContinue drops the Continue entries at once; finished entries and server positions stay; no request; not a reset; the entries are not written back', async () => {
+    const h = setup();
+    const { repo, store, kv, net } = h;
+    await repo.ready();
+    const done: MediaRef = { blogUrl: 'synthetic-blog', postId: 'post-2', mediaId: 'v3' };
+    store.put({ ref: done, positionSec: 590, durationSec: 600, updatedAt: 1, meta: META }, { flush: true });
+    repo.onServerProgress('v2', 200);
+    repo.begin(REF, META);
+    repo.report(REF, 100, 'pause', 600);
+    repo.begin(REF2, META);
+    repo.report(REF2, 40, 'pause', 600);
+    await flush();
+    await store.flush();
+    const sent = net.calls.length;
+    const resets = jest.fn();
+    store.onReset(resets);
+    repo.clearContinue();
+    expect(store.entries().map(entry => entry.ref.mediaId)).toEqual(['v3']);
+    // The server values stay: the accepted E9 positions (v2's replaced its E8 200).
+    expect(store.snapshot('v1')).toEqual({ positionSec: 100, durationSec: null, source: 'server' });
+    expect(store.snapshot('v2')).toEqual({ positionSec: 40, durationSec: null, source: 'server' });
+    expect(store.isReady()).toBe(true);
+    expect(resets).not.toHaveBeenCalled();
+    await flush();
+    expect(
+      JSON.parse(kv.data.get(PROGRESS_STORAGE_KEY) ?? '{}').entries.map((entry: { ref: { mediaId: string } }) => entry.ref.mediaId),
+    ).toEqual(['v3']);
+    await advance(DISK_DEBOUNCE_MS + WRITE_RETRY_MS);
+    expect(store.entries().map(entry => entry.ref.mediaId)).toEqual(['v3']);
+    expect(net.calls).toHaveLength(sent);
+  });
+
+  it('Story 12.1: a clear-all disk write that lands after an account reset undoes itself (generation guard)', async () => {
+    const h = setup();
+    const { repo, store, kv } = h;
+    await repo.ready();
+    store.put({ ref: REF, positionSec: 10, durationSec: 600, updatedAt: 1, meta: META }, { flush: true });
+    await store.flush();
+    let release!: () => void;
+    kv.setGate = new Promise(resolve => {
+      release = resolve;
+    });
+    repo.clearContinue();
+    await flush();
+    await h.accountReset();
+    kv.setGate = null;
+    release();
+    await flush();
+    expect(kv.data.has(PROGRESS_STORAGE_KEY)).toBe(false);
+  });
+
+  it('Story 12.1: dismiss and clearContinue on an empty history change nothing and write nothing', async () => {
+    const { repo, store, kv } = setup();
+    await repo.ready();
+    const listener = jest.fn();
+    store.subscribe(listener);
+    repo.dismiss('v1');
+    repo.clearContinue();
+    await flush();
+    expect(listener).not.toHaveBeenCalled();
+    expect(kv.data.has(PROGRESS_STORAGE_KEY)).toBe(false);
+  });
+
   it('Story 4.7: subscribers are told when the disk was read, also when it was empty', async () => {
     const { store } = setup();
     const listener = jest.fn();

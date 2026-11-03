@@ -75,6 +75,18 @@ export type ProgressStore = {
    * locked or gone). Memory now; disk debounced.
    */
   remove(mediaId: string): void;
+  /**
+   * Story 12.1: drops one video's local entry only (the user removed it
+   * from «Продолжить просмотр»); the server value stays, so Пост still
+   * offers the E8 `timeCode`. Memory now; disk at once.
+   */
+  removeLocal(mediaId: string): void;
+  /**
+   * Story 12.1 («Очистить всё»): drops the local entries that `remove`
+   * selects (the caller passes the Continue rule); the server values stay.
+   * Not a reset (no AccountScope wipe). Memory now; disk at once.
+   */
+  clearLocal(remove: (entry: ProgressEntry) => boolean): void;
   serverPosition(mediaId: string): number | undefined;
   setServerPosition(mediaId: string, positionSec: number): void;
   /** The local entry, else the server value, else null. Stable until it changes. */
@@ -298,6 +310,28 @@ export function createProgressStore({
         // At once: a kill or sleep must not bring the forgotten card back.
         schedule(true);
       }
+    },
+    removeLocal(mediaId) {
+      if (!local.delete(mediaId)) {
+        return;
+      }
+      notify(mediaId);
+      // At once: a kill or sleep must not bring the removed card back.
+      schedule(true);
+    },
+    clearLocal(remove) {
+      let removed = false;
+      for (const [mediaId, entry] of local) {
+        if (remove(entry)) {
+          local.delete(mediaId);
+          removed = true;
+        }
+      }
+      if (!removed) {
+        return;
+      }
+      notify(null);
+      schedule(true);
     },
     serverPosition: mediaId => server.get(mediaId),
     setServerPosition(mediaId, positionSec) {

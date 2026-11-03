@@ -14,6 +14,7 @@ import {
 } from '../../shared/filters';
 import {
   focusRestoration,
+  focusSoonRun,
   mayTakeScreenFocus,
   restoreElseFirst,
   useFocusRestoration,
@@ -27,6 +28,7 @@ import {
   entryDurationSec,
   progressStatus,
   useContinueEntries,
+  useProgressRepository,
   type ProgressEntry,
 } from '../../shared/services/progress';
 import {
@@ -65,6 +67,8 @@ import {
   continueNeighbour,
   type ContinueItem,
 } from './ContinueRow';
+import { CONTINUE_CLEAR_ID } from './ContinueClearTile';
+import { ContinueClearDialog, ContinueRemoveDialog } from './ContinueDialogs';
 import { manualRefreshFeed } from './feedRefresh';
 import { useSubscriptionFeed } from './useSubscriptionFeed';
 
@@ -422,6 +426,13 @@ export function HomeScreen({
       return;
     }
     listRef.current?.scrollToOffset({ offset: entry?.scrollOffset ?? 0, animated: false });
+    if (entry?.focusId === CONTINUE_CLEAR_ID) {
+      // «Очистить всё» (Story 12.1): shown while the row has cards.
+      autoContinue.current = true;
+      latch.auto(CONTINUE_CLEAR_ID);
+      restoration.focusItem(CONTINUE_CLEAR_ID);
+      return;
+    }
     const found = entry ? rowIds.indexOf(entry.focusId) : -1;
     const index = found >= 0 ? found : Math.min(entry?.index ?? 0, rowIds.length - 1);
     autoContinue.current = true;
@@ -634,6 +645,10 @@ export function HomeScreen({
       current === null ||
       !current.startsWith(CONTINUE_CARD_PREFIX) ||
       continueIds.includes(current) ||
+      // «Очистить всё» stays while the row has cards (Story 12.1).
+      (current === CONTINUE_CLEAR_ID && continueIds.length > 0) ||
+      // A dialog holds focus (Story 12.1): its own close moves focus.
+      modal.isOpen() ||
       !canFocus()
     ) {
       return;
@@ -652,7 +667,121 @@ export function HomeScreen({
       listRef.current?.scrollToOffset({ offset: 0, animated: false });
       restoration.focusInitial();
     }
-  }, [continueIds, canFocus, restoration, latch]);
+  }, [continueIds, canFocus, restoration, latch, modal]);
+
+  // Story 12.1 (our improvement, owner decision 2026-11-02): remove a video
+  // from «Продолжить просмотр» (a long OK on its card) or clear the row
+  // («Очистить всё»), each after a confirmation dialog in the modal host
+  // («Отмена» focused; «Отмена» and Back close it and focus returns to the
+  // initiator). Local only, through ProgressRepository (no request; the
+  // server position stays).
+  const repository = useProgressRepository();
+  const repositoryRef = useLatestRef(repository);
+  /**
+   * After a confirmed removal: the dialog closes without a focus return
+   * (its initiator is going away), then focus goes to `neighbour` (a card),
+   * else the first feed card, else the restoration's fallback (the action
+   * above). Sent now and again two frames later (the modal host's device
+   * lesson: a request in the same commit as the dialog's unmount is lost),
+   * the second only while focus is still on the removed stop or the target.
+   */
+  const focusAfterRemoval = useCallback(
+    (goneId: string, neighbour: string | null) => {
+      modal.close({ restoreFocus: false });
+      const target = neighbour ?? idsRef.current[0];
+      const move = () => {
+        if (neighbour !== null) {
+          autoContinue.current = true;
+          latch.auto(neighbour);
+          restoration.focusItem(neighbour);
+        } else {
+          autoContinue.current = false;
+          latch.auto(idsRef.current[0]);
+          listRef.current?.scrollToOffset({ offset: 0, animated: false });
+          restoration.focusInitial();
+        }
+      };
+      focusSoonRun(move, {
+        guard: () => {
+          const current = focusRef.current.current();
+          return (
+            !modal.isOpen() &&
+            focusRef.current.isActive() &&
+            (current === goneId || (target !== undefined && current === target))
+          );
+        },
+      });
+    },
+    [modal, latch, restoration],
+  );
+  const onContinueLongPress = useCallback(
+    (id: string) => {
+      if (modal.isOpen()) {
+        return;
+      }
+      const item = continueItemsRef.current.find(i => i.id === id);
+      if (!item) {
+        return;
+      }
+      latch.move();
+      const mediaId = item.ref.mediaId;
+      const initiator = {
+        get current() {
+          return restoration.viewOf(id);
+        },
+      };
+      const leave = () => {
+        // The neighbour among the cards now shown, as if `id` were gone.
+        const shown = continueIdsRef.current;
+        focusAfterRemoval(id, continueNeighbour(shown, id, shown.filter(other => other !== id)));
+      };
+      modal.open(
+        <ContinueRemoveDialog
+          onCancel={() => {
+            if (continueIdsRef.current.includes(id)) {
+              modal.close();
+            } else {
+              // The card left meanwhile (e.g. the history was wiped).
+              leave();
+            }
+          }}
+          onConfirm={() => {
+            leave();
+            repositoryRef.current?.dismiss(mediaId);
+          }}
+        />,
+        initiator,
+      );
+    },
+    [modal, latch, restoration, continueItemsRef, continueIdsRef, repositoryRef, focusAfterRemoval],
+  );
+  const onClearContinue = useCallback(() => {
+    if (modal.isOpen()) {
+      return;
+    }
+    latch.move();
+    const initiator = {
+      get current() {
+        return restoration.viewOf(CONTINUE_CLEAR_ID);
+      },
+    };
+    modal.open(
+      <ContinueClearDialog
+        onCancel={() => {
+          if (continueIdsRef.current.length > 0) {
+            modal.close();
+          } else {
+            focusAfterRemoval(CONTINUE_CLEAR_ID, null);
+          }
+        }}
+        onConfirm={() => {
+          focusAfterRemoval(CONTINUE_CLEAR_ID, null);
+          repositoryRef.current?.clearContinue();
+        }}
+      />,
+      initiator,
+    );
+  }, [modal, latch, restoration, continueIdsRef, repositoryRef, focusAfterRemoval]);
 
   // A Continue card the page focused by itself is never left for the head.
   const followHead = useCallback(
@@ -993,6 +1122,8 @@ export function HomeScreen({
                 initialCardId={initialContinueId}
                 restoration={restoration}
                 onCardPress={onContinuePress}
+                onCardLongPress={onContinueLongPress}
+                onClearAll={onClearContinue}
                 titleRow={titleRow}
               />
             ) : null
@@ -1015,6 +1146,8 @@ function ContinueHeader({
   initialCardId?: string;
   restoration: ReturnType<typeof useFocusRestoration>;
   onCardPress: (id: string) => void;
+  onCardLongPress?: (id: string) => void;
+  onClearAll?: () => void;
   titleRow: ReactNode;
 }) {
   return (

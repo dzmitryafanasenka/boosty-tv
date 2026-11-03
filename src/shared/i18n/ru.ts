@@ -116,6 +116,9 @@ export const ru = {
       a11y: '{title}. {author}. {left}',
       a11yNoLeft: '{title}. {author}',
       a11yNoAuthor: '{title}. {left}',
+      // Story 12.1: the last tile of the row; OK asks before the row is cleared.
+      clearAll: 'Очистить всё',
+      clearAllA11y: 'Очистить «Продолжить просмотр»',
     },
     // Cold start with a stored session and no network (Story 2.5). The
     // session is kept; this is never «Сессия истекла».
@@ -762,6 +765,21 @@ export const ru = {
       cancel: 'Отмена',
       confirm: 'Выйти',
       error: 'Не удалось выйти из аккаунта. Попробуйте ещё раз.',
+    },
+    // Story 12.1: a long OK on a «Продолжить просмотр» card. Local only:
+    // the server position stays.
+    continueRemove: {
+      title: 'Убрать из «Продолжить просмотр»?',
+      body: 'Видео пропадёт только из этого списка. Позиция на Boosty сохранится.',
+      cancel: 'Отмена',
+      confirm: 'Убрать из списка',
+    },
+    // Story 12.1: OK on «Очистить всё» at the end of the row.
+    continueClear: {
+      title: 'Очистить «Продолжить просмотр»?',
+      body: 'Список на этом устройстве станет пустым.',
+      cancel: 'Отмена',
+      confirm: 'Очистить всё',
     },
   },
   // Debug-only «Проверка фокуса» (Story 2.4, __DEV__ builds). Not product

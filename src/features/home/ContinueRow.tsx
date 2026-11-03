@@ -14,6 +14,7 @@ import {
   typography,
   type HostView,
 } from '../../shared/ui';
+import { CONTINUE_CLEAR_ID, ContinueClearTile } from './ContinueClearTile';
 
 /** Focus ids (docs/focus-map.md §1.5): `home/continue/<mediaId>`. */
 export const CONTINUE_CARD_PREFIX = 'home/continue/';
@@ -85,6 +86,7 @@ type CardProps = {
   onCardFocus: (id: string, view: HostView | null) => void;
   onCardView: (id: string, view: HostView | null) => void;
   onCardPress: (id: string) => void;
+  onCardLongPress?: (id: string) => void;
 };
 
 /** A FocusZone item (Back, ← → zones) and a FocusRestoration item (route key + `home`). */
@@ -95,6 +97,7 @@ const RowCard = memo(function RowCardView({
   onCardFocus,
   onCardView,
   onCardPress,
+  onCardLongPress,
 }: CardProps) {
   const { id } = item;
   const zone = useZoneItem(id);
@@ -118,6 +121,7 @@ const RowCard = memo(function RowCardView({
     onCardFocus(id, view.current);
   }, [zone, restoration, id, index, onCardFocus]);
   const onPress = useCallback(() => onCardPress(id), [onCardPress, id]);
+  const onLongPress = useCallback(() => onCardLongPress?.(id), [onCardLongPress, id]);
   return (
     <ContinueCard
       ref={ref}
@@ -130,7 +134,58 @@ const RowCard = memo(function RowCardView({
       width={WIDTH}
       onFocus={onFocus}
       onPress={onPress}
+      onLongPress={onCardLongPress ? onLongPress : undefined}
       style={index === 0 ? styles.slot : styles.slotNext}
+    />
+  );
+});
+
+type ClearProps = {
+  /** The tile's index in the row (after the last card). */
+  index: number;
+  restoration: ListRestoration;
+  onCardFocus: (id: string, view: HostView | null) => void;
+  onCardView: (id: string, view: HostView | null) => void;
+  onPress: () => void;
+};
+
+/**
+ * «Очистить всё» (Story 12.1): a FocusZone item and a FocusRestoration item
+ * like a card (Back → `nav/home`; its index is the row's length), and a
+ * row-guide candidate (↑ from the feed returns to it when it was last).
+ */
+const RowClearTile = memo(function RowClearTileView({
+  index,
+  restoration,
+  onCardFocus,
+  onCardView,
+  onPress,
+}: ClearProps) {
+  const zone = useZoneItem(CONTINUE_CLEAR_ID);
+  const view = useRef<HostView | null>(null);
+  const zoneRef = zone.ref;
+  const itemRef = restoration.itemRef(CONTINUE_CLEAR_ID);
+  const ref = useCallback(
+    (next: HostView | null) => {
+      view.current = next;
+      zoneRef?.(next);
+      itemRef(next);
+      onCardView(CONTINUE_CLEAR_ID, next);
+    },
+    [zoneRef, itemRef, onCardView],
+  );
+  const onFocus = useCallback(() => {
+    zone.onFocus();
+    restoration.onItemFocus(CONTINUE_CLEAR_ID, index);
+    onCardFocus(CONTINUE_CLEAR_ID, view.current);
+  }, [zone, restoration, index, onCardFocus]);
+  return (
+    <ContinueClearTile
+      ref={ref}
+      width={WIDTH}
+      onFocus={onFocus}
+      onPress={onPress}
+      style={styles.slotNext}
     />
   );
 });
@@ -146,6 +201,10 @@ export type ContinueRowProps = {
   restoration: ListRestoration;
   /** OK on a card (by focus id). */
   onCardPress: (id: string) => void;
+  /** A long OK on a card (Story 12.1, by focus id). */
+  onCardLongPress?: (id: string) => void;
+  /** OK on «Очистить всё» (Story 12.1); absent: no tile. */
+  onClearAll?: () => void;
 };
 
 /**
@@ -157,7 +216,14 @@ export type ContinueRowProps = {
  * inside the row and scroll it; ↓ lands natively on the grid card in the
  * same column (the columns line up).
  */
-export function ContinueRow({ items, initialCardId, restoration, onCardPress }: ContinueRowProps) {
+export function ContinueRow({
+  items,
+  initialCardId,
+  restoration,
+  onCardPress,
+  onCardLongPress,
+  onClearAll,
+}: ContinueRowProps) {
   const views = useRef(new Map<string, HostView>());
   const remembered = useRef<string | null>(null);
   const [target, setTarget] = useState<HostView | null>(null);
@@ -198,10 +264,12 @@ export function ContinueRow({ items, initialCardId, restoration, onCardPress }: 
     },
     [],
   );
+  // «Очистить всё» (Story 12.1) is the row's last stop while it has cards.
+  const clearAll = items.length > 0 ? onClearAll : undefined;
   // Cards came or went (refs attach before effects): a gone remembered card
   // is replaced by its neighbour by id (the same card Главная focuses),
   // else the first one.
-  const ids = items.map(item => item.id).join('\n');
+  const ids = [...items.map(item => item.id), ...(clearAll ? [CONTINUE_CLEAR_ID] : [])].join('\n');
   const lastIds = useRef(ids);
   useEffect(() => {
     const previous = lastIds.current.length > 0 ? lastIds.current.split('\n') : [];
@@ -209,7 +277,9 @@ export function ContinueRow({ items, initialCardId, restoration, onCardPress }: 
     const current = ids.length > 0 ? ids.split('\n') : [];
     const id = remembered.current;
     if (id !== null && !current.includes(id)) {
-      remembered.current = continueNeighbour(previous, id, current);
+      // Among the cards only (the tile is never a removed card's neighbour).
+      const cards = (list: string[]) => list.filter(cardId => cardId !== CONTINUE_CLEAR_ID);
+      remembered.current = continueNeighbour(cards(previous), id, cards(current));
     }
     pickTarget();
   }, [ids, pickTarget]);
@@ -241,8 +311,18 @@ export function ContinueRow({ items, initialCardId, restoration, onCardPress }: 
               onCardFocus={onCardFocus}
               onCardView={onCardView}
               onCardPress={onCardPress}
+              onCardLongPress={onCardLongPress}
             />
           ))}
+          {clearAll ? (
+            <RowClearTile
+              index={items.length}
+              restoration={restoration}
+              onCardFocus={onCardFocus}
+              onCardView={onCardView}
+              onPress={clearAll}
+            />
+          ) : null}
         </ScrollView>
       </TVFocusGuideView>
     </View>
@@ -250,12 +330,18 @@ export function ContinueRow({ items, initialCardId, restoration, onCardPress }: 
 }
 
 /**
- * The row's start offset that shows `cardId` flush on the last visible
+ * The row's start offset that shows `cardId` (a card or «Очистить всё») flush on the last visible
  * column (0 when it is among the first `POST_GRID_COLUMNS` or not in the row).
  * Each card's padded view advances by one column step (`WIDTH + GAP`).
  */
 export function continueRowOffset(items: readonly ContinueItem[], cardId: string | undefined): number {
-  const index = cardId === undefined ? -1 : items.findIndex(item => item.id === cardId);
+  // «Очистить всё» (Story 12.1) follows the last card.
+  const index =
+    cardId === undefined
+      ? -1
+      : cardId === CONTINUE_CLEAR_ID
+        ? items.length
+        : items.findIndex(item => item.id === cardId);
   return Math.max(0, index - (POST_GRID_COLUMNS - 1)) * (WIDTH + GAP);
 }
 

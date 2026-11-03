@@ -1,6 +1,6 @@
 import { memo, type Ref } from 'react';
 import { Image, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import { tf } from '../i18n';
+import { t, tf } from '../i18n';
 import type { ProgressStatus } from '../services/progress/finished';
 import { FocusableSurface, type FocusableSurfaceProps, type HostView } from './FocusableSurface';
 import { POST_CARD_TEXT, postCardHeight, postCardThumbHeight } from './PostCard';
@@ -20,6 +20,8 @@ import { colors, components } from './tokens';
 
 const TOKENS = components['post-card'];
 const PROGRESS_HEIGHT = components.timeline.trackHeight;
+/** Story 12.1: the long-press removal as an accessibility action. */
+const LONG_PRESS_ACTIONS = [{ name: 'longpress', label: t('dialog.continueRemove.confirm') }];
 
 export type ContinueCardProps = {
   /** The video title rule is the caller's (`videoDisplayTitle`). */
@@ -32,6 +34,12 @@ export type ContinueCardProps = {
   testID?: string;
   onFocus?: FocusableSurfaceProps['onFocus'];
   onPress?: () => void;
+  /**
+   * A long OK (Story 12.1): react-native-tvos sends `pressIn` on the native
+   * key down of OK and Pressability calls this after its long-press delay
+   * (500 ms), then skips `onPress` on the key up. No JS key handler.
+   */
+  onLongPress?: () => void;
   style?: StyleProp<ViewStyle>;
   /** The media id: per-card state (a failed preview) starts over for another video. */
   resetKey: string;
@@ -67,6 +75,7 @@ export function ContinueCardView({
   testID,
   onFocus,
   onPress,
+  onLongPress,
   style,
   resetKey,
   ref,
@@ -86,6 +95,18 @@ export function ContinueCardView({
       accessibilityLabel={continueCardA11yLabel(title, authorName, status)}
       onFocus={onFocus}
       onPress={onPress}
+      onLongPress={onLongPress}
+      // TalkBack reaches the removal too (its «long press» action).
+      accessibilityActions={onLongPress ? LONG_PRESS_ACTIONS : undefined}
+      onAccessibilityAction={
+        onLongPress
+          ? event => {
+              if (event.nativeEvent.actionName === 'longpress') {
+                onLongPress();
+              }
+            }
+          : undefined
+      }
       style={style}
       resetKey={resetKey}
       surfaceStyle={() => ({ width, height: postCardHeight(width) })}
