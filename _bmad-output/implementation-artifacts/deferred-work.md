@@ -413,3 +413,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-13-2-timestamp-chips.md`
   summary: The Пост body is not virtualized, so posts with hundreds of chapter chips render every stop at once.
   evidence: `PostBody` maps all items inside the Пост ScrollView (pre-existing since Story 3.4); Story 13.2 only tested 300 chapter lines at entity level.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-12-2-progress-on-feed-cards.md`
+  summary: Every mounted PostCard now subscribes to the progress store; confirm long-list scrolling and playback-time store writes stay smooth on the pinned TV.
+  evidence: maybe-false (review 12.2 #11); `getSnapshot` is a cached per-id read and the render-count tests pass; settle with a device check scrolling a few hundred feed cards right after playback.

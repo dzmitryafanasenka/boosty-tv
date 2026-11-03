@@ -27,6 +27,7 @@ import { focusRestoration } from '../src/shared/focus';
 import { t } from '../src/shared/i18n';
 import { formatCount } from '../src/shared/i18n/format';
 import { logger } from '../src/shared/services/logger';
+import { progressStore } from '../src/shared/services/progress';
 import { colors } from '../src/shared/ui';
 import { requestHostFocus } from '../src/shared/ui/requestHostFocus';
 import { resetLiveLikesForTests } from '../src/features/author/useLiveLike';
@@ -246,6 +247,8 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  // Story 12.2: no local progress leaks between tests.
+  await progressStore.reset();
   filtersStore.getState().clear();
   await resetQueryCache();
   clearNativeModules();
@@ -3451,6 +3454,45 @@ describe('Story 7.4: like and share a live stream', () => {
     await advance(30_000);
     expect(visible(root, LIKE)).toBe(false);
     expect(lastFocusTarget()).toBe(SHARE);
+    await unmount(root);
+  });
+});
+
+describe('Story 12.2: progress and «Просмотрено» on the Author grid', () => {
+  const card = (n: number) => `author/${BLOG}/post/blog-post-${n}`;
+  const DURATION = 3600;
+  function put(n: number, positionSec: number) {
+    progressStore.put({
+      ref: { blogUrl: BLOG, postId: `blog-post-${n}`, mediaId: `author-v${n}` },
+      positionSec,
+      durationSec: DURATION,
+      updatedAt: Date.now(),
+      meta: { title: '', postTitle: `Post ${n}`, authorName: 'Owner Name', previewUrl: null, durationSec: DURATION },
+    });
+  }
+
+  it('in progress → the line; finished → «Просмотрено»; no entry → unchanged; no request per card', async () => {
+    e4 = () => ({
+      status: 200,
+      body: {
+        data: [0, 1, 2].map(n =>
+          blogPost(BLOG, n, { data: [{ type: 'ok_video', id: `author-v${n}`, title: 'v', duration: DURATION }] }),
+        ),
+        extra: { offset: cursorFor(3), isLast: true },
+      },
+    });
+    put(0, 720);
+    put(1, 3590);
+    const root = await openAuthor();
+    expect(authorCards(root)).toEqual([card(0), card(1), card(2)]);
+    expect(visible(root, `${card(0)}/progress`)).toBe(true);
+    expect(visible(root, `${card(0)}/watched`)).toBe(false);
+    expect(one(root, card(0)).props.accessibilityLabel).toMatch(/осталось 48 мин\.$/);
+    expect(visible(root, `${card(1)}/watched`)).toBe(true);
+    expect(one(root, card(1)).props.accessibilityLabel).toMatch(/просмотрено\.$/);
+    expect(visible(root, `${card(2)}/progress`)).toBe(false);
+    expect(visible(root, `${card(2)}/watched`)).toBe(false);
+    expect(transport.calls.filter(c => /\/post\/blog-post-\d+$/.test(c.path))).toEqual([]);
     await unmount(root);
   });
 });

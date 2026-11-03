@@ -30,11 +30,11 @@ import {
 } from '../../shared/focus';
 import { t } from '../../shared/i18n';
 import {
+  primaryTarget,
   progressStatus,
   useProgress,
   useProgressRepository,
   type ProgressSnapshot,
-  type ProgressStatus,
 } from '../../shared/services/progress';
 import { boostyPostUrl } from '../../shared/entities/externalUrls';
 import { QrDialog, StateView, requestHostFocus, spacing, type HostView } from '../../shared/ui';
@@ -89,27 +89,6 @@ export {
   postCommentsRetryId,
   postRepliesMoreId,
 } from './comments/PostComments';
-
-/**
- * The primary's target (Story 4.2): the first unfinished video; `resume`
- * when it has progress > 0 («Продолжить», «С начала»). All finished: the
- * first video, no resume («Смотреть», it starts at 0). Null without rows.
- */
-export function primaryTarget(
-  rows: readonly VideoRow[],
-  statuses: readonly (ProgressStatus | null)[],
-): { row: VideoRow; resume: boolean } | null {
-  for (let i = 0; i < rows.length; i += 1) {
-    const status = statuses[i];
-    if (status?.kind !== 'watched') {
-      return {
-        row: rows[i],
-        resume: status?.kind === 'inProgress' || status?.kind === 'unknown',
-      };
-    }
-  }
-  return rows.length > 0 ? { row: rows[0], resume: false } : null;
-}
 
 /**
  * Story 4.5 (focus-map G «Ended»): where focus lands on the Post after a

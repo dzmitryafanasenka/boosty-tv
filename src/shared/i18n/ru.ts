@@ -639,6 +639,14 @@ export const ru = {
     a11yPinned: 'Закреплено. {label}',
     a11y: '{badge}. {title}. {author}, {date}.',
     a11yDuration: '{badge}. {title}. {author}, {date}. Длительность {duration}.',
+    // Story 12.2 (IMP-02): local progress on a video post's card (the
+    // «Просмотрено» badge is `post.video.status.watched`); the label ends
+    // with the status: «… Прогресс: осталось 48 мин.».
+    a11yProgress: '{label} Прогресс: {status}.',
+    progress: {
+      left: 'осталось {n} мин',
+      watched: 'просмотрено',
+    },
   },
   // DESIGN.md AuthorCard: «{name}. {title}» — the owner's name first, the
   // blog title second (owner decision 2026-10-27); the main line alone when
