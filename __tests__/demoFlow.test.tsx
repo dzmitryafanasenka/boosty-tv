@@ -861,3 +861,38 @@ test('Story 9.2: the demo sends no update check, deletes no update files and sho
     root.unmount();
   });
 });
+
+test('Story 12.5: the demo never writes the launcher channel (start, a progress change, the wipe) and ignores a launcher card', async () => {
+  const sync = jest.fn(() => Promise.resolve('synced'));
+  const ref = { blogUrl: 'demo-blog-1', postId: 'demo-post-0', mediaId: 'demo-video-0-0' };
+  const meta = { title: 'Демо', postTitle: 'Демо', authorName: 'Демо', previewUrl: null, durationSec: 600 };
+  let pending: Record<string, unknown> | null = { target: 'media', ...ref };
+  const takePendingOpen = jest.fn(() => {
+    const open = pending;
+    pending = null;
+    return Promise.resolve(open);
+  });
+  installNativeModules({ AppInfo: { versionName: '1.0' }, LauncherChannel: { sync, takePendingOpen } });
+  // The card's video is in the (demo, in-memory) Continue history: still ignored.
+  progressStore.put({ ref, positionSec: 42, durationSec: 600, updatedAt: 1, meta });
+  // Signed in as far as the open is concerned (an earlier test may have
+  // signed the demo out): only the demo gate keeps the Player away.
+  jest.spyOn(session, 'getStatus').mockReturnValue('signedIn');
+  const root = await renderApp();
+  expect(takePendingOpen).toHaveBeenCalled();
+  expect(pending).toBeNull();
+  expect(navigationRef.getRootState()?.routes.map(r => r.name)).not.toContain('Player');
+  await act(async () => {
+    await progressStore.ready();
+    progressStore.put({ ref: { ...ref, mediaId: 'demo-video-0-1' }, positionSec: 30, durationSec: 600, updatedAt: 2, meta });
+  });
+  await settle({ rounds: 5, timerRounds: 0 });
+  await act(async () => {
+    await accountScope.reset();
+  });
+  await settle({ rounds: 5, timerRounds: 0 });
+  expect(sync).not.toHaveBeenCalled();
+  await act(async () => {
+    root.unmount();
+  });
+});

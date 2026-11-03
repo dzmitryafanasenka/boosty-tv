@@ -31,6 +31,7 @@ export {
   createProgressStore,
   persistablePreviewUrl,
   progressAccountStore,
+  progressRefSchema,
   progressStore,
   setProgressKeyValueStore,
   type ProgressEntry,

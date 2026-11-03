@@ -50,7 +50,7 @@ test('every declaration names its store with a string literal', () => {
 
 test('the scan finds the known declarations', () => {
   expect(declaredNames().map(d => d.name).sort()).toEqual(
-    ['authFlow', 'filters', 'focusRestoration', 'logFile', 'logger', 'progress', 'queryCache', 'searchQuery', 'session'].sort(),
+    ['authFlow', 'filters', 'focusRestoration', 'launcherChannel', 'logFile', 'logger', 'progress', 'queryCache', 'searchQuery', 'session'].sort(),
   );
 });
 
@@ -64,6 +64,11 @@ test('every declared store is registered by the bootstrap, once', () => {
 test('each name is declared in one place only', () => {
   const names = declaredNames().map(d => d.name);
   expect(new Set(names).size).toBe(names.length);
+});
+
+test('Story 12.5: the launcher channel is wiped after the progress it mirrors', () => {
+  const names = accountScope.registeredNames();
+  expect(names.indexOf('launcherChannel')).toBeGreaterThan(names.indexOf('progress'));
 });
 
 test('the session is the gate (first) and the scope is sealed', () => {

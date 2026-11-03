@@ -116,12 +116,18 @@ const metaSchema = z.object({
   durationSec: z.number().int().positive().nullable().catch(null),
 });
 
+/**
+ * A stored video identity (AD-9). Story 12.5: also the check of a ref that
+ * comes back from a launcher card (outside input) before it is looked up.
+ */
+export const progressRefSchema = z.object({
+  blogUrl: z.string().min(1),
+  postId: z.string().min(1),
+  mediaId: z.string().min(1),
+});
+
 const entrySchema = z.object({
-  ref: z.object({
-    blogUrl: z.string().min(1),
-    postId: z.string().min(1),
-    mediaId: z.string().min(1),
-  }),
+  ref: progressRefSchema,
   positionSec: z.number().int().nonnegative(),
   durationSec: z.number().int().positive().nullable().catch(null),
   updatedAt: z.number(),

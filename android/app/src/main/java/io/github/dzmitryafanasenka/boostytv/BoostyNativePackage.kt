@@ -16,6 +16,7 @@ class BoostyNativePackage : ReactPackage {
       ExternalPlayerModule(reactContext),
       LogFileModule(reactContext),
       AppUpdaterModule(reactContext),
+      LauncherChannelModule(reactContext),
     )
 
   override fun createViewManagers(

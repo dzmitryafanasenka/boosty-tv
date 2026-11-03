@@ -5,6 +5,10 @@
          system installer, which asks the user. The user grants it per app in
          «Установка неизвестных приложений»; no silent install. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Story 12.5 (ADR 0016): write our «Продолжить просмотр» preview channel
+         and its programs to the TV provider (TvContract, API 26+). A normal
+         permission: granted at install, no prompt. -->
+    <uses-permission android:name="com.android.providers.tv.permission.WRITE_EPG_DATA" />
 
     <!-- Android TV / Google TV: no touchscreen required, leanback optional so the
          same APK also installs on non-leanback Android devices used for testing. -->
