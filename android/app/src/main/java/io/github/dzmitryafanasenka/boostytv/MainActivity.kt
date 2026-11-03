@@ -1,5 +1,7 @@
 package io.github.dzmitryafanasenka.boostytv
 
+import android.content.Intent
+import android.os.Bundle
 import android.view.KeyEvent
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
@@ -20,6 +22,26 @@ class MainActivity : ReactActivity() {
    */
   override fun createReactActivityDelegate(): ReactActivityDelegate =
       DefaultReactActivityDelegate(this, mainComponentName, fabricEnabled)
+
+  /**
+   * Story 12.5: a launcher card (our preview channel) starts this activity
+   * with its own intent; `LauncherChannelModule` keeps it for one
+   * `takePendingOpen()`. A recreated activity (saved state) does not hand
+   * its old intent over again.
+   */
+  override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+    if (savedInstanceState == null) {
+      LauncherChannelModule.stash(intent)
+    }
+  }
+
+  /** Story 12.5: a launcher card while the app runs (`singleTask`). */
+  override fun onNewIntent(intent: Intent) {
+    super.onNewIntent(intent)
+    setIntent(intent)
+    LauncherChannelModule.stash(intent)
+  }
 
   /**
    * Hold-to-seek (Story 4.1): D-pad left/right key down (with repeats) and

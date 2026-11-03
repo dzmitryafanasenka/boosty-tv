@@ -15,3 +15,4 @@ export {
 } from './livePlaque';
 export { LIVE_PLAQUE_PREFIX, livePlaqueId } from './LivePlaqueRow';
 export { manualRefreshFeed, mergeFeedHead, refreshFeedHead, type FeedRefreshResult } from './feedRefresh';
+export { continueCardId } from './ContinueRow';

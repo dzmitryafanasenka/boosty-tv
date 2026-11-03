@@ -690,6 +690,12 @@ export const ru = {
       dec: 'декабрь',
     },
   },
+  // Story 12.5 (IMP-04): the app preview channel the launcher shows on the
+  // Boosty TV tile. `openApp` is the neutral card of an empty history.
+  launcher: {
+    channel: 'Продолжить просмотр',
+    openApp: 'Откройте Boosty TV',
+  },
   // The persistent badge of the debug-only demo mode (Story 2.5).
   demo: {
     badge: 'ДЕМО',

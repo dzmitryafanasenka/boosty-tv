@@ -29,7 +29,7 @@ import {
   WelcomeScreen,
 } from '../features/auth';
 import { refreshAuthorPostsHeads } from '../features/author';
-import { refreshFeedHead, refreshLivePlaque } from '../features/home';
+import { continueCardId, refreshFeedHead, refreshLivePlaque } from '../features/home';
 import { debugBreakNextVideoSource } from '../features/player';
 import { DiagnosticsScreen, SignOutDialog } from '../features/settings';
 import { UpdateDialog, UpdatePlaqueHost, useUpdateSnapshot, type KnownRelease } from '../features/update';
@@ -47,11 +47,19 @@ import type { MediaRef } from '../shared/entities/post';
 import type { LiveRef } from '../shared/entities/stream';
 import { subscribeAppForeground } from '../shared/platform/appLifecycle';
 import { cleanupUpdates } from '../shared/platform/appUpdater';
+import { takeLauncherOpen } from '../shared/platform/launcherChannel';
 import { playerOpenMark } from '../shared/services/perfMark';
-import { ProgressContext } from '../shared/services/progress';
+import { ProgressContext, progressStore } from '../shared/services/progress';
 import { t } from '../shared/i18n';
 import { Text, colors, components, spacing, type HostView } from '../shared/ui';
 import type * as DevFocusModule from './dev/devFocus';
+import { launcherChannel } from './launcherChannel';
+import {
+  clearShellContentReturn,
+  requestShellContentReturn,
+  resolveLauncherOpen,
+  takeShellContentReturn,
+} from './launcherOpen';
 import { progress } from './progress';
 import { queryClient, resetQueryCache } from './queryClient';
 import type { RootStackParamList } from './routes';
@@ -94,6 +102,7 @@ export const SHELL_RESTORATION_KEY = 'shell';
 /** Replace the whole stack with the Shell (Back on Главная then exits). */
 function openShell() {
   if (navigationRef.isReady()) {
+    clearShellContentReturn();
     navigationRef.reset({ index: 0, routes: [{ name: 'Shell' }] });
   }
 }
@@ -188,6 +197,7 @@ function openExpired() {
   if (state?.routes.length === 1 && state.routes[0].name === 'Expired') {
     return;
   }
+  clearShellContentReturn();
   navigationRef.reset({ index: 0, routes: [{ name: 'Expired' }] });
 }
 
@@ -204,11 +214,75 @@ async function signOut(modal: ModalApi): Promise<void> {
   await accountScope.reset();
   modal.close({ restoreFocus: false });
   if (navigationRef.isReady()) {
+    clearShellContentReturn();
     navigationRef.reset({
       index: 0,
       routes: [{ name: 'Welcome', params: { signInAgain: false } }],
     });
   }
+}
+
+/**
+ * Story 12.5 (ADR 0016, docs/focus-map.md «Launcher entry»): applies the
+ * launcher card the user opened, once (`takeLauncherOpen`). Called when the
+ * navigator is ready (cold start, `cold`) and on every return to the
+ * foreground (a card while the app runs: `onNewIntent`).
+ *
+ * - The demo, not signed in, or no card: nothing changes (a card is dropped).
+ * - The neutral card, the channel link, or a ref that is malformed or not
+ *   in the current local Continue view: Главная (`[Shell]`; a cold start
+ *   that is already there stays).
+ * - A video card: `[Shell, Player]` as from a Continue card (origin
+ *   Главная, focus id `home/continue/<mediaId>`, the resume point). A cold
+ *   start keeps its fresh Shell; a warm start replaces the whole stack (an
+ *   open modal closes without a focus return). Back from the Player lands on
+ *   Главная's card (or its neighbour), not on the sidebar.
+ */
+async function applyLauncherOpen(cold: boolean, modal: ModalApi | null): Promise<void> {
+  const open = await takeLauncherOpen();
+  if (DEMO_ACTIVE) {
+    // The demo never writes the channel, so a card there is never ours: dropped.
+    return;
+  }
+  const target = await resolveLauncherOpen(open, {
+    signedIn: () => session.getStatus() === 'signedIn',
+    store: progressStore,
+    playerEnabled: phaseFlags.player,
+  });
+  if (target.kind === 'none' || !navigationRef.isReady()) {
+    return;
+  }
+  const state = navigationRef.getRootState();
+  const shell = state?.routes.length === 1 && state.routes[0].name === 'Shell' ? state.routes[0] : null;
+  if (target.kind === 'home') {
+    if (!(cold && shell)) {
+      modal?.close({ restoreFocus: false });
+      openShell();
+    }
+    return;
+  }
+  modal?.close({ restoreFocus: false });
+  // Story 9.3: the time-to-first-frame mark, as for a Continue card.
+  playerOpenMark.mark('continue');
+  navigationRef.reset({
+    index: 1,
+    routes: [
+      // A partial route with the fresh Shell's key keeps it mounted.
+      cold && shell ? { key: shell.key, name: 'Shell' } : { name: 'Shell' },
+      {
+        name: 'Player',
+        params: {
+          ref: target.ref,
+          origin: {
+            routeKey: SHELL_RESTORATION_KEY,
+            sectionId: 'home',
+            focusId: continueCardId(target.ref.mediaId),
+          },
+        },
+      },
+    ],
+  });
+  requestShellContentReturn();
 }
 
 /** Hands the modal host API to App, which sits outside the provider. */
@@ -355,6 +429,7 @@ function ShellRoute({
       onOpenPlayer={phaseFlags.player ? onOpenPlayer : undefined}
       onOpenLive={phaseFlags.player && phaseFlags.live && phaseFlags.livePlaque ? onOpenLive : undefined}
       takePendingSection={takePendingShellSection}
+      takePendingContentReturn={takeShellContentReturn}
     />
   );
 }
@@ -430,6 +505,21 @@ function App() {
   const onNavigationState = useCallback(() => {
     setTopRoute(navigationRef.getCurrentRoute()?.name);
   }, []);
+
+  // Story 12.5: the launcher channel mirrors the Continue history (off in
+  // the demo); a launcher card opened while the app runs is applied on the
+  // return to the foreground, once the navigator is ready.
+  const navigationReady = useRef(false);
+  useEffect(() => launcherChannel.start(), []);
+  useEffect(
+    () =>
+      subscribeAppForeground(() => {
+        if (navigationReady.current) {
+          applyLauncherOpen(false, modalApi.current).catch(() => {});
+        }
+      }),
+    [],
+  );
 
   // Story 9.2: on start, old update files are deleted and the daily update
   // check runs; again on every return to the foreground (still at most once
@@ -516,6 +606,9 @@ function App() {
    */
   const onNavigationReady = useCallback(() => {
     onNavigationState();
+    navigationReady.current = true;
+    // Story 12.5: a cold start from a launcher card.
+    applyLauncherOpen(true, modalApi.current).catch(() => {});
     if (session.getStatus() === 'expired') {
       openExpired();
     } else if (session.getStatus() === 'signedIn') {

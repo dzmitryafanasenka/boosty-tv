@@ -78,6 +78,13 @@ export type ShellProps = {
    * popped back here. Read once per return; null: a plain return.
    */
   takePendingSection?: () => SectionId | null;
+  /**
+   * Story 12.5: true once when the Shell is focused for the first time
+   * under a Player opened from a launcher card (it never had focus): its
+   * return goes to the current section's content (Главная's remembered
+   * Continue card) as after any Player opened from that content.
+   */
+  takePendingContentReturn?: () => boolean;
 };
 
 /** The content's initial element per section; none: focus stays on the sidebar. */
@@ -129,6 +136,7 @@ export function Shell({
   onOpenPlayer,
   onOpenLive,
   takePendingSection,
+  takePendingContentReturn,
 }: ShellProps) {
   const sections = useMemo(() => enabledSections(), []);
   const [view, setView] = useState<View_>({ section: HOME, focusContent: false });
@@ -164,6 +172,8 @@ export function Shell({
   const sectionReturn = useRef<(() => boolean) | null>(null);
   const takePendingRef = useRef(takePendingSection);
   takePendingRef.current = takePendingSection;
+  const takeContentReturnRef = useRef(takePendingContentReturn);
+  takeContentReturnRef.current = takePendingContentReturn;
   /**
    * Whether the Shell is the focused route. A covered Shell ignores focus
    * events: Android can move fallback focus into a covered screen (e.g. when
@@ -195,6 +205,10 @@ export function Shell({
     useCallback(() => {
       routeFocused.current = true;
       const pending = takePendingRef.current?.() ?? null;
+      if (takeContentReturnRef.current?.() === true && pending === null) {
+        // Story 12.5: the Player of a launcher card was on top from the start.
+        zone.current = 'content';
+      }
       if (pending !== null && sections.includes(pending)) {
         // OK on a sidebar item of the screen that was on top: as OK on that
         // item here. The item has focus and the user has not moved, so the

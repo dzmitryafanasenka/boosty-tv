@@ -6,6 +6,7 @@ import { focusRestorationAccountStore } from '../shared/focus';
 import { logFileAccountStore } from '../shared/services/logFileSink';
 import { loggerAccountStore } from '../shared/services/logger';
 import { progressAccountStore } from '../shared/services/progress';
+import { launcherChannelAccountStore } from './launcherChannel';
 import { queryCacheAccountStore } from './queryClient';
 import { session, sessionAccountStore } from './session';
 
@@ -42,6 +43,8 @@ accountScope.register(
   logFileAccountStore,
   queryCacheAccountStore,
   progressAccountStore,
+  // Story 12.5: after the progress it mirrors (the launcher gets the neutral card).
+  launcherChannelAccountStore,
   filtersAccountStore,
   searchQueryAccountStore,
 );

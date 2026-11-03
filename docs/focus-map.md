@@ -221,6 +221,13 @@ Implementation notes (Story 12.3, the «в эфире» plaque; our improvement 
 - **Back** from a plaque → `nav/home` (the Shell's content → sidebar rule).
 - **A new pass removes the focused plaque** (the stream ended): the next plaque, else the previous one, else the first Continue card, else the first feed card; never while covered, a dialog is open or focus is elsewhere.
 
+Implementation notes (Story 12.5, «Launcher entry»: the launcher channel «Продолжить просмотр»; our improvement IMP-04, owner decisions 2026-11-03; host-tested, the device rows are in `docs/testing.md` «Story 12.5»; ADR 0016):
+- The app has a second entry besides its tile: a card of its preview channel in the launcher (Aero TV), which fires a `boostytv://continue?…` link (a video) or `boostytv://home` (the neutral card, the channel link). Any app can fire the same links, so the rules below always check the ref against the local Continue view. The link is applied once, when the navigator is ready (cold start) or on the return to the foreground (the app was running anywhere).
+- **A video card** (its ref in the current local Continue view, signed in) → `[Shell, Player]` exactly as OK on that Continue card: origin Главная (`routeKey: 'shell'`, section `home`), focus id `home/continue/<mediaId>`, the resume point. A warm start replaces the whole stack (an open dialog closes without a focus return); a cold start keeps its fresh Shell. **Back** (the Player's own order: overlay → exit) → Главная with focus on that card, else its neighbour (the Story 4.7 return rules), not the sidebar: the Shell under the Player was never focused, so on its first focus it goes to its content's return (`takePendingContentReturn`, read once; cleared by every other stack reset). Back again → `nav/home`, then exit.
+- **The neutral card «Откройте Boosty TV», the channel link, an unknown `boostytv://` host, or a stale / foreign / malformed ref** → Главная: a cold start stays on its Shell (the usual initial focus); a warm start resets the stack to a fresh `[Shell]` on Главная (the usual initial focus).
+- **Signed out or expired** → nothing changes (Welcome on a cold start; the sign-in stack or A11 as it was); the card is dropped, not applied after a sign-in.
+- Locked or removed posts: the Player's existing unavailable path, then Back as above.
+
 Implementation notes (Story 12.2, progress on feed cards; our improvement IMP-02; host-tested):
 - Focus is unchanged. The progress line and the «Просмотрено» badge are drawn inside the PostCard (absolute, not focusable, the card keeps its height) on Главная, Автор and Поиск. A progress change (Back from the Player, a Continue removal) re-renders only that card from the progress store; no refetch, no focus move, no new focus stop. The card's accessibility label adds «Прогресс: осталось N мин.» / «Прогресс: просмотрено.».
 
@@ -574,6 +581,7 @@ Implementation notes (Story 9.2, host-tested; device rows in `docs/testing.md` �
 | Player quality, recovery, Ended | Stories 4.3–4.5 |
 | Live player, stream ended | Stories 7.2, 7.3 |
 | «в эфире» plaque (События removed) | Story 12.3 |
+| Launcher entry (a launcher channel card → Player / Главная) | Story 12.5 |
 | Settings, sign-out dialog, account switch | Stories 2.7, 2.8 |
 | System player, diagnostics, speed | Stories 8.1–8.3 |
 | Update notice | Story 9.2 |

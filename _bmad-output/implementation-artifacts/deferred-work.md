@@ -417,3 +417,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-12-2-progress-on-feed-cards.md`
   summary: Every mounted PostCard now subscribes to the progress store; confirm long-list scrolling and playback-time store writes stay smooth on the pinned TV.
   evidence: maybe-false (review 12.2 #11); `getSnapshot` is a cached per-id read and the render-count tests pass; settle with a device check scrolling a few hundred feed cards right after playback.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-12-5-continue-history-launcher-channel.md`
+  summary: LauncherChannelModule behaviour (card order by weight, one-shot pending open, recents/tile launch handling) is covered only by Kotlin source-text tests.
+  evidence: maybe-false (review 12.5 #10); no JVM/Robolectric path in the repo; settle with the device rows in docs/testing.md Story 12.5 or add a JVM test harness later.
