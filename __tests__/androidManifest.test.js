@@ -66,6 +66,20 @@ describe('AndroidManifest.xml', () => {
     expect(manifest).not.toContain('QUERY_ALL_PACKAGES');
   });
 
+  it('Story 12.5: the only VIEW filter on an activity is the launcher channel link (scheme boostytv, hosts continue and home)', () => {
+    const activity = manifest.slice(manifest.indexOf('<activity'), manifest.indexOf('</activity>'));
+    const views = activity
+      .split('<intent-filter>')
+      .slice(1)
+      .map(f => f.slice(0, f.indexOf('</intent-filter>')))
+      .filter(f => f.includes('android.intent.action.VIEW'));
+    expect(views).toHaveLength(1);
+    const schemes = [...views[0].matchAll(/android:scheme="([^"]*)"/g)].map(m => m[1]);
+    const hosts = [...views[0].matchAll(/android:host="([^"]*)"/g)].map(m => m[1]);
+    expect(new Set(schemes)).toEqual(new Set(['boostytv']));
+    expect(hosts.sort()).toEqual(['continue', 'home']);
+  });
+
   it('Story 9.1: the banner resolves to one 320x180 xhdpi PNG', () => {
     const banners = [...manifest.matchAll(/android:banner="([^"]*)"/g)].map(m => m[1]);
     expect(banners.length).toBeGreaterThan(0);

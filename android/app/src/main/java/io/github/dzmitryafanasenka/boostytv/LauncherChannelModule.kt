@@ -5,6 +5,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.media.tv.TvContract
+import android.net.Uri
 import android.os.Build
 import androidx.annotation.RequiresApi
 import com.facebook.react.bridge.Arguments
@@ -43,9 +44,13 @@ import java.util.concurrent.atomic.AtomicReference
  * Nothing is logged; a rejection carries a fixed code and the exception's
  * class name only (a message may hold a title or an intent URI).
  *
- * The card intents are explicit-component intents to `MainActivity` with
- * our own action and string extras (no VIEW filter, no URL scheme): only
- * the launcher that reads our channel starts them.
+ * The card links are `boostytv://continue?blogUrl=…&postId=…&mediaId=…`
+ * (URL-encoded) and `boostytv://home` (the neutral card and the channel
+ * app link), received by `MainActivity`'s VIEW filter (scheme `boostytv`,
+ * hosts `continue` and `home`). Story 12.5 device run: Aero TV ignores a
+ * program's explicit-component intent (it starts the LEANBACK_LAUNCHER
+ * intent) but fires a VIEW link. Any app can fire these links, so JS opens
+ * a video only when its ids match the local Continue history (ADR 0016).
  */
 class LauncherChannelModule(reactContext: ReactApplicationContext) :
   ReactContextBaseJavaModule(reactContext) {
@@ -163,7 +168,7 @@ class LauncherChannelModule(reactContext: ReactApplicationContext) :
           put(TvContract.PreviewPrograms.COLUMN_WEIGHT, cards.size - index)
           put(
             TvContract.PreviewPrograms.COLUMN_INTENT_URI,
-            openIntent(context, card.open).toUri(Intent.URI_INTENT_SCHEME),
+            openLink(card.open),
           )
         }
       val uri =
@@ -196,7 +201,7 @@ class LauncherChannelModule(reactContext: ReactApplicationContext) :
         put(TvContract.Channels.COLUMN_DISPLAY_NAME, channelName)
         put(
           TvContract.Channels.COLUMN_APP_LINK_INTENT_URI,
-          openIntent(context, null).toUri(Intent.URI_INTENT_SCHEME),
+          openLink(null),
         )
         put(TvContract.Channels.COLUMN_INTERNAL_PROVIDER_ID, CHANNEL_PROVIDER_ID)
       }
@@ -243,8 +248,10 @@ class LauncherChannelModule(reactContext: ReactApplicationContext) :
 
   companion object {
     const val NAME = "LauncherChannel"
-    /** Our action on the card and channel intents (explicit component; no intent-filter). */
-    const val ACTION_OPEN = "io.github.dzmitryafanasenka.boostytv.action.OPEN_FROM_LAUNCHER"
+    /** The card links: `boostytv://continue?…` and `boostytv://home` (MainActivity's VIEW filter). */
+    const val LINK_SCHEME = "boostytv"
+    private const val HOST_CONTINUE = "continue"
+    private const val HOST_HOME = "home"
     private const val CHANNEL_PROVIDER_ID = "continue"
     private const val KEY_TARGET = "target"
     private const val KEY_TITLE = "title"
@@ -270,46 +277,49 @@ class LauncherChannelModule(reactContext: ReactApplicationContext) :
     fun stash(intent: Intent?) {
       pending.set(
         try {
+          val data = intent?.data
           if (
             intent == null ||
-              intent.action != ACTION_OPEN ||
+              intent.action != Intent.ACTION_VIEW ||
+              data == null ||
+              data.scheme != LINK_SCHEME ||
               (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0
           ) {
+            // The tile, recents, or anything that is not our link.
             null
-          } else {
-            when (intent.getStringExtra(KEY_TARGET)) {
-              TARGET_MEDIA -> {
-                val blogUrl = intent.getStringExtra(KEY_BLOG_URL)
-                val postId = intent.getStringExtra(KEY_POST_ID)
-                val mediaId = intent.getStringExtra(KEY_MEDIA_ID)
-                if (blogUrl != null && postId != null && mediaId != null) {
-                  PendingOpen.Media(blogUrl, postId, mediaId)
-                } else {
-                  PendingOpen.Home
-                }
-              }
-              else -> PendingOpen.Home
+          } else if (data.host == HOST_CONTINUE) {
+            val blogUrl = data.getQueryParameter(KEY_BLOG_URL)
+            val postId = data.getQueryParameter(KEY_POST_ID)
+            val mediaId = data.getQueryParameter(KEY_MEDIA_ID)
+            if (!blogUrl.isNullOrEmpty() && !postId.isNullOrEmpty() && !mediaId.isNullOrEmpty()) {
+              PendingOpen.Media(blogUrl, postId, mediaId)
+            } else {
+              PendingOpen.Home
             }
+          } else {
+            // `boostytv://home`, or a host we do not know: Главная.
+            PendingOpen.Home
           }
         } catch (_: Throwable) {
-          // A malformed extras bundle from another app: open Главная.
+          // A malformed link from another app: open Главная.
           PendingOpen.Home
         },
       )
     }
 
-    /** The intent a card (or, with null, the neutral card and the channel link) starts. */
-    private fun openIntent(context: Context, media: PendingOpen.Media?): Intent =
-      Intent(context, MainActivity::class.java).apply {
-        action = ACTION_OPEN
-        if (media == null) {
-          putExtra(KEY_TARGET, TARGET_HOME)
-        } else {
-          putExtra(KEY_TARGET, TARGET_MEDIA)
-          putExtra(KEY_BLOG_URL, media.blogUrl)
-          putExtra(KEY_POST_ID, media.postId)
-          putExtra(KEY_MEDIA_ID, media.mediaId)
-        }
+    /** The link a card (or, with null, the neutral card and the channel link) opens. */
+    private fun openLink(media: PendingOpen.Media?): String =
+      if (media == null) {
+        Uri.Builder().scheme(LINK_SCHEME).authority(HOST_HOME).build().toString()
+      } else {
+        Uri.Builder()
+          .scheme(LINK_SCHEME)
+          .authority(HOST_CONTINUE)
+          .appendQueryParameter(KEY_BLOG_URL, media.blogUrl)
+          .appendQueryParameter(KEY_POST_ID, media.postId)
+          .appendQueryParameter(KEY_MEDIA_ID, media.mediaId)
+          .build()
+          .toString()
       }
 
     private fun ReadableMap.stringOrNull(key: String): String? =

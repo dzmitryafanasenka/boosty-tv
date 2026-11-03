@@ -4,9 +4,10 @@
  * tests run here, so this pins what the JS side and the spec rely on:
  * registration, one preview channel found by its internal provider id and
  * never deleted, programs replaced (new first, then the old ones), API 26+
- * only, one serial thread, explicit-component intents with our own action
- * (no VIEW filter, no URL scheme), the pending open stashed from the launch
- * intent and `onNewIntent`, nothing logged and rejections carrying a class
+ * only, one serial thread, the `boostytv://continue` / `boostytv://home`
+ * card links and the one VIEW filter for them (Aero TV fires a program's
+ * VIEW link, not an explicit-component intent), the pending open stashed
+ * from the launch intent and `onNewIntent`, nothing logged and rejections carrying a class
  * name only. Aero TV's behaviour is a device check (docs/testing.md).
  */
 const fs = require('fs');
@@ -62,17 +63,28 @@ describe('LauncherChannelModule (Story 12.5)', () => {
     expect(module_).toContain('/drawable/tv_banner');
   });
 
-  it('card and channel intents: explicit MainActivity component with our action and string extras', () => {
-    expect(module_).toContain('Intent(context, MainActivity::class.java)');
-    expect(module_).toContain('ACTION_OPEN = "io.github.dzmitryafanasenka.boostytv.action.OPEN_FROM_LAUNCHER"');
-    expect(module_).toContain('TvContract.Channels.COLUMN_APP_LINK_INTENT_URI');
-    expect(module_).toContain('toUri(Intent.URI_INTENT_SCHEME)');
-    expect(module_).not.toMatch(/Intent\.ACTION_VIEW|Uri\.parse/);
+  it('card and channel links: boostytv://continue?blogUrl&postId&mediaId (encoded by Uri.Builder) and boostytv://home', () => {
+    expect(module_).toContain('LINK_SCHEME = "boostytv"');
+    expect(module_).toContain('HOST_CONTINUE = "continue"');
+    expect(module_).toContain('HOST_HOME = "home"');
+    expect(module_).toMatch(/Uri\.Builder\(\)\.scheme\(LINK_SCHEME\)\.authority\(HOST_HOME\)/);
+    expect(module_).toMatch(
+      /\.authority\(HOST_CONTINUE\)\s*\.appendQueryParameter\(KEY_BLOG_URL, media\.blogUrl\)\s*\.appendQueryParameter\(KEY_POST_ID, media\.postId\)\s*\.appendQueryParameter\(KEY_MEDIA_ID, media\.mediaId\)/,
+    );
+    expect(module_).toContain('TvContract.PreviewPrograms.COLUMN_INTENT_URI,\n            openLink(card.open),');
+    expect(module_).toContain('TvContract.Channels.COLUMN_APP_LINK_INTENT_URI,\n          openLink(null),');
+    // The old explicit-component path is gone.
+    expect(module_).not.toMatch(/ACTION_OPEN|OPEN_FROM_LAUNCHER|MainActivity::class|URI_INTENT_SCHEME|putExtra/);
   });
 
-  it('the pending open: ours by action only, launches from recents ignored, read once', () => {
-    expect(module_).toMatch(/intent\.action != ACTION_OPEN/);
+  it('the pending open: VIEW + boostytv only; continue with 3 non-empty params → media, else Главная; non-VIEW clears; recents ignored; read once', () => {
+    expect(module_).toMatch(/intent\.action != Intent\.ACTION_VIEW \|\|\s*data == null \|\|\s*data\.scheme != LINK_SCHEME \|\|/);
     expect(module_).toContain('FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY');
+    expect(module_).toMatch(/\) \{\s*\/\/ The tile, recents, or anything that is not our link\.\s*null\s*\} else if \(data\.host == HOST_CONTINUE\)/);
+    expect(module_).toMatch(
+      /if \(!blogUrl\.isNullOrEmpty\(\) && !postId\.isNullOrEmpty\(\) && !mediaId\.isNullOrEmpty\(\)\) \{\s*PendingOpen\.Media\(blogUrl, postId, mediaId\)\s*\} else \{\s*PendingOpen\.Home/,
+    );
+    expect(module_).toMatch(/\/\/ `boostytv:\/\/home`, or a host we do not know: Главная\.\s*PendingOpen\.Home/);
     expect(module_).toContain('private val pending = AtomicReference<PendingOpen?>(null)');
     expect(module_).toContain('pending.getAndSet(null)');
     expect(module_).toContain('pending.set(');
@@ -90,11 +102,20 @@ describe('LauncherChannelModule (Story 12.5)', () => {
     expect(module_).toMatch(/reject\(E_LAUNCHER_CHANNEL, error\.javaClass\.simpleName\)/);
   });
 
-  it('the manifest: WRITE_EPG_DATA; no new intent-filter (only MAIN/LAUNCHER), no URL scheme', () => {
+  it('the manifest: WRITE_EPG_DATA; MAIN/LAUNCHER plus one VIEW filter for boostytv://continue and boostytv://home only', () => {
     expect(manifest).toContain('<uses-permission android:name="com.android.providers.tv.permission.WRITE_EPG_DATA" />');
-    expect(manifest.match(/<intent-filter>/g)).toHaveLength(1);
-    const filter = manifest.slice(manifest.indexOf('<intent-filter>'), manifest.indexOf('</intent-filter>'));
-    expect(filter).not.toContain('<data');
-    expect(filter).not.toContain('android.intent.action.VIEW');
+    const filters = manifest.split('<intent-filter>').slice(1).map(f => f.slice(0, f.indexOf('</intent-filter>')));
+    expect(filters).toHaveLength(2);
+    expect(filters[0]).toContain('android.intent.category.LEANBACK_LAUNCHER');
+    expect(filters[0]).not.toContain('<data');
+    const view = filters[1];
+    expect(view).toContain('<action android:name="android.intent.action.VIEW" />');
+    expect(view).toContain('<category android:name="android.intent.category.DEFAULT" />');
+    expect(view).toContain('<category android:name="android.intent.category.BROWSABLE" />');
+    expect(view.match(/<data [^>]*>/g)).toEqual([
+      '<data android:scheme="boostytv" android:host="continue" />',
+      '<data android:scheme="boostytv" android:host="home" />',
+    ]);
+    expect(view).not.toMatch(/pathPrefix|pathPattern|android:path=|autoVerify|https?"/);
   });
 });

@@ -3,7 +3,8 @@
  * FixtureTransport as the global `fetch` and a fake `LauncherChannel` native
  * module: the channel sync from the app (the Continue history, then the
  * neutral card after «Выйти»), and every pending-open row of the spec's I/O
- * matrix (cold start, warm start, stale/foreign/malformed refs, signed out,
+ * matrix (cold start, warm start, stale/foreign/malformed refs and crafted
+ * `boostytv://` links from other apps, signed out,
  * the neutral card, Back from the Player to Главная's card). The native
  * intent handling and Aero TV are device checks (docs/testing.md Story
  * 12.5); these tests prove what the app asks to show and focus.
@@ -339,6 +340,28 @@ describe('Story 12.5: opening a launcher card', () => {
       expect(pending).toBeNull();
       await unmount(root);
     }
+  });
+
+  it('a crafted boostytv:// link from another app (warm start): a foreign ref, a malformed one, or an unknown host → Главная, never the Player', async () => {
+    seed(1, 600, 2000);
+    const root = await renderApp();
+    for (const open of [
+      // boostytv://continue?blogUrl=other-blog&postId=cw-post-1&mediaId=cw-v1 (foreign blog)
+      mediaOpen({ ...cwRef(1), blogUrl: 'other-blog' }),
+      // a video id that is not in this device's history
+      mediaOpen({ blogUrl: BLOG, postId: 'cw-post-1', mediaId: 'someone-else' }),
+      // malformed: an id that is not a string
+      { target: 'media', blogUrl: BLOG, postId: 'cw-post-1', mediaId: 7 },
+      // boostytv://continue without its params, or boostytv://elsewhere: the native side answers `home`
+      { target: 'home' },
+    ]) {
+      const before = navigationRef.getRootState()?.routes[0].key;
+      await warmOpen(open);
+      // A fresh Shell on Главная (the warm Главная rule), no Player.
+      expect(routes()).toEqual(['Shell']);
+      expect(navigationRef.getRootState()?.routes[0].key).not.toBe(before);
+    }
+    await unmount(root);
   });
 
   it('a finished video (no longer in Continue): Главная, warm start from the Player → [Shell]', async () => {

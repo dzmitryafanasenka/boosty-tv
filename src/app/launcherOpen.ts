@@ -8,7 +8,8 @@ import {
 
 /**
  * Story 12.5 (ADR 0016, docs/focus-map.md «Launcher entry»): what a card of
- * the launcher channel opens. The ids come from an intent (outside input):
+ * the launcher channel opens. The ids come from a public `boostytv://` link
+ * that any app can fire (outside input; this check is the boundary):
  * they are checked with the progress ref schema and must match an entry of
  * the current local Continue view, else Главная. Nothing opens while the
  * app is not signed in (the sign-in stack stays as it is; Welcome on a cold

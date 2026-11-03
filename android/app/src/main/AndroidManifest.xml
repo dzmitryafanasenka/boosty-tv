@@ -55,6 +55,18 @@
             <category android:name="android.intent.category.LAUNCHER" />
             <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
         </intent-filter>
+        <!-- Story 12.5 (ADR 0016): the launcher channel's card links
+             boostytv://continue?… and boostytv://home (Aero TV fires a program's
+             VIEW link, not an explicit-component intent). Any app can fire them:
+             the app opens a video only when the ids match its local Continue
+             history, else Главная. -->
+        <intent-filter>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="boostytv" android:host="continue" />
+            <data android:scheme="boostytv" android:host="home" />
+        </intent-filter>
       </activity>
       <!-- Story 9.2: content URIs for the downloaded update APK only
            (res/xml/update_file_paths.xml: cacheDir/updates/). -->

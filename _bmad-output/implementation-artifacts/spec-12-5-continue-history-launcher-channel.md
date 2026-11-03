@@ -2,7 +2,7 @@
 title: 'Story 12.5: «Продолжить просмотр» as an app channel in the launcher'
 type: 'feature'
 created: '2026-11-03'
-status: 'in-review'
+status: 'done'
 baseline_commit: 'bcd274dad206817b3f949f01a17f30c857476fb1'
 route: 'dispatch'
 review_loop_iteration: 0
@@ -21,9 +21,9 @@ context:
 
 ## Boundaries & Constraints
 
-**Always:** one channel found by its `INTERNAL_PROVIDER_ID`, created once and kept (programs replaced, the channel never deleted); programs mirror `continueEntries(store.entries())` (same order, ≤ `MAX_CONTINUE_ENTRIES`) with title (video title rule of the Continue card), author as the short description, and a poster that passes `persistablePreviewUrl`, else the app banner; an empty list publishes the neutral card (banner, «Откройте Boosty TV»); sync is driven by a projection key (order + titles + posters), so periodic progress ticks never sync; the AccountScope wipe publishes the neutral card (an account-scoped store registered after `progressAccountStore`) and late syncs carry the scope generation so an old account is never republished; the native module runs only on API 26+, off the UI thread, logs nothing and rejects with outcomes only; `WRITE_EPG_DATA` (normal) in the manifest; the card intent is an explicit-component intent (no public VIEW filter) whose extras the native module stashes for a one-time `takePendingOpen()` (cold start and `onNewIntent` with `setIntent`); a pending open is applied after navigation is ready and only when signed in and the ref matches a current local Continue entry (validated with the progress ref schema), else Главная; the Player opens as from a Continue card (`[Shell, Player]`, origin Главная, focus id `home/continue/<mediaId>`); the neutral card and the channel app link open Главная; demo mode never writes the channel.
+**Always:** one channel found by its `INTERNAL_PROVIDER_ID`, created once and kept (programs replaced, the channel never deleted); programs mirror `continueEntries(store.entries())` (same order, ≤ `MAX_CONTINUE_ENTRIES`) with title (video title rule of the Continue card), author as the short description, and a poster that passes `persistablePreviewUrl`, else the app banner; an empty list publishes the neutral card (banner, «Откройте Boosty TV»); sync is driven by a projection key (order + titles + posters), so periodic progress ticks never sync; the AccountScope wipe publishes the neutral card (an account-scoped store registered after `progressAccountStore`) and late syncs carry the scope generation so an old account is never republished; the native module runs only on API 26+, off the UI thread, logs nothing and rejects with outcomes only; `WRITE_EPG_DATA` (normal) in the manifest; card links are `boostytv://continue?blogUrl=…&postId=…&mediaId=…` (URL-encoded) and `boostytv://home` for the neutral card and the channel app link, received through a VIEW + DEFAULT + BROWSABLE intent-filter (scheme `boostytv`, hosts `continue` and `home`) and stashed by the native module for a one-time `takePendingOpen()` (cold start and `onNewIntent` with `setIntent`); any other app can fire these links, so the ref validation below is the security boundary (owner decision 2026-11-03, after the device probe: Aero TV ignores a program's explicit-component intent and launches the app's LEANBACK_LAUNCHER intent, but fires a `boostytv://` VIEW link); a pending open is applied after navigation is ready and only when signed in and the ref matches a current local Continue entry (validated with the progress ref schema), else Главная; the Player opens as from a Continue card (`[Shell, Player]`, origin Главная, focus id `home/continue/<mediaId>`); the neutral card and the channel app link open Главная; demo mode never writes the channel.
 
-**Never:** Watch Next; deleting the channel; account data beyond what the card shows; signed URLs; logging titles, ids or intent URIs; a custom URL scheme filter; syncing on every progress write.
+**Never:** Watch Next; deleting the channel; account data beyond what the card shows; signed URLs; logging titles, ids or intent URIs; any scheme or host other than `boostytv://continue` / `boostytv://home`; acting on a link without the local-history check; syncing on every progress write.
 
 ## I/O & Edge-Case Matrix
 
@@ -67,6 +67,8 @@ context:
 - Given `npm run lint`, `npm run typecheck`, `npm test`, then all pass.
 
 ## Implementation Notes
+
+- Device run 2026-11-03 on the first build: cards and the neutral card appear in Aero TV; OK on a card did not open the Player. Logcat: Aero starts `act=MAIN cat=[LEANBACK_LAUNCHER]` for our explicit-component program intent. A temporary probe card (`TEMP126`, removed) with `INTENT_URI` `boostytv://continue?probe=1` and a VIEW filter: Aero started `act=VIEW dat=boostytv://continue/...` and the app received it. The link format was changed with the owner's approval (frozen block updated).
 
 ## Spec Change Log
 
