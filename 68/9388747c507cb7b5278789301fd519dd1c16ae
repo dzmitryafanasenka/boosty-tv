@@ -1,0 +1,69 @@
+CHANGELOG.md
+  s_835eb95b89135d::t_e643d092bcfd14 9-11
+CHANGELOG.ru.md
+  s_835eb95b89135d::t_e4a784083191c5 9-11
+__tests__/homeFeedFlow.test.tsx
+  s_835eb95b89135d::t_e288d8bb241b65 2118-2120,2744-2978
+_bmad-output/implementation-artifacts/spec-12-1-remove-from-continue-watching.md
+  s_835eb95b89135d::t_9794ade413705d 1-116
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_835eb95b89135d::t_005f2561759318 32,130-131
+docs/feature-parity.md
+  s_835eb95b89135d::t_1404852f2c3865 183
+docs/focus-map.md
+  s_835eb95b89135d::t_d5d898dde5b65d 15,18,61,70,208-214
+docs/testing.md
+  s_835eb95b89135d::t_7cefed59456079 922-940
+src/features/home/ContinueClearTile.tsx
+  s_835eb95b89135d::t_c88f6802664491 1-75
+src/features/home/ContinueDialogs.tsx
+  s_835eb95b89135d::t_a45ab53fd59399 1-45
+src/features/home/ContinueRow.tsx
+  s_835eb95b89135d::t_9f338ab403e434 17,89,100,124,137,143-192,204-207,219-226,267-268,272,280-282,314,317-325,333,338-344
+src/features/home/HomeScreen.tsx
+  s_835eb95b89135d::t_19fc5dbe6ac7da 17,31,70-71,429-435,648-651,670-784,1125-1126,1149-1150
+src/features/home/__tests__/continueRowOffset.test.ts
+  s_835eb95b89135d::t_2eff9abbf81c6a 28-32
+src/shared/i18n/ru.ts
+  s_835eb95b89135d::t_955f2bbeb2d98b 119-121,769-783
+src/shared/services/progress/__tests__/progressRepository.test.ts
+  s_835eb95b89135d::t_f60c15c046f546 670-817
+src/shared/services/progress/continueEntries.ts
+  s_835eb95b89135d::t_eab3da5ef26d7b 14-22,37
+src/shared/services/progress/progressRepository.ts
+  s_835eb95b89135d::t_66f249bff5dbfa 5,79-95,183-191,256-258,400,403-408
+src/shared/services/progress/progressStore.ts
+  s_835eb95b89135d::t_f57f8a3b9aa70b 78-89,314-335
+src/shared/ui/ContinueCard.tsx
+  s_835eb95b89135d::t_1d000672fb3350 3,23-24,37-42,78,98-109
+src/shared/ui/__tests__/ContinueCard.test.tsx
+  s_835eb95b89135d::t_87d829a15427e9 80-137
+.gitignore
+  s_835eb95b89135d::t_b244d336e0fe2f 30-32
+_bmad-output/implementation-artifacts/epic-12-context.md
+  s_ab753da03da0a0::t_cbaabe01a02101 1-105
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "689388747c507cb7b5278789301fd519dd1c16ae",
+  "prompts": {},
+  "sessions": {
+    "s_835eb95b89135d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5024ade5-03c5-45d9-9934-e24d9370e8ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_ab753da03da0a0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ae6efb6b9473722e9",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
