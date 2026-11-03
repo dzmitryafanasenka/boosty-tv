@@ -1,0 +1,41 @@
+__tests__/androidManifest.test.js
+  s_835eb95b89135d::t_05bb665b670757 69-82
+__tests__/launcherChannelModule.test.js
+  s_835eb95b89135d::t_05a3e0942c25a2 7-10,66-77,80-81,83-87,105,107-119
+__tests__/launcherOpenFlow.test.tsx
+  s_835eb95b89135d::t_8f5d7ede280113 6-7,345-366
+_bmad-output/implementation-artifacts/spec-12-5-continue-history-launcher-channel.md
+  s_835eb95b89135d::t_023ef296ab5fda 5,24,26,71-72
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_835eb95b89135d::t_adc8d6edee1ee0 32,135
+android/app/src/main/AndroidManifest.xml
+  s_835eb95b89135d::t_3a11a66ee0fdf0 58-69
+android/app/src/main/java/io/github/dzmitryafanasenka/boostytv/LauncherChannelModule.kt
+  s_835eb95b89135d::t_79bb22bdcd9855 8,47-53,171,204,251-254,280,283-285,288,290-297,299-301,304,310-322
+docs/adr/0016-launcher-preview-channel.md
+  s_835eb95b89135d::t_29c684c50c9d72 18-19,21,25
+docs/feature-parity.md
+  s_835eb95b89135d::t_68a54af207d3fb 186
+docs/focus-map.md
+  s_835eb95b89135d::t_e9e866f81aa923 225,227
+docs/testing.md
+  s_835eb95b89135d::t_f0180419db96d4 924,930-931,937-945,950-951
+src/app/launcherOpen.ts
+  s_835eb95b89135d::t_2814fedebfec42 11-12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "50bd3e268ed36f2031deb2827248877a7362ddc1",
+  "prompts": {},
+  "sessions": {
+    "s_835eb95b89135d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5024ade5-03c5-45d9-9934-e24d9370e8ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
