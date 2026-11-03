@@ -1,0 +1,71 @@
+CHANGELOG.md
+  s_835eb95b89135d::t_19ee578d626083 11
+CHANGELOG.ru.md
+  s_835eb95b89135d::t_ee96444dd35a42 11
+__tests__/authorFlow.test.tsx
+  s_835eb95b89135d::t_e3e526470276ee 30,250-251,3460-3498
+__tests__/homeFeedFlow.test.tsx
+  s_835eb95b89135d::t_f9c744789b5315 2979-3140
+__tests__/searchFlow.test.tsx
+  s_835eb95b89135d::t_0e0cf9bbc2b1a7 969-1014
+_bmad-output/implementation-artifacts/deferred-work.md
+  s_835eb95b89135d::t_bca06da9ec9aa3 416-419
+_bmad-output/implementation-artifacts/spec-12-2-progress-on-feed-cards.md
+  s_835eb95b89135d::t_2aff0943703fa8 1-101
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_835eb95b89135d::t_dc1183b5683e22 32,132
+_bmad-output/planning-artifacts/ux-designs/ux-boosty-tv-2026-10-25/DESIGN.md
+  s_835eb95b89135d::t_f0ec8e5b197fbc 250
+docs/feature-parity.md
+  s_835eb95b89135d::t_11ca6efdd4e90c 184
+docs/focus-map.md
+  s_835eb95b89135d::t_89e6010ae75c3d 215-217
+docs/testing.md
+  s_835eb95b89135d::t_334efe4122b438 941-958
+src/features/post/PostScreen.tsx
+  s_835eb95b89135d::t_8e56667a6dc3a0 33
+src/shared/i18n/ru.ts
+  s_835eb95b89135d::t_0428deef14abce 642-649
+src/shared/services/progress/cardProgress.ts
+  s_f1e09bc7f8f077::t_abc744cad09ed4 1-67
+src/shared/services/progress/index.ts
+  s_835eb95b89135d::t_87b2717fa24723 43
+src/shared/ui/PostCard.tsx
+  s_835eb95b89135d::t_2bf2e6f24579ae 1,3,16-17,38-42,65-67,114-124,131,135-144,256-267,284-286,294,373,378-396,500-514
+src/shared/ui/__tests__/PostCard.test.tsx
+  s_835eb95b89135d::t_2361aa7b413545 8-13,567-728
+src/shared/services/progress/__tests__/cardProgress.test.ts
+  s_0918f5d8d272b3::t_e70672ce654d54 1-85
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "69f3a637d699510225988f2d44c8a7e0ba7ef626",
+  "prompts": {},
+  "sessions": {
+    "s_0918f5d8d272b3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ab2f822f0e71d2080",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_835eb95b89135d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5024ade5-03c5-45d9-9934-e24d9370e8ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_f1e09bc7f8f077": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0831813a-a39e-4441-9005-a43c3fce3f94",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
