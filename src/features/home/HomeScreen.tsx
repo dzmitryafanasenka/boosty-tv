@@ -70,6 +70,8 @@ import {
 import { CONTINUE_CLEAR_ID } from './ContinueClearTile';
 import { ContinueClearDialog, ContinueRemoveDialog } from './ContinueDialogs';
 import { manualRefreshFeed } from './feedRefresh';
+import { useLivePlaque, type LivePlaqueItem } from './livePlaque';
+import { LIVE_PLAQUE_PREFIX, LIVE_PLAQUE_ROW_HEIGHT, LivePlaqueRow, livePlaqueId } from './LivePlaqueRow';
 import { useSubscriptionFeed } from './useSubscriptionFeed';
 
 /** Focus id of «Повторить» on the offline StateView (docs/focus-map.md §3). */
@@ -153,6 +155,12 @@ export type HomeScreenProps = {
    */
   onOpenPlayer?: (ref: MediaRef, focusId: string) => void;
   /**
+   * OK on a «в эфире» plaque (Story 12.3): open the live Player for that
+   * blog; `focusId` is the plaque (the return focus). Absent (the live or
+   * player phase is off): no plaque and no E2/E15 pass.
+   */
+  onOpenLive?: (blogUrl: string, focusId: string) => void;
+  /**
    * The «Фильтры» chip (Story 5.3, `phaseFlags.filters`). Off: no chip and
    * the feed uses the default Filter.
    */
@@ -225,6 +233,7 @@ export function HomeScreen({
   focus,
   onOpenPost,
   onOpenPlayer,
+  onOpenLive,
   filtersEnabled = false,
 }: HomeScreenProps) {
   const offlineRetry = useZoneItem(HOME_OFFLINE_RETRY_ID);
@@ -274,11 +283,6 @@ export function HomeScreen({
   const continueIdsRef = useLatestRef(continueIds);
   const showContinue = continueItems.length > 0;
   const windowHeight = useWindowDimensions().height;
-  // A bounded viewport (Story 2.4 device lesson): the content zone's height
-  // (window − 2 × safe-y) minus the header and the grid's top gap. With the
-  // Continue row, the feed title scrolls with the grid (the list header).
-  const listHeight =
-    windowHeight - 2 * spacing['safe-y'] - (showContinue ? 0 : TITLE_ROW_HEIGHT) - FEED_LIST_TOP_GAP;
 
   const listRef = useRef<FlashListRef<FeedRowItem>>(null);
   // The grid's posts (`useShownGridPosts` over PostGrid's
@@ -369,7 +373,8 @@ export function HomeScreen({
       current === info.sectionItemId ||
       current === HOME_STATE_ACTION_ID ||
       current.startsWith(FEED_CARD_PREFIX) ||
-      current.startsWith(CONTINUE_CARD_PREFIX)
+      current.startsWith(CONTINUE_CARD_PREFIX) ||
+      current.startsWith(LIVE_PLAQUE_PREFIX)
     );
   }, []);
 
@@ -400,6 +405,23 @@ export function HomeScreen({
           : feed.posts.length === 0
             ? 'empty'
             : 'grid';
+
+  // «в эфире» (Story 12.3, IMP-03): the bounded pass runs only once the grid
+  // shows (it never delays the feed or the initial focus); the plaques show
+  // in the grid only.
+  const livePlaques = useLivePlaque(http, onOpenLive !== undefined && phase === 'grid');
+  const liveIds = useMemo(() => livePlaques.map(item => livePlaqueId(item.blogUrl)), [livePlaques]);
+  const liveIdsRef = useLatestRef(liveIds);
+  const showLive = phase === 'grid' && livePlaques.length > 0;
+  // A bounded viewport (Story 2.4 device lesson): the content zone's height
+  // (window − 2 × safe-y) minus the header and the grid's top gap. With the
+  // Continue row, the feed title (and the plaques) scroll with the grid (the
+  // list header); without it, the plaques and the title row sit above it.
+  const listHeight =
+    windowHeight -
+    2 * spacing['safe-y'] -
+    (showContinue ? 0 : TITLE_ROW_HEIGHT + (showLive ? LIVE_PLAQUE_ROW_HEIGHT : 0)) -
+    FEED_LIST_TOP_GAP;
 
   const pendingMountFocus = useRef(focusOnMount);
   /**
@@ -441,6 +463,38 @@ export function HomeScreen({
   }, [latch, restoration, routeKey, continueIdsRef]);
 
   /**
+   * A remembered «в эфире» plaque (Story 12.3; Back from the live Player):
+   * that plaque by id; gone (the stream ended, a new pass) → the first
+   * plaque left, else the Continue/feed rule (`restoreContinue` with no
+   * remembered card: the first Continue card, else the first feed card).
+   * The grid's remembered scroll offset is restored first.
+   */
+  const restoreLive = useCallback(() => {
+    const entry = focusRestoration.peek(routeKey, HOME_SECTION);
+    const plaques = liveIdsRef.current;
+    const target = entry && plaques.includes(entry.focusId) ? entry.focusId : plaques[0];
+    if (target !== undefined) {
+      listRef.current?.scrollToOffset({ offset: entry?.scrollOffset ?? 0, animated: false });
+      autoContinue.current = true;
+      latch.auto(target);
+      restoration.focusItem(target);
+      return;
+    }
+    const firstContinue = continueIdsRef.current[0];
+    if (firstContinue !== undefined) {
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+      autoContinue.current = true;
+      latch.auto(firstContinue);
+      restoration.focusItem(firstContinue);
+      return;
+    }
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+    autoContinue.current = false;
+    latch.auto(idsRef.current[0]);
+    restoration.focusInitial();
+  }, [latch, restoration, routeKey, continueIdsRef, liveIdsRef]);
+
+  /**
    * Главная takes its content focus by itself: the remembered card
    * (FocusRestoration, fallback chain; a Continue card by its own rule),
    * else the first Continue card (Story 4.7), else the first feed card.
@@ -456,6 +510,10 @@ export function HomeScreen({
       restoreContinue();
       return;
     }
+    if (remembered?.startsWith(LIVE_PLAQUE_PREFIX)) {
+      restoreLive();
+      return;
+    }
     const firstContinue = continueIdsRef.current[0];
     if (remembered === undefined && firstContinue !== undefined) {
       autoContinue.current = true;
@@ -468,7 +526,7 @@ export function HomeScreen({
     if (target.kind === 'item') {
       latch.auto(target.id);
     }
-  }, [latch, restoration, routeKey, restoreContinue, continueIdsRef]);
+  }, [latch, restoration, routeKey, restoreContinue, restoreLive, continueIdsRef]);
 
   /**
    * Главная focuses a StateView action (empty/error) or the offline
@@ -583,6 +641,12 @@ export function HomeScreen({
         restoreContinue();
         return true;
       }
+      if (phaseRef.current === 'grid' && remembered?.startsWith(LIVE_PLAQUE_PREFIX)) {
+        // Back from the live Player (Story 12.3): the same plaque, else the
+        // first plaque, else the first Continue card, else the first feed card.
+        restoreLive();
+        return true;
+      }
       if (
         phaseRef.current !== 'grid' ||
         remembered === undefined ||
@@ -595,7 +659,7 @@ export function HomeScreen({
       return true;
     });
     return () => unregister?.();
-  }, [restoration, routeKey, phaseRef, restoreContinue]);
+  }, [restoration, routeKey, phaseRef, restoreContinue, restoreLive]);
 
   const postsRef = useRef(shownPosts);
   postsRef.current = shownPosts;
@@ -627,6 +691,56 @@ export function HomeScreen({
     },
     [latch, continueItemsRef, onOpenPlayerRef],
   );
+
+  // OK on a «в эфире» plaque (Story 12.3): the live Player for that blog, as
+  // Автор's LiveCard opens it (a move for the head-follow rule).
+  const livePlaquesRef = useLatestRef<readonly LivePlaqueItem[]>(livePlaques);
+  const onOpenLiveRef = useLatestRef(onOpenLive);
+  const onLivePress = useCallback(
+    (id: string) => {
+      latch.move();
+      const item = livePlaquesRef.current.find(i => livePlaqueId(i.blogUrl) === id);
+      if (item) {
+        onOpenLiveRef.current?.(item.blogUrl, id);
+      }
+    },
+    [latch, livePlaquesRef, onOpenLiveRef],
+  );
+
+  // A new pass removed the focused plaque (the stream ended): the next
+  // plaque, else the previous one, else the first Continue card, else the
+  // first feed card. Never while covered, a dialog is open or focus is
+  // elsewhere (`canFocus`).
+  const lastLiveIds = useRef(liveIds);
+  useLayoutEffect(() => {
+    const previous = lastLiveIds.current;
+    lastLiveIds.current = liveIds;
+    if (previous === liveIds) {
+      return;
+    }
+    const current = focusRef.current.current();
+    if (
+      current === null ||
+      !current.startsWith(LIVE_PLAQUE_PREFIX) ||
+      liveIds.includes(current) ||
+      modal.isOpen() ||
+      !canFocus()
+    ) {
+      return;
+    }
+    const neighbour = continueNeighbour(previous, current, liveIds);
+    const target = neighbour ?? continueIdsRef.current[0];
+    if (target !== undefined) {
+      autoContinue.current = true;
+      latch.auto(target);
+      restoration.focusItem(target);
+    } else if (idsRef.current.length > 0) {
+      autoContinue.current = false;
+      latch.auto(idsRef.current[0]);
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+      restoration.focusInitial();
+    }
+  }, [liveIds, canFocus, restoration, latch, modal, continueIdsRef]);
 
   // The row reacts to the store (Story 4.7: a finished video leaves it, a
   // just-watched one moves first). A focused card keeps focus by id (its
@@ -783,11 +897,12 @@ export function HomeScreen({
     );
   }, [modal, latch, restoration, continueIdsRef, repositoryRef, focusAfterRemoval]);
 
-  // A Continue card the page focused by itself is never left for the head.
+  // A Continue card or a plaque the page focused by itself is never left for the head.
   const followHead = useCallback(
     (focused: string | null) =>
       !autoContinue.current &&
       !(focused?.startsWith(CONTINUE_CARD_PREFIX) ?? false) &&
+      !(focused?.startsWith(LIVE_PLAQUE_PREFIX) ?? false) &&
       latch.followHead(focused),
     [latch],
   );
@@ -1032,6 +1147,9 @@ export function HomeScreen({
 
   return (
     <View testID="home/feed" style={styles.root}>
+      {phase === 'grid' && !showContinue && showLive ? (
+        <LivePlaqueRow items={livePlaques} restoration={restoration} onPress={onLivePress} inList={false} />
+      ) : null}
       {phase === 'grid' ? (
         showContinue ? null : (
           titleRow
@@ -1118,6 +1236,11 @@ export function HomeScreen({
           header={
             showContinue ? (
               <ContinueHeader
+                live={
+                  showLive ? (
+                    <LivePlaqueRow items={livePlaques} restoration={restoration} onPress={onLivePress} inList />
+                  ) : null
+                }
                 items={continueItems}
                 initialCardId={initialContinueId}
                 restoration={restoration}
@@ -1135,13 +1258,16 @@ export function HomeScreen({
 }
 
 /**
- * The grid's list header with the Continue row (Story 4.7): the row, then
- * the feed's title row (it scrolls with the grid here).
+ * The grid's list header with the Continue row (Story 4.7): the «в эфире»
+ * plaques (Story 12.3) when any, the row, then the feed's title row (it
+ * scrolls with the grid here).
  */
 function ContinueHeader({
+  live,
   titleRow,
   ...props
 }: {
+  live: ReactNode;
   items: readonly ContinueItem[];
   initialCardId?: string;
   restoration: ReturnType<typeof useFocusRestoration>;
@@ -1152,6 +1278,7 @@ function ContinueHeader({
 }) {
   return (
     <View testID="home/header">
+      {live}
       <ContinueRow {...props} />
       {titleRow}
     </View>

@@ -9,7 +9,6 @@ export const NAV_ID: Record<SectionId, string> = {
   home: 'nav/home',
   search: 'nav/search',
   subs: 'nav/subs',
-  events: 'nav/events',
   settings: 'nav/settings',
 };
 

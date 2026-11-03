@@ -23,8 +23,7 @@ export type RootStackParamList = {
    * D Автор (Story 3.3): one blog's header and posts. `blogUrl` already
    * passed `blogUrlSchema` (it came from an Author or Post entity).
    * `section`: the origin Shell section, the sidebar's current item
-   * (default Подписки; Главная when opened from a post of the feed;
-   * События when opened from an event row, Story 7.5).
+   * (default Подписки; Главная when opened from a post of the feed).
    */
   Author: { blogUrl: string; section?: SectionId };
   /**
@@ -44,7 +43,9 @@ export type RootStackParamList = {
    * (Story 4.7): the FocusRestoration section of the origin (`home` for a
    * Главная «Продолжить просмотр» card on the Shell); absent: `main`.
    * Story 7.2: `ref` can be a `LiveRef {kind: 'live', blogUrl}` (opened from
-   * Автор's LiveCard; the player resolves the live URLs through E15). `start`
+   * Автор's LiveCard, or Главная's «в эфире» plaque in Story 12.3 with
+   * `origin.sectionId` `home`; the player resolves the live URLs through
+   * E15). `start`
    * stays VOD-only (ignored for live).
    */
   Player: {

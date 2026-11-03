@@ -51,3 +51,13 @@ export type LiveRef = {
 export function isLiveRef(ref: object): ref is LiveRef {
   return 'kind' in ref && ref.kind === 'live';
 }
+
+/**
+ * Story 7.2 (LIVE-02): the stream can open the live player: it is live, the
+ * account has access, and E15 listed at least one live-edge URL. Shared by
+ * the Author page's LiveCard (`liveCardPlayable`) and, Story 12.3, Главная's
+ * live plaque (a locked, scheduled or source-less stream gets no plaque).
+ */
+export function isPlayableLive(stream: Stream): boolean {
+  return stream.status === 'live' && stream.hasAccess && stream.hasLiveSources;
+}

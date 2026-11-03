@@ -47,6 +47,10 @@ import {
 import { E5_PATH, e5Page, e5Posts } from '../src/test/feedFixtures';
 
 jest.mock('react-native-keychain');
+/** Story 12.3: the «в эфире» plaque's E2 + E15 pass is off here (livePlaqueFlow covers it). */
+jest.mock('../src/app/phaseFlags', () =>
+  require('../src/test/phaseFlagsMock').phaseFlagsWith({ livePlaque: false }),
+);
 jest.mock('../src/shared/ui/requestHostFocus', () => ({
   requestHostFocus: jest.fn(),
 }));

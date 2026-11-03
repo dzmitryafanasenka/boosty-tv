@@ -75,6 +75,8 @@ jest.mock('../src/app/phaseFlags', () => {
       get myBlog() {
         return mockMyBlogFlag.on;
       },
+      // Story 12.3: the «в эфире» plaque's E2 + E15 pass is off here (livePlaqueFlow covers it).
+      livePlaque: false,
     },
   };
 });
@@ -196,13 +198,12 @@ async function openSubs(settleOverrides?: { timerRounds: number }) {
 }
 
 describe('sidebar (phase flag)', () => {
-  it('Подписки is in the sidebar after Главная and Поиск, before События and Настройки; focus alone sends nothing', async () => {
+  it('Подписки is in the sidebar after Главная and Поиск, before Настройки; focus alone sends nothing', async () => {
     const root = await render(<App />);
     expect(focusableIds(root, byTestId(root, 'shell/sidebar')[0])).toEqual([
       'nav/home',
       'nav/search',
       'nav/subs',
-      'nav/events',
       'nav/settings',
     ]);
     await focusOn(root, 'nav/subs');

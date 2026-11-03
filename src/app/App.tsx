@@ -29,7 +29,7 @@ import {
   WelcomeScreen,
 } from '../features/auth';
 import { refreshAuthorPostsHeads } from '../features/author';
-import { refreshFeedHead } from '../features/home';
+import { refreshFeedHead, refreshLivePlaque } from '../features/home';
 import { debugBreakNextVideoSource } from '../features/player';
 import { DiagnosticsScreen, SignOutDialog } from '../features/settings';
 import { UpdateDialog, UpdatePlaqueHost, useUpdateSnapshot, type KnownRelease } from '../features/update';
@@ -44,6 +44,7 @@ import {
 import { getFilter } from '../shared/filters';
 import { ModalHostProvider, useModal, type ModalApi } from '../shared/focus';
 import type { MediaRef } from '../shared/entities/post';
+import type { LiveRef } from '../shared/entities/stream';
 import { subscribeAppForeground } from '../shared/platform/appLifecycle';
 import { cleanupUpdates } from '../shared/platform/appUpdater';
 import { playerOpenMark } from '../shared/services/perfMark';
@@ -226,11 +227,10 @@ function ShellRoute({
   navigation,
 }: StackScreenProps<RootStackParamList, 'Shell'>) {
   const ui = useSessionUi();
-  // OK on a Подписки tile: Автор; OK on a События row (Story 7.5): Автор
-  // with `events` as its sidebar's current item. Only while the Shell is the
-  // focused route (the same guard as `onOpenPost`): a second OK during the
-  // transition (a double press, or another tile) is dropped (Epic 3 retro F8).
-  // Returns whether it navigated (События marks a row read only then).
+  // OK on a Подписки tile: Автор. Only while the Shell is the focused route
+  // (the same guard as `onOpenPost`): a second OK during the transition (a
+  // double press, or another tile) is dropped (Epic 3 retro F8). Returns
+  // whether it navigated.
   const onOpenAuthor = useCallback(
     (blogUrl: string, section?: SectionId): boolean => {
       if (!navigation.isFocused()) {
@@ -259,6 +259,23 @@ function ShellRoute({
       if (navigation.isFocused()) {
         // Story 9.3: the time-to-first-frame mark (the Player takes it once).
         playerOpenMark.mark('continue');
+        navigation.push('Player', {
+          ref,
+          origin: { routeKey: SHELL_RESTORATION_KEY, sectionId: 'home', focusId },
+        });
+      }
+    },
+    [navigation],
+  );
+  // OK on a «в эфире» plaque (Story 12.3): the live Player, exactly as
+  // Автор's LiveCard opens it (`LiveRef`, ids only); the origin is Главная's
+  // FocusRestoration section, so the exit returns focus to the plaque.
+  const onOpenLive = useCallback(
+    (blogUrl: string, focusId: string) => {
+      if (navigation.isFocused()) {
+        const ref: LiveRef = { kind: 'live', blogUrl };
+        // Story 9.3: the time-to-first-frame mark (the Player takes it once).
+        playerOpenMark.mark('live');
         navigation.push('Player', {
           ref,
           origin: { routeKey: SHELL_RESTORATION_KEY, sectionId: 'home', focusId },
@@ -336,6 +353,7 @@ function ShellRoute({
       onOpenAuthor={onOpenAuthor}
       onOpenPost={onOpenPost}
       onOpenPlayer={phaseFlags.player ? onOpenPlayer : undefined}
+      onOpenLive={phaseFlags.player && phaseFlags.live && phaseFlags.livePlaque ? onOpenLive : undefined}
       takePendingSection={takePendingShellSection}
     />
   );
@@ -479,9 +497,9 @@ function App() {
           // fetched again, so a stream that started or ended while the app
           // was in the background shows at once. No observer, no request.
           queryClient.invalidateQueries({ queryKey: queryKeys.allStreams() }).catch(() => {});
-          // Story 7.5: an observed События list (the section is shown) is
-          // fetched again, so an event that arrived in the background shows.
-          queryClient.invalidateQueries({ queryKey: queryKeys.events() }).catch(() => {});
+          // Story 12.3: Главная's «в эфире» plaque gets a new pass only when
+          // it is observed and its last pass is older than the 5 min TTL.
+          refreshLivePlaque(queryClient, now).catch(() => {});
         }
       });
     });

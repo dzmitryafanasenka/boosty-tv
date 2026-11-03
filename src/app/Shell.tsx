@@ -8,7 +8,6 @@ import {
   type RefObject,
 } from 'react';
 import { BackHandler } from 'react-native';
-import { EventsScreen, type EventsFocusInfo } from '../features/events';
 import { HomeScreen, type HomeFocusInfo, type HomeScreenProps } from '../features/home';
 import { useExternalPlayerPreference } from '../features/player';
 import { SearchScreen, type SearchFocusInfo } from '../features/search';
@@ -56,8 +55,7 @@ export type ShellProps = {
   /** Главная's offline StateView (Story 2.5); absent: the feed. */
   homeOffline?: HomeScreenProps['offline'];
   /**
-   * Подписки: OK on a tile opens the Author page (Story 3.3); События: OK
-   * on a row (Story 7.5, `section` 'events': Автор's sidebar current item;
+   * Подписки: OK on a tile opens the Author page (Story 3.3; `section`
    * absent: the Author route's default, Подписки). Returns whether it
    * navigated (false: dropped, e.g. during a transition).
    */
@@ -69,6 +67,11 @@ export type ShellProps = {
   onOpenPost?: (blogUrl: string, postId: string, section?: SectionId) => void;
   /** Главная: OK on a «Продолжить просмотр» card opens the Player (Story 4.7). */
   onOpenPlayer?: (ref: MediaRef, focusId: string) => void;
+  /**
+   * Главная: OK on a «в эфире» plaque opens the live Player (Story 12.3);
+   * absent: no plaque and no E2/E15 pass.
+   */
+  onOpenLive?: (blogUrl: string, focusId: string) => void;
   /**
    * A section to open when the Shell is the focused route again: OK on a
    * sidebar item of a screen on top (Автор, owner decision 2026-10-27)
@@ -89,7 +92,7 @@ const HOME: SectionId = 'home';
  * virtualized grid, or after the first data arrives), so the content zone
  * does not focus its target on mount.
  */
-const SELF_FOCUS_SECTIONS: ReadonlySet<SectionId> = new Set<SectionId>(['home', 'subs', 'search', 'events']);
+const SELF_FOCUS_SECTIONS: ReadonlySet<SectionId> = new Set<SectionId>(['home', 'subs', 'search']);
 
 type View_ = { section: SectionId; focusContent: boolean };
 
@@ -124,6 +127,7 @@ export function Shell({
   onOpenAuthor,
   onOpenPost,
   onOpenPlayer,
+  onOpenLive,
   takePendingSection,
 }: ShellProps) {
   const sections = useMemo(() => enabledSections(), []);
@@ -302,18 +306,6 @@ export function Shell({
     [focusNav, setReturnFocus],
   );
 
-  // События (Story 7.5) follows Подписки's rules (docs/focus-map.md §5 J).
-  const eventsFocus = useMemo<EventsFocusInfo>(
-    () => ({
-      isActive: () => routeFocused.current,
-      current: () => lastFocusId.current,
-      sectionItemId: NAV_ID.events,
-      focusSidebar: () => focusNav('events'),
-      setReturnFocus,
-    }),
-    [focusNav, setReturnFocus],
-  );
-
   // Поиск (Story 5.6): the field on open, the result card on return.
   const searchFocus = useMemo<SearchFocusInfo>(
     () => ({
@@ -344,7 +336,7 @@ export function Shell({
         routeKey={routeKey}
         sectionId={view.section}
         initialFocusId={INITIAL_CONTENT_ID[view.section]}
-        // Главная, Подписки, Поиск and События take their content focus themselves.
+        // Главная, Подписки and Поиск take their content focus themselves.
         focusOnMount={view.focusContent && !SELF_FOCUS_SECTIONS.has(view.section)}
         onItemFocus={onContentFocus}
         isActive={isShellActive}
@@ -358,7 +350,6 @@ export function Shell({
           homeFocus={homeFocus}
           subsFocus={subsFocus}
           searchFocus={searchFocus}
-          eventsFocus={eventsFocus}
           onOpenSignOut={onOpenSignOut}
           onOpenFocusCheck={onOpenFocusCheck}
           onOpenDiagnostics={onOpenDiagnostics}
@@ -371,6 +362,7 @@ export function Shell({
           onOpenAuthor={onOpenAuthor}
           onOpenPost={onOpenPost}
           onOpenPlayer={onOpenPlayer}
+          onOpenLive={onOpenLive}
         />
       </FocusZone>
     </Screen>
@@ -385,7 +377,6 @@ function SectionContent({
   homeFocus,
   subsFocus,
   searchFocus,
-  eventsFocus,
   onOpenSignOut,
   onOpenFocusCheck,
   onOpenDiagnostics,
@@ -398,6 +389,7 @@ function SectionContent({
   onOpenAuthor,
   onOpenPost,
   onOpenPlayer,
+  onOpenLive,
 }: {
   section: SectionId;
   routeKey: string;
@@ -406,7 +398,6 @@ function SectionContent({
   homeFocus: HomeFocusInfo;
   subsFocus: SubscriptionsFocusInfo;
   searchFocus: SearchFocusInfo;
-  eventsFocus: EventsFocusInfo;
   onOpenSignOut: (initiator: RefObject<HostView | null>) => void;
   onOpenFocusCheck?: () => void;
   onOpenDiagnostics?: () => void;
@@ -419,19 +410,16 @@ function SectionContent({
   onOpenAuthor?: (blogUrl: string, section?: SectionId) => boolean;
   onOpenPost?: (blogUrl: string, postId: string, section?: SectionId) => void;
   onOpenPlayer?: (ref: MediaRef, focusId: string) => void;
+  onOpenLive?: (blogUrl: string, focusId: string) => void;
 }) {
   const onOpenSearchResult = useCallback(
     (blogUrl: string, postId: string) => onOpenPost?.(blogUrl, postId, 'search'),
     [onOpenPost],
   );
-  // Подписки opens Автор with the route's default section; События with its own.
+  // Подписки opens Автор with the route's default section.
   const onOpenSubsAuthor = useCallback((blogUrl: string) => {
     onOpenAuthor?.(blogUrl);
   }, [onOpenAuthor]);
-  const onOpenEventAuthor = useCallback(
-    (blogUrl: string) => onOpenAuthor?.(blogUrl, 'events') ?? false,
-    [onOpenAuthor],
-  );
   switch (section) {
     case 'home':
       return (
@@ -443,6 +431,7 @@ function SectionContent({
           focus={homeFocus}
           onOpenPost={onOpenPost}
           onOpenPlayer={onOpenPlayer}
+          onOpenLive={onOpenLive}
           filtersEnabled={phaseFlags.filters}
         />
       );
@@ -479,17 +468,6 @@ function SectionContent({
           focus={searchFocus}
           onOpenPost={onOpenSearchResult}
           filtersEnabled={phaseFlags.filters}
-        />
-      );
-    // Story 7.5: rendered only while `phaseFlags.events` lists the section.
-    case 'events':
-      return (
-        <EventsScreen
-          http={http}
-          routeKey={routeKey}
-          focusOnMount={focusContent}
-          focus={eventsFocus}
-          onOpenAuthor={onOpenEventAuthor}
         />
       );
   }

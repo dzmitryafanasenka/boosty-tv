@@ -1,5 +1,4 @@
 import { authFlowAccountStore } from '../features/auth';
-import { eventReadMarksAccountStore } from '../features/events';
 import { searchQueryAccountStore } from '../features/search';
 import { accountScope } from '../shared/account';
 import { filtersAccountStore } from '../shared/filters';
@@ -45,7 +44,6 @@ accountScope.register(
   progressAccountStore,
   filtersAccountStore,
   searchQueryAccountStore,
-  eventReadMarksAccountStore,
 );
 accountScope.seal();
 session.setAccountSwitchHook(accountSwitchHook);

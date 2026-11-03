@@ -33,18 +33,18 @@ The sidebar is visible everywhere except in the player and on the sign-in screen
 |---|---|---|---|---|
 | Sign-in | A1–A10 | Cold start without a session; after sign-out | Phone → code → session | AUTH-03, AUTH-04, AUTH-08 |
 | Session expired | A11 | Any 401 after a failed refresh | Re-login with a prefilled phone | AUTH-05, AUTH-06 |
-| Главная | B1–B6 | Default after sign-in; sidebar | «Продолжить просмотр» (client improvement), the subscription feed, «Фильтры», «Обновить». *Planned (owner decisions 2026-11-02, `sprint-change-proposal-2026-11-02-post-1-2-0.md`):* a «в эфире» plaque above the row (Story 12.3), long-OK removal and a «Очистить всё» tile (Story 12.1), progress on cards (Story 12.2) | FEED-01, FEED-02, FEED-03, FILTER-01..04, PLAY-03 |
+| Главная | B1–B6 | Default after sign-in; sidebar | «Продолжить просмотр» (client improvement), the subscription feed, «Фильтры», «Обновить». *Planned (owner decisions 2026-11-02, `sprint-change-proposal-2026-11-02-post-1-2-0.md`):* a «в эфире» plaque above the row (Story 12.3, as built: one plaque per subscribed author who is live now with a playable stream; above the feed title when there is no Continue row), long-OK removal and a «Очистить всё» tile (Story 12.1), progress on cards (Story 12.2) | FEED-01, FEED-02, FEED-03, FILTER-01..04, PLAY-03 |
 | Подписки | C1–C3 | Sidebar | Author grid plus «Мой блог» | SUB-01, SUB-02 |
 | Автор | D1–D11 | Author tile, post author, event | Header, live card, posts, search in this author, filters | AUTH-PAGE-01..03, LIVE-01, LIVE-04, LIVE-05 |
 | Поиск | E1–E10 | Sidebar | Search «по подпискам» (feed scope) with filters | FEED-04, SEARCH-SCOPES, FILTER-01..04 |
 | Пост | F1–F8 | Post card, search result, «Продолжить» (via player exit) | Media rows, text, images, audio, files and links (QR), poll, read-only likes and comment count; then the read-only «Комментарии» block after the blocks (Story 11.2). *As built (Story 13.1):* a header with a large preview beside the actions and «На телефоне» on every post. *As built (Story 13.2):* a line that starts with a timestamp of this post's video is one chip «▶ time title» instead of the text and a duplicate chip; consecutive lines are a tight list (↑ ↓ through it); a timestamp inside a paragraph keeps the text and gets a «▶ time» chip | POST-01..11, POLL-01..05, COMM-01 |
 | Плеер | G1–G12 | Media row, «Продолжить» card, live card | VOD and live playback | PLAY-01..08, PLAY-10..13 (**not** PLAY-09 download), LIVE-02, LIVE-03 |
-| События | J1–J3 | Sidebar; hidden until E18 (EVT-01) is verified (verified live and shown since Story 7.5, `events` flag on). **Retired by the owner 2026-11-02; removed in Story 12.3, replaced by the live plaque on Главная.** | Events, e.g. «Начался эфир» → author | EVT-01 (client improvement) |
+| События | J1–J3 | Sidebar; hidden until E18 (EVT-01) is verified (verified live and shown since Story 7.5, `events` flag on). **Retired by the owner 2026-11-02; removed in Story 12.3 (no section, route or E18), replaced by the live plaque on Главная.** | Events, e.g. «Начался эфир» → author | EVT-01 (client improvement) |
 | Настройки | K1–K4 | Sidebar | System player, version, diagnostics (hidden), sign out | SET-01, SET-02, SET-05, SET-06, AUTH-07 (**not** SET-03 light theme) |
 
 Overlays: the filter SideSheet (from Главная, Автор, Поиск), the player-settings SideSheet, QrDialog, the sign-out Dialog and the system keyboard.
 
-**Live streams on Главная.** Home does not fetch live streams: a stream comes only from the per-author endpoint (E15), and polling every subscription would cause a request storm. Home learns about a live stream through События (`video_stream_start`). **Superseded 2026-11-02 (owner decision):** События is removed, and Главная shows a «в эфире» plaque from one bounded source (E18, or E15 for a capped set of authors, sequential, TTL ≥ 5 min; Story 12.3). Unbounded per-author polling stays forbidden. A LIVE card appears in the feed only if the spike proves the feed returns stream posts.
+**Live streams on Главная.** Home does not fetch live streams: a stream comes only from the per-author endpoint (E15), and polling every subscription would cause a request storm. Home learns about a live stream through События (`video_stream_start`). **Superseded 2026-11-02 (owner decision):** События is removed, and Главная shows a «в эфире» plaque from one bounded source. *As built (Story 12.3):* E15 for at most the first 10 subscriptions in E2 order, sequential, TTL 5 min, a new pass only on Главная mount/focus or app resume after the TTL; E18 is not used. Known limits: a live author beyond the first 10 subscriptions gets no plaque; a failed pass hides the plaques until the TTL passes. Unbounded per-author polling stays forbidden. A LIVE card appears in the feed only if the spike proves the feed returns stream posts.
 
 ## Voice and Tone
 
@@ -110,7 +110,7 @@ Global rules:
 | Content unavailable | 404 / deleted post | «Пост недоступен» + «Назад». No «Повторить». |
 | Network error | Request failed | Error + «Повторить». GETs get a bounded automatic retry first. |
 | Cold start offline | No network, session stored | Главная StateView «Нет подключения к интернету» + «Повторить». The session is kept; this is not A11. |
-| Resume from sleep | App returns to the foreground | The player stays paused with the overlay shown. The next play re-resolves the media URL if needed (PLAY-10 path). Lists refetch silently and keep focus. *As built (ADR 0010, `src/app/App.tsx`; this supersedes «lists refetch»): only after the resume E1 succeeds, and focus is kept. Главная's feed and every Автор route in the stack get a **head refresh**: one page-1 request each, sent only when the cached list is at least 60 s old and merged into the head. Paged lists are never refetched in full. Every observed live stream (E15) and an observed События list (E18) are fetched again. Подписки, Поиск results and an open Пост are not refreshed on resume.* |
+| Resume from sleep | App returns to the foreground | The player stays paused with the overlay shown. The next play re-resolves the media URL if needed (PLAY-10 path). Lists refetch silently and keep focus. *As built (ADR 0010, `src/app/App.tsx`; this supersedes «lists refetch»): only after the resume E1 succeeds, and focus is kept. Главная's feed and every Автор route in the stack get a **head refresh**: one page-1 request each, sent only when the cached list is at least 60 s old and merged into the head. Paged lists are never refetched in full. Every observed live stream (E15) is fetched again; Главная's «в эфире» plaque gets a new pass only when shown and its last pass is at least 5 min old (Story 12.3; the События E18 refetch is gone). Подписки, Поиск results and an open Пост are not refreshed on resume.* |
 
 Error classes stay distinct (CLAUDE.md): session expired ≠ no access ≠ media URL expired ≠ content unavailable ≠ rate limit ≠ network.
 
@@ -229,7 +229,7 @@ Error classes stay distinct (CLAUDE.md): session expired ≠ no access ≠ media
 - *Failure:* «Ничего не найдено» + «Сбросить фильтры» (focus on that action). A load-more error appears as an inline «Повторить» row.
 
 ### Flow 5 — Live stream (the owner)
-1. События shows «Начался эфир» (when EVT-01 is enabled), or the owner opens the author directly. *Planned (2026-11-02): the «в эфире» plaque on Главная replaces События (Story 12.3).* Focus lands on the LiveCard.
+1. События shows «Начался эфир» (when EVT-01 is enabled), or the owner opens the author directly. *Since Story 12.3: the «в эфире» plaque on Главная replaces События; OK on it opens the live stream directly.* Focus lands on the LiveCard.
 2. OK opens the live player: LIVE badge, elapsed time, no timeline.
 3. OK pauses; OK again resumes at the live edge.
 4. The stream ends → «Стрим завершён» with focus on «Назад».

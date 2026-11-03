@@ -282,21 +282,21 @@ export const components = {
     scaleFocus: focus['scale-post-card'],
   },
   /**
-   * Story 7.5 (События): the row spans the 720 dp content minus the focus
-   * headroom on both sides (720 − 2 × 12), so the 1.02 scale and the ring
-   * stay inside the content.
+   * Story 12.3 LivePlaque (Главная, our improvement IMP-03): one stop per
+   * live subscribed author in a row above «Продолжить просмотр». Two fit in
+   * the 720 dp content with the focus headroom and the card gap
+   * ((720 − 2 × 12 − 16) / 2 = 340); a `badge` «в эфире» on `colors.live`,
+   * the avatar, the author's name and the stream title.
    */
-  'event-row': {
-    width: 696,
-    height: 56,
-    avatar: 32,
-    dot: 6,
+  'live-plaque': {
+    width: 340,
+    height: 64,
+    avatar: 40,
     radius: rounded.lg,
     bg: colors.surface,
     bgFocus: colors['surface-focus-row'],
-    chip: colors.live,
+    badge: colors.live,
     scaleFocus: focus['scale-row'],
-    skeletonLine: 12,
   },
   /**
    * Story 11.2 CommentRow (read-only): `indent` shifts a reply right by one
