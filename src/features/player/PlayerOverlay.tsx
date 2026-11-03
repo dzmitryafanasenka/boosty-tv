@@ -1,8 +1,9 @@
-import { useEffect, useState, type ReactNode, type Ref } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type Ref } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { chapterAt, isGenericVideoTitle, type Chapter } from '../../shared/entities/post';
 import { tf, t } from '../../shared/i18n';
-import { formatDuration } from '../../shared/i18n/format';
+import { formatClockTime, formatDuration } from '../../shared/i18n/format';
+import { endTimeMs, stableEndTime } from './endTime';
 import { speedLabel, type PlaybackSpeed } from './speedPreference';
 import {
   AuthorAvatar,
@@ -51,6 +52,34 @@ export const LIVE_ELAPSED_TICK_MS = 1_000;
 /** Story 7.2: whole seconds since the stream's start (epoch seconds), never negative. */
 export function liveElapsedSec(startTime: number, nowMs: number): number {
   return Math.max(0, Math.floor(nowMs / 1000 - startTime));
+}
+
+/** Story 14.1: the end time is recomputed at least this often (also while paused). */
+export const ENDS_AT_TICK_MS = 30_000;
+
+/**
+ * Story 14.1 (our improvement, FR-65): «Закончится в 21:47» next to the
+ * remaining time. Follows the position and speed props (a re-render on each
+ * progress tick, seek done or speed change) and a timer, so the clock moves
+ * on while paused. Plain text: not focusable, no live region.
+ */
+function EndsAt({ positionSec, durationSec, rate }: { positionSec: number; durationSec: number; rate: number }) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setTick(n => n + 1), ENDS_AT_TICK_MS);
+    return () => clearInterval(timer);
+  }, []);
+  const shown = useRef<number | null>(null);
+  const end = stableEndTime(shown.current, endTimeMs(Date.now(), positionSec, durationSec, rate));
+  shown.current = end;
+  if (end === null) {
+    return null;
+  }
+  return (
+    <Text testID="player/endsAt" variant="meta" color="text-secondary" numberOfLines={1} style={styles.tabular}>
+      {tf('player.endsAt', { time: formatClockTime(end) })}
+    </Text>
+  );
 }
 
 /**
@@ -497,9 +526,12 @@ export function PlayerOverlay({
                 ) : null}
               </View>
               {durationSec > 0 ? (
-                <Text testID="player/remaining" variant="meta" color="text-secondary" style={styles.tabular}>
-                  {tf('player.remaining', { remaining: time(Math.max(0, durationSec - positionSec)) })}
-                </Text>
+                <View style={styles.endRow}>
+                  <Text testID="player/remaining" variant="meta" color="text-secondary" style={styles.tabular}>
+                    {tf('player.remaining', { remaining: time(Math.max(0, durationSec - positionSec)) })}
+                  </Text>
+                  <EndsAt positionSec={positionSec} durationSec={durationSec} rate={rate} />
+                </View>
               ) : null}
             </View>
           </>
@@ -647,6 +679,11 @@ const styles = StyleSheet.create({
   elapsedRow: {
     flexDirection: 'row',
     flexShrink: 1,
+  },
+  // Story 14.1: «−remaining» then «Закончится в H:MM» on the right.
+  endRow: {
+    flexDirection: 'row',
+    gap: spacing['4'],
   },
   // Story 10.1: the chapter name after the elapsed time (and «N×»): one line, truncated.
   chapter: {
