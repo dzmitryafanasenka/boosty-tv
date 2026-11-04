@@ -921,7 +921,7 @@ Host tests: `src/shared/services/progress/__tests__/progressRepository.test.ts` 
 
 ### Story 15.1 — «О приложении» and «Сообщить о проблеме», 2026-11-04
 
-**Status: implemented and host-tested; not yet checked on the pinned TV. After the review patches: lint and typecheck clean, full `npm test` 3626/3626, `assembleRelease` (armeabi-v7a) BUILD SUCCESSFUL with the `settings/row/about` marker in the bundle.** `spec-15-1-about-and-report-a-problem.md`, our improvement IMP-09 (FR-66). Focus: `docs/focus-map.md` «Story 15.1».
+**Status: implemented, host-tested and checked on the pinned TV (2026-11-04, release-like build, owner-signed, still 1.2.0 / 10200, `adb install -r`, session kept): the agent walked the rows and both dialogs over adb with screencaps; the owner scanned both QR codes with a phone (owner: «все работает»). The device reports `Google` / `Chromecast` / `14`. Not re-checked on the device: the «Версия» gestures (host tests only). After the review patches: lint and typecheck clean, full `npm test` 3626/3626, `assembleRelease` (armeabi-v7a) BUILD SUCCESSFUL with the `settings/row/about` marker in the bundle.** `spec-15-1-about-and-report-a-problem.md`, our improvement IMP-09 (FR-66). Focus: `docs/focus-map.md` «Story 15.1».
 
 Host tests:
 - `src/features/settings/__tests__/reportIssueUrl.test.ts` (10): the repository page; the bug form URL with `version` and `device`; reserved characters and non-ASCII encoded (decoded back exactly); an unknown or blank version or device leaves its parameter out; only `template`, `version` and `device` are sent; the template file exists and declares `id: version` and `id: device`.
@@ -933,13 +933,13 @@ Device checks (release-like build on the pinned TV; all to check):
 
 | Check | Result | By |
 |---|---|---|
-| Настройки rows in order: «Системный видеоплеер», «Версия» (focused), «О приложении», «Сообщить о проблеме», «Выйти из аккаунта»; ↑ ↓ move between them | To check | agent (adb) → owner |
-| OK on «О приложении»: the dialog with «Boosty TV», «Версия 1.2.0», the disclaimer, «Лицензия MIT», the QR, «Откроется на телефоне», focus on «Закрыть»; legible, nothing clipped | To check | agent (adb) → owner |
-| «Закрыть» and Back close the About dialog, focus back on «О приложении» | To check | agent (adb) |
-| OK on «Сообщить о проблеме»: the QrDialog «Сообщить о проблеме», focus on «Закрыть»; «Закрыть» and Back return focus to the row | To check | agent (adb) |
-| The About QR scanned with a phone opens the repository page | To check | owner |
-| The report QR scanned with a phone opens the GitHub bug form with «Версия приложения» and «Устройство» filled in (version, manufacturer model, Android release) | To check | owner |
-| «Версия»: one OK still runs the update check; seven quick OKs still open Diagnostics | To check | agent (adb) |
+| Настройки rows in order: «Системный видеоплеер», «Версия» (focused), «О приложении», «Сообщить о проблеме», «Выйти из аккаунта»; ↑ ↓ move between them | 2026-11-04: as described | agent (adb + screencap) |
+| OK on «О приложении»: the dialog with «Boosty TV», «Версия 1.2.0», the disclaimer, «Лицензия MIT», the QR, «Откроется на телефоне», focus on «Закрыть»; legible, nothing clipped | 2026-11-04: as described | agent (adb + screencap) |
+| «Закрыть» and Back close the About dialog, focus back on «О приложении» | 2026-11-04: Back checked, focus back on the row | agent (adb + screencap) |
+| OK on «Сообщить о проблеме»: the QrDialog «Сообщить о проблеме», focus on «Закрыть»; «Закрыть» and Back return focus to the row | 2026-11-04: dialog and focus as described; closed by the owner | agent (adb + screencap), owner |
+| The About QR scanned with a phone opens the repository page | 2026-11-04: works | owner |
+| The report QR scanned with a phone opens the GitHub bug form with «Версия приложения» and «Устройство» filled in (version, manufacturer model, Android release) | 2026-11-04: works | owner |
+| «Версия»: one OK still runs the update check; seven quick OKs still open Diagnostics | Not checked on the device (host tests) | — |
 
 ### Story 14.2 — Sleep timer, 2026-11-03
 
