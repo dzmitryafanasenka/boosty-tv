@@ -1,5 +1,7 @@
 export {
+  SETTINGS_ABOUT_ID,
   SETTINGS_EXTERNAL_PLAYER_ID,
+  SETTINGS_REPORT_ID,
   SETTINGS_FOCUS_CHECK_ID,
   SETTINGS_SIGN_OUT_ID,
   SETTINGS_VERSION_ID,
@@ -24,3 +26,5 @@ export {
   createVersionPressCounter,
   useVersionPresses,
 } from './useVersionPresses';
+export { ABOUT_CLOSE_ID, AboutDialog, type AboutDialogProps } from './AboutDialog';
+export { reportIssueUrl, repositoryUrl, type ReportIssueInfo } from './reportIssueUrl';

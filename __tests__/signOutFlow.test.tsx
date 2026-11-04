@@ -146,7 +146,14 @@ describe('Настройки', () => {
     const [settings] = byTestId(root, 'settings');
     const ids = focusableIds(settings);
     // Story 8.2: «Системный видеоплеер» is the first row; the version keeps the initial focus.
-    expect(ids.slice(0, 3)).toEqual(['settings/row/external-player', VERSION, ROW]);
+    // Story 15.1: «О приложении» and «Сообщить о проблеме» sit between «Версия» and «Выйти».
+    expect(ids.slice(0, 5)).toEqual([
+      'settings/row/external-player',
+      VERSION,
+      'settings/row/about',
+      'settings/row/report',
+      ROW,
+    ]);
     expect(one(root, ROW).props.accessibilityLabel).toBe('Выйти из аккаунта');
     await unmount(root);
   });

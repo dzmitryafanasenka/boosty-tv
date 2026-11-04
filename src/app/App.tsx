@@ -31,8 +31,20 @@ import {
 import { refreshAuthorPostsHeads } from '../features/author';
 import { continueCardId, refreshFeedHead, refreshLivePlaque } from '../features/home';
 import { debugBreakNextVideoSource } from '../features/player';
-import { DiagnosticsScreen, SignOutDialog } from '../features/settings';
-import { UpdateDialog, UpdatePlaqueHost, useUpdateSnapshot, type KnownRelease } from '../features/update';
+import {
+  AboutDialog,
+  DiagnosticsScreen,
+  SignOutDialog,
+  reportIssueUrl,
+  repositoryUrl,
+} from '../features/settings';
+import {
+  UPDATE_REPOSITORY,
+  UpdateDialog,
+  UpdatePlaqueHost,
+  useUpdateSnapshot,
+  type KnownRelease,
+} from '../features/update';
 import { accountScope } from '../shared/account';
 import {
   SessionCheckContext,
@@ -46,12 +58,14 @@ import { ModalHostProvider, useModal, type ModalApi } from '../shared/focus';
 import type { MediaRef } from '../shared/entities/post';
 import type { LiveRef } from '../shared/entities/stream';
 import { subscribeAppForeground } from '../shared/platform/appLifecycle';
+import { getVersionName } from '../shared/platform/appInfo';
 import { cleanupUpdates } from '../shared/platform/appUpdater';
+import { getDeviceDescription } from '../shared/platform/deviceInfo';
 import { takeLauncherOpen } from '../shared/platform/launcherChannel';
 import { playerOpenMark } from '../shared/services/perfMark';
 import { ProgressContext, progressStore } from '../shared/services/progress';
 import { t } from '../shared/i18n';
-import { Text, colors, components, spacing, type HostView } from '../shared/ui';
+import { QrDialog, Text, colors, components, spacing, type HostView } from '../shared/ui';
 import type * as DevFocusModule from './dev/devFocus';
 import { launcherChannel } from './launcherChannel';
 import {
@@ -405,11 +419,44 @@ function ShellRoute({
     },
     [modal],
   );
+  // Story 15.1 (IMP-09): «О приложении» and «Сообщить о проблеме», dialogs
+  // in the modal host with the row as the initiator. The URLs carry only the
+  // repository, the version and the device text: no account data. They are
+  // only drawn as QR codes.
+  const onOpenAbout = useCallback(
+    (initiator: RefObject<HostView | null>) => {
+      modal.open(
+        <AboutDialog repositoryUrl={repositoryUrl(UPDATE_REPOSITORY)} onClose={() => modal.close()} />,
+        initiator,
+      );
+    },
+    [modal],
+  );
+  const onOpenReport = useCallback(
+    (initiator: RefObject<HostView | null>) => {
+      const url = reportIssueUrl(UPDATE_REPOSITORY, {
+        version: getVersionName(),
+        device: getDeviceDescription(),
+      });
+      modal.open(
+        <QrDialog
+          testID="dialog/report"
+          title={t('dialog.report.title')}
+          value={url}
+          onClose={() => modal.close()}
+        />,
+        initiator,
+      );
+    },
+    [modal],
+  );
   return (
     <Shell
       routeKey={SHELL_RESTORATION_KEY}
       http={session.http}
       onOpenSignOut={onOpenSignOut}
+      onOpenAbout={onOpenAbout}
+      onOpenReport={onOpenReport}
       onOpenFocusCheck={
         __DEV__ ? () => navigation.navigate('DevFocus') : undefined
       }

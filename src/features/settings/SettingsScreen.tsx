@@ -9,6 +9,8 @@ import { useVersionPresses } from './useVersionPresses';
 /** Focus ids (docs/focus-map.md §1.5). */
 export const SETTINGS_EXTERNAL_PLAYER_ID = 'settings/row/external-player';
 export const SETTINGS_VERSION_ID = 'settings/row/version';
+export const SETTINGS_ABOUT_ID = 'settings/row/about';
+export const SETTINGS_REPORT_ID = 'settings/row/report';
 export const SETTINGS_SIGN_OUT_ID = 'settings/row/signout';
 export const SETTINGS_FOCUS_CHECK_ID = 'settings/row/focus-check';
 /**
@@ -51,6 +53,17 @@ export type SettingsScreenProps = {
    */
   availableVersion?: string;
   /**
+   * OK on «О приложении» (Story 15.1, IMP-09): the app opens the About
+   * dialog in the modal host with the row as the initiator, so focus
+   * returns to it on «Закрыть» or Back.
+   */
+  onOpenAbout: (initiator: RefObject<HostView | null>) => void;
+  /**
+   * OK on «Сообщить о проблеме» (Story 15.1, IMP-09): the app opens the
+   * QrDialog with the bug form URL, the row as the initiator.
+   */
+  onOpenReport: (initiator: RefObject<HostView | null>) => void;
+  /**
    * OK on «Выйти из аккаунта» (Story 2.7): the app opens the sign-out
    * dialog in the modal host with the row as the initiator, so focus
    * returns to it on «Отмена» or Back.
@@ -92,7 +105,9 @@ export type SettingsScreenProps = {
  * `onVersionFirstPress`, the update check or dialog, Story 9.2; with a
  * known newer release it reads «0.9.0 · доступна X.Y.Z»), the initial
  * focus of the section; below
- * it the nav row «Выйти из аккаунта», which opens the sign-out dialog; the
+ * it the nav rows «О приложении» and «Сообщить о проблеме» (Story 15.1,
+ * dialogs in the modal host), then «Выйти из аккаунта», which opens the
+ * sign-out dialog; the
  * debug rows (`__DEV__` only) after it. Rendered inside the Shell's content
  * FocusZone.
  */
@@ -101,6 +116,8 @@ export function SettingsScreen({
   onOpenDiagnostics,
   onVersionFirstPress,
   availableVersion,
+  onOpenAbout,
+  onOpenReport,
   onOpenSignOut,
   onOpenFocusCheck,
   onCheckSession,
@@ -137,6 +154,28 @@ export function SettingsScreen({
   const sessionCheck = useZoneItem(SETTINGS_SESSION_CHECK_ID);
   const expiredCheck = useZoneItem(SETTINGS_EXPIRED_CHECK_ID);
   const breakVideo = useZoneItem(SETTINGS_BREAK_VIDEO_ID);
+  const about = useZoneItem(SETTINGS_ABOUT_ID);
+  /** The row's host view, the About dialog's initiator. */
+  const aboutView = useRef<HostView | null>(null);
+  const aboutZoneRef = about.ref;
+  const aboutRef = useCallback(
+    (view: HostView | null) => {
+      aboutView.current = view;
+      aboutZoneRef?.(view);
+    },
+    [aboutZoneRef],
+  );
+  const report = useZoneItem(SETTINGS_REPORT_ID);
+  /** The row's host view, the report QrDialog's initiator. */
+  const reportView = useRef<HostView | null>(null);
+  const reportZoneRef = report.ref;
+  const reportRef = useCallback(
+    (view: HostView | null) => {
+      reportView.current = view;
+      reportZoneRef?.(view);
+    },
+    [reportZoneRef],
+  );
   const signOut = useZoneItem(SETTINGS_SIGN_OUT_ID);
   /** The row's host view, the dialog's initiator. */
   const signOutView = useRef<HostView | null>(null);
@@ -177,6 +216,22 @@ export function SettingsScreen({
           accessibilityLabel={versionA11y}
           onPress={onVersionPress}
           onFocus={version.onFocus}
+        />
+        <SettingRow
+          ref={aboutRef}
+          testID={SETTINGS_ABOUT_ID}
+          kind="nav"
+          label={t('settings.about.row')}
+          onPress={() => onOpenAbout(aboutView)}
+          onFocus={about.onFocus}
+        />
+        <SettingRow
+          ref={reportRef}
+          testID={SETTINGS_REPORT_ID}
+          kind="nav"
+          label={t('settings.report.row')}
+          onPress={() => onOpenReport(reportView)}
+          onFocus={report.onFocus}
         />
         <SettingRow
           ref={signOutRef}

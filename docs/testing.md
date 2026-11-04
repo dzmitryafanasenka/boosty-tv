@@ -919,6 +919,28 @@ Review fixes (2026-10-28, host-tested only): short visits write nothing (owner d
 
 Host tests: `src/shared/services/progress/__tests__/progressRepository.test.ts` (29: the finished rule and status, resume precedence, the 10 s cadence, one write in flight with the latest position, forced events, start over, seeks as movement, failure gating ≥ 10 s and the bounded automatic retry, expired hold/flush/drop, sign-out wipe, a late write after a reset, the debounced/forced disk write, cold-start load, corrupt disk, the 200-entry cap, the stale disk write undone, a load after a reset dropped, stable snapshots); `__tests__/playerProgressFlow.test.tsx` «progress and resume (Story 4.2)» (10: server only with no pre-seek t=0 and the E9 request shape, local wins, finished, multi-video + start over, hold-scrub, background and end, the vanished «С начала» fallback, failure retry, cold start from the persisted entry, log hygiene); `__tests__/postFlow.test.tsx` (status and «Продолжить» only while the player is on); `__tests__/accountScopeRegistry.test.js` (`progress` registered); `demoFlow` (the row label now ends with the status). Lint (`--max-warnings 0`), typecheck, `check:fixtures` clean; `npm test` ×3: 1494 passed each; `playerFlow` + `postFlow` + the progress suite 30/30 (187 tests each run).
 
+### Story 15.1 — «О приложении» and «Сообщить о проблеме», 2026-11-04
+
+**Status: implemented and host-tested; not yet checked on the pinned TV. After the review patches: lint and typecheck clean, full `npm test` 3626/3626, `assembleRelease` (armeabi-v7a) BUILD SUCCESSFUL with the `settings/row/about` marker in the bundle.** `spec-15-1-about-and-report-a-problem.md`, our improvement IMP-09 (FR-66). Focus: `docs/focus-map.md` «Story 15.1».
+
+Host tests:
+- `src/features/settings/__tests__/reportIssueUrl.test.ts` (10): the repository page; the bug form URL with `version` and `device`; reserved characters and non-ASCII encoded (decoded back exactly); an unknown or blank version or device leaves its parameter out; only `template`, `version` and `device` are sent; the template file exists and declares `id: version` and `id: device`.
+- `src/shared/platform/__tests__/deviceInfo.test.ts` (17): «Manufacturer Model, Android Release»; a model that already names the manufacturer as a whole word (followed by the end, a space, `-` or `_`) is not repeated, «LG» + «LGenius» keeps both; each missing or blank part left out; values trimmed; null when nothing is known or the values are not strings; the default read of a stubbed `Platform.constants`.
+- `__tests__/aboutReportFlow.test.tsx` (12) through the App (the QR renderer records its values; the device adapter is faked): the row order and «Версия» as the initial focus; About: the copy, the repository QR, «Закрыть» the only focus target and focused, the background hidden; «Закрыть» and Back close it with focus on the row; «Версия неизвестна»; a QR that cannot be drawn shows «Не удалось показать QR-код» and «Закрыть» still closes; the report QrDialog with the exact URL (no account id or token in it), the URL never in the rendered text or the log ring; «Закрыть» and Back close it with focus on the row; no `version` / no `device` when unknown; the seven-press «Версия» gesture still opens Diagnostics after the About dialog was closed.
+- Updated: `__tests__/signOutFlow.test.tsx` (the Настройки row order).
+
+Device checks (release-like build on the pinned TV; all to check):
+
+| Check | Result | By |
+|---|---|---|
+| Настройки rows in order: «Системный видеоплеер», «Версия» (focused), «О приложении», «Сообщить о проблеме», «Выйти из аккаунта»; ↑ ↓ move between them | To check | agent (adb) → owner |
+| OK on «О приложении»: the dialog with «Boosty TV», «Версия 1.2.0», the disclaimer, «Лицензия MIT», the QR, «Откроется на телефоне», focus on «Закрыть»; legible, nothing clipped | To check | agent (adb) → owner |
+| «Закрыть» and Back close the About dialog, focus back on «О приложении» | To check | agent (adb) |
+| OK on «Сообщить о проблеме»: the QrDialog «Сообщить о проблеме», focus on «Закрыть»; «Закрыть» and Back return focus to the row | To check | agent (adb) |
+| The About QR scanned with a phone opens the repository page | To check | owner |
+| The report QR scanned with a phone opens the GitHub bug form with «Версия приложения» and «Устройство» filled in (version, manufacturer model, Android release) | To check | owner |
+| «Версия»: one OK still runs the update check; seven quick OKs still open Diagnostics | To check | agent (adb) |
+
 ### Story 14.2 — Sleep timer, 2026-11-03
 
 **Status: implemented and host-tested; partly checked on the pinned TV by the owner with the physical remote (release-like build, owner-signed, still 1.2.0 / 10200, `adb install -r`, session kept): «Таймер сна» → «15 мин» starts the countdown in the overlay; at T−60 s the overlay opened with focus on «Ещё 15 мин»; OK extended the timer (the indicator showed about 15:5x) and playback went on; at the next deadline, without OK, playback paused (owner: «пауза сработала»). Not checked on the device: «До конца видео», the live gear, the screensaver after a pause (host tests only; deferred-work entry for the screensaver). Full `npm test` 3587/3587 (twice), lint and typecheck clean.** `spec-14-2-sleep-timer.md`, our improvement IMP-08 (FR-64). Focus: `docs/focus-map.md` «Story 14.2».
