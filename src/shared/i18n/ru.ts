@@ -732,6 +732,13 @@ export const ru = {
     signOut: {
       row: 'Выйти из аккаунта',
     },
+    // Story 15.1 (IMP-09, FR-66): nav rows that open dialogs in the modal host.
+    about: {
+      row: 'О приложении',
+    },
+    report: {
+      row: 'Сообщить о проблеме',
+    },
     // Story 8.2 (PLAY-13, SET-02): the device-scoped toggle; the
     // description says progress is not tracked in this mode.
     externalPlayer: {
@@ -777,6 +784,18 @@ export const ru = {
       cancel: 'Отмена',
       confirm: 'Выйти',
       error: 'Не удалось выйти из аккаунта. Попробуйте ещё раз.',
+    },
+    // Story 15.1 (IMP-09): «О приложении». The app name is `shell.wordmark`;
+    // the QR opens the public repository on a phone.
+    about: {
+      version: 'Версия {version}',
+      versionUnknown: 'Версия неизвестна',
+      disclaimer: 'Неофициальный клиент Boosty, не связан с Boosty',
+      license: 'Лицензия MIT',
+    },
+    // Story 15.1 (IMP-09): the QrDialog title; the QR opens the bug form.
+    report: {
+      title: 'Сообщить о проблеме',
     },
     // Story 12.1: a long OK on a «Продолжить просмотр» card. Local only:
     // the server position stays.

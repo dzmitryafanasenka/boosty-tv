@@ -35,6 +35,10 @@ export type ShellProps = {
   http: HttpClient;
   /** Настройки «Выйти из аккаунта»: open the sign-out dialog (Story 2.7). */
   onOpenSignOut: (initiator: RefObject<HostView | null>) => void;
+  /** Настройки «О приложении»: open the About dialog (Story 15.1). */
+  onOpenAbout: (initiator: RefObject<HostView | null>) => void;
+  /** Настройки «Сообщить о проблеме»: open the report QrDialog (Story 15.1). */
+  onOpenReport: (initiator: RefObject<HostView | null>) => void;
   /** Debug builds only: open «Проверка фокуса» from Настройки. */
   onOpenFocusCheck?: () => void;
   /**
@@ -123,6 +127,8 @@ export function Shell({
   routeKey,
   http,
   onOpenSignOut,
+  onOpenAbout,
+  onOpenReport,
   onOpenFocusCheck,
   onOpenDiagnostics,
   onVersionFirstPress,
@@ -365,6 +371,8 @@ export function Shell({
           subsFocus={subsFocus}
           searchFocus={searchFocus}
           onOpenSignOut={onOpenSignOut}
+          onOpenAbout={onOpenAbout}
+          onOpenReport={onOpenReport}
           onOpenFocusCheck={onOpenFocusCheck}
           onOpenDiagnostics={onOpenDiagnostics}
           onVersionFirstPress={onVersionFirstPress}
@@ -392,6 +400,8 @@ function SectionContent({
   subsFocus,
   searchFocus,
   onOpenSignOut,
+  onOpenAbout,
+  onOpenReport,
   onOpenFocusCheck,
   onOpenDiagnostics,
   onVersionFirstPress,
@@ -413,6 +423,8 @@ function SectionContent({
   subsFocus: SubscriptionsFocusInfo;
   searchFocus: SearchFocusInfo;
   onOpenSignOut: (initiator: RefObject<HostView | null>) => void;
+  onOpenAbout: (initiator: RefObject<HostView | null>) => void;
+  onOpenReport: (initiator: RefObject<HostView | null>) => void;
   onOpenFocusCheck?: () => void;
   onOpenDiagnostics?: () => void;
   onVersionFirstPress?: SettingsScreenProps['onVersionFirstPress'];
@@ -453,6 +465,8 @@ function SectionContent({
       return (
         <SettingsSection
           onOpenSignOut={onOpenSignOut}
+          onOpenAbout={onOpenAbout}
+          onOpenReport={onOpenReport}
           onOpenFocusCheck={onOpenFocusCheck}
           onOpenDiagnostics={onOpenDiagnostics}
           onVersionFirstPress={onVersionFirstPress}
