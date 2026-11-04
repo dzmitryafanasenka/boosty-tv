@@ -1,0 +1,67 @@
+CHANGELOG.md
+  s_72e2afabab65f5::t_37a23a8f295dd9 10
+CHANGELOG.ru.md
+  s_72e2afabab65f5::t_7146b69ea447e5 10
+__tests__/aboutReportFlow.test.tsx
+  s_72e2afabab65f5::t_d6dfe7b989cb08 1-308
+__tests__/signOutFlow.test.tsx
+  s_72e2afabab65f5::t_67d0c13319edb6 149-156
+_bmad-output/implementation-artifacts/spec-15-1-about-and-report-a-problem.md
+  s_72e2afabab65f5::t_bf4e02ae10020b 1-97
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_72e2afabab65f5::t_7e7f1a5224880b 32,148-149
+_bmad-output/planning-artifacts/ux-designs/ux-boosty-tv-2026-10-25/EXPERIENCE.md
+  s_72e2afabab65f5::t_3937e5f0066c44 43,45
+docs/feature-parity.md
+  s_72e2afabab65f5::t_8a3214bf2c3420 191
+docs/focus-map.md
+  s_72e2afabab65f5::t_e3afeecb47e3e3 70,558-559,566,581-584
+docs/testing.md
+  s_72e2afabab65f5::t_045b0c02587267 922-943
+src/app/App.tsx
+  s_72e2afabab65f5::t_8c28f7a7ada969 34-47,61,63,68,422-452,458-459
+src/app/Shell.tsx
+  s_72e2afabab65f5::t_59bf8f956bc7a2 38-41,130-131,374-375,403-404,426-427,468-469
+src/features/settings/AboutDialog.tsx
+  s_72e2afabab65f5::t_6ad558b12aee2e 1-96
+src/features/settings/SettingsScreen.tsx
+  s_72e2afabab65f5::t_10c5b34f0e435a 12-13,55-65,108-110,119-120,157-178,220-235
+src/features/settings/__tests__/reportIssueUrl.test.ts
+  s_72e2afabab65f5::t_3134f6bd9268c1 1-65
+src/features/settings/index.ts
+  s_72e2afabab65f5::t_085efb65e366f5 2,4,29-30
+src/features/settings/reportIssueUrl.ts
+  s_72e2afabab65f5::t_9f3bdc5db29437 1-36
+src/shared/i18n/ru.ts
+  s_72e2afabab65f5::t_1e373fc827dc66 735-741,788-799
+src/shared/platform/__tests__/deviceInfo.test.ts
+  s_72e2afabab65f5::t_4b0e68dd72b8b5 1-55
+src/shared/platform/deviceInfo.ts
+  s_72e2afabab65f5::t_07d98b765a4644 1-51
+_bmad-output/implementation-artifacts/epic-15-context.md
+  s_ad62c8757c3de0::t_79669909597a98 1-46
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "0352140b64bcf0030ab6d036054787945440cb74",
+  "prompts": {},
+  "sessions": {
+    "s_72e2afabab65f5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9ec6701e-abb3-49ee-aac8-08da5c985668",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    },
+    "s_ad62c8757c3de0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a5daec358d3786cfb",
+        "model": "unknown"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
