@@ -10,4 +10,10 @@ export type CurrentUser = {
    * the account has none or the value is not a safe `blogUrl`.
    */
   blogUrl: string | null;
+  /**
+   * The account's display name (E1 `name`, Story 15.2, IMP-10), trimmed;
+   * null when missing, blank, not a string or phone-like
+   * (`accountDisplayName`). Personal data: never logged.
+   */
+  name: string | null;
 };

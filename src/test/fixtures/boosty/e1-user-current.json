@@ -3,6 +3,7 @@
   "status": 200,
   "body": {
     "id": 1001,
-    "blogUrl": "synthetic-blog-1"
+    "blogUrl": "synthetic-blog-1",
+    "name": "redacted"
   }
 }

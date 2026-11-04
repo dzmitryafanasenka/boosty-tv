@@ -311,12 +311,14 @@ it('debug row «Проверка обновления сессии»: corrupted 
   };
   const root = await renderApp();
   await press(root, 'nav/settings');
+  // Story 15.2: Настройки' own E1 (the account name) is sent on open.
+  const before = transport.calls.length;
   expect(one(root, 'settings/row/session-check').props.accessibilityLabel).toBe(t('dev.sessionCheck.row'));
   await press(root, 'settings/row/session-check');
-  const calls = transport.calls.filter(c => c.path !== E5_PATH);
-  expect(calls.map(c => c.path)).toEqual([E1, E1, TOKEN, E1]);
-  expect(calls[1].headers.Authorization).not.toBe(`Bearer ${OLD_ACCESS}`);
-  expect(calls[3].headers.Authorization).toBe(`Bearer ${NEW_ACCESS}`);
+  const calls = transport.calls.slice(before).filter(c => c.path !== E5_PATH);
+  expect(calls.map(c => c.path)).toEqual([E1, TOKEN, E1]);
+  expect(calls[0].headers.Authorization).not.toBe(`Bearer ${OLD_ACCESS}`);
+  expect(calls[2].headers.Authorization).toBe(`Bearer ${NEW_ACCESS}`);
   const saved = JSON.parse(keychain.__values.get('boostytv.session') ?? '{}');
   expect(saved).toMatchObject({ accessToken: NEW_ACCESS, refreshToken: NEW_REFRESH });
   expect(visible(root, 'shell')).toBe(true);

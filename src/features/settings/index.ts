@@ -28,3 +28,4 @@ export {
 } from './useVersionPresses';
 export { ABOUT_CLOSE_ID, AboutDialog, type AboutDialogProps } from './AboutDialog';
 export { reportIssueUrl, repositoryUrl, type ReportIssueInfo } from './reportIssueUrl';
+export { useAccountName } from './useAccountName';
