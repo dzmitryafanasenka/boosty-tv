@@ -555,8 +555,9 @@ describe('re-login', () => {
 
 it('debug row «Проверка: сессия истекла»: A11 in memory; SecureStore untouched, nothing sent; next cold start → Shell', async () => {
   const root = await renderApp();
-  const sent = transport.calls.length;
   await press(root, 'nav/settings');
+  // Story 15.2: counted after Настройки' own E1 (the account name).
+  const sent = transport.calls.length;
   expect(one(root, 'settings/row/expired-check').props.accessibilityLabel).toBe(t('dev.expiredCheck.row'));
   keychain.setGenericPassword.mockClear();
   keychain.resetGenericPassword.mockClear();

@@ -154,7 +154,8 @@ describe('Настройки', () => {
       'settings/row/report',
       ROW,
     ]);
-    expect(one(root, ROW).props.accessibilityLabel).toBe('Выйти из аккаунта');
+    // Story 15.2: the fixture's synthetic E1 `name` is spoken with the label.
+    expect(one(root, ROW).props.accessibilityLabel).toBe(`Выйти из аккаунта ${e1Ok.body.name}`);
     await unmount(root);
   });
 });

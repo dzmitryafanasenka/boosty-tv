@@ -165,6 +165,12 @@ export type HomeScreenProps = {
    * the feed uses the default Filter.
    */
   filtersEnabled?: boolean;
+  /**
+   * «Мой блог» is on (`phaseFlags.myBlog`, Story 5.2): «Обновить» re-checks
+   * its failed steps (`manualRefreshFeed`). Off: no re-check, so no E1
+   * for a feature that is off (Story 15.2: Настройки fills `me` too).
+   */
+  myBlogEnabled?: boolean;
 };
 
 /**
@@ -235,6 +241,7 @@ export function HomeScreen({
   onOpenPlayer,
   onOpenLive,
   filtersEnabled = false,
+  myBlogEnabled = false,
 }: HomeScreenProps) {
   const offlineRetry = useZoneItem(HOME_OFFLINE_RETRY_ID);
   const offlineRetryView = useRef<HostView | null>(null);
@@ -961,7 +968,9 @@ export function HomeScreen({
     // OK on «Обновить» is a move (the head-follow rule never takes it).
     latch.move();
     setRefresh('busy');
-    manualRefreshFeed(queryClient, httpRef.current, filterRef.current, Date.now())
+    manualRefreshFeed(queryClient, httpRef.current, filterRef.current, Date.now(), undefined, {
+      myBlog: myBlogEnabled,
+    })
       .catch(() => 'failed' as const)
       .then(result => {
         refreshRunning.current = false;
@@ -969,7 +978,7 @@ export function HomeScreen({
           setRefresh(result === 'failed' ? 'failed' : 'idle');
         }
       });
-  }, [latch, queryClient, httpRef, filterRef]);
+  }, [latch, queryClient, httpRef, filterRef, myBlogEnabled]);
 
   // «Фильтры» (Story 5.3, FILTER-01): OK opens the filter sheet in the one
   // modal host (focus trapped, opens on the selected value; Back closes it

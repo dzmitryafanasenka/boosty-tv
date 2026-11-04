@@ -92,11 +92,13 @@ function refetchExact(client: QueryClient, queryKey: readonly unknown[]): Promis
  *   one is trimmed to page 1 first, so one request is sent, never a
  *   page storm.
  * - A step never asked, one in flight, or one that succeeded (a shown
- *   tile): no request. Подписки not visited yet: the `me` query is not in
- *   the cache. With `phaseFlags.myBlog` off, `useMyBlog` never fills the
- *   `me` query, so nothing is re-asked.
- * - Cost: for an account without a blog, every «Обновить» after a visit
- *   to Подписки sends one E1.
+ *   tile): no request. Neither Подписки nor Настройки visited yet: the
+ *   `me` query is not in the cache.
+ * - `phaseFlags.myBlog` off (the caller passes `myBlog: false`): nothing
+ *   is re-asked, although Настройки (Story 15.2, the account name) fills
+ *   `me` whatever the flag says.
+ * - Cost: with the flag on, for an account without a blog, every
+ *   «Обновить» after a visit to Подписки or Настройки sends one E1.
  */
 function recheckMyBlog(client: QueryClient): void {
   const settled = (state: { status: string; fetchStatus: string } | undefined) =>
@@ -138,7 +140,8 @@ const manualRunning = new WeakMap<QueryClient, Promise<FeedRefreshResult>>();
  * infinite query, ADR 0010), and an invalidation of exactly the
  * subscriptions query (E2, refetched once when it is cached, even with no
  * observer; not awaited), plus the «Мой блог» re-check (`recheckMyBlog`,
- * Epic 5 retro A3; not awaited). The feed is the active `feed` Filter's (Story
+ * Epic 5 retro A3; not awaited; skipped when `options.myBlog` is false,
+ * the `phaseFlags.myBlog` value the caller passes). The feed is the active `feed` Filter's (Story
  * 5.3). Single-flight: a call while one runs returns the
  * same promise; a resume refresh already running is joined, not
  * duplicated. The result is the feed's (`failed`: the cache stays, the kind
@@ -151,6 +154,7 @@ export function manualRefreshFeed(
   filter: Filter,
   now: number,
   logger: Logger = appLogger,
+  options: { myBlog: boolean } = { myBlog: true },
 ): Promise<FeedRefreshResult> {
   const running = manualRunning.get(client);
   if (running) {
@@ -162,7 +166,9 @@ export function manualRefreshFeed(
     .invalidateQueries({ queryKey: queryKeys.subscriptions(), exact: true, refetchType: 'all' })
     .catch(() => {});
   // «Мой блог» steps that ended without a tile (Epic 5 retro A3); not awaited.
-  recheckMyBlog(client);
+  if (options.myBlog) {
+    recheckMyBlog(client);
+  }
   const run = (async () => {
     try {
       return await refreshPostsHead(

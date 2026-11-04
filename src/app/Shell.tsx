@@ -11,7 +11,12 @@ import { BackHandler } from 'react-native';
 import { HomeScreen, type HomeFocusInfo, type HomeScreenProps } from '../features/home';
 import { useExternalPlayerPreference } from '../features/player';
 import { SearchScreen, type SearchFocusInfo } from '../features/search';
-import { SETTINGS_VERSION_ID, SettingsScreen, type SettingsScreenProps } from '../features/settings';
+import {
+  SETTINGS_VERSION_ID,
+  SettingsScreen,
+  useAccountName,
+  type SettingsScreenProps,
+} from '../features/settings';
 import { SubscriptionsScreen, type SubscriptionsFocusInfo } from '../features/subscriptions';
 import type { HttpClient } from '../shared/api';
 import type { MediaRef } from '../shared/entities/post';
@@ -459,11 +464,13 @@ function SectionContent({
           onOpenPlayer={onOpenPlayer}
           onOpenLive={onOpenLive}
           filtersEnabled={phaseFlags.filters}
+          myBlogEnabled={phaseFlags.myBlog}
         />
       );
     case 'settings':
       return (
         <SettingsSection
+          http={http}
           onOpenSignOut={onOpenSignOut}
           onOpenAbout={onOpenAbout}
           onOpenReport={onOpenReport}
@@ -512,8 +519,16 @@ function SectionContent({
  * Story 8.3: the «Версия» gesture reaches Diagnostics only while
  * `phaseFlags.diagnostics` is on; otherwise Настройки gets no target and
  * «Версия» does nothing on any number of presses.
+ *
+ * Story 15.2 (IMP-10): the account name on «Выйти из аккаунта» comes from
+ * the shared, account-scoped `me` query (`useAccountName`); no new store.
  */
-function SettingsSection({ onOpenDiagnostics, ...props }: Omit<SettingsScreenProps, 'externalPlayer'>) {
+function SettingsSection({
+  http,
+  onOpenDiagnostics,
+  ...props
+}: Omit<SettingsScreenProps, 'externalPlayer' | 'accountName'> & { http: HttpClient }) {
+  const accountName = useAccountName(http);
   const enabled = phaseFlags.externalPlayer;
   const { on, toggle } = useExternalPlayerPreference(enabled);
   const externalPlayer = useMemo(
@@ -524,6 +539,7 @@ function SettingsSection({ onOpenDiagnostics, ...props }: Omit<SettingsScreenPro
     <SettingsScreen
       {...props}
       externalPlayer={externalPlayer}
+      accountName={accountName}
       onOpenDiagnostics={phaseFlags.diagnostics ? onOpenDiagnostics : undefined}
     />
   );

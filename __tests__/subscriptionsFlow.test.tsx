@@ -10,7 +10,7 @@
 import { notifyManager } from '@tanstack/react-query';
 import { act } from 'react';
 import App, { navigationRef } from '../src/app/App';
-import { queryClient, resetQueryCache } from '../src/app/queryClient';
+import { QUERY_GC_TIME_MS, queryClient, resetQueryCache } from '../src/app/queryClient';
 import { accountScope } from '../src/shared/account';
 import { DEFAULT_FILTER } from '../src/shared/filters';
 import { queryKeys } from '../src/shared/api';
@@ -932,7 +932,7 @@ describe('«Мой блог» (Story 5.2, SUB-02, focus-map §3 C)', () => {
     e1 = e1With(MINE);
     blog = ownBlog();
     const root = await openSubs();
-    expect(queryClient.getQueryData(queryKeys.me())).toEqual({ id: '1001', blogUrl: MINE });
+    expect(queryClient.getQueryData(queryKeys.me())).toEqual({ id: '1001', blogUrl: MINE, name: 'redacted' });
     await unmount(root);
     await accountScope.reset();
     expect(queryClient.getQueryData(queryKeys.me())).toBeUndefined();
@@ -948,6 +948,55 @@ describe('«Мой блог» (Story 5.2, SUB-02, focus-map §3 C)', () => {
       await press(root, REFRESH);
       await settle();
     }
+
+    describe('Настройки visited, not Подписки (Story 15.2: Настройки fills `me`)', () => {
+      const blogCalls = () => transport.calls.filter(c => c.path.startsWith('/v1/blog/'));
+
+      beforeEach(() => {
+        // The flow's settle runs every pending timer: keep the unobserved
+        // `me` query as the app does for its 10 min gcTime.
+        queryClient.setQueryDefaults(queryKeys.me(), { gcTime: Infinity });
+      });
+
+      afterEach(() => {
+        queryClient.setQueryDefaults(queryKeys.me(), { gcTime: QUERY_GC_TIME_MS });
+      });
+
+      /** Настройки opened (its `me` observer settles), then «Обновить» on Главная. */
+      async function settingsThenRefresh() {
+        const root = await render(<App />);
+        await press(root, 'nav/settings');
+        // The cold-start validate and Настройки' profile E1.
+        expect(profileCalls()).toHaveLength(2);
+        const profile = profileCalls().length;
+        await refreshFromHome(root);
+        return { root, profile };
+      }
+
+      it('`me` without a blogUrl: one more profile E1, no E3/E4', async () => {
+        const { root, profile } = await settingsThenRefresh();
+        expect(profileCalls()).toHaveLength(profile + 1);
+        expect(blogCalls()).toHaveLength(0);
+        await unmount(root);
+      });
+
+      it('`me` with a blogUrl: no E1 (and no E3/E4: Подписки never asked them)', async () => {
+        e1 = e1With(MINE);
+        blog = ownBlog();
+        const { root, profile } = await settingsThenRefresh();
+        expect(profileCalls()).toHaveLength(profile);
+        expect(blogCalls()).toHaveLength(0);
+        await unmount(root);
+      });
+
+      it('`myBlog` off: no E1', async () => {
+        mockMyBlogFlag.on = false;
+        const { root, profile } = await settingsThenRefresh();
+        expect(profileCalls()).toHaveLength(profile);
+        expect(blogCalls()).toHaveLength(0);
+        await unmount(root);
+      });
+    });
 
     it('no tile, the first own post published: «Обновить» refetches own E4 page 1 only; the tile appears', async () => {
       e1 = e1With(MINE);
@@ -1046,7 +1095,7 @@ describe('«Мой блог» (Story 5.2, SUB-02, focus-map §3 C)', () => {
       e1 = e1With(MINE);
       await refreshFromHome(root);
       expect(profileCalls()).toHaveLength(profile + 1);
-      expect(queryClient.getQueryData(queryKeys.me())).toEqual({ id: '1001', blogUrl: MINE });
+      expect(queryClient.getQueryData(queryKeys.me())).toEqual({ id: '1001', blogUrl: MINE, name: 'redacted' });
       await press(root, 'nav/subs');
       expect(e3Calls()).toHaveLength(1);
       expect(e4Calls()).toHaveLength(1);

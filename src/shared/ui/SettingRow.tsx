@@ -32,6 +32,13 @@ export type SettingRowProps = {
    */
   valueLines?: number;
   /**
+   * One-line value only (Story 15.2, the account name on «Выйти из
+   * аккаунта»): a value too long for the row is ellipsized and the label
+   * keeps its full width. Default: the label yields (today's rows, whose
+   * values are short).
+   */
+  valueYields?: boolean;
+  /**
    * A secondary line under the label (DESIGN.md SettingRow: «optional
    * description»), e.g. the «Системный видеоплеер» note (Story 8.2).
    */
@@ -75,6 +82,7 @@ export function SettingRow({
   value,
   description,
   valueLines = 1,
+  valueYields = false,
   onPress,
   selected = false,
   checked = false,
@@ -148,7 +156,7 @@ export function SettingRow({
             <Text
               variant="body"
               numberOfLines={1}
-              style={valueLines > 1 ? undefined : styles.label}
+              style={valueLines > 1 ? undefined : valueYields ? styles.labelKept : styles.label}
             >
               {label}
             </Text>
@@ -157,6 +165,7 @@ export function SettingRow({
                 testID={testID ? `${testID}/value` : undefined}
                 variant="body"
                 numberOfLines={valueLines}
+                style={valueYields && valueLines === 1 ? styles.valueYields : undefined}
                 color={toggle && checked ? 'accent' : focused ? 'text-secondary' : 'text-meta'}
               >
                 {value}
@@ -192,6 +201,16 @@ const styles = StyleSheet.create({
   label: {
     flex: 1,
     marginRight: spacing['8'],
+  },
+  // `valueYields`: the label keeps its natural width (and fills the rest),
+  // the value shrinks and is ellipsized (Story 15.2, a long account name).
+  labelKept: {
+    flexGrow: 1,
+    flexShrink: 0,
+    marginRight: spacing['8'],
+  },
+  valueYields: {
+    flexShrink: 1,
   },
   // `valueLines` > 1: the value under the label (device: Story 5.4, a long
   // value beside the label squeezed the label or overflowed the row).

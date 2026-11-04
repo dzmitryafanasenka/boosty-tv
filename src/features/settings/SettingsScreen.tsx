@@ -64,6 +64,13 @@ export type SettingsScreenProps = {
    */
   onOpenReport: (initiator: RefObject<HostView | null>) => void;
   /**
+   * Story 15.2 (IMP-10, FR-66): the signed-in account's display name, shown
+   * right-aligned on «Выйти из аккаунта» (one line, ellipsized when long)
+   * and spoken with the label. Absent (loading, an E1 failure, no name or a
+   * phone-like one): the row as before, with no value.
+   */
+  accountName?: string;
+  /**
    * OK on «Выйти из аккаунта» (Story 2.7): the app opens the sign-out
    * dialog in the modal host with the row as the initiator, so focus
    * returns to it on «Отмена» or Back.
@@ -107,7 +114,7 @@ export type SettingsScreenProps = {
  * focus of the section; below
  * it the nav rows «О приложении» and «Сообщить о проблеме» (Story 15.1,
  * dialogs in the modal host), then «Выйти из аккаунта», which opens the
- * sign-out dialog; the
+ * sign-out dialog and shows the account name when known (Story 15.2); the
  * debug rows (`__DEV__` only) after it. Rendered inside the Shell's content
  * FocusZone.
  */
@@ -119,6 +126,7 @@ export function SettingsScreen({
   onOpenAbout,
   onOpenReport,
   onOpenSignOut,
+  accountName,
   onOpenFocusCheck,
   onCheckSession,
   onExpireSession,
@@ -238,6 +246,8 @@ export function SettingsScreen({
           testID={SETTINGS_SIGN_OUT_ID}
           kind="nav"
           label={t('settings.signOut.row')}
+          value={accountName}
+          valueYields
           onPress={() => onOpenSignOut(signOutView)}
           onFocus={signOut.onFocus}
         />
