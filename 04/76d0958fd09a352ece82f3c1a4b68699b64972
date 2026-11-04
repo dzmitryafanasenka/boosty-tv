@@ -1,0 +1,25 @@
+CHANGELOG.md
+  s_72e2afabab65f5::t_2740d126048229 9-12,23-26,30-32
+CHANGELOG.ru.md
+  s_72e2afabab65f5::t_2b9baf2c917e9c 9-12,23-26,30-32
+android/app/build.gradle
+  s_72e2afabab65f5::t_86a7d09bdf0bd2 81
+docs/release.md
+  s_72e2afabab65f5::t_382c25850612b5 18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "0476d0958fd09a352ece82f3c1a4b68699b64972",
+  "prompts": {},
+  "sessions": {
+    "s_72e2afabab65f5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9ec6701e-abb3-49ee-aac8-08da5c985668",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
