@@ -6,6 +6,10 @@ The Russian version of this file is [CHANGELOG.ru.md](CHANGELOG.ru.md); both lis
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-04
+
+Everyday improvements after 1.2.0 (Epics 12–15): Home and feed, the post screen, the player and Settings.
+
 ### Added
 - Settings (Story 15.2): «Выйти из аккаунта» shows the name of the signed-in account on the right of the row, so you can see which account you would sign out. Nothing is shown when Boosty gives no name; the phone number is never shown.
 - Settings (Story 15.1): «О приложении» shows the app name, the version, that Boosty TV is an unofficial client not affiliated with Boosty, the MIT license, and a QR code of the GitHub repository to open on a phone. «Сообщить о проблеме» shows a QR code that opens a new GitHub bug report on a phone with the app version and the TV model already filled in. No account data is in either link.
@@ -16,8 +20,15 @@ The Russian version of this file is [CHANGELOG.ru.md](CHANGELOG.ru.md); both lis
 - Главная (Story 12.3): a «в эфире» plaque above «Продолжить просмотр» for each subscribed author who is live now, with the author and the stream title. OK opens the live stream; Back returns to the plaque. The app checks at most the first 10 subscriptions, one at a time, at most once every 5 minutes (when Главная opens or the app returns); nothing is shown if nobody is live or the check fails.
 - «Продолжить просмотр» in the launcher (Story 12.5): when Boosty TV is focused in a launcher that shows app channels (Aero TV), its cards are the videos you started on this TV, newest first. OK on a card opens the video where you stopped; Back goes to Главная. With an empty list, or after «Выйти», the launcher shows one card «Откройте Boosty TV». The list updates when a video is started, finished or removed, not during playback. Android 8 or newer only, and only in launchers that show app channels (for example Aero TV); the stock Google TV launcher on our test TV shows none.
 
+### Changed
+- Post screen (Story 13.1): a video post opens with a large 16:9 preview on the left and the title, details and «Смотреть» / «Продолжить» on the right, plus a «На телефоне» QR code that opens the post on a phone. A post with one video no longer shows the separate video strip; a post with several videos shows a compact row of them under the header.
+- Post screen (Story 13.2): a text line that starts with a timestamp of this post is now a single button «▶ 0:20 Chapter title» instead of the text plus a separate «Смотреть» chip, so chapter lists take half the room. A timestamp inside a paragraph keeps the text, with a «▶ 42:10» button after it.
+
 ### Removed
 - The «События» section (Story 12.3, owner decision): the sidebar now has Главная, Поиск, Подписки and Настройки. The live plaque on Главная replaces it.
+
+### Notes
+- Install from the app on 1.2.0: Settings → «Версия» → «Скачать и установить». The session is kept.
 
 ## [1.2.0] - 2026-11-02
 

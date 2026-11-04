@@ -15,7 +15,7 @@ Every command block below runs from the repository root.
   derived `versionCode` of the unsigned release APK.
 - The tag is `v{versionName}` (for example `v0.9.0`). Story 9.2 compares the latest tag with
   the installed `versionName`, so keep this format.
-- `0.9.0` is the first release. `1.0.0` (2026-11-01) is the release the owner accepted in Story 9.5. `1.1.0` (2026-11-02) adds the player chapters (Story 10.1). `1.2.0` (2026-11-02) adds read-only comments and the image viewer (Epic 11).
+- `0.9.0` is the first release. `1.0.0` (2026-11-01) is the release the owner accepted in Story 9.5. `1.1.0` (2026-11-02) adds the player chapters (Story 10.1). `1.2.0` (2026-11-02) adds read-only comments and the image viewer (Epic 11). `1.3.0` (2026-11-04) adds the everyday improvements of Epics 12–15.
 - «Версия» in Настройки shows the native `versionName`.
 
 ## One-time setup (owner, outside the repository)
