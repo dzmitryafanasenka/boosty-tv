@@ -1,0 +1,71 @@
+CHANGELOG.md
+  s_72e2afabab65f5::t_e0eed50a1d9329 10
+CHANGELOG.ru.md
+  s_72e2afabab65f5::t_8c2127ade572c0 10
+__tests__/accountNameFlow.test.tsx
+  s_72e2afabab65f5::t_d44dbf08275946 1-387
+__tests__/expiredFlow.test.tsx
+  s_72e2afabab65f5::t_113288df07171d 559-560
+__tests__/sessionFlow.test.tsx
+  s_72e2afabab65f5::t_3d03d437887937 314-315,318-321
+__tests__/signOutFlow.test.tsx
+  s_72e2afabab65f5::t_0064acf76f4a8d 157-158
+__tests__/subscriptionsFlow.test.tsx
+  s_72e2afabab65f5::t_5148acedb9b4e5 13,935,952-1000,1098
+_bmad-output/implementation-artifacts/spec-15-2-account-name-in-settings.md
+  s_72e2afabab65f5::t_6d8d5e639d82e4 1-107
+_bmad-output/implementation-artifacts/sprint-status.yaml
+  s_72e2afabab65f5::t_1907ee1576ff38 32,150
+_bmad-output/planning-artifacts/ux-designs/ux-boosty-tv-2026-10-25/EXPERIENCE.md
+  s_72e2afabab65f5::t_9527ea623c897b 43
+docs/api-contract.md
+  s_72e2afabab65f5::t_de45230cb598e8 245
+docs/feature-parity.md
+  s_72e2afabab65f5::t_0112b0df27cc6c 192
+docs/focus-map.md
+  s_72e2afabab65f5::t_043528334032cf 566,583
+docs/testing.md
+  s_72e2afabab65f5::t_eb8b57aed5ef37 922-940
+src/app/Shell.tsx
+  s_72e2afabab65f5::t_fbe9e5b9b60a1b 14-19,467,473,522-524,526-531,542
+src/features/home/HomeScreen.tsx
+  s_72e2afabab65f5::t_79635b168897ad 168-173,244,971-973,981
+src/features/home/feedRefresh.ts
+  s_72e2afabab65f5::t_2314a40056d2ff 95-101,143-144,157,169-171
+src/features/settings/SettingsScreen.tsx
+  s_72e2afabab65f5::t_9c54e5aecd0967 66-72,117,129,249-250
+src/features/settings/index.ts
+  s_72e2afabab65f5::t_9053916a7c6a14 31
+src/features/settings/useAccountName.ts
+  s_72e2afabab65f5::t_62a13cff5c7b68 1-28
+src/shared/api/dto/userCurrent.ts
+  s_72e2afabab65f5::t_ec2131fdebf196 9-13,19
+src/shared/entities/user/__tests__/userRepository.test.ts
+  s_72e2afabab65f5::t_cec9776e67625a 8,31-36,58-70,76-120,127,135,137-147
+src/shared/entities/user/index.ts
+  s_72e2afabab65f5::t_b01ecca7465ee0 1
+src/shared/entities/user/types.ts
+  s_72e2afabab65f5::t_c383ee5eb66dac 13-18
+src/shared/entities/user/userRepository.ts
+  s_72e2afabab65f5::t_490dcd90ec452f 7-9,17-48,52-53,57-61
+src/shared/ui/SettingRow.tsx
+  s_72e2afabab65f5::t_e2e5b041031e51 34-40,85,159,168,205-214
+src/test/fixtures/boosty/e1-user-current.json
+  s_72e2afabab65f5::t_a0955b452beb76 6-7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "301d1d9202fb4b2f159bbb0e8659030a03158ffb",
+  "prompts": {},
+  "sessions": {
+    "s_72e2afabab65f5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9ec6701e-abb3-49ee-aac8-08da5c985668",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
