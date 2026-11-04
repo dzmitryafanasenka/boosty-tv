@@ -1,0 +1,19 @@
+docs/testing.md
+  s_72e2afabab65f5::t_ec2a11e4795ae6 924,932,936
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "937ca49fbf98b0bdc3a187686ae3188332a5d50a",
+  "prompts": {},
+  "sessions": {
+    "s_72e2afabab65f5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9ec6701e-abb3-49ee-aac8-08da5c985668",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dzmitry Afanasenka <38220597+dzmitryafanasenka@users.noreply.github.com>"
+    }
+  }
+}
