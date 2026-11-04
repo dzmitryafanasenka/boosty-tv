@@ -921,7 +921,7 @@ Host tests: `src/shared/services/progress/__tests__/progressRepository.test.ts` 
 
 ### Story 15.2 — Account name next to «Выйти из аккаунта», 2026-11-04
 
-**Status: implemented, host-tested and checked by the agent on the pinned TV (2026-11-04, release-like build `assembleRelease` armeabi-v7a, still 1.2.0, `adb install -r`, session kept; adb + screencaps, the name value is not recorded here); the owner's own look is still to come. lint, typecheck, `check:fixtures` clean; full `npm test` 3670/3670.** `spec-15-2-account-name-in-settings.md`, our improvement IMP-10 (FR-66). E1 `name` evidence: the probe of 2026-11-04 (`docs/api-contract.md` §3 E1, keys and types only). Focus: `docs/focus-map.md` «Story 15.2» (unchanged ids and order).
+**Status: implemented, host-tested and checked on the pinned TV (2026-11-04, release-like build `assembleRelease` armeabi-v7a, still 1.2.0, `adb install -r`, session kept): the agent over adb with screencaps (the name value is not recorded here) before the review patches; after them the owner looked at Настройки on the rebuilt build (owner: «все ок»). After the review patches: lint, typecheck, `check:fixtures` clean; full `npm test` 3683/3683; `assembleRelease` OK, no probe marker in the bundle.** `spec-15-2-account-name-in-settings.md`, our improvement IMP-10 (FR-66). E1 `name` evidence: the probe of 2026-11-04 (`docs/api-contract.md` §3 E1, keys and types only). Focus: `docs/focus-map.md` «Story 15.2» (unchanged ids and order).
 
 Host tests:
 - `src/shared/entities/user/__tests__/userRepository.test.ts` (Story 15.2 cases): the fixture's `name`; a missing, `null`, number, object or array `name` is absent and never a parse failure (`blogUrl` still read); `accountDisplayName`: missing, empty, blank → null, trimmed, phone-like values (`+7 900 123-45-67`, `8 (900) 123 45 67`, 7+ digits only) → null, six digits, letters with digits and nicknames kept; `UserRepository.current` maps padded, blank, phone-like and non-string names.
@@ -929,11 +929,11 @@ Host tests:
 - Updated: `signOutFlow` (the row's spoken label with the fixture's `redacted` name), `subscriptionsFlow` (the `me` data has `name`; Epic 5 retro A3: «Обновить» after visiting only Настройки sends one more profile E1 and no E3/E4 when `me` has no `blogUrl`, no E1 when it has one, and no E1 with `myBlog` off), `sessionFlow` and `expiredFlow` (request counts after Настройки' own E1).
 - Host tests do not prove native layout, ellipsis or the focus ring.
 
-Device checks (release-like build on the pinned TV, 2026-11-04; checked by the agent over adb with screencaps; the owner has not checked yet):
+Device checks (release-like build on the pinned TV, 2026-11-04; checked by the agent over adb with screencaps before the review patches; the owner checked the first row on the rebuilt build):
 
 | Check | Result | By |
 |---|---|---|
-| Настройки: «Выйти из аккаунта» shows the account name on the right of the same line, the row height and order unchanged; never the phone number | 2026-11-04: as described (the owner's display name, right-aligned like «1.2.0»; no phone). Owner: not checked yet | agent (adb + screencap) |
+| Настройки: «Выйти из аккаунта» shows the account name on the right of the same line, the row height and order unchanged; never the phone number | 2026-11-04: as described (the owner's display name, right-aligned like «1.2.0»; no phone). Owner on the rebuilt build: «все ок» | agent (adb + screencap), owner |
 | Focused «Выйти из аккаунта» with the name: the ring and scale are not clipped; the label is not truncated | 2026-11-04: as described with the owner's short name. A long name's ellipsis: not checked on the device (host tests only) | agent (adb + screencap) |
 | OK on the row still opens the sign-out dialog with focus on «Отмена»; Back closes it with focus on the row | 2026-11-04: as described; the sign-out itself was not confirmed (closed by Back) | agent (adb + screencap) |
 | The name is not in `adb logcat` | 2026-11-04: no match | agent (adb) |
